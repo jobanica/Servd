@@ -150,6 +150,19 @@ Phase 1; until then provision via Supabase dashboard + seed.
   place; sending/opt-in flows not built yet.
 - **Custom subdomains/domains** — `restaurants.subdomain` reserved, unused.
 
+## Custom domains (premium)
+
+Gated by the `custom_domain` plan module. A restaurant can serve its diner pages
+on `mango-grill.servd.app` (subdomain) or its own `order.mybistro.com` (auto-SSL
+via the **Vercel Domains API**, behind a `DomainProvider` interface). `middleware.ts`
+routes by host shape (Edge-safe, no DB) and rewrites tenant hosts to
+`app/sites/[host]/…`, which resolves the restaurant by host and reuses the exact
+diner UI — order/pay/bill still resolve by `slug`, so they work on any host. The
+printable table QR points to the branded host when set. Configure
+`NEXT_PUBLIC_ROOT_DOMAIN`, `VERCEL_TOKEN`, `VERCEL_PROJECT_ID` (a one-time
+wildcard `*.servd.app` domain on the Vercel project enables subdomains). Manage
+at `/admin/domains`.
+
 ## Internationalization (i18n)
 
 `next-intl` with **cookie-based locale** (no URL changes) — English + Filipino,
@@ -240,7 +253,7 @@ feedback screen, kept separate from the (non-incentivized) Google review ask.
 | C | Analytics & reporting | ✅ |
 | D | Internationalization (i18n) | ✅ (diner-first) |
 | E | Menu item videos | ✅ |
-| F | Custom subdomains / domains | planned |
+| F | Custom subdomains / domains | ✅ |
 | G | HRIS module (plan-gated) | planned |
 | H | Inventory module (plan-gated) | planned |
 ```

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
 import { getTables, getRestaurantBrief } from "@/server/tables/queries";
-import { dinerOrderUrl } from "@/lib/qr";
+import { restaurantOrderUrl } from "@/lib/qr";
 import { AddTableForm } from "@/components/admin/AddTableForm";
 import { deleteTable, regenerateQrToken } from "@/server/tables/actions";
 
@@ -55,7 +55,15 @@ export default async function TablesPage() {
                   Table {table.tableNumber}
                 </span>
                 <p className="truncate text-xs text-plum-ink/40">
-                  {dinerOrderUrl(restaurant.slug, table.qrToken)}
+                  {restaurantOrderUrl(
+                    {
+                      slug: restaurant.slug,
+                      subdomain: restaurant.subdomain,
+                      customDomain: restaurant.customDomain,
+                      customDomainVerified: !!restaurant.customDomainVerifiedAt,
+                    },
+                    table.qrToken,
+                  )}
                 </p>
               </div>
               <form action={regenerateQrToken}>

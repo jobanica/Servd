@@ -11,7 +11,14 @@ export function getTables(restaurantId: string) {
 export function getRestaurantBrief(restaurantId: string) {
   return tenantDb(restaurantId, (tx) =>
     tx.restaurant.findFirstOrThrow({
-      select: { name: true, displayName: true, slug: true },
+      select: {
+        name: true,
+        displayName: true,
+        slug: true,
+        subdomain: true,
+        customDomain: true,
+        customDomainVerifiedAt: true,
+      },
     }),
   );
 }

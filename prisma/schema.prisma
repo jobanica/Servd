@@ -180,8 +180,10 @@ model Restaurant {
   // Default to double opt-in (confirmation reply required); single is a fallback.
   smsDoubleOptIn   Boolean @default(true)
 
-  // Reserved for the premium custom-domain tier (not built in v1) ---
-  subdomain String? @unique
+  // Premium custom-domain tier (gated by the custom_domain plan module).
+  subdomain              String?   @unique
+  customDomain           String?   @unique
+  customDomainVerifiedAt DateTime?
 
   // Self-serve onboarding: null until the owner finishes/dismisses the wizard.
   onboardingCompletedAt DateTime?

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
 import { getTables, getRestaurantBrief } from "@/server/tables/queries";
-import { dinerOrderUrl, qrSvg } from "@/lib/qr";
+import { restaurantOrderUrl, qrSvg } from "@/lib/qr";
 import { PrintButton } from "@/components/admin/PrintButton";
 
 export default async function PrintTablesPage() {
@@ -15,7 +15,17 @@ export default async function PrintTablesPage() {
   const cards = await Promise.all(
     tables.map(async (t) => ({
       tableNumber: t.tableNumber,
-      svg: await qrSvg(dinerOrderUrl(restaurant.slug, t.qrToken)),
+      svg: await qrSvg(
+        restaurantOrderUrl(
+          {
+            slug: restaurant.slug,
+            subdomain: restaurant.subdomain,
+            customDomain: restaurant.customDomain,
+            customDomainVerified: !!restaurant.customDomainVerifiedAt,
+          },
+          t.qrToken,
+        ),
+      ),
     })),
   );
 
