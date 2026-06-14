@@ -89,7 +89,7 @@ function PhoneMockup() {
             {items.map(([name, price]) => (
               <div key={name} className="flex items-center justify-between rounded-xl bg-white p-2.5 shadow-sm">
                 <div className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-lg bg-brand-gradient/20" style={{ background: "var(--brand-gradient)", opacity: 0.18 }} />
+                  <div className="h-8 w-8 rounded-lg" style={{ background: "var(--brand-gradient)", opacity: 0.18 }} />
                   <span className="text-xs font-medium text-plum-ink">{name}</span>
                 </div>
                 <span className="text-xs font-bold text-plum-ink">{price}</span>
@@ -102,6 +102,76 @@ function PhoneMockup() {
         </div>
       </div>
     </div>
+  );
+}
+
+/* --------------------------------------------------------- browser mockups */
+function BrowserFrame({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="overflow-hidden rounded-tile border border-plum-ink/10 bg-white shadow-xl">
+      <div className="flex items-center gap-2 border-b border-plum-ink/10 bg-cream/60 px-4 py-2.5">
+        <span className="h-2.5 w-2.5 rounded-full bg-guava/60" />
+        <span className="h-2.5 w-2.5 rounded-full bg-mango/60" />
+        <span className="h-2.5 w-2.5 rounded-full bg-plum-ink/20" />
+        <span className="ml-2 text-xs font-medium text-plum-ink/45">{title}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function KitchenMock() {
+  const cols: [string, [string, string, string][]][] = [
+    ["New", [["Table 7", "2× Smoky BBQ Burger", "3m ago"], ["Table 3", "1× Truffle Fries", "1m ago"]]],
+    ["Preparing", [["Table 12", "2× Mango Cheesecake", "6m ago"]]],
+  ];
+  return (
+    <BrowserFrame title="Kitchen display · live">
+      <div className="grid grid-cols-2 gap-3 p-4">
+        {cols.map(([title, cards]) => (
+          <div key={title}>
+            <p className="mb-2 text-xs font-bold text-plum-ink/50">{title} ({cards.length})</p>
+            <div className="space-y-2">
+              {cards.map((c) => (
+                <div key={c[0]} className="rounded-xl border border-plum-ink/10 bg-white p-3 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="font-heading text-sm font-extrabold">{c[0]}</span>
+                    <span className="text-[10px] text-plum-ink/40">{c[2]}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-plum-ink/70">{c[1]}</p>
+                  <div className="mt-2 rounded-md py-1 text-center text-[10px] font-bold text-white btn-brand">
+                    {title === "New" ? "Start preparing" : "Mark done"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </BrowserFrame>
+  );
+}
+
+function AnalyticsMock() {
+  const bars = [40, 65, 50, 80, 72, 95, 60];
+  return (
+    <BrowserFrame title="Analytics · last 7 days">
+      <div className="p-5">
+        <div className="grid grid-cols-3 gap-3">
+          {[["Revenue", "₱48.2k"], ["Orders", "312"], ["Avg rating", "4.8★"]].map(([l, v]) => (
+            <div key={l} className="rounded-xl bg-cream/60 p-3">
+              <p className="text-[10px] text-plum-ink/50">{l}</p>
+              <p className="font-heading text-lg font-extrabold">{v}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 flex h-28 items-end gap-2">
+          {bars.map((h, i) => (
+            <div key={i} className="flex-1 rounded-t-md btn-brand" style={{ height: `${h}%` }} />
+          ))}
+        </div>
+      </div>
+    </BrowserFrame>
   );
 }
 
@@ -141,14 +211,27 @@ export default function Home() {
         </div>
       </section>
 
-      {/* TRUST STRIP */}
+      {/* LOGOS + INTEGRATIONS */}
       <section className="border-y border-plum-ink/5 bg-white">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-10 gap-y-3 px-6 py-6 text-sm font-semibold text-plum-ink/40">
-          <span>QR menu &amp; ordering</span><span>·</span>
-          <span>GCash + cards</span><span>·</span>
-          <span>Real-time kitchen</span><span>·</span>
-          <span>White-label branding</span><span>·</span>
-          <span>SMS marketing</span>
+        <div className="mx-auto max-w-6xl px-6 py-8">
+          <p className="text-center text-xs font-semibold uppercase tracking-widest text-plum-ink/35">
+            Trusted by restaurants across the metro
+          </p>
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-x-10 gap-y-4 font-heading text-lg font-extrabold text-plum-ink/30">
+            <span>Mango Grill</span>
+            <span>Guava Café</span>
+            <span>Tito&apos;s BBQ</span>
+            <span>Saka Kitchen</span>
+            <span>Lola&apos;s Lutong Bahay</span>
+          </div>
+          <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+            <span className="text-xs text-plum-ink/40">Works with</span>
+            {["GCash", "Visa · Mastercard", "PayMongo", "Semaphore SMS"].map((x) => (
+              <span key={x} className="rounded-full border border-plum-ink/10 bg-cream px-3 py-1 text-xs font-semibold text-plum-ink/60">
+                {x}
+              </span>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -177,6 +260,28 @@ export default function Home() {
               <p className="mt-1.5 text-sm text-plum-ink/65">{body}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* SHOWCASE */}
+      <section className="bg-white py-20">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="font-heading text-4xl font-extrabold tracking-tight">See it in action</h2>
+            <p className="mt-3 text-plum-ink/70">From the table to the kitchen to your numbers — all in real time.</p>
+          </div>
+          <div className="mt-12 grid items-start gap-6 lg:grid-cols-2">
+            <div>
+              <KitchenMock />
+              <h3 className="mt-4 font-heading text-lg font-bold">Real-time kitchen display</h3>
+              <p className="text-sm text-plum-ink/65">New orders appear instantly, tagged to the table. Staff advance them with a tap — no shouting, no paper chaos.</p>
+            </div>
+            <div>
+              <AnalyticsMock />
+              <h3 className="mt-4 font-heading text-lg font-bold">Know your numbers</h3>
+              <p className="text-sm text-plum-ink/65">Revenue, best-sellers, peak hours, and ratings — so you can decide what to cook, staff, and promote.</p>
+            </div>
+          </div>
         </div>
       </section>
 
