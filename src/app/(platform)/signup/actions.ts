@@ -35,51 +35,56 @@ export async function signUpRestaurant(
   }
   const { restaurantName, email, password } = parsed.data;
 
-  const supabase = await createSupabaseServerClient();
-  const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: { emailRedirectTo: `${base}/login` },
-  });
-  if (error) return { error: error.message };
-
-  // Supabase obfuscates "already registered": a user with no identities.
-  if (!data.user || (data.user.identities && data.user.identities.length === 0)) {
-    return { error: "That email is already registered. Try logging in." };
-  }
-  const authUserId = data.user.id;
-
   try {
-    await systemDb(async (tx) => {
-      const slug = await uniqueSlug(restaurantName, async (s) => {
-        const hit = await tx.restaurant.findUnique({ where: { slug: s }, select: { id: true } });
-        return !!hit;
-      });
-      const restaurant = await tx.restaurant.create({
-        data: {
-          name: restaurantName,
-          displayName: restaurantName,
-          slug,
-          status: "active",
-          staff: { create: { authUserId, role: "admin", email } },
-        },
-        select: { id: true },
-      });
-      // Start the 30-day free trial.
-      await startTrial(tx, restaurant.id);
+    const supabase = await createSupabaseServerClient();
+    const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: `${base.replace(/\/$/, "")}/login` },
     });
-  } catch (e) {
-    // Log the real cause for debugging (often a stale DB schema).
-    console.error("[signup] provisioning failed:", e);
-    // Roll back the orphaned auth user so the email can be reused on retry.
-    try {
-      await createSupabaseAdminClient().auth.admin.deleteUser(authUserId);
-    } catch (cleanup) {
-      console.error("[signup] orphan cleanup failed:", cleanup);
-    }
-    return { error: "Couldn't create your restaurant. Please try again." };
-  }
+    if (error) return { error: error.message };
 
-  return { ok: true };
+    // Supabase obfuscates "already registered": a user with no identities.
+    if (!data.user || (data.user.identities && data.user.identities.length === 0)) {
+      return { error: "That email is already registered. Try logging in." };
+    }
+    const authUserId = data.user.id;
+
+    try {
+      await systemDb(async (tx) => {
+        const slug = await uniqueSlug(restaurantName, async (s) => {
+          const hit = await tx.restaurant.findUnique({ where: { slug: s }, select: { id: true } });
+          return !!hit;
+        });
+        const restaurant = await tx.restaurant.create({
+          data: {
+            name: restaurantName,
+            displayName: restaurantName,
+            slug,
+            status: "active",
+            staff: { create: { authUserId, role: "admin", email } },
+          },
+          select: { id: true },
+        });
+        // Start the 30-day free trial.
+        await startTrial(tx, restaurant.id);
+      });
+    } catch (e) {
+      console.error("[signup] provisioning failed:", e);
+      // Roll back the orphaned auth user so the email can be reused on retry.
+      try {
+        await createSupabaseAdminClient().auth.admin.deleteUser(authUserId);
+      } catch (cleanup) {
+        console.error("[signup] orphan cleanup failed:", cleanup);
+      }
+      return { error: "Couldn't create your restaurant. Please try again." };
+    }
+
+    return { ok: true };
+  } catch (e) {
+    // Never let the action crash into a 500 page — surface a friendly message.
+    console.error("[signup] unexpected error:", e);
+    return { error: "Something went wrong creating your account. Please try again." };
+  }
 }
