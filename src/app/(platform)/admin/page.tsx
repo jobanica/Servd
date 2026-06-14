@@ -37,23 +37,35 @@ export default async function AdminHome() {
       </div>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {[
-          ["Menu", "/admin/menu", "Categories, items & add-ons"],
-          ["Tables", "/admin/tables", "Printable QR per table"],
-          ["Branding", "/admin/branding", "Logo, colors & display name"],
-          ["Staff", "/admin/staff", "Kitchen, cashier & admin logins"],
-          ["Feedback", "/admin/feedback", "Ratings & comments inbox"],
-          ["Subscription", "/admin/subscription", "Plan & billing"],
-        ].map(([title, , body]) => (
-          <div
-            key={title}
-            className="rounded-tile border border-plum-ink/10 bg-white p-5"
-          >
-            <h3 className="font-heading font-bold">{title}</h3>
-            <p className="mt-1 text-sm text-plum-ink/60">{body}</p>
-            <p className="mt-3 text-xs text-muted">Coming in Phase 2+</p>
-          </div>
-        ))}
+        {(
+          [
+            ["Menu", "/admin/menu", "Categories, items & add-ons", true],
+            ["Tables", "/admin/tables", "Printable QR per table", true],
+            ["Modifiers", "/admin/modifiers", "Reusable option sets", true],
+            ["Branding", "/admin/branding", "Logo, colors & display name", false],
+            ["Staff", "/admin/staff", "Kitchen, cashier & admin logins", false],
+            ["Feedback", "/admin/feedback", "Ratings & comments inbox", false],
+          ] as const
+        ).map(([title, href, body, ready]) => {
+          const card = (
+            <div className="h-full rounded-tile border border-plum-ink/10 bg-white p-5">
+              <h3 className="font-heading font-bold">{title}</h3>
+              <p className="mt-1 text-sm text-plum-ink/60">{body}</p>
+              {!ready && (
+                <p className="mt-3 text-xs text-muted">Coming soon</p>
+              )}
+            </div>
+          );
+          return ready ? (
+            <a key={title} href={href} className="block transition hover:opacity-90">
+              {card}
+            </a>
+          ) : (
+            <div key={title} className="opacity-70">
+              {card}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

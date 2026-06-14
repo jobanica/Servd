@@ -12,8 +12,8 @@ export default function PlatformLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-cream text-plum-ink">
-      <header className="border-b border-plum-ink/10 bg-white">
+    <div className="min-h-screen bg-cream text-plum-ink print:bg-white">
+      <header className="border-b border-plum-ink/10 bg-white print:hidden">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-6 py-3">
           <Link href="/" className="flex items-center gap-2">
             <AppIcon size={28} />
