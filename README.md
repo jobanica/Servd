@@ -120,8 +120,8 @@ Phase 1; until then provision via Supabase dashboard + seed.
 | 1 | Tenancy, auth, branding, RLS + isolation tests | ✅ |
 | 2 | Menu management (categories, items, modifiers) | ✅ |
 | 3 | Tables + printable QR | ✅ |
-| 4 | Diner menu → cart | next |
-| 5 | Place order (modifier pricing, snapshotting) | |
+| 4 | Diner menu → cart | ✅ |
+| 5 | Place order (modifier pricing, snapshotting) | next |
 | 6 | Real-time kitchen display | |
 | 7 | Cashier dashboard + pluggable printing | |
 | 8 | Request bill | |
