@@ -15,7 +15,9 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
-    "db:rls": "node scripts/apply-rls.mjs"
+    "db:rls": "node scripts/apply-rls.mjs",
+    "db:seed": "node prisma/seed.mjs",
+    "db:setup": "prisma db push && node scripts/apply-rls.mjs && node prisma/seed.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.2.1",
