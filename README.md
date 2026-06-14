@@ -151,8 +151,8 @@ Phase 1; until then provision via Supabase dashboard + seed.
 | 5 | Place order (modifier pricing, snapshotting) | ✅ |
 | 6 | Real-time kitchen display | ✅ |
 | 7 | Cashier dashboard + pluggable printing | ✅ |
-| 8 | Request bill | next |
-| 9 | Online payment (PayMongo, webhooks) — **high risk** | |
+| 8 | Request bill | ✅ |
+| 9 | Online payment (PayMongo, webhooks) — **high risk** | next |
 | 10 | Post-payment feedback + Google review invite | |
 | 11 | SMS marketing (post-MVP) — **compliance risk** | |
 ```

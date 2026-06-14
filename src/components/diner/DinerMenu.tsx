@@ -9,6 +9,7 @@ import { placeOrder } from "@/server/orders/place-order";
 import type { PlaceOrderResult } from "@/lib/validation/order";
 import { ItemModal } from "./ItemModal";
 import { CartDrawer } from "./CartDrawer";
+import { RequestBillButton } from "./RequestBillButton";
 
 interface RestaurantBrand {
   name: string;
@@ -75,10 +76,14 @@ export function DinerMenu({
             {brand.name}
           </h1>
           <p className="text-sm text-brand-ink/60">
-            {brand.tagline ?? `Table ${tableNumber}`}
+            {brand.tagline ? `${brand.tagline} · Table ${tableNumber}` : `Table ${tableNumber}`}
           </p>
         </div>
       </header>
+
+      <div className="mt-3 flex justify-end">
+        <RequestBillButton slug={slug} tableToken={tableToken} />
+      </div>
 
       {/* Sticky category nav */}
       {nonEmptyCategories.length > 1 && (
