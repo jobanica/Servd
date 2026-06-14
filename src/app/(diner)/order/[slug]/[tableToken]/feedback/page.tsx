@@ -4,6 +4,7 @@ import {
   getTableByToken,
 } from "@/server/restaurants/get-public";
 import { FeedbackForm } from "@/components/diner/FeedbackForm";
+import { SmsOptIn } from "@/components/diner/SmsOptIn";
 
 /**
  * Diner feedback screen (white-label). Reached after payment, or via the "Leave
@@ -28,6 +29,15 @@ export default async function FeedbackPage({
           slug={slug}
           tableToken={tableToken}
           googleReviewUrl={restaurant.googleReviewUrl}
+        />
+      </div>
+
+      {/* Marketing opt-in — separate from feedback and the review ask. */}
+      <div className="mt-4 rounded-tile bg-white p-6 shadow-sm">
+        <SmsOptIn
+          slug={slug}
+          restaurantName={restaurant.displayName || restaurant.name}
+          source="feedback_screen"
         />
       </div>
     </div>

@@ -160,6 +160,25 @@ to the feedback screen on success when `feedbackMode` is `on_device`/`both`; a
 link + feedback mode at `/admin/reputation`. The automated follow-up SMS invite
 is Phase 11.
 
+## SMS marketing (Semaphore)
+
+Platform-held provider account, metered per restaurant via the credit ledger
+(`adjustCredits`) — you resell credits; the super-admin tops them up and assigns
+each restaurant's registered sender name. `SmsProvider` abstracts Semaphore.
+
+Consent is enforced by design:
+- opt-in is always optional (never blocks ordering/paying); the checkbox is
+  **unchecked by default**, standalone (not bundled with terms), and states who/
+  what/frequency/how to stop — the exact wording is stored as proof;
+- **double opt-in by default**: a contact is `pending` until they reply YES
+  (handled by `/api/webhooks/sms`); single opt-in is a per-restaurant fallback;
+- **STOP** opts a number out immediately; campaigns send to `confirmed` contacts
+  only — never pending/opted-out;
+- marketing consent is tracked separately from any transactional number.
+
+Compose/send + delivery results at `/admin/sms`; the diner opt-in appears on the
+feedback screen, kept separate from the (non-incentivized) Google review ask.
+
 ## Compliance guardrails (built into the design)
 
 - **No review gating.** The Google review invite is shown to ALL diners
@@ -184,5 +203,5 @@ is Phase 11.
 | 8 | Request bill | ✅ |
 | 9 | Online payment (PayMongo, webhooks) — **high risk** | ✅ |
 | 10 | Post-payment feedback + Google review invite | ✅ **(MVP complete)** |
-| 11 | SMS marketing (post-MVP) — **compliance risk** | next |
+| 11 | SMS marketing (post-MVP) — **compliance risk** | ✅ |
 ```

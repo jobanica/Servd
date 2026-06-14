@@ -47,6 +47,7 @@ export default async function AdminHome() {
             ["Branding", "/admin/branding", "Logo, colors & display name", false],
             ["Staff", "/admin/staff", "Kitchen, cashier & admin logins", false],
             ["Feedback", "/admin/feedback", "Ratings & comments inbox", true],
+            ["SMS marketing", "/admin/sms", "Promos to opted-in customers", true],
           ] as const
         ).map(([title, href, body, ready]) => {
           const card = (

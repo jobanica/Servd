@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/server/tenancy/current-user";
 import { systemDb } from "@/server/tenancy/scoped-db";
+import { addSmsCredits, setSenderName } from "@/server/sms/admin";
 import { signOut } from "../login/actions";
 
 /**
@@ -37,18 +38,51 @@ export default async function SuperAdminHome() {
         <thead className="text-plum-ink/50">
           <tr>
             <th className="py-2">Name</th>
-            <th>Slug</th>
             <th>Status</th>
             <th>SMS credits</th>
+            <th>Sender name</th>
+            <th>Add credits</th>
           </tr>
         </thead>
         <tbody>
           {restaurants.map((r) => (
-            <tr key={r.id} className="border-t border-plum-ink/10">
-              <td className="py-2">{r.name}</td>
-              <td>/{r.slug}</td>
-              <td>{r.status}</td>
-              <td>{r.smsCreditBalance}</td>
+            <tr key={r.id} className="border-t border-plum-ink/10 align-top">
+              <td className="py-2">
+                {r.name}
+                <span className="block text-xs text-plum-ink/40">/{r.slug}</span>
+              </td>
+              <td className="py-2">{r.status}</td>
+              <td className="py-2 font-semibold">{r.smsCreditBalance}</td>
+              <td className="py-2">
+                <form action={setSenderName} className="flex gap-1">
+                  <input type="hidden" name="restaurantId" value={r.id} />
+                  <input
+                    name="senderName"
+                    defaultValue={r.smsSenderName ?? ""}
+                    maxLength={11}
+                    placeholder="SENDER"
+                    className="w-24 rounded border border-plum-ink/15 px-2 py-1 text-xs"
+                  />
+                  <button className="rounded border border-plum-ink/15 px-2 py-1 text-xs font-semibold">
+                    Set
+                  </button>
+                </form>
+              </td>
+              <td className="py-2">
+                <form action={addSmsCredits} className="flex gap-1">
+                  <input type="hidden" name="restaurantId" value={r.id} />
+                  <input
+                    name="amount"
+                    type="number"
+                    min="1"
+                    placeholder="100"
+                    className="w-20 rounded border border-plum-ink/15 px-2 py-1 text-xs"
+                  />
+                  <button className="rounded border border-plum-ink/15 px-2 py-1 text-xs font-semibold">
+                    Add
+                  </button>
+                </form>
+              </td>
             </tr>
           ))}
         </tbody>
