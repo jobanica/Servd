@@ -1,62 +1,344 @@
 import Link from "next/link";
 import { AppIcon, Wordmark } from "@/components/Wordmark";
 
-// Platform marketing page — full Servd identity.
-export default function Home() {
+/* ------------------------------------------------------------------ icons */
+function Icon({ path }: { path: string }) {
   return (
-    <main className="min-h-screen bg-cream text-plum-ink">
-      <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
-        <div className="flex items-center gap-3">
-          <AppIcon size={36} />
-          <Wordmark size="1.5rem" />
-        </div>
-        <Link
-          href="/login"
-          className="rounded-full px-5 py-2 text-sm font-semibold btn-brand"
-        >
-          Staff login
-        </Link>
-      </header>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}
+      strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+      <path d={path} />
+    </svg>
+  );
+}
+const ICONS = {
+  qr: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 14h2M20 18v2M14 20h2",
+  bolt: "M13 2L3 14h7l-1 8 10-12h-7z",
+  card: "M2 7h20v10H2zM2 11h20",
+  brush: "M9 11l6-6 4 4-6 6M9 11l-3 7 7-3M9 11l3 3",
+  chart: "M4 20V10M10 20V4M16 20v-7M22 20H2",
+  chat: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z",
+  box: "M21 8l-9-5-9 5 9 5 9-5zM3 8v8l9 5 9-5V8M12 13v8",
+  check: "M20 6L9 17l-5-5",
+};
 
-      <section className="mx-auto max-w-3xl px-6 pt-16 text-center">
-        <h1 className="font-heading text-5xl font-extrabold leading-tight tracking-tight">
-          Scan. Order. Pay.
-        </h1>
-        <p className="mt-5 text-lg text-plum-ink/70">
-          A QR-based ordering platform for restaurants — real-time kitchen
-          tickets, online payment, and your own branding on every diner screen.
-        </p>
-        <div className="mt-8 flex justify-center gap-3">
-          <Link
-            href="/signup"
-            className="rounded-full px-6 py-3 font-semibold btn-brand"
-          >
-            Start your restaurant
-          </Link>
-          <Link
-            href="/login"
-            className="rounded-full border border-plum-ink/15 px-6 py-3 font-semibold"
-          >
+/* ------------------------------------------------------------------ nav */
+function Nav() {
+  const links = [
+    ["Features", "#features"],
+    ["How it works", "#how"],
+    ["Pricing", "#pricing"],
+    ["FAQ", "#faq"],
+  ];
+  return (
+    <header className="sticky top-0 z-50 border-b border-plum-ink/5 bg-cream/80 backdrop-blur">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
+        <Link href="/" className="flex items-center gap-2">
+          <AppIcon size={32} />
+          <Wordmark size="1.4rem" />
+        </Link>
+        <nav className="hidden items-center gap-7 md:flex">
+          {links.map(([l, h]) => (
+            <a key={h} href={h} className="text-sm font-medium text-plum-ink/70 hover:text-plum-ink">{l}</a>
+          ))}
+        </nav>
+        <div className="flex items-center gap-2">
+          <Link href="/login" className="rounded-full px-4 py-2 text-sm font-semibold text-plum-ink/80 hover:text-plum-ink">
             Staff login
           </Link>
+          <Link href="/signup" className="rounded-full px-5 py-2 text-sm font-semibold btn-brand shadow-sm">
+            Start free
+          </Link>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+/* ------------------------------------------------------------- phone mockup */
+function PhoneMockup() {
+  const items = [
+    ["Smoky BBQ Burger", "₱290"],
+    ["Truffle Fries", "₱180"],
+    ["Mango Cheesecake", "₱160"],
+  ];
+  return (
+    <div className="relative mx-auto w-[260px]">
+      {/* floating "new order" chip */}
+      <div className="absolute -left-10 top-24 hidden rounded-2xl border border-plum-ink/10 bg-white p-3 shadow-xl sm:block">
+        <p className="text-[10px] font-semibold text-mango">● NEW ORDER · Table 7</p>
+        <p className="mt-1 text-xs font-bold text-plum-ink">2× Smoky BBQ Burger</p>
+      </div>
+      {/* floating "paid" chip */}
+      <div className="absolute -right-8 bottom-20 hidden rounded-2xl border border-plum-ink/10 bg-white p-3 shadow-xl sm:block">
+        <p className="text-xs font-bold text-plum-ink">Paid via GCash ✓</p>
+        <p className="text-[10px] text-plum-ink/50">₱630.00</p>
+      </div>
+      {/* device */}
+      <div className="rounded-[2.5rem] border-[10px] border-plum-ink bg-white p-3 shadow-2xl">
+        <div className="overflow-hidden rounded-[1.6rem] bg-cream">
+          <div className="bg-brand-gradient px-4 pb-6 pt-5 text-white">
+            <div className="flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/25 font-bold">M</div>
+              <div>
+                <p className="text-sm font-bold leading-tight">Mango Grill</p>
+                <p className="text-[10px] opacity-80">Table 7</p>
+              </div>
+            </div>
+          </div>
+          <div className="-mt-3 space-y-2 rounded-t-2xl bg-cream p-3">
+            {items.map(([name, price]) => (
+              <div key={name} className="flex items-center justify-between rounded-xl bg-white p-2.5 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-brand-gradient/20" style={{ background: "var(--brand-gradient)", opacity: 0.18 }} />
+                  <span className="text-xs font-medium text-plum-ink">{name}</span>
+                </div>
+                <span className="text-xs font-bold text-plum-ink">{price}</span>
+              </div>
+            ))}
+            <div className="mt-2 rounded-full py-2 text-center text-xs font-bold text-white btn-brand">
+              View order · ₱630
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ page */
+export default function Home() {
+  return (
+    <main className="bg-cream text-plum-ink">
+      <Nav />
+
+      {/* HERO */}
+      <section className="relative overflow-hidden">
+        <div className="pointer-events-none absolute -right-32 -top-32 h-96 w-96 rounded-full bg-brand-gradient opacity-20 blur-3xl" />
+        <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 py-16 lg:grid-cols-2 lg:py-24">
+          <div>
+            <span className="inline-flex items-center gap-2 rounded-full border border-plum-ink/10 bg-white px-3 py-1 text-xs font-semibold text-plum-ink/70">
+              🇵🇭 Built for Philippine restaurants
+            </span>
+            <h1 className="mt-5 font-heading text-5xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
+              The QR ordering system that{" "}
+              <span className="bg-brand-gradient bg-clip-text text-transparent">grows your sales</span>.
+            </h1>
+            <p className="mt-5 max-w-md text-lg text-plum-ink/70">
+              Diners scan, browse your branded menu, order, and pay — GCash or card.
+              Orders hit the kitchen in real time. You keep every peso.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link href="/signup" className="rounded-full px-7 py-3.5 font-semibold btn-brand shadow-lg">
+                Start free — 30 days
+              </Link>
+              <a href="#how" className="rounded-full border border-plum-ink/15 bg-white px-7 py-3.5 font-semibold">
+                See how it works
+              </a>
+            </div>
+            <p className="mt-4 text-sm text-plum-ink/50">No card required · Set up in minutes</p>
+          </div>
+          <PhoneMockup />
         </div>
       </section>
 
-      <section className="mx-auto mt-20 grid max-w-5xl gap-4 px-6 pb-24 sm:grid-cols-3">
-        {[
-          ["Real-time kitchen", "Orders appear instantly, tagged to the table."],
-          ["Online payment", "GCash & cards — funds go straight to you."],
-          ["Your brand", "Every diner page wears your logo and colors."],
-        ].map(([title, body]) => (
-          <div
-            key={title}
-            className="rounded-tile border border-plum-ink/10 bg-white p-6"
-          >
-            <h3 className="font-heading text-lg font-bold">{title}</h3>
-            <p className="mt-2 text-sm text-plum-ink/70">{body}</p>
-          </div>
-        ))}
+      {/* TRUST STRIP */}
+      <section className="border-y border-plum-ink/5 bg-white">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-10 gap-y-3 px-6 py-6 text-sm font-semibold text-plum-ink/40">
+          <span>QR menu &amp; ordering</span><span>·</span>
+          <span>GCash + cards</span><span>·</span>
+          <span>Real-time kitchen</span><span>·</span>
+          <span>White-label branding</span><span>·</span>
+          <span>SMS marketing</span>
+        </div>
       </section>
+
+      {/* FEATURES */}
+      <section id="features" className="mx-auto max-w-6xl px-6 py-20">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="font-heading text-4xl font-extrabold tracking-tight">Everything your restaurant needs</h2>
+          <p className="mt-3 text-plum-ink/70">One platform from the table to the kitchen to the books.</p>
+        </div>
+        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            [ICONS.qr, "QR ordering", "Each table has its own QR. Diners browse, customize add-ons, and order — no app, no waiting."],
+            [ICONS.bolt, "Real-time kitchen", "Orders appear instantly on the kitchen display, tagged to the table. Advance them with a tap."],
+            [ICONS.card, "Online payment", "GCash & cards via PayMongo. Connected accounts mean funds go straight to you."],
+            [ICONS.brush, "White-label", "Your logo, colors, and even your own domain. Diners see your brand, never ours."],
+            [ICONS.chart, "Analytics", "Revenue, best-sellers, peak hours, payment mix, and feedback trends — exportable."],
+            [ICONS.chat, "Feedback & SMS", "Collect ratings, invite Google reviews, and run opt-in SMS promos to regulars."],
+            [ICONS.box, "Inventory", "Recipes auto-deduct stock as orders cook, with low-stock alerts and COGS."],
+            [ICONS.check, "HR & payroll prep", "Employees, schedules, QR time-clock, leave, and payroll-prep exports."],
+          ].map(([icon, title, body]) => (
+            <div key={title} className="rounded-tile border border-plum-ink/10 bg-white p-6 transition hover:shadow-lg">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-gradient text-white">
+                <Icon path={icon} />
+              </div>
+              <h3 className="mt-4 font-heading text-lg font-bold">{title}</h3>
+              <p className="mt-1.5 text-sm text-plum-ink/65">{body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* HOW IT WORKS */}
+      <section id="how" className="bg-plum-ink py-20 text-cream">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="font-heading text-4xl font-extrabold tracking-tight">Up and running in three steps</h2>
+            <p className="mt-3 text-cream/60">Your diners already know how to do it.</p>
+          </div>
+          <div className="mt-14 grid gap-8 md:grid-cols-3">
+            {[
+              ["01", "Scan", "The diner scans the QR on their table — your branded menu opens instantly."],
+              ["02", "Order", "They pick items and add-ons; the order lands on the kitchen screen in real time."],
+              ["03", "Pay", "They pay online or at the counter, then leave a rating and a Google review."],
+            ].map(([n, title, body]) => (
+              <div key={n} className="relative rounded-tile border border-cream/10 bg-white/5 p-7">
+                <span className="font-heading text-5xl font-extrabold text-mango/40">{n}</span>
+                <h3 className="mt-2 font-heading text-xl font-bold">{title}</h3>
+                <p className="mt-2 text-sm text-cream/65">{body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* STATS */}
+      <section className="mx-auto max-w-6xl px-6 py-16">
+        <div className="grid gap-6 rounded-tile bg-brand-gradient p-10 text-center text-white sm:grid-cols-3">
+          {[
+            ["Faster", "table turns with self-ordering"],
+            ["0%", "of your sales taken — funds go to you"],
+            ["1 platform", "menu, kitchen, payments, HR & stock"],
+          ].map(([big, small]) => (
+            <div key={small}>
+              <p className="font-heading text-4xl font-extrabold">{big}</p>
+              <p className="mt-1 text-sm text-white/85">{small}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* PRICING */}
+      <section id="pricing" className="mx-auto max-w-6xl px-6 py-20">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="font-heading text-4xl font-extrabold tracking-tight">Simple, honest pricing</h2>
+          <p className="mt-3 text-plum-ink/70">Every plan starts with a 30-day free trial. No card to start.</p>
+        </div>
+        <div className="mt-12 grid items-start gap-5 lg:grid-cols-3">
+          {[
+            ["Starter", "1,999", ["Up to 10 tables", "QR ordering & kitchen", "Online payment", "Feedback & reviews"], false],
+            ["Pro", "2,499", ["Up to 30 tables", "Everything in Starter", "SMS marketing credits", "Inventory module"], true],
+            ["Business", "4,999", ["Unlimited tables", "Everything in Pro", "HR & payroll prep", "Custom domain"], false],
+          ].map(([name, price, features, featured]) => (
+            <div
+              key={name as string}
+              className={`rounded-tile border bg-white p-7 ${featured ? "border-brand-primary shadow-xl ring-2 ring-brand-primary/20" : "border-plum-ink/10"}`}
+            >
+              {featured ? (
+                <span className="inline-block rounded-full bg-brand-gradient px-3 py-1 text-xs font-bold text-white">Most popular</span>
+              ) : (
+                <span className="inline-block text-xs font-bold uppercase tracking-wide text-plum-ink/40">{name}</span>
+              )}
+              {featured && <p className="mt-2 text-xs font-bold uppercase tracking-wide text-plum-ink/40">{name}</p>}
+              <p className="mt-3">
+                <span className="font-heading text-4xl font-extrabold">₱{price as string}</span>
+                <span className="text-plum-ink/50">/month</span>
+              </p>
+              <ul className="mt-5 space-y-2.5">
+                {(features as string[]).map((f) => (
+                  <li key={f} className="flex items-start gap-2 text-sm text-plum-ink/75">
+                    <span className="mt-0.5 text-brand-primary"><Icon path={ICONS.check} /></span>
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href="/signup"
+                className={`mt-6 block rounded-full py-3 text-center font-semibold ${featured ? "btn-brand text-white" : "border border-plum-ink/15"}`}
+              >
+                Start free trial
+              </Link>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* TESTIMONIAL */}
+      <section className="mx-auto max-w-3xl px-6 pb-20 text-center">
+        <p className="font-heading text-2xl font-bold leading-snug sm:text-3xl">
+          “Servd paid for itself in a week. Orders are faster, mistakes dropped, and
+          our regulars love getting our promos by text.”
+        </p>
+        <p className="mt-5 text-sm font-semibold text-plum-ink/60">Maria · Owner, Mango Grill</p>
+      </section>
+
+      {/* FAQ */}
+      <section id="faq" className="mx-auto max-w-3xl px-6 py-16">
+        <h2 className="text-center font-heading text-4xl font-extrabold tracking-tight">Questions, answered</h2>
+        <div className="mt-10 space-y-3">
+          {[
+            ["Do diners need to download an app?", "No. They scan the QR on the table and your menu opens in their browser — order and pay right there."],
+            ["Where does the money go?", "Straight to your own PayMongo account. Servd uses connected accounts, so we never hold your funds."],
+            ["Can I use my own branding?", "Yes — your logo, colors, tagline, and even your own domain. Diners only ever see your brand."],
+            ["Is there a free trial?", "Every plan includes a 30-day free trial, and you don't need a card to start."],
+            ["Does it work on iPad for the cashier?", "Yes. Printing supports cloud/poll printers and AirPrint so it works on any device."],
+          ].map(([q, a]) => (
+            <details key={q} className="group rounded-tile border border-plum-ink/10 bg-white p-5">
+              <summary className="flex cursor-pointer list-none items-center justify-between font-semibold">
+                {q}
+                <span className="text-plum-ink/40 transition group-open:rotate-45">+</span>
+              </summary>
+              <p className="mt-3 text-sm text-plum-ink/65">{a}</p>
+            </details>
+          ))}
+        </div>
+      </section>
+
+      {/* FINAL CTA */}
+      <section className="mx-auto max-w-6xl px-6 pb-20">
+        <div className="rounded-tile bg-plum-ink px-8 py-14 text-center text-cream">
+          <h2 className="font-heading text-4xl font-extrabold tracking-tight">Ready to serve smarter?</h2>
+          <p className="mx-auto mt-3 max-w-md text-cream/70">
+            Launch your QR ordering in minutes. Free for 30 days.
+          </p>
+          <Link href="/signup" className="mt-7 inline-block rounded-full px-8 py-3.5 font-semibold btn-brand shadow-lg">
+            Start your restaurant
+          </Link>
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer className="border-t border-plum-ink/10 bg-white">
+        <div className="mx-auto grid max-w-6xl gap-8 px-6 py-12 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <AppIcon size={28} />
+              <Wordmark size="1.2rem" />
+            </div>
+            <p className="mt-3 max-w-xs text-sm text-plum-ink/55">
+              QR ordering, payments, and back-office for modern restaurants.
+            </p>
+          </div>
+          {[
+            ["Product", [["Features", "#features"], ["Pricing", "#pricing"], ["Staff login", "/login"]]],
+            ["Company", [["About", "#"], ["Contact", "#"], ["Blog", "#"]]],
+            ["Legal", [["Privacy", "#"], ["Terms", "#"], ["SMS consent", "#"]]],
+          ].map(([title, rows]) => (
+            <div key={title as string}>
+              <p className="font-heading font-bold">{title as string}</p>
+              <ul className="mt-3 space-y-2 text-sm text-plum-ink/60">
+                {(rows as string[][]).map(([l, h]) => (
+                  <li key={l}><Link href={h} className="hover:text-plum-ink">{l}</Link></li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+        <div className="border-t border-plum-ink/5 py-5 text-center text-xs text-plum-ink/40">
+          © {new Date().getFullYear()} Servd. Made for restaurants in the Philippines.
+        </div>
+      </footer>
     </main>
   );
 }
