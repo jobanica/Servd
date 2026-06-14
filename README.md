@@ -72,6 +72,11 @@ node prisma/seed.mjs            # two demo restaurants (mango-grill, guava-cafe)
 npm run dev
 ```
 
+**Storage bucket (menu photos):** in Supabase → Storage, create a **public**
+bucket named `menu-images`. Uploads are namespaced per restaurant
+(`{restaurantId}/{uuid}.ext`) and validated server-side (JPEG/PNG/WebP, ≤ 5 MB)
+in `src/server/storage/menu-images.ts`.
+
 To run the **isolation tests** against your database:
 
 ```bash
@@ -113,8 +118,8 @@ Phase 1; until then provision via Supabase dashboard + seed.
 | --- | --- | --- |
 | 0 | Scaffold + Servd design system | ✅ |
 | 1 | Tenancy, auth, branding, RLS + isolation tests | ✅ |
-| 2 | Menu management (categories, items, modifiers) | next |
-| 3 | Tables + printable QR | |
+| 2 | Menu management (categories, items, modifiers) | ✅ |
+| 3 | Tables + printable QR | next |
 | 4 | Diner menu → cart | |
 | 5 | Place order (modifier pricing, snapshotting) | |
 | 6 | Real-time kitchen display | |

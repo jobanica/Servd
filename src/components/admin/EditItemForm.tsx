@@ -1,0 +1,117 @@
+"use client";
+
+import { useActionState } from "react";
+import { updateItem, type FormState } from "@/server/menu/actions";
+import { SubmitButton } from "./SubmitButton";
+
+type Category = { id: string; name: string };
+type Item = {
+  id: string;
+  categoryId: string;
+  name: string;
+  description: string | null;
+  price: number;
+  isAvailable: boolean;
+  imageUrl: string | null;
+};
+
+export function EditItemForm({
+  item,
+  categories,
+}: {
+  item: Item;
+  categories: Category[];
+}) {
+  const [state, action] = useActionState<FormState, FormData>(updateItem, null);
+
+  return (
+    <form
+      action={action}
+      className="space-y-4 rounded-tile border border-plum-ink/10 bg-white p-5"
+    >
+      <input type="hidden" name="id" value={item.id} />
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="block text-sm">
+          <span className="font-medium">Name</span>
+          <input
+            name="name"
+            defaultValue={item.name}
+            required
+            className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2"
+          />
+        </label>
+        <label className="block text-sm">
+          <span className="font-medium">Category</span>
+          <select
+            name="categoryId"
+            defaultValue={item.categoryId}
+            className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2"
+          >
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block text-sm">
+          <span className="font-medium">Price (₱)</span>
+          <input
+            name="pricePesos"
+            type="number"
+            step="0.01"
+            min="0"
+            defaultValue={(item.price / 100).toFixed(2)}
+            required
+            className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2"
+          />
+        </label>
+        <label className="flex items-center gap-2 self-end text-sm">
+          <input
+            type="checkbox"
+            name="isAvailable"
+            defaultChecked={item.isAvailable}
+          />
+          Available (in stock)
+        </label>
+      </div>
+
+      <label className="block text-sm">
+        <span className="font-medium">Description</span>
+        <textarea
+          name="description"
+          defaultValue={item.description ?? ""}
+          rows={3}
+          className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2"
+        />
+      </label>
+
+      <div className="flex items-center gap-4">
+        {item.imageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={item.imageUrl}
+            alt={item.name}
+            className="h-16 w-16 rounded-lg object-cover"
+          />
+        )}
+        <label className="text-sm">
+          <span className="mr-2 text-plum-ink/60">
+            {item.imageUrl ? "Replace photo" : "Add photo"}
+          </span>
+          <input
+            type="file"
+            name="image"
+            accept="image/jpeg,image/png,image/webp"
+            className="text-xs"
+          />
+        </label>
+      </div>
+
+      {state?.error && <p className="text-sm text-guava">{state.error}</p>}
+      {state?.ok && <p className="text-sm text-mango">Saved.</p>}
+      <SubmitButton>Save changes</SubmitButton>
+    </form>
+  );
+}
