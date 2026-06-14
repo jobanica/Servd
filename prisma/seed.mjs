@@ -8,6 +8,15 @@
 import { PrismaClient } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 
+// Load env from .env / .env.local (node doesn't do this automatically).
+for (const f of [".env", ".env.local"]) {
+  try {
+    process.loadEnvFile(f);
+  } catch {
+    /* file may not exist — ignore */
+  }
+}
+
 const prisma = new PrismaClient();
 
 async function asSuper(fn) {

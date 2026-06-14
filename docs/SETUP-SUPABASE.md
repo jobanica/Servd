@@ -52,6 +52,20 @@ DATABASE_URL="postgresql://postgres.<REF>:<DB_PASSWORD>@aws-0-ap-southeast-1.poo
   npm run test:isolation
 ```
 
+## 4b. Create login accounts
+The seed makes restaurants but no logins. Create a Supabase Auth user + linked
+profile (run with `--` so npm forwards the args):
+```bash
+# platform super-admin (you)
+npm run user:create -- superadmin you@servd.app 'StrongPass123!'
+
+# staff for a seeded restaurant (role = kitchen | cashier | admin)
+npm run user:create -- staff mango-grill admin owner@mango.test 'StrongPass123!'
+npm run user:create -- staff mango-grill kitchen kitchen@mango.test 'StrongPass123!'
+npm run user:create -- staff mango-grill cashier cashier@mango.test 'StrongPass123!'
+```
+Then sign in at `/login`; the super-admin lands on `/super-admin`.
+
 ## 5. Storage bucket (dashboard-only)
 In Supabase → Storage, create a **public** bucket named **`menu-images`**
 (menu photo uploads, validated server-side to JPEG/PNG/WebP ≤ 5 MB).

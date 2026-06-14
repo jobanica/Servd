@@ -5,6 +5,15 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import pg from "pg";
 
+// Load env from .env / .env.local (node doesn't do this automatically).
+for (const f of [".env", ".env.local"]) {
+  try {
+    process.loadEnvFile(f);
+  } catch {
+    /* file may not exist — ignore */
+  }
+}
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const sql = readFileSync(join(__dirname, "..", "prisma", "rls.sql"), "utf8");
 
