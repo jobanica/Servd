@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { uniqueSlug } from "@/lib/slug";
+import { startTrial } from "@/server/billing/subscription";
 
 export type SignupState = { ok?: boolean; error?: string } | null;
 
@@ -54,7 +55,7 @@ export async function signUpRestaurant(
         const hit = await tx.restaurant.findUnique({ where: { slug: s }, select: { id: true } });
         return !!hit;
       });
-      await tx.restaurant.create({
+      const restaurant = await tx.restaurant.create({
         data: {
           name: restaurantName,
           displayName: restaurantName,
@@ -62,7 +63,10 @@ export async function signUpRestaurant(
           status: "active",
           staff: { create: { authUserId, role: "admin", email } },
         },
+        select: { id: true },
       });
+      // Start the 30-day free trial.
+      await startTrial(tx, restaurant.id);
     });
   } catch {
     return { error: "Couldn't create your restaurant. Please try again." };

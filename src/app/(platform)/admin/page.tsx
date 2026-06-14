@@ -18,6 +18,10 @@ export default async function AdminHome() {
     tx.restaurant.findFirstOrThrow(),
   );
 
+  // Non-payment: send the owner to billing to resolve it.
+  if (restaurant.status === "suspended") {
+    redirect("/admin/billing");
+  }
   // First-run: guide new owners through the onboarding wizard (skippable).
   if (!restaurant.onboardingCompletedAt) {
     redirect("/admin/onboarding");
@@ -53,6 +57,7 @@ export default async function AdminHome() {
             ["Staff", "/admin/staff", "Kitchen, cashier & admin logins", false],
             ["Feedback", "/admin/feedback", "Ratings & comments inbox", true],
             ["SMS marketing", "/admin/sms", "Promos to opted-in customers", true],
+            ["Billing", "/admin/billing", "Plan, trial & invoices", true],
           ] as const
         ).map(([title, href, body, ready]) => {
           const card = (

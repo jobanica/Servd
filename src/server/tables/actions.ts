@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireAdminAction } from "@/server/tenancy/require-admin";
+import { assertWithinLimit } from "@/server/billing/entitlements";
 
 export type FormState = { ok?: boolean; error?: string } | null;
 
@@ -27,6 +28,14 @@ export async function createTable(
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  // Enforce the plan's table limit.
+  try {
+    const count = await tenantDb(restaurantId, (tx) => tx.table.count());
+    await assertWithinLimit(restaurantId, "maxTables", count);
+  } catch {
+    return { error: "You've reached your plan's table limit. Upgrade to add more." };
   }
 
   try {

@@ -150,6 +150,23 @@ Phase 1; until then provision via Supabase dashboard + seed.
   place; sending/opt-in flows not built yet.
 - **Custom subdomains/domains** — `restaurants.subdomain` reserved, unused.
 
+## Subscription billing (restaurants pay the platform)
+
+`BillingProvider` interface (PayMongo impl on the **platform's** account, swappable).
+New signups get a **30-day free trial** (no card upfront). Near/at trial end the
+owner adds a card via hosted checkout (`/admin/billing`); that card is saved and
+auto-charged monthly by a **Vercel Cron** (`/api/cron/billing`, guarded by
+`CRON_SECRET`). The pure lifecycle (`src/lib/billing/lifecycle.ts`) drives
+trial → active → past_due (dunning) → suspended; a signature-verified billing
+webhook (`/api/webhooks/billing`) is the only thing that marks invoices paid.
+
+Plans (`Starter ₱1,999 / Pro ₱2,499 / Business ₱4,999`) carry `limits`
+(enforced, e.g. `maxTables`) and `plan_modules` (`inventory / hris /
+custom_domain`) that the entitlements helper gates F/G/H on. Suspended
+restaurants are blocked from staff/admin screens (owner is routed to billing);
+super-admin sees MRR and can un-suspend. Restaurant subscription billing is **no
+longer stubbed.**
+
 ## Feedback & reputation
 
 After payment, every diner gets the same ask — a 1–5 star rating + optional
@@ -209,7 +226,7 @@ feedback screen, kept separate from the (non-incentivized) Google review ask.
 | Phase | What | Status |
 | --- | --- | --- |
 | A | Self-serve signup + onboarding wizard + branding editor | ✅ |
-| B | Subscription billing (restaurants pay the platform) | planned |
+| B | Subscription billing (restaurants pay the platform) | ✅ |
 | C | Analytics & reporting | planned |
 | D | Internationalization (i18n) | planned |
 | E | Menu item videos | planned |

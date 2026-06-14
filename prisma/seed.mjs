@@ -26,17 +26,54 @@ async function asSuper(fn) {
   });
 }
 
+// Plan tiers (centavos). Modules unlock the optional add-on phases (F/G/H).
+const PLANS = [
+  {
+    id: "00000000-0000-0000-0000-0000000000a1",
+    name: "Starter",
+    priceMonthly: 199900, // ₱1,999
+    limits: { maxTables: 10, maxStaff: 5, smsIncluded: 0 },
+    modules: [],
+  },
+  {
+    id: "00000000-0000-0000-0000-0000000000a2",
+    name: "Pro",
+    priceMonthly: 249900, // ₱2,499
+    limits: { maxTables: 30, maxStaff: 20, smsIncluded: 200 },
+    modules: ["inventory"],
+  },
+  {
+    id: "00000000-0000-0000-0000-0000000000a3",
+    name: "Business",
+    priceMonthly: 499900, // ₱4,999
+    limits: { maxTables: 200, maxStaff: 100, smsIncluded: 1000 },
+    modules: ["inventory", "hris", "custom_domain"],
+  },
+];
+
 await asSuper(async (tx) => {
-  const plan = await tx.plan.upsert({
-    where: { id: "00000000-0000-0000-0000-0000000000a1" },
-    update: {},
-    create: {
-      id: "00000000-0000-0000-0000-0000000000a1",
-      name: "Starter",
-      priceMonthly: 99900, // ₱999.00 in centavos
-      limits: { maxTables: 20, maxStaff: 10, smsIncluded: 0 },
-    },
-  });
+  let plan; // default (cheapest) plan, used for demo trials
+  for (const p of PLANS) {
+    const created = await tx.plan.upsert({
+      where: { id: p.id },
+      update: { priceMonthly: p.priceMonthly, limits: p.limits, trialDays: 30 },
+      create: {
+        id: p.id,
+        name: p.name,
+        priceMonthly: p.priceMonthly,
+        limits: p.limits,
+        trialDays: 30,
+      },
+    });
+    for (const module of p.modules) {
+      await tx.planModule.upsert({
+        where: { planId_module: { planId: p.id, module } },
+        update: { enabled: true },
+        create: { planId: p.id, module, enabled: true },
+      });
+    }
+    if (!plan) plan = created;
+  }
 
   for (const r of [
     { name: "Mango Grill", slug: "mango-grill", primary: "#1F8A4C" },
@@ -75,6 +112,24 @@ await asSuper(async (tx) => {
         qrToken: randomUUID().replace(/-/g, ""),
       },
     });
+
+    // 30-day trial subscription on the default (Starter) plan.
+    const existingSub = await tx.subscription.findFirst({
+      where: { restaurantId: restaurant.id },
+    });
+    if (!existingSub) {
+      const trialEndsAt = new Date();
+      trialEndsAt.setDate(trialEndsAt.getDate() + 30);
+      await tx.subscription.create({
+        data: {
+          restaurantId: restaurant.id,
+          planId: plan.id,
+          status: "trialing",
+          trialEndsAt,
+          currentPeriodEnd: trialEndsAt,
+        },
+      });
+    }
 
     console.log(`Seeded ${r.name} (/${r.slug})`);
   }

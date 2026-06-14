@@ -110,13 +110,34 @@ model Plan {
   name         String
   priceMonthly Int // store money in centavos (integers) to avoid float errors
   limits       Json // e.g. { maxTables, maxStaff, smsIncluded }
+  trialDays    Int      @default(30) // free-trial length for new signups
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 
   restaurants   Restaurant[]
   subscriptions Subscription[]
+  modules       PlanModule[]
 
   @@map("plans")
+}
+
+enum PlanModuleType {
+  hris
+  inventory
+  custom_domain
+}
+
+// Which optional add-on modules a plan unlocks. Read by the entitlements helper
+// that F/G/H gate on. Platform-level reference data (no restaurant_id).
+model PlanModule {
+  planId  String
+  module  PlanModuleType
+  enabled Boolean        @default(true)
+
+  plan Plan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@id([planId, module])
+  @@map("plan_modules")
 }
 
 // ----------------------------------------------------------------------------
@@ -181,6 +202,7 @@ model Restaurant {
   customers       CustomerContact[]
   smsCampaigns    SmsCampaign[]
   smsCreditLedger SmsCreditLedger[]
+  invoices        RestaurantInvoice[]
 
   @@map("restaurants")
 }
@@ -205,19 +227,42 @@ model StaffUser {
 
 model Subscription {
   id               String             @id @default(uuid())
-  restaurantId     String
+  restaurantId     String // current subscription is the latest row; app keeps one active
   planId           String
   status           SubscriptionStatus @default(trialing)
+  trialEndsAt      DateTime?
   currentPeriodEnd DateTime?
-  // NOTE: actual recurring billing to restaurants is STUBBED for now. Status is
-  // set manually by the super-admin; no charge is taken automatically yet.
+  cancelAtPeriodEnd Boolean           @default(false)
+  // Dunning: how many consecutive charge attempts have failed.
+  failedCharges    Int                @default(0)
+  // Gateway refs for off-session recurring charges (platform's PayMongo account).
+  providerCustomerId      String?
+  providerPaymentMethodId String?
   createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   plan       Plan       @relation(fields: [planId], references: [id])
 
-  @@index([restaurantId])
+  @@index([status, currentPeriodEnd])
   @@map("subscriptions")
+}
+
+model RestaurantInvoice {
+  id           String    @id @default(uuid())
+  restaurantId String
+  amount       Int // centavos
+  status       String    @default("open") // open | paid | failed | void
+  periodStart  DateTime
+  periodEnd    DateTime
+  providerRef  String? // gateway payment-intent id
+  paidAt       DateTime?
+  createdAt    DateTime  @default(now())
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@map("restaurant_invoices")
 }
 
 // ----------------------------------------------------------------------------

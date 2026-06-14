@@ -50,7 +50,7 @@ declare
   tenant_tables text[] := array[
     'staff_users', 'subscriptions', 'tables', 'categories', 'menu_items',
     'modifier_groups', 'orders', 'feedback', 'customer_contacts',
-    'sms_campaigns', 'sms_credit_ledger', 'print_jobs'
+    'sms_campaigns', 'sms_credit_ledger', 'print_jobs', 'restaurant_invoices'
   ];
 begin
   foreach t in array tenant_tables loop
@@ -176,6 +176,16 @@ drop policy if exists plans_read on plans;
 drop policy if exists plans_write on plans;
 create policy plans_read on plans for select using (true);
 create policy plans_write on plans for all
+  using (app.is_super_admin()) with check (app.is_super_admin());
+
+-- plan_modules: reference data — readable by everyone (entitlements check),
+-- writable by super-admin only.
+alter table plan_modules enable row level security;
+alter table plan_modules force row level security;
+drop policy if exists plan_modules_read on plan_modules;
+drop policy if exists plan_modules_write on plan_modules;
+create policy plan_modules_read on plan_modules for select using (true);
+create policy plan_modules_write on plan_modules for all
   using (app.is_super_admin()) with check (app.is_super_admin());
 
 alter table platform_admins enable row level security;

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/server/tenancy/current-user";
+import { tenantDb } from "@/server/tenancy/scoped-db";
 import { getCashierTables } from "@/server/orders/cashier";
 import { CashierBoard } from "@/components/cashier/CashierBoard";
 import { signOut } from "../login/actions";
@@ -10,6 +11,10 @@ export default async function CashierHome() {
   if (!user || user.kind !== "staff" || !["cashier", "admin"].includes(user.role)) {
     redirect("/login");
   }
+  const r = await tenantDb(user.restaurantId, (tx) =>
+    tx.restaurant.findFirstOrThrow({ select: { status: true } }),
+  );
+  if (r.status === "suspended") redirect("/suspended");
 
   const initialTables = await getCashierTables();
 
