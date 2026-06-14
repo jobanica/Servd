@@ -46,7 +46,7 @@ export default async function AdminHome() {
             ["Printing", "/admin/printing", "Kitchen ticket printer setup", true],
             ["Branding", "/admin/branding", "Logo, colors & display name", false],
             ["Staff", "/admin/staff", "Kitchen, cashier & admin logins", false],
-            ["Feedback", "/admin/feedback", "Ratings & comments inbox", false],
+            ["Feedback", "/admin/feedback", "Ratings & comments inbox", true],
           ] as const
         ).map(([title, href, body, ready]) => {
           const card = (

@@ -21,6 +21,8 @@ export async function getPublicRestaurantBySlug(slug: string) {
         brandPrimaryColor: true,
         brandAccentColor: true,
         paymentOnlineEnabled: true,
+        googleReviewUrl: true,
+        feedbackMode: true,
       },
     }),
   );

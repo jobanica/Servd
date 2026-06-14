@@ -150,6 +150,16 @@ Phase 1; until then provision via Supabase dashboard + seed.
   place; sending/opt-in flows not built yet.
 - **Custom subdomains/domains** — `restaurants.subdomain` reserved, unused.
 
+## Feedback & reputation
+
+After payment, every diner gets the same ask — a 1–5 star rating + optional
+comment (stored for the owner's inbox at `/admin/feedback`) — and the same Google
+review invite, shown to **everyone regardless of rating**. Online payment routes
+to the feedback screen on success when `feedbackMode` is `on_device`/`both`; a
+"Leave feedback" link is always available for cash payers. Owners set the Google
+link + feedback mode at `/admin/reputation`. The automated follow-up SMS invite
+is Phase 11.
+
 ## Compliance guardrails (built into the design)
 
 - **No review gating.** The Google review invite is shown to ALL diners
@@ -173,6 +183,6 @@ Phase 1; until then provision via Supabase dashboard + seed.
 | 7 | Cashier dashboard + pluggable printing | ✅ |
 | 8 | Request bill | ✅ |
 | 9 | Online payment (PayMongo, webhooks) — **high risk** | ✅ |
-| 10 | Post-payment feedback + Google review invite | next |
-| 11 | SMS marketing (post-MVP) — **compliance risk** | |
+| 10 | Post-payment feedback + Google review invite | ✅ **(MVP complete)** |
+| 11 | SMS marketing (post-MVP) — **compliance risk** | next |
 ```

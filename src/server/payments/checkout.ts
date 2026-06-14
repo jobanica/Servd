@@ -25,7 +25,7 @@ export async function createTableCheckout(input: {
   const ctx = await systemDb(async (tx) => {
     const restaurant = await tx.restaurant.findFirst({
       where: { slug: parsed.data.slug, status: "active" },
-      select: { id: true, name: true, displayName: true },
+      select: { id: true, name: true, displayName: true, feedbackMode: true },
     });
     if (!restaurant) return null;
     const table = await tx.table.findFirst({
@@ -54,7 +54,12 @@ export async function createTableCheckout(input: {
   if (orders.length === 0) return { ok: false, error: "Nothing to pay right now." };
 
   const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const successUrl = `${base}/order/${parsed.data.slug}/${parsed.data.tableToken}?paid=1`;
+  const orderPath = `${base}/order/${parsed.data.slug}/${parsed.data.tableToken}`;
+  // After paying, send the diner to the on-device feedback screen when enabled;
+  // otherwise back to the menu (follow-up SMS handles feedback in that mode).
+  const onDevice =
+    ctx.restaurant.feedbackMode === "on_device" || ctx.restaurant.feedbackMode === "both";
+  const successUrl = onDevice ? `${orderPath}/feedback?paid=1` : `${orderPath}?paid=1`;
 
   let checkout;
   try {

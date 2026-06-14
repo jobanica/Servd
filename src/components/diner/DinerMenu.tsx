@@ -92,7 +92,13 @@ export function DinerMenu({
         </div>
       )}
 
-      <div className="mt-3 flex flex-wrap justify-end gap-2">
+      <div className="mt-3 flex flex-wrap items-center justify-end gap-3">
+        <a
+          href={`/order/${slug}/${tableToken}/feedback`}
+          className="text-sm font-semibold text-brand-primary"
+        >
+          Leave feedback
+        </a>
         {payOnline && <PayOnlineButton slug={slug} tableToken={tableToken} />}
         <RequestBillButton slug={slug} tableToken={tableToken} />
       </div>
