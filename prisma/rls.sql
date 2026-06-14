@@ -16,15 +16,22 @@
 --   Prisma connects as) is subject to the policies — without FORCE, the owner
 --   would silently bypass RLS and the isolation guarantee would be a lie.
 --
+-- COLUMN NAMES: Prisma maps tables to snake_case (@@map) but leaves COLUMNS in
+-- camelCase, so the foreign keys are "restaurantId", "modifierGroupId", etc.
+-- They MUST be double-quoted here or Postgres folds them to lowercase and the
+-- policies fail to compile.
+--
 -- APPLY WITH:  npm run db:rls   (after `prisma migrate`/`db push`)
 -- ============================================================================
 
 create schema if not exists app;
 
 -- The restaurant the current request is scoped to (NULL if unset).
-create or replace function app.current_restaurant_id() returns uuid
+-- Returns TEXT: Prisma stores ids as String/TEXT (not native uuid), so the
+-- comparison columns ("restaurantId", restaurants.id) are TEXT too.
+create or replace function app.current_restaurant_id() returns text
   language sql stable as $$
-    select nullif(current_setting('app.current_restaurant_id', true), '')::uuid
+    select nullif(current_setting('app.current_restaurant_id', true), '')
 $$;
 
 -- Whether the current request is a trusted platform/super-admin context.
@@ -35,7 +42,7 @@ $$;
 
 -- ----------------------------------------------------------------------------
 -- Helper: enable + FORCE rls and add a tenant policy for tables that have a
--- direct `restaurantId` ("restaurant_id") column.
+-- direct restaurant foreign key ("restaurantId" column).
 -- ----------------------------------------------------------------------------
 do $$
 declare
@@ -52,8 +59,8 @@ begin
     execute format('drop policy if exists tenant_isolation on %I;', t);
     execute format($f$
       create policy tenant_isolation on %I
-      using (app.is_super_admin() or restaurant_id = app.current_restaurant_id())
-      with check (app.is_super_admin() or restaurant_id = app.current_restaurant_id());
+      using (app.is_super_admin() or "restaurantId" = app.current_restaurant_id())
+      with check (app.is_super_admin() or "restaurantId" = app.current_restaurant_id());
     $f$, t);
   end loop;
 end $$;
@@ -69,7 +76,7 @@ create policy tenant_isolation on restaurants
   with check (app.is_super_admin() or id = app.current_restaurant_id());
 
 -- ----------------------------------------------------------------------------
--- Child tables WITHOUT a direct restaurant_id — isolate via their parent.
+-- Child tables WITHOUT a direct "restaurantId" — isolate via their parent.
 -- ----------------------------------------------------------------------------
 
 -- modifiers -> modifier_groups
@@ -79,12 +86,12 @@ drop policy if exists tenant_isolation on modifiers;
 create policy tenant_isolation on modifiers
   using (app.is_super_admin() or exists (
     select 1 from modifier_groups g
-    where g.id = modifiers.modifier_group_id
-      and g.restaurant_id = app.current_restaurant_id()))
+    where g.id = modifiers."modifierGroupId"
+      and g."restaurantId" = app.current_restaurant_id()))
   with check (app.is_super_admin() or exists (
     select 1 from modifier_groups g
-    where g.id = modifiers.modifier_group_id
-      and g.restaurant_id = app.current_restaurant_id()));
+    where g.id = modifiers."modifierGroupId"
+      and g."restaurantId" = app.current_restaurant_id()));
 
 -- menu_item_modifier_groups -> menu_items
 alter table menu_item_modifier_groups enable row level security;
@@ -93,12 +100,12 @@ drop policy if exists tenant_isolation on menu_item_modifier_groups;
 create policy tenant_isolation on menu_item_modifier_groups
   using (app.is_super_admin() or exists (
     select 1 from menu_items m
-    where m.id = menu_item_modifier_groups.menu_item_id
-      and m.restaurant_id = app.current_restaurant_id()))
+    where m.id = menu_item_modifier_groups."menuItemId"
+      and m."restaurantId" = app.current_restaurant_id()))
   with check (app.is_super_admin() or exists (
     select 1 from menu_items m
-    where m.id = menu_item_modifier_groups.menu_item_id
-      and m.restaurant_id = app.current_restaurant_id()));
+    where m.id = menu_item_modifier_groups."menuItemId"
+      and m."restaurantId" = app.current_restaurant_id()));
 
 -- order_items -> orders
 alter table order_items enable row level security;
@@ -107,12 +114,12 @@ drop policy if exists tenant_isolation on order_items;
 create policy tenant_isolation on order_items
   using (app.is_super_admin() or exists (
     select 1 from orders o
-    where o.id = order_items.order_id
-      and o.restaurant_id = app.current_restaurant_id()))
+    where o.id = order_items."orderId"
+      and o."restaurantId" = app.current_restaurant_id()))
   with check (app.is_super_admin() or exists (
     select 1 from orders o
-    where o.id = order_items.order_id
-      and o.restaurant_id = app.current_restaurant_id()));
+    where o.id = order_items."orderId"
+      and o."restaurantId" = app.current_restaurant_id()));
 
 -- order_item_modifiers -> order_items -> orders
 alter table order_item_modifiers enable row level security;
@@ -121,14 +128,14 @@ drop policy if exists tenant_isolation on order_item_modifiers;
 create policy tenant_isolation on order_item_modifiers
   using (app.is_super_admin() or exists (
     select 1 from order_items oi
-    join orders o on o.id = oi.order_id
-    where oi.id = order_item_modifiers.order_item_id
-      and o.restaurant_id = app.current_restaurant_id()))
+    join orders o on o.id = oi."orderId"
+    where oi.id = order_item_modifiers."orderItemId"
+      and o."restaurantId" = app.current_restaurant_id()))
   with check (app.is_super_admin() or exists (
     select 1 from order_items oi
-    join orders o on o.id = oi.order_id
-    where oi.id = order_item_modifiers.order_item_id
-      and o.restaurant_id = app.current_restaurant_id()));
+    join orders o on o.id = oi."orderId"
+    where oi.id = order_item_modifiers."orderItemId"
+      and o."restaurantId" = app.current_restaurant_id()));
 
 -- payments -> orders
 alter table payments enable row level security;
@@ -137,12 +144,12 @@ drop policy if exists tenant_isolation on payments;
 create policy tenant_isolation on payments
   using (app.is_super_admin() or exists (
     select 1 from orders o
-    where o.id = payments.order_id
-      and o.restaurant_id = app.current_restaurant_id()))
+    where o.id = payments."orderId"
+      and o."restaurantId" = app.current_restaurant_id()))
   with check (app.is_super_admin() or exists (
     select 1 from orders o
-    where o.id = payments.order_id
-      and o.restaurant_id = app.current_restaurant_id()));
+    where o.id = payments."orderId"
+      and o."restaurantId" = app.current_restaurant_id()));
 
 -- sms_messages -> sms_campaigns
 alter table sms_messages enable row level security;
@@ -151,12 +158,12 @@ drop policy if exists tenant_isolation on sms_messages;
 create policy tenant_isolation on sms_messages
   using (app.is_super_admin() or exists (
     select 1 from sms_campaigns c
-    where c.id = sms_messages.campaign_id
-      and c.restaurant_id = app.current_restaurant_id()))
+    where c.id = sms_messages."campaignId"
+      and c."restaurantId" = app.current_restaurant_id()))
   with check (app.is_super_admin() or exists (
     select 1 from sms_campaigns c
-    where c.id = sms_messages.campaign_id
-      and c.restaurant_id = app.current_restaurant_id()));
+    where c.id = sms_messages."campaignId"
+      and c."restaurantId" = app.current_restaurant_id()));
 
 -- ----------------------------------------------------------------------------
 -- Platform-level tables.
