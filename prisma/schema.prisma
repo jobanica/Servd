@@ -40,6 +40,7 @@ enum OrderStatus {
   new
   preparing
   done
+  closed // settled by the cashier — leaves the active boards
   cancelled
 }
 
@@ -170,6 +171,7 @@ model Restaurant {
   menuItems       MenuItem[]
   modifierGroups  ModifierGroup[]
   orders          Order[]
+  printJobs       PrintJob[]
   feedback        Feedback[]
   customers       CustomerContact[]
   smsCampaigns    SmsCampaign[]
@@ -365,6 +367,25 @@ model OrderItemModifier {
 
   @@index([orderItemId])
   @@map("order_item_modifiers")
+}
+
+/// Queue for the "cloud" / server-direct print transport: the printer polls an
+/// endpoint and pulls pending jobs (ESC/POS, base64). Also records jobs for the
+/// network transport for auditing.
+model PrintJob {
+  id           String   @id @default(uuid())
+  restaurantId String
+  orderId      String?
+  method       PrintMethod
+  payloadBase64 String // ESC/POS bytes, base64
+  status       String   @default("queued") // queued | printed | failed
+  createdAt    DateTime @default(now())
+  printedAt    DateTime?
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, status])
+  @@map("print_jobs")
 }
 
 model Payment {

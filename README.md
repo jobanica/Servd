@@ -46,6 +46,23 @@ tenant-isolated path everything else uses. This avoids needing per-restaurant JW
 claims to satisfy RLS on a streamed table. A 15s polling fallback keeps boards
 fresh even if Supabase Realtime isn't configured (the UI shows Live vs Polling).
 
+## Pluggable printing
+
+One ticket model (`src/lib/printing/ticket.ts`) renders to either ESC/POS bytes
+(`escpos.ts`) or printable HTML. The transport is chosen per restaurant
+(`restaurant.printMethod`) and dispatched in `src/server/printing/print.ts`:
+
+| Method | Where it runs | Notes |
+| --- | --- | --- |
+| `network` | server → local print-bridge agent | Wi-Fi/USB ESC/POS; browsers can't open raw :9100, so a tiny agent relays it. Most reliable. |
+| `cloud` | printer polls `/api/print/cloud/[id]?token=` | CloudPRNT/Server Direct; works on ANY device incl. iPad/iPhone. |
+| `bluetooth` | browser (Web Bluetooth) | Chromium desktop/Android only, BLE ESC/POS only; runtime-detected with fallback. |
+| `os_dialog` | browser (print HTML ticket) | AirPrint/OS dialog; device-agnostic fallback. |
+
+Manual print is the "Print ticket" button on the cashier board; `autoPrint`
+prints each new order automatically (server-driven methods only). Configure at
+`/admin/printing`.
+
 ## White-label branding
 
 The Servd palette (`src/styles/globals.css`) is the **default**. Diner pages
@@ -133,8 +150,8 @@ Phase 1; until then provision via Supabase dashboard + seed.
 | 4 | Diner menu → cart | ✅ |
 | 5 | Place order (modifier pricing, snapshotting) | ✅ |
 | 6 | Real-time kitchen display | ✅ |
-| 7 | Cashier dashboard + pluggable printing | next |
-| 8 | Request bill | |
+| 7 | Cashier dashboard + pluggable printing | ✅ |
+| 8 | Request bill | next |
 | 9 | Online payment (PayMongo, webhooks) — **high risk** | |
 | 10 | Post-payment feedback + Google review invite | |
 | 11 | SMS marketing (post-MVP) — **compliance risk** | |

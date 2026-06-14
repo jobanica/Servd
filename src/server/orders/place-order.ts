@@ -8,6 +8,7 @@ import {
 } from "@/lib/validation/order";
 import { unitPrice, validateSelection } from "@/lib/cart/pricing";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
+import { autoPrintIfEnabled } from "@/server/printing/print";
 import type { DinerItem, Selection } from "@/lib/cart/types";
 
 /**
@@ -161,6 +162,8 @@ export async function placeOrder(
 
   // Push the new order to the live kitchen/cashier screens.
   await notifyOrdersChanged(ctx.restaurantId);
+  // Auto-print the ticket if the restaurant uses a server-driven printer.
+  await autoPrintIfEnabled(ctx.restaurantId, order.id);
 
   return { ok: true, orderId: order.id };
 }
