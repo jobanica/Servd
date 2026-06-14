@@ -51,7 +51,9 @@ declare
     'staff_users', 'subscriptions', 'tables', 'categories', 'menu_items',
     'modifier_groups', 'orders', 'feedback', 'customer_contacts',
     'sms_campaigns', 'sms_credit_ledger', 'print_jobs', 'restaurant_invoices',
-    'menu_item_translations', 'category_translations'
+    'menu_item_translations', 'category_translations',
+    'suppliers', 'inventory_items', 'recipe_components', 'stock_movements',
+    'purchase_orders', 'purchase_order_items'
   ];
 begin
   foreach t in array tenant_tables loop

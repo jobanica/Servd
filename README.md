@@ -150,6 +150,18 @@ Phase 1; until then provision via Supabase dashboard + seed.
   place; sending/opt-in flows not built yet.
 - **Custom subdomains/domains** — `restaurants.subdomain` reserved, unused.
 
+## Inventory (premium module)
+
+Gated by the `inventory` plan module. Ingredients (`inventory_items`), suppliers,
+purchase orders (receive → **weighted-average cost**), and recipes
+(`recipe_components`, edited on the menu item page). Stock changes only via
+`stock_movements` (sale/waste/received/adjustment/count) — a full audit trail.
+When the kitchen marks an order **done**, ingredients auto-deduct (idempotent via
+`order.inventoryDeductedAt`); if `autoOutOfStock` is on, items whose ingredient
+hits zero flip to unavailable (reuses `isAvailable`). `/admin/inventory` shows
+low-stock + 30-day COGS; counts record variance. (Email/SMS low-stock alerts
+deferred.)
+
 ## Custom domains (premium)
 
 Gated by the `custom_domain` plan module. A restaurant can serve its diner pages
@@ -255,5 +267,5 @@ feedback screen, kept separate from the (non-incentivized) Google review ask.
 | E | Menu item videos | ✅ |
 | F | Custom subdomains / domains | ✅ |
 | G | HRIS module (plan-gated) | planned |
-| H | Inventory module (plan-gated) | planned |
+| H | Inventory module (plan-gated) | ✅ |
 ```

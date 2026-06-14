@@ -191,6 +191,9 @@ model Restaurant {
   // Language the base menu text was written in (the i18n fallback).
   defaultLocale String @default("en")
 
+  // Inventory: auto-flip a menu item to out-of-stock when an ingredient hits 0.
+  autoOutOfStock Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -208,6 +211,9 @@ model Restaurant {
   smsCampaigns    SmsCampaign[]
   smsCreditLedger SmsCreditLedger[]
   invoices        RestaurantInvoice[]
+  suppliers       Supplier[]
+  inventoryItems  InventoryItem[]
+  purchaseOrders  PurchaseOrder[]
 
   @@map("restaurants")
 }
@@ -334,9 +340,10 @@ model MenuItem {
 
   restaurant     Restaurant              @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   category       Category                @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  modifierGroups MenuItemModifierGroup[]
-  orderItems     OrderItem[]
-  translations   MenuItemTranslation[]
+  modifierGroups   MenuItemModifierGroup[]
+  orderItems       OrderItem[]
+  translations     MenuItemTranslation[]
+  recipeComponents RecipeComponent[]
 
   @@index([restaurantId])
   @@index([categoryId])
@@ -402,6 +409,125 @@ model MenuItemModifierGroup {
 }
 
 // ----------------------------------------------------------------------------
+// Inventory module (plan-gated by `inventory`)
+// ----------------------------------------------------------------------------
+
+enum StockReason {
+  sale // auto-deducted when an order is marked done
+  waste
+  received // from a purchase order
+  adjustment // manual correction
+  count // reconciled by a stock count
+}
+
+enum PurchaseOrderStatus {
+  draft
+  ordered
+  received
+  cancelled
+}
+
+model Supplier {
+  id           String   @id @default(uuid())
+  restaurantId String
+  name         String
+  contactJson  Json?
+  createdAt    DateTime @default(now())
+
+  restaurant     Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  inventoryItems InventoryItem[]
+  purchaseOrders PurchaseOrder[]
+
+  @@index([restaurantId])
+  @@map("suppliers")
+}
+
+model InventoryItem {
+  id           String   @id @default(uuid())
+  restaurantId String
+  name         String
+  unit         String // "kg", "pc", "ml", …
+  stockQty     Float    @default(0)
+  costPerUnit  Int      @default(0) // centavos (weighted-average)
+  reorderLevel Float    @default(0)
+  supplierId   String?
+  createdAt    DateTime @default(now())
+
+  restaurant       Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  supplier         Supplier?           @relation(fields: [supplierId], references: [id])
+  movements        StockMovement[]
+  recipeComponents RecipeComponent[]
+  poItems          PurchaseOrderItem[]
+
+  @@index([restaurantId])
+  @@map("inventory_items")
+}
+
+model RecipeComponent {
+  id              String @id @default(uuid())
+  restaurantId    String
+  menuItemId      String
+  inventoryItemId String
+  quantity        Float // amount consumed per 1 of the menu item
+
+  menuItem      MenuItem      @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+
+  @@unique([menuItemId, inventoryItemId])
+  @@index([restaurantId])
+  @@map("recipe_components")
+}
+
+model StockMovement {
+  id              String      @id @default(uuid())
+  restaurantId    String
+  inventoryItemId String
+  changeQty       Float // negative = consumed, positive = added
+  reason          StockReason
+  unitCost        Int? // cost/unit at the time (centavos) — for COGS
+  refId           String? // orderId / purchaseOrderId / etc.
+  note            String?
+  createdAt       DateTime    @default(now())
+
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, createdAt])
+  @@index([inventoryItemId])
+  @@map("stock_movements")
+}
+
+model PurchaseOrder {
+  id           String              @id @default(uuid())
+  restaurantId String
+  supplierId   String?
+  status       PurchaseOrderStatus @default(draft)
+  createdAt    DateTime            @default(now())
+  receivedAt   DateTime?
+
+  restaurant Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  supplier   Supplier?           @relation(fields: [supplierId], references: [id])
+  items      PurchaseOrderItem[]
+
+  @@index([restaurantId])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String @id @default(uuid())
+  restaurantId    String
+  purchaseOrderId String
+  inventoryItemId String
+  quantity        Float
+  unitCost        Int // centavos
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+
+  @@index([restaurantId])
+  @@map("purchase_order_items")
+}
+
+// ----------------------------------------------------------------------------
 // Orders
 // ----------------------------------------------------------------------------
 
@@ -413,6 +539,7 @@ model Order {
   billRequested Boolean       @default(false)
   paymentStatus PaymentStatus @default(unpaid)
   total         Int           @default(0) // centavos
+  inventoryDeductedAt DateTime? // set once stock is deducted (idempotency)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 

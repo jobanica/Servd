@@ -3,6 +3,7 @@
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireStaff } from "@/server/tenancy/current-user";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
+import { deductForOrder } from "@/server/inventory/deduct";
 import type { KitchenOrder } from "@/lib/orders/types";
 
 const ACTIVE = ["new", "preparing"] as const;
@@ -75,6 +76,11 @@ export async function advanceOrderStatus(
   await tenantDb(staff.restaurantId, (tx) =>
     tx.order.update({ where: { id: orderId }, data: { status: toStatus } }),
   );
+
+  // Consumption happens when the kitchen finishes the order.
+  if (toStatus === "done") {
+    await deductForOrder(staff.restaurantId, orderId);
+  }
 
   // Signal other screens (cashier, other kitchen tablets) to refresh.
   await notifyOrdersChanged(staff.restaurantId);

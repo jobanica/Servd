@@ -60,6 +60,7 @@ export default async function AdminHome() {
             ["Billing", "/admin/billing", "Plan, trial & invoices", true],
             ["Analytics", "/admin/analytics", "Revenue, items & trends", true],
             ["Custom domain", "/admin/domains", "Branded subdomain or your own domain", true],
+            ["Inventory", "/admin/inventory", "Ingredients, recipes & stock", true],
           ] as const
         ).map(([title, href, body, ready]) => {
           const card = (
