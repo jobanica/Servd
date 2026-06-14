@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/server/tenancy/current-user";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { addSmsCredits, setSenderName } from "@/server/sms/admin";
 import { unsuspendRestaurant } from "@/server/billing/admin-actions";
+import { getPlatformMetrics } from "@/server/analytics/platform";
 import { formatPeso } from "@/lib/money";
 import { signOut } from "../login/actions";
 
@@ -31,6 +32,7 @@ export default async function SuperAdminHome() {
     return sum + (sub && (sub.status === "active" || sub.status === "trialing") ? sub.plan.priceMonthly : 0);
   }, 0);
   const activeCount = restaurants.filter((r) => r.status === "active").length;
+  const metrics = await getPlatformMetrics();
 
   return (
     <div>
@@ -57,6 +59,14 @@ export default async function SuperAdminHome() {
         <div className="rounded-tile border border-plum-ink/10 bg-white p-4">
           <p className="text-xs text-plum-ink/50">MRR (incl. trials)</p>
           <p className="font-heading text-2xl font-extrabold">{formatPeso(mrr)}</p>
+        </div>
+        <div className="rounded-tile border border-plum-ink/10 bg-white p-4">
+          <p className="text-xs text-plum-ink/50">Orders (30d)</p>
+          <p className="font-heading text-2xl font-extrabold">{metrics.orders30}</p>
+        </div>
+        <div className="rounded-tile border border-plum-ink/10 bg-white p-4">
+          <p className="text-xs text-plum-ink/50">SMS credits used</p>
+          <p className="font-heading text-2xl font-extrabold">{metrics.smsCreditsUsed}</p>
         </div>
       </div>
 

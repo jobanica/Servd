@@ -227,7 +227,7 @@ feedback screen, kept separate from the (non-incentivized) Google review ask.
 | --- | --- | --- |
 | A | Self-serve signup + onboarding wizard + branding editor | ✅ |
 | B | Subscription billing (restaurants pay the platform) | ✅ |
-| C | Analytics & reporting | planned |
+| C | Analytics & reporting | ✅ |
 | D | Internationalization (i18n) | planned |
 | E | Menu item videos | planned |
 | F | Custom subdomains / domains | planned |

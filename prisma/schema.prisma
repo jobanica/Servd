@@ -385,6 +385,7 @@ model Order {
   feedback   Feedback[]
 
   @@index([restaurantId, status])
+  @@index([restaurantId, createdAt]) // date-range analytics
   @@index([tableId])
   @@map("orders")
 }
@@ -474,6 +475,7 @@ model Feedback {
   order      Order?     @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
   @@index([restaurantId])
+  @@index([restaurantId, createdAt]) // rating-trend analytics
   @@map("feedback")
 }
 
