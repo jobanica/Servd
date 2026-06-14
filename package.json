@@ -3,10 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "description": "Servd — multi-tenant QR restaurant ordering platform",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "postinstall": "prisma generate",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
