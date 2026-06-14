@@ -13,6 +13,7 @@ type Item = {
   price: number;
   isAvailable: boolean;
   imageUrl: string | null;
+  videoUrl: string | null;
 };
 
 export function EditItemForm({
@@ -107,6 +108,30 @@ export function EditItemForm({
             className="text-xs"
           />
         </label>
+      </div>
+
+      <div className="rounded-lg border border-plum-ink/10 p-3">
+        <p className="text-sm font-medium">Video (optional)</p>
+        <p className="text-xs text-plum-ink/50">
+          Paste a YouTube/Vimeo or direct link, or upload an MP4/WebM (≤ 50 MB).
+        </p>
+        <input
+          name="videoUrl"
+          defaultValue={item.videoUrl ?? ""}
+          placeholder="https://youtu.be/… or https://…/clip.mp4"
+          className="mt-2 w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+        />
+        <input
+          type="file"
+          name="video"
+          accept="video/mp4,video/webm"
+          className="mt-2 block text-xs"
+        />
+        {item.videoUrl && (
+          <label className="mt-2 flex items-center gap-2 text-xs text-plum-ink/60">
+            <input type="checkbox" name="removeVideo" /> Remove current video
+          </label>
+        )}
       </div>
 
       {state?.error && <p className="text-sm text-guava">{state.error}</p>}

@@ -14,6 +14,8 @@ const item: DinerItem = {
   description: null,
   price: 20000, // ₱200
   imageUrl: null,
+  videoUrl: null,
+  videoPosterUrl: null,
   isAvailable: true,
   groups: [
     {

@@ -59,3 +59,7 @@ export const ALLOWED_IMAGE_TYPES = [
   "image/webp",
 ] as const;
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
+
+// Menu item videos (short clips).
+export const ALLOWED_VIDEO_TYPES = ["video/mp4", "video/webm"] as const;
+export const MAX_VIDEO_BYTES = 50 * 1024 * 1024; // 50 MB

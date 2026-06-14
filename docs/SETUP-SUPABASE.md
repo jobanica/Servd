@@ -72,8 +72,11 @@ Then sign in at `/login`; the super-admin lands on `/super-admin`.
 > confirming + signing in, the owner is guided through the onboarding wizard.
 
 ## 5. Storage bucket (dashboard-only)
-In Supabase → Storage, create a **public** bucket named **`menu-images`**
-(menu photo uploads, validated server-side to JPEG/PNG/WebP ≤ 5 MB).
+In Supabase → Storage, create two **public** buckets:
+- **`menu-images`** — menu/branding photos (JPEG/PNG/WebP ≤ 5 MB)
+- **`menu-videos`** — menu item clips (MP4/WebM ≤ 50 MB)
+
+Both are validated server-side and namespaced per restaurant.
 
 ## 6. Run
 ```bash

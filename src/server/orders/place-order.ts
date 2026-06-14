@@ -85,6 +85,8 @@ export async function placeOrder(
       description: dbItem.description,
       price: dbItem.price,
       imageUrl: dbItem.imageUrl,
+      videoUrl: dbItem.videoUrl,
+      videoPosterUrl: dbItem.videoPosterUrl,
       isAvailable: dbItem.isAvailable,
       groups: dbItem.modifierGroups.map((l) => ({
         id: l.group.id,

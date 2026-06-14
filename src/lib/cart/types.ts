@@ -25,6 +25,8 @@ export interface DinerItem {
   description: string | null;
   price: number; // centavos
   imageUrl: string | null;
+  videoUrl: string | null;
+  videoPosterUrl: string | null;
   isAvailable: boolean;
   groups: DinerModifierGroup[];
 }

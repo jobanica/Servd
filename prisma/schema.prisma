@@ -306,6 +306,8 @@ model MenuItem {
   description  String?
   price        Int // centavos
   imageUrl     String?
+  videoUrl     String? // uploaded file URL or a YouTube/Vimeo/direct link
+  videoPosterUrl String? // optional poster; UI falls back to imageUrl
   isAvailable  Boolean  @default(true) // false => out of stock
   sortOrder    Int      @default(0)
   createdAt    DateTime @default(now())

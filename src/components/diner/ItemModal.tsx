@@ -8,6 +8,7 @@ import {
   selectionToLineModifiers,
 } from "@/lib/cart/pricing";
 import type { CartLine, DinerItem, Selection } from "@/lib/cart/types";
+import { VideoPlayer } from "./VideoPlayer";
 
 /** Generates a unique line id without pulling in a uuid dependency. */
 function lineId(): string {
@@ -80,6 +81,12 @@ export function ItemModal({
         </div>
         {item.description && (
           <p className="mt-1 text-sm text-brand-ink/60">{item.description}</p>
+        )}
+
+        {item.videoUrl && (
+          <div className="mt-3">
+            <VideoPlayer url={item.videoUrl} poster={item.videoPosterUrl ?? item.imageUrl} />
+          </div>
         )}
 
         {item.groups.map((group) => {

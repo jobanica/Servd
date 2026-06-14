@@ -5,6 +5,7 @@ import { z } from "zod";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireAdminAction } from "@/server/tenancy/require-admin";
 import { uploadMenuImage } from "@/server/storage/menu-images";
+import { uploadMenuVideo } from "@/server/storage/menu-videos";
 import { pesosToCentavos } from "@/lib/money";
 import {
   categorySchema,
@@ -80,6 +81,29 @@ async function resolveImageUrl(
   return undefined;
 }
 
+/**
+ * Resolves the video change from the form:
+ *   removeVideo → null · uploaded file → upload · pasted URL → that URL · else no change.
+ * A returned {} means "leave the existing video untouched".
+ */
+async function resolveVideoUpdate(
+  restaurantId: string,
+  formData: FormData,
+): Promise<{ videoUrl?: string | null }> {
+  if (formData.get("removeVideo") === "on") return { videoUrl: null };
+
+  const file = formData.get("video");
+  if (file instanceof File && file.size > 0) {
+    return { videoUrl: await uploadMenuVideo(restaurantId, file) };
+  }
+  const url = String(formData.get("videoUrl") ?? "").trim();
+  if (url) {
+    if (!/^https?:\/\//i.test(url)) throw new Error("Video URL must start with http(s)://");
+    return { videoUrl: url };
+  }
+  return {};
+}
+
 export async function createItem(
   _prev: FormState,
   formData: FormData,
@@ -134,10 +158,12 @@ export async function updateItem(
   if (!parsed.success) return { error: firstError(parsed.error) };
 
   let imageUrl: string | undefined;
+  let videoUpdate: { videoUrl?: string | null } = {};
   try {
     imageUrl = await resolveImageUrl(restaurantId, formData);
+    videoUpdate = await resolveVideoUpdate(restaurantId, formData);
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Image upload failed" };
+    return { error: e instanceof Error ? e.message : "Upload failed" };
   }
 
   await tenantDb(restaurantId, (tx) =>
@@ -151,6 +177,7 @@ export async function updateItem(
         isAvailable: parsed.data.isAvailable,
         // Only overwrite the image when a new one was uploaded.
         ...(imageUrl ? { imageUrl } : {}),
+        ...videoUpdate,
       },
     }),
   );

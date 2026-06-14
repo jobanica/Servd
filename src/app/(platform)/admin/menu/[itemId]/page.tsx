@@ -41,6 +41,7 @@ export default async function EditItemPage({
           price: item.price,
           isAvailable: item.isAvailable,
           imageUrl: item.imageUrl,
+          videoUrl: item.videoUrl,
         }}
         categories={categories}
       />

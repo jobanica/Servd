@@ -229,7 +229,7 @@ feedback screen, kept separate from the (non-incentivized) Google review ask.
 | B | Subscription billing (restaurants pay the platform) | ✅ |
 | C | Analytics & reporting | ✅ |
 | D | Internationalization (i18n) | planned |
-| E | Menu item videos | planned |
+| E | Menu item videos | ✅ |
 | F | Custom subdomains / domains | planned |
 | G | HRIS module (plan-gated) | planned |
 | H | Inventory module (plan-gated) | planned |
