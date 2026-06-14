@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { uniqueSlug } from "@/lib/slug";
 import { startTrial } from "@/server/billing/subscription";
@@ -68,7 +69,15 @@ export async function signUpRestaurant(
       // Start the 30-day free trial.
       await startTrial(tx, restaurant.id);
     });
-  } catch {
+  } catch (e) {
+    // Log the real cause for debugging (often a stale DB schema).
+    console.error("[signup] provisioning failed:", e);
+    // Roll back the orphaned auth user so the email can be reused on retry.
+    try {
+      await createSupabaseAdminClient().auth.admin.deleteUser(authUserId);
+    } catch (cleanup) {
+      console.error("[signup] orphan cleanup failed:", cleanup);
+    }
     return { error: "Couldn't create your restaurant. Please try again." };
   }
 
