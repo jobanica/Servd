@@ -30,6 +30,7 @@ export default async function DinerOrderPage({
   return (
     <DinerMenu
       restaurantId={restaurant.id}
+      slug={slug}
       tableToken={tableToken}
       tableNumber={table.tableNumber}
       brand={{

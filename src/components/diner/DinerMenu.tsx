@@ -5,6 +5,8 @@ import { formatPeso } from "@/lib/money";
 import { cartCount, cartTotal } from "@/lib/cart/pricing";
 import { useCart } from "@/lib/cart/useCart";
 import type { DinerCategory, DinerItem } from "@/lib/cart/types";
+import { placeOrder } from "@/server/orders/place-order";
+import type { PlaceOrderResult } from "@/lib/validation/order";
 import { ItemModal } from "./ItemModal";
 import { CartDrawer } from "./CartDrawer";
 
@@ -16,18 +18,35 @@ interface RestaurantBrand {
 
 export function DinerMenu({
   restaurantId,
+  slug,
   tableToken,
   tableNumber,
   brand,
   categories,
 }: {
   restaurantId: string;
+  slug: string;
   tableToken: string;
   tableNumber: string;
   brand: RestaurantBrand;
   categories: DinerCategory[];
 }) {
   const cart = useCart(restaurantId, tableToken);
+
+  // Build the untrusted payload (ids + quantities only) and submit it. The
+  // server re-validates and recomputes the real total.
+  async function submitOrder(): Promise<PlaceOrderResult> {
+    return placeOrder({
+      slug,
+      tableToken,
+      lines: cart.lines.map((l) => ({
+        itemId: l.itemId,
+        quantity: l.quantity,
+        note: l.note,
+        modifierIds: l.modifiers.map((m) => m.modifierId),
+      })),
+    });
+  }
   const [activeItem, setActiveItem] = useState<DinerItem | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
 
@@ -162,6 +181,8 @@ export function DinerMenu({
           onSetQty={cart.setQty}
           onRemove={cart.removeLine}
           onClose={() => setCartOpen(false)}
+          onPlaceOrder={submitOrder}
+          onPlaced={cart.clear}
         />
       )}
     </div>
