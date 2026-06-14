@@ -17,7 +17,7 @@ it as a subscription to many restaurants.
 | ORM / migrations | Prisma |
 | Auth | Supabase Auth (staff/admin/super-admin only; diners need no login) |
 | Tenant isolation | `restaurant_id` on every row + **Postgres Row-Level Security** |
-| Realtime (Phase 6+) | Supabase Realtime |
+| Realtime (Phase 6+) | Supabase Realtime (broadcast ping + server refetch) |
 | Object storage (Phase 1+) | Supabase Storage |
 | Styling | Tailwind CSS driven by CSS variables (enables white-label) |
 | Payments (Phase 9) | PayMongo behind a `PaymentGateway` interface |
@@ -35,6 +35,16 @@ it as a subscription to many restaurants.
    bypassed. The super-admin uses `systemDb(…)` to operate across tenants.
 
 This is verified by `tests/isolation/tenant-isolation.test.ts`.
+
+## Realtime (kitchen/cashier)
+
+We treat realtime as a **signal, not a data channel**. When an order is placed or
+its status changes, the server broadcasts a contentless `refresh` ping on a
+per-restaurant channel (`orders-{id}`). Live screens react by refetching through
+the session-scoped server actions (`getKitchenOrders`) — the same trusted,
+tenant-isolated path everything else uses. This avoids needing per-restaurant JWT
+claims to satisfy RLS on a streamed table. A 15s polling fallback keeps boards
+fresh even if Supabase Realtime isn't configured (the UI shows Live vs Polling).
 
 ## White-label branding
 
@@ -122,8 +132,8 @@ Phase 1; until then provision via Supabase dashboard + seed.
 | 3 | Tables + printable QR | ✅ |
 | 4 | Diner menu → cart | ✅ |
 | 5 | Place order (modifier pricing, snapshotting) | ✅ |
-| 6 | Real-time kitchen display | next |
-| 7 | Cashier dashboard + pluggable printing | |
+| 6 | Real-time kitchen display | ✅ |
+| 7 | Cashier dashboard + pluggable printing | next |
 | 8 | Request bill | |
 | 9 | Online payment (PayMongo, webhooks) — **high risk** | |
 | 10 | Post-payment feedback + Google review invite | |

@@ -1,12 +1,17 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/server/tenancy/current-user";
+import { getKitchenOrders } from "@/server/orders/kitchen";
+import { KitchenBoard } from "@/components/kitchen/KitchenBoard";
 import { signOut } from "../login/actions";
 
 export default async function KitchenHome() {
   const user = await getCurrentUser();
-  if (!user || user.kind !== "staff" || user.role !== "kitchen") {
+  if (!user || user.kind !== "staff" || !["kitchen", "admin"].includes(user.role)) {
     redirect("/login");
   }
+
+  const initialOrders = await getKitchenOrders();
+
   return (
     <div>
       <div className="flex items-center justify-between">
@@ -17,9 +22,11 @@ export default async function KitchenHome() {
           </button>
         </form>
       </div>
-      <p className="mt-4 text-sm text-plum-ink/60">
-        Real-time incoming orders arrive here in Phase 6.
+      <p className="mb-6 text-sm text-plum-ink/60">
+        New orders appear here automatically. Advance each order as you cook.
       </p>
+
+      <KitchenBoard restaurantId={user.restaurantId} initialOrders={initialOrders} />
     </div>
   );
 }

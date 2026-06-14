@@ -7,6 +7,7 @@ import {
   type PlaceOrderResult,
 } from "@/lib/validation/order";
 import { unitPrice, validateSelection } from "@/lib/cart/pricing";
+import { notifyOrdersChanged } from "@/server/realtime/notify";
 import type { DinerItem, Selection } from "@/lib/cart/types";
 
 /**
@@ -157,6 +158,9 @@ export async function placeOrder(
       select: { id: true },
     }),
   );
+
+  // Push the new order to the live kitchen/cashier screens.
+  await notifyOrdersChanged(ctx.restaurantId);
 
   return { ok: true, orderId: order.id };
 }
