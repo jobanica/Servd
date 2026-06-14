@@ -18,6 +18,11 @@ export default async function AdminHome() {
     tx.restaurant.findFirstOrThrow(),
   );
 
+  // First-run: guide new owners through the onboarding wizard (skippable).
+  if (!restaurant.onboardingCompletedAt) {
+    redirect("/admin/onboarding");
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between">

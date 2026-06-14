@@ -204,4 +204,16 @@ feedback screen, kept separate from the (non-incentivized) Google review ask.
 | 9 | Online payment (PayMongo, webhooks) — **high risk** | ✅ |
 | 10 | Post-payment feedback + Google review invite | ✅ **(MVP complete)** |
 | 11 | SMS marketing (post-MVP) — **compliance risk** | ✅ |
+
+### Extension phases (post-MVP roadmap: A–H)
+| Phase | What | Status |
+| --- | --- | --- |
+| A | Self-serve signup + onboarding wizard + branding editor | ✅ |
+| B | Subscription billing (restaurants pay the platform) | planned |
+| C | Analytics & reporting | planned |
+| D | Internationalization (i18n) | planned |
+| E | Menu item videos | planned |
+| F | Custom subdomains / domains | planned |
+| G | HRIS module (plan-gated) | planned |
+| H | Inventory module (plan-gated) | planned |
 ```

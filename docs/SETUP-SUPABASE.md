@@ -66,6 +66,11 @@ npm run user:create -- staff mango-grill cashier cashier@mango.test 'StrongPass1
 ```
 Then sign in at `/login`; the super-admin lands on `/super-admin`.
 
+> Restaurants can now also **self-serve sign up** at `/signup` (no script). This
+> requires email confirmation, so configure Supabase Auth → **Email** (the
+> built-in sender is rate-limited; set real SMTP for production). After
+> confirming + signing in, the owner is guided through the onboarding wizard.
+
 ## 5. Storage bucket (dashboard-only)
 In Supabase → Storage, create a **public** bucket named **`menu-images`**
 (menu photo uploads, validated server-side to JPEG/PNG/WebP ≤ 5 MB).
