@@ -53,7 +53,10 @@ declare
     'sms_campaigns', 'sms_credit_ledger', 'print_jobs', 'restaurant_invoices',
     'menu_item_translations', 'category_translations',
     'suppliers', 'inventory_items', 'recipe_components', 'stock_movements',
-    'purchase_orders', 'purchase_order_items'
+    'purchase_orders', 'purchase_order_items',
+    'employees', 'employee_documents', 'shifts', 'availabilities',
+    'shift_swap_requests', 'time_entries', 'leave_types', 'leave_requests',
+    'leave_balances'
   ];
 begin
   foreach t in array tenant_tables loop

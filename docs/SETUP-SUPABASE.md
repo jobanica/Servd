@@ -76,7 +76,9 @@ In Supabase → Storage, create two **public** buckets:
 - **`menu-images`** — menu/branding photos (JPEG/PNG/WebP ≤ 5 MB)
 - **`menu-videos`** — menu item clips (MP4/WebM ≤ 50 MB)
 
-Both are validated server-side and namespaced per restaurant.
+Both are validated server-side and namespaced per restaurant. Also create a
+**private** bucket **`employee-documents`** (HRIS docs are sensitive; served via
+signed URLs).
 
 ## 6. Run
 ```bash

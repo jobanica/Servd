@@ -124,6 +124,16 @@ d("tenant isolation (RLS)", () => {
     expect(bTr.length).toBe(0);
   });
 
+  it("employees are tenant-isolated", async () => {
+    await asSuper((tx) =>
+      tx.employee.create({ data: { restaurantId: A, fullName: "Iso Employee" } }),
+    );
+    const aEmp = await asTenant<any[]>(A, (tx) => tx.employee.findMany());
+    const bEmp = await asTenant<any[]>(B, (tx) => tx.employee.findMany());
+    expect(aEmp.length).toBeGreaterThanOrEqual(1);
+    expect(bEmp.length).toBe(0);
+  });
+
   it("inventory_items are tenant-isolated", async () => {
     await asSuper((tx) =>
       tx.inventoryItem.create({

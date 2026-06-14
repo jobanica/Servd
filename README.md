@@ -162,6 +162,19 @@ hits zero flip to unavailable (reuses `isAvailable`). `/admin/inventory` shows
 low-stock + 30-day COGS; counts record variance. (Email/SMS low-stock alerts
 deferred.)
 
+## HRIS (premium module)
+
+Gated by the `hris` module; accessible to owner + a new **`manager`** role.
+Employees (profiles, pay rate/type, emergency contact, document uploads to a
+**private** `employee-documents` bucket), scheduling (shifts, weekly roster,
+availability, shift-swap requests), time & attendance (QR personal clock at
+`/clock/[token]` + PIN station at `/clock`, worked hours + overtime flag,
+timesheet approval), leave (types, requests with approval, balances), and
+**payroll prep** (`/admin/hr/payroll`): hours → gross + CSV. **No statutory PH
+rates are hardcoded** (SSS/PhilHealth/Pag-IBIG/BIR/13th-month) — compliant
+payroll is a separate later phase; OT multiplier/contribution rates stay
+configurable.
+
 ## Custom domains (premium)
 
 Gated by the `custom_domain` plan module. A restaurant can serve its diner pages
@@ -266,6 +279,6 @@ feedback screen, kept separate from the (non-incentivized) Google review ask.
 | D | Internationalization (i18n) | ✅ (diner-first) |
 | E | Menu item videos | ✅ |
 | F | Custom subdomains / domains | ✅ |
-| G | HRIS module (plan-gated) | planned |
+| G | HRIS module (plan-gated) | ✅ **(all phases complete)** |
 | H | Inventory module (plan-gated) | ✅ |
 ```

@@ -27,6 +27,7 @@ datasource db {
 enum StaffRole {
   kitchen
   cashier
+  manager // HR / scheduling
   admin // restaurant owner/admin
 }
 
@@ -214,6 +215,7 @@ model Restaurant {
   suppliers       Supplier[]
   inventoryItems  InventoryItem[]
   purchaseOrders  PurchaseOrder[]
+  employees       Employee[]
 
   @@map("restaurants")
 }
@@ -525,6 +527,193 @@ model PurchaseOrderItem {
 
   @@index([restaurantId])
   @@map("purchase_order_items")
+}
+
+// ----------------------------------------------------------------------------
+// HRIS module (plan-gated by `hris`)
+// ----------------------------------------------------------------------------
+
+enum EmploymentType {
+  full_time
+  part_time
+  contract
+}
+
+enum PayType {
+  hourly
+  monthly
+}
+
+enum EmployeeStatus {
+  active
+  inactive
+}
+
+enum LeaveStatus {
+  pending
+  approved
+  rejected
+}
+
+enum SwapStatus {
+  pending
+  approved
+  rejected
+}
+
+model Employee {
+  id             String         @id @default(uuid())
+  restaurantId   String
+  staffUserId    String?        @unique // optional link to an app login
+  fullName       String
+  title          String?
+  employmentType EmploymentType @default(full_time)
+  payRate        Int            @default(0) // centavos (per hour or per month)
+  payType        PayType        @default(hourly)
+  hiredAt        DateTime?
+  contactJson    Json? // phone, address, emergency contact …
+  status         EmployeeStatus @default(active)
+  clockPin       String? // for PIN clock-in at a station
+  clockToken     String         @unique @default(uuid()) // for personal-QR clock-in
+  createdAt      DateTime       @default(now())
+
+  restaurant    Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  documents     EmployeeDocument[]
+  shifts        Shift[]
+  availability  Availability[]
+  timeEntries   TimeEntry[]
+  leaveRequests LeaveRequest[]
+  leaveBalances LeaveBalance[]
+  swapRequests  ShiftSwapRequest[]
+
+  @@index([restaurantId])
+  @@map("employees")
+}
+
+model EmployeeDocument {
+  id           String   @id @default(uuid())
+  restaurantId String
+  employeeId   String
+  name         String
+  url          String
+  createdAt    DateTime @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@map("employee_documents")
+}
+
+model Shift {
+  id           String   @id @default(uuid())
+  restaurantId String
+  employeeId   String? // null = open/unassigned shift
+  startsAt     DateTime
+  endsAt       DateTime
+  role         String?
+  notes        String?
+  createdAt    DateTime @default(now())
+
+  employee     Employee?          @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  swapRequests ShiftSwapRequest[]
+
+  @@index([restaurantId, startsAt])
+  @@map("shifts")
+}
+
+model Availability {
+  id           String @id @default(uuid())
+  restaurantId String
+  employeeId   String
+  dayOfWeek    Int // 0=Sun … 6=Sat
+  startMinute  Int // minutes from midnight
+  endMinute    Int
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@map("availabilities")
+}
+
+model ShiftSwapRequest {
+  id           String     @id @default(uuid())
+  restaurantId String
+  shiftId      String
+  employeeId   String // who requested
+  status       SwapStatus @default(pending)
+  note         String?
+  createdAt    DateTime   @default(now())
+
+  shift    Shift    @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@map("shift_swap_requests")
+}
+
+model TimeEntry {
+  id           String    @id @default(uuid())
+  restaurantId String
+  employeeId   String
+  clockIn      DateTime
+  clockOut     DateTime?
+  breakMinutes Int       @default(0)
+  source       String    @default("qr") // qr | pin
+  approved     Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, clockIn])
+  @@index([employeeId])
+  @@map("time_entries")
+}
+
+model LeaveType {
+  id           String  @id @default(uuid())
+  restaurantId String
+  name         String
+  isPaid       Boolean @default(true)
+
+  requests LeaveRequest[]
+  balances LeaveBalance[]
+
+  @@index([restaurantId])
+  @@map("leave_types")
+}
+
+model LeaveRequest {
+  id           String      @id @default(uuid())
+  restaurantId String
+  employeeId   String
+  leaveTypeId  String
+  startDate    DateTime
+  endDate      DateTime
+  status       LeaveStatus @default(pending)
+  approverId   String?
+  note         String?
+  createdAt    DateTime    @default(now())
+
+  employee  Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@map("leave_requests")
+}
+
+model LeaveBalance {
+  id           String @id @default(uuid())
+  restaurantId String
+  employeeId   String
+  leaveTypeId  String
+  balance      Float  @default(0) // days
+
+  employee  Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, leaveTypeId])
+  @@index([restaurantId])
+  @@map("leave_balances")
 }
 
 // ----------------------------------------------------------------------------

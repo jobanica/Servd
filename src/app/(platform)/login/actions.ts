@@ -28,6 +28,7 @@ export async function signIn(_prev: unknown, formData: FormData) {
   if (user.kind === "super") redirect("/super-admin");
   if (user.role === "kitchen") redirect("/kitchen");
   if (user.role === "cashier") redirect("/cashier");
+  if (user.role === "manager") redirect("/admin/hr");
   redirect("/admin");
 }
 
