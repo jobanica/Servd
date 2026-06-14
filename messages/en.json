@@ -1,0 +1,75 @@
+{
+  "diner": {
+    "table": "Table",
+    "leaveFeedback": "Leave feedback",
+    "requestBill": "Request bill",
+    "requesting": "Requesting…",
+    "billRequested": "✓ Bill requested — a server is on the way",
+    "billError": "Couldn't request the bill.",
+    "payOnline": "Pay online",
+    "starting": "Starting…",
+    "payError": "Couldn't start payment.",
+    "paymentConfirming": "✓ Thanks! We're confirming your payment — it'll update shortly.",
+    "soldOut": "Sold out",
+    "menuUnavailable": "This menu isn't available yet. Please check back soon.",
+    "viewOrder": "View order",
+    "items": "{count, plural, one {# item} other {# items}}"
+  },
+  "item": {
+    "required": "required",
+    "optional": "optional",
+    "upTo": "up to {n}",
+    "specialRequest": "Special request",
+    "specialRequestPlaceholder": "e.g. no onions",
+    "add": "Add"
+  },
+  "cart": {
+    "yourOrder": "Your order",
+    "empty": "Your cart is empty.",
+    "total": "Total",
+    "placeOrder": "Place order",
+    "sending": "Sending…",
+    "payNote": "You can pay online or at the counter after ordering.",
+    "orderSent": "Order sent to the kitchen!",
+    "reference": "Reference #{ref}",
+    "done": "Done",
+    "remove": "Remove"
+  },
+  "feedback": {
+    "howWasVisit": "How was your visit?",
+    "ratingNote": "Your rating goes straight to the restaurant.",
+    "commentPlaceholder": "Anything you'd like to tell us? (optional)",
+    "submit": "Submit feedback",
+    "submitting": "Submitting…",
+    "tapStar": "Please tap a star to rate.",
+    "thanks": "Thanks for your feedback!",
+    "googlePrompt": "Would you share your experience on Google? It really helps us.",
+    "googleButton": "Leave a Google review"
+  },
+  "sms": {
+    "incentive": "Get 10% off your next visit 🎉",
+    "namePlaceholder": "Your name (optional)",
+    "consent": "Yes, send me offers. {name} will text occasional promos (a few a month). Reply STOP anytime.",
+    "signup": "Send me offers",
+    "signingUp": "Signing up…"
+  },
+  "auth": {
+    "loginTitle": "Staff login",
+    "loginSubtitle": "Sign in to your restaurant's dashboard.",
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign in",
+    "signingIn": "Signing in…",
+    "signupTitle": "Start your restaurant",
+    "signupSubtitle": "Create your account — it takes a minute.",
+    "restaurantName": "Restaurant name",
+    "yourEmail": "Your email",
+    "createAccount": "Create my restaurant",
+    "creating": "Creating…",
+    "haveAccount": "Already have an account?",
+    "checkEmail": "Check your email",
+    "checkEmailBody": "We sent a confirmation link. Click it, then sign in to finish setting up your restaurant.",
+    "goToLogin": "Go to login →"
+  },
+  "language": "Language"
+}

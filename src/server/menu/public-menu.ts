@@ -11,15 +11,18 @@ import type { DinerCategory } from "@/lib/cart/types";
  */
 export async function getPublicMenu(
   restaurantId: string,
+  locale = "en",
 ): Promise<DinerCategory[]> {
   const categories = await systemDb((tx) =>
     tx.category.findMany({
       where: { restaurantId },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       include: {
+        translations: { where: { locale } },
         menuItems: {
           orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
           include: {
+            translations: { where: { locale } },
             modifierGroups: {
               orderBy: { sortOrder: "asc" },
               include: {
@@ -32,13 +35,14 @@ export async function getPublicMenu(
     }),
   );
 
+  // Overlay the requested locale's translations, falling back to base text.
   return categories.map((c) => ({
     id: c.id,
-    name: c.name,
+    name: c.translations[0]?.name ?? c.name,
     items: c.menuItems.map((item) => ({
       id: item.id,
-      name: item.name,
-      description: item.description,
+      name: item.translations[0]?.name ?? item.name,
+      description: item.translations[0]?.description ?? item.description,
       price: item.price,
       imageUrl: item.imageUrl,
       videoUrl: item.videoUrl,

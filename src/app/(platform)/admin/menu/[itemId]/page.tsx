@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
+import { tenantDb } from "@/server/tenancy/scoped-db";
 import { getItem, getCategories, getModifierGroups } from "@/server/menu/queries";
 import { formatDelta } from "@/lib/money";
 import { EditItemForm } from "@/components/admin/EditItemForm";
+import { ItemTranslationForm } from "@/components/admin/ItemTranslationForm";
 import { setItemModifierGroup } from "@/server/menu/actions";
+import { LOCALES, DEFAULT_LOCALE, LOCALE_LABELS } from "@/i18n/locales";
 
 export default async function EditItemPage({
   params,
@@ -14,12 +17,17 @@ export default async function EditItemPage({
   const { itemId } = await params;
   const { restaurantId } = await requireAdminPage();
 
-  const [item, categories, allGroups] = await Promise.all([
+  const [item, categories, allGroups, translations] = await Promise.all([
     getItem(restaurantId, itemId),
     getCategories(restaurantId),
     getModifierGroups(restaurantId),
+    tenantDb(restaurantId, (tx) =>
+      tx.menuItemTranslation.findMany({ where: { menuItemId: itemId } }),
+    ),
   ]);
   if (!item) notFound();
+
+  const translationByLocale = new Map(translations.map((tr) => [tr.locale, tr]));
 
   const attachedIds = new Set(item.modifierGroups.map((g) => g.modifierGroupId));
 
@@ -99,6 +107,28 @@ export default async function EditItemPage({
             );
           })}
         </ul>
+      </section>
+
+      <section className="rounded-tile border border-plum-ink/10 bg-white p-5">
+        <h2 className="font-heading text-lg font-bold">Translations</h2>
+        <p className="text-sm text-plum-ink/50">
+          Optional translated name/description per language. Diners see these in
+          their chosen language, falling back to the default.
+        </p>
+        <div className="mt-3 space-y-3">
+          {LOCALES.filter((l) => l !== DEFAULT_LOCALE).map((l) => {
+            const tr = translationByLocale.get(l);
+            return (
+              <ItemTranslationForm
+                key={l}
+                menuItemId={item.id}
+                locale={l}
+                localeLabel={LOCALE_LABELS[l]}
+                initial={{ name: tr?.name ?? "", description: tr?.description ?? "" }}
+              />
+            );
+          })}
+        </div>
       </section>
     </div>
   );

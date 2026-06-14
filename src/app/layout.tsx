@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Outfit, Inter } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale } from "next-intl/server";
 import "@/styles/globals.css";
 
 // Outfit = wordmark + headings (700–800). Inter = UI/body. Loaded once here and
@@ -23,14 +25,19 @@ export const metadata: Metadata = {
     "Scan, order, pay. A QR-based ordering platform for restaurants.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const locale = await getLocale();
   return (
-    <html lang="en" className={`${outfit.variable} ${inter.variable}`}>
-      <body>{children}</body>
+    <html lang={locale} className={`${outfit.variable} ${inter.variable}`}>
+      <body>
+        {/* Messages are provided to client components; server components use
+            getTranslations directly. */}
+        <NextIntlClientProvider>{children}</NextIntlClientProvider>
+      </body>
     </html>
   );
 }

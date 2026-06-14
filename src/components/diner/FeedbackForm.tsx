@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { submitFeedback, recordGoogleClick } from "@/server/feedback/actions";
 
 export function FeedbackForm({
@@ -19,10 +20,11 @@ export function FeedbackForm({
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [feedbackId, setFeedbackId] = useState<string | null>(null);
+  const t = useTranslations("feedback");
 
   async function handleSubmit() {
     if (rating < 1) {
-      setError("Please tap a star to rate.");
+      setError(t("tapStar"));
       return;
     }
     setBusy(true);
@@ -49,20 +51,18 @@ export function FeedbackForm({
           ✓
         </div>
         <h2 className="mt-4 font-heading text-xl font-bold text-brand-ink">
-          Thanks for your feedback!
+          {t("thanks")}
         </h2>
 
         {/* Google invite — offered to EVERY diner, regardless of rating. */}
         {googleReviewUrl && (
           <div className="mt-6">
-            <p className="text-sm text-brand-ink/70">
-              Would you share your experience on Google? It really helps us.
-            </p>
+            <p className="text-sm text-brand-ink/70">{t("googlePrompt")}</p>
             <button
               onClick={handleGoogle}
               className="mt-3 w-full rounded-full py-3 font-semibold btn-brand"
             >
-              Leave a Google review
+              {t("googleButton")}
             </button>
           </div>
         )}
@@ -73,11 +73,9 @@ export function FeedbackForm({
   return (
     <div>
       <h2 className="font-heading text-xl font-bold text-brand-ink">
-        How was your visit?
+        {t("howWasVisit")}
       </h2>
-      <p className="mt-1 text-sm text-brand-ink/60">
-        Your rating goes straight to the restaurant.
-      </p>
+      <p className="mt-1 text-sm text-brand-ink/60">{t("ratingNote")}</p>
 
       <div className="mt-5 flex justify-center gap-1">
         {[1, 2, 3, 4, 5].map((n) => (
@@ -99,7 +97,7 @@ export function FeedbackForm({
         value={comment}
         onChange={(e) => setComment(e.target.value)}
         rows={3}
-        placeholder="Anything you'd like to tell us? (optional)"
+        placeholder={t("commentPlaceholder")}
         className="mt-5 w-full rounded-lg border border-brand-ink/15 px-3 py-2 text-sm"
       />
 
@@ -110,7 +108,7 @@ export function FeedbackForm({
         disabled={busy}
         className="mt-4 w-full rounded-full py-3 font-semibold btn-brand disabled:opacity-60"
       >
-        {busy ? "Submitting…" : "Submit feedback"}
+        {busy ? t("submitting") : t("submit")}
       </button>
     </div>
   );

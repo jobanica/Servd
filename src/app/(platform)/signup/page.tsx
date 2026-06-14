@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { signUpRestaurant, type SignupState } from "./actions";
 
 export default function SignupPage() {
@@ -9,6 +10,7 @@ export default function SignupPage() {
     signUpRestaurant,
     null,
   );
+  const t = useTranslations("auth");
 
   if (state?.ok) {
     return (
@@ -16,13 +18,10 @@ export default function SignupPage() {
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand-gradient text-2xl text-white">
           ✓
         </div>
-        <h1 className="mt-4 font-heading text-2xl font-bold">Check your email</h1>
-        <p className="mt-2 text-sm text-plum-ink/60">
-          We sent a confirmation link. Click it, then sign in to finish setting
-          up your restaurant.
-        </p>
+        <h1 className="mt-4 font-heading text-2xl font-bold">{t("checkEmail")}</h1>
+        <p className="mt-2 text-sm text-plum-ink/60">{t("checkEmailBody")}</p>
         <Link href="/login" className="mt-6 inline-block font-semibold text-brand-primary">
-          Go to login →
+          {t("goToLogin")}
         </Link>
       </div>
     );
@@ -30,15 +29,13 @@ export default function SignupPage() {
 
   return (
     <div className="mx-auto max-w-sm pt-10">
-      <h1 className="font-heading text-2xl font-bold">Start your restaurant</h1>
-      <p className="mt-1 text-sm text-plum-ink/60">
-        Create your account — it takes a minute.
-      </p>
+      <h1 className="font-heading text-2xl font-bold">{t("signupTitle")}</h1>
+      <p className="mt-1 text-sm text-plum-ink/60">{t("signupSubtitle")}</p>
 
       <form action={action} className="mt-6 space-y-4">
         <div>
           <label className="block text-sm font-medium" htmlFor="restaurantName">
-            Restaurant name
+            {t("restaurantName")}
           </label>
           <input
             id="restaurantName"
@@ -49,7 +46,7 @@ export default function SignupPage() {
         </div>
         <div>
           <label className="block text-sm font-medium" htmlFor="email">
-            Your email
+            {t("yourEmail")}
           </label>
           <input
             id="email"
@@ -62,7 +59,7 @@ export default function SignupPage() {
         </div>
         <div>
           <label className="block text-sm font-medium" htmlFor="password">
-            Password
+            {t("password")}
           </label>
           <input
             id="password"
@@ -82,14 +79,14 @@ export default function SignupPage() {
           disabled={pending}
           className="w-full rounded-lg py-2.5 font-semibold btn-brand disabled:opacity-60"
         >
-          {pending ? "Creating…" : "Create my restaurant"}
+          {pending ? t("creating") : t("createAccount")}
         </button>
       </form>
 
       <p className="mt-4 text-center text-sm text-plum-ink/50">
-        Already have an account?{" "}
+        {t("haveAccount")}{" "}
         <Link href="/login" className="font-semibold text-brand-primary">
-          Sign in
+          {t("signIn")}
         </Link>
       </p>
     </div>

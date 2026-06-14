@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { requestBill } from "@/server/orders/request-bill";
 
 export function RequestBillButton({
@@ -12,6 +13,7 @@ export function RequestBillButton({
 }) {
   const [state, setState] = useState<"idle" | "busy" | "done">("idle");
   const [msg, setMsg] = useState<string | null>(null);
+  const t = useTranslations("diner");
 
   async function handle() {
     setState("busy");
@@ -21,14 +23,14 @@ export function RequestBillButton({
       setState("done");
     } else {
       setState("idle");
-      setMsg(res.error ?? "Couldn't request the bill.");
+      setMsg(res.error ?? t("billError"));
     }
   }
 
   if (state === "done") {
     return (
       <span className="text-sm font-semibold text-brand-primary">
-        ✓ Bill requested — a server is on the way
+        {t("billRequested")}
       </span>
     );
   }
@@ -40,7 +42,7 @@ export function RequestBillButton({
         disabled={state === "busy"}
         className="rounded-full border border-brand-ink/15 px-4 py-1.5 text-sm font-semibold disabled:opacity-60"
       >
-        {state === "busy" ? "Requesting…" : "Request bill"}
+        {state === "busy" ? t("requesting") : t("requestBill")}
       </button>
       {msg && <span className="text-xs text-guava">{msg}</span>}
     </span>

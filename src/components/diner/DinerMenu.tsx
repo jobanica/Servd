@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { formatPeso } from "@/lib/money";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { cartCount, cartTotal } from "@/lib/cart/pricing";
 import { useCart } from "@/lib/cart/useCart";
 import type { DinerCategory, DinerItem } from "@/lib/cart/types";
@@ -38,6 +40,7 @@ export function DinerMenu({
   justPaid?: boolean;
 }) {
   const cart = useCart(restaurantId, tableToken);
+  const t = useTranslations("diner");
 
   // Build the untrusted payload (ids + quantities only) and submit it. The
   // server re-validates and recomputes the real total.
@@ -76,19 +79,22 @@ export function DinerMenu({
             {brand.name.charAt(0)}
           </div>
         )}
-        <div>
+        <div className="min-w-0 flex-1">
           <h1 className="font-heading text-xl font-bold text-brand-ink">
             {brand.name}
           </h1>
           <p className="text-sm text-brand-ink/60">
-            {brand.tagline ? `${brand.tagline} · Table ${tableNumber}` : `Table ${tableNumber}`}
+            {brand.tagline
+              ? `${brand.tagline} · ${t("table")} ${tableNumber}`
+              : `${t("table")} ${tableNumber}`}
           </p>
         </div>
+        <LanguageSwitcher />
       </header>
 
       {justPaid && (
         <div className="mt-3 rounded-lg bg-mango/15 px-3 py-2 text-sm text-brand-ink">
-          ✓ Thanks! We&apos;re confirming your payment — it’ll update shortly.
+          {t("paymentConfirming")}
         </div>
       )}
 
@@ -97,7 +103,7 @@ export function DinerMenu({
           href={`/order/${slug}/${tableToken}/feedback`}
           className="text-sm font-semibold text-brand-primary"
         >
-          Leave feedback
+          {t("leaveFeedback")}
         </a>
         {payOnline && <PayOnlineButton slug={slug} tableToken={tableToken} />}
         <RequestBillButton slug={slug} tableToken={tableToken} />
@@ -120,7 +126,7 @@ export function DinerMenu({
 
       {nonEmptyCategories.length === 0 && (
         <p className="mt-10 text-center text-sm text-brand-ink/50">
-          This menu isn’t available yet. Please check back soon.
+          {t("menuUnavailable")}
         </p>
       )}
 
@@ -144,7 +150,7 @@ export function DinerMenu({
                       </span>
                       {!item.isAvailable && (
                         <span className="rounded-full bg-muted/20 px-2 py-0.5 text-xs text-muted">
-                          Sold out
+                          {t("soldOut")}
                         </span>
                       )}
                     </div>
@@ -179,10 +185,8 @@ export function DinerMenu({
             onClick={() => setCartOpen(true)}
             className="flex w-full items-center justify-between rounded-full px-5 py-3 font-semibold text-white shadow-lg btn-brand"
           >
-            <span>
-              {count} item{count > 1 ? "s" : ""}
-            </span>
-            <span>View order · {formatPeso(total)}</span>
+            <span>{t("items", { count })}</span>
+            <span>{t("viewOrder")} · {formatPeso(total)}</span>
           </button>
         </div>
       )}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { formatPeso } from "@/lib/money";
 import { cartTotal } from "@/lib/cart/pricing";
 import type { CartLine } from "@/lib/cart/types";
@@ -25,6 +26,7 @@ export function CartDrawer({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [placedId, setPlacedId] = useState<string | null>(null);
+  const t = useTranslations("cart");
 
   async function handlePlace() {
     setSubmitting(true);
@@ -49,23 +51,23 @@ export function CartDrawer({
               ✓
             </div>
             <h2 className="mt-4 font-heading text-xl font-bold text-brand-ink">
-              Order sent to the kitchen!
+              {t("orderSent")}
             </h2>
             <p className="mt-1 text-sm text-brand-ink/60">
-              Reference #{placedId.slice(0, 8)}
+              {t("reference", { ref: placedId.slice(0, 8) })}
             </p>
             <button
               onClick={onClose}
               className="mt-6 w-full rounded-full py-3 font-semibold btn-brand"
             >
-              Done
+              {t("done")}
             </button>
           </div>
         ) : (
           <>
             <div className="flex items-center justify-between">
               <h2 className="font-heading text-xl font-bold text-brand-ink">
-                Your order
+                {t("yourOrder")}
               </h2>
               <button
                 onClick={onClose}
@@ -78,7 +80,7 @@ export function CartDrawer({
 
             {lines.length === 0 ? (
               <p className="mt-6 text-center text-sm text-plum-ink/50">
-                Your cart is empty.
+                {t("empty")}
               </p>
             ) : (
               <ul className="mt-4 divide-y divide-plum-ink/5">
@@ -126,7 +128,7 @@ export function CartDrawer({
                         onClick={() => onRemove(line.lineId)}
                         className="text-xs text-muted hover:text-guava"
                       >
-                        Remove
+                        {t("remove")}
                       </button>
                     </div>
                   </li>
@@ -139,7 +141,7 @@ export function CartDrawer({
             {lines.length > 0 && (
               <div className="mt-4 border-t border-plum-ink/10 pt-4">
                 <div className="flex justify-between font-heading text-lg font-bold">
-                  <span>Total</span>
+                  <span>{t("total")}</span>
                   <span>{formatPeso(total)}</span>
                 </div>
                 <button
@@ -147,10 +149,10 @@ export function CartDrawer({
                   disabled={submitting}
                   className="mt-4 w-full rounded-full py-3 font-semibold btn-brand disabled:opacity-60"
                 >
-                  {submitting ? "Sending…" : "Place order"}
+                  {submitting ? t("sending") : t("placeOrder")}
                 </button>
                 <p className="mt-2 text-center text-xs text-brand-ink/40">
-                  You can pay online or at the counter after ordering.
+                  {t("payNote")}
                 </p>
               </div>
             )}

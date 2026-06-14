@@ -50,7 +50,8 @@ declare
   tenant_tables text[] := array[
     'staff_users', 'subscriptions', 'tables', 'categories', 'menu_items',
     'modifier_groups', 'orders', 'feedback', 'customer_contacts',
-    'sms_campaigns', 'sms_credit_ledger', 'print_jobs', 'restaurant_invoices'
+    'sms_campaigns', 'sms_credit_ledger', 'print_jobs', 'restaurant_invoices',
+    'menu_item_translations', 'category_translations'
   ];
 begin
   foreach t in array tenant_tables loop

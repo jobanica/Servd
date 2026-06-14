@@ -186,6 +186,9 @@ model Restaurant {
   // Self-serve onboarding: null until the owner finishes/dismisses the wizard.
   onboardingCompletedAt DateTime?
 
+  // Language the base menu text was written in (the i18n fallback).
+  defaultLocale String @default("en")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -291,11 +294,26 @@ model Category {
   sortOrder    Int      @default(0)
   createdAt    DateTime @default(now())
 
-  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  menuItems  MenuItem[]
+  restaurant   Restaurant           @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  menuItems    MenuItem[]
+  translations CategoryTranslation[]
 
   @@index([restaurantId])
   @@map("categories")
+}
+
+model CategoryTranslation {
+  id           String @id @default(uuid())
+  restaurantId String
+  categoryId   String
+  locale       String // e.g. "fil"
+  name         String
+
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, locale])
+  @@index([restaurantId])
+  @@map("category_translations")
 }
 
 model MenuItem {
@@ -316,10 +334,26 @@ model MenuItem {
   category       Category                @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   modifierGroups MenuItemModifierGroup[]
   orderItems     OrderItem[]
+  translations   MenuItemTranslation[]
 
   @@index([restaurantId])
   @@index([categoryId])
   @@map("menu_items")
+}
+
+model MenuItemTranslation {
+  id           String  @id @default(uuid())
+  restaurantId String
+  menuItemId   String
+  locale       String
+  name         String
+  description  String?
+
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  @@unique([menuItemId, locale])
+  @@index([restaurantId])
+  @@map("menu_item_translations")
 }
 
 model ModifierGroup {

@@ -150,6 +150,16 @@ Phase 1; until then provision via Supabase dashboard + seed.
   place; sending/opt-in flows not built yet.
 - **Custom subdomains/domains** — `restaurants.subdomain` reserved, unused.
 
+## Internationalization (i18n)
+
+`next-intl` with **cookie-based locale** (no URL changes) — English + Filipino,
+add a language by dropping a `messages/<code>.json` catalog. The diner flow
+(menu, cart, item, feedback, bill, pay, SMS opt-in) and login/signup are
+translated; a language switcher on the diner header persists the choice. Admin
+chrome stays English for now (catalog is ready to extend). **Menu content** is
+translatable per restaurant: `menu_item_translations` / `category_translations`
+overlay the base text with a fallback, editable on the item page.
+
 ## Subscription billing (restaurants pay the platform)
 
 `BillingProvider` interface (PayMongo impl on the **platform's** account, swappable).
@@ -228,7 +238,7 @@ feedback screen, kept separate from the (non-incentivized) Google review ask.
 | A | Self-serve signup + onboarding wizard + branding editor | ✅ |
 | B | Subscription billing (restaurants pay the platform) | ✅ |
 | C | Analytics & reporting | ✅ |
-| D | Internationalization (i18n) | planned |
+| D | Internationalization (i18n) | ✅ (diner-first) |
 | E | Menu item videos | ✅ |
 | F | Custom subdomains / domains | planned |
 | G | HRIS module (plan-gated) | planned |

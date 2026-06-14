@@ -108,6 +108,22 @@ d("tenant isolation (RLS)", () => {
     expect(ids.length).toBe(2);
   });
 
+  it("menu_item_translations are tenant-isolated", async () => {
+    await asSuper(async (tx) => {
+      const cat = await tx.category.create({ data: { restaurantId: A, name: "TX cat" } });
+      const item = await tx.menuItem.create({
+        data: { restaurantId: A, categoryId: cat.id, name: "TX item", price: 100 },
+      });
+      await tx.menuItemTranslation.create({
+        data: { restaurantId: A, menuItemId: item.id, locale: "fil", name: "Isda" },
+      });
+    });
+    const aTr = await asTenant<any[]>(A, (tx) => tx.menuItemTranslation.findMany());
+    const bTr = await asTenant<any[]>(B, (tx) => tx.menuItemTranslation.findMany());
+    expect(aTr.length).toBeGreaterThanOrEqual(1);
+    expect(bTr.length).toBe(0);
+  });
+
   it("restaurant_invoices are tenant-isolated", async () => {
     // Seed an invoice for A only.
     await asSuper((tx) =>

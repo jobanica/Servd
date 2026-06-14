@@ -1,0 +1,75 @@
+{
+  "diner": {
+    "table": "Mesa",
+    "leaveFeedback": "Mag-iwan ng feedback",
+    "requestBill": "Hingin ang bill",
+    "requesting": "Hinihiling…",
+    "billRequested": "✓ Hiniling ang bill — paparating na ang server",
+    "billError": "Hindi mahiling ang bill.",
+    "payOnline": "Magbayad online",
+    "starting": "Sinisimulan…",
+    "payError": "Hindi masimulan ang bayad.",
+    "paymentConfirming": "✓ Salamat! Kinukumpirma namin ang iyong bayad — mag-a-update kaagad.",
+    "soldOut": "Ubos na",
+    "menuUnavailable": "Hindi pa available ang menu na ito. Bumalik po kayo mamaya.",
+    "viewOrder": "Tingnan ang order",
+    "items": "{count, plural, other {# item}}"
+  },
+  "item": {
+    "required": "kailangan",
+    "optional": "opsyonal",
+    "upTo": "hanggang {n}",
+    "specialRequest": "Espesyal na kahilingan",
+    "specialRequestPlaceholder": "hal. walang sibuyas",
+    "add": "Idagdag"
+  },
+  "cart": {
+    "yourOrder": "Iyong order",
+    "empty": "Walang laman ang iyong cart.",
+    "total": "Kabuuan",
+    "placeOrder": "Mag-order",
+    "sending": "Pinapadala…",
+    "payNote": "Pwede kang magbayad online o sa counter pagkatapos mag-order.",
+    "orderSent": "Naipadala na ang order sa kusina!",
+    "reference": "Reference #{ref}",
+    "done": "Tapos",
+    "remove": "Alisin"
+  },
+  "feedback": {
+    "howWasVisit": "Kumusta ang iyong pagbisita?",
+    "ratingNote": "Direktang mapupunta sa restaurant ang iyong rating.",
+    "commentPlaceholder": "May gusto ka bang sabihin? (opsyonal)",
+    "submit": "Ipasa ang feedback",
+    "submitting": "Pinapasa…",
+    "tapStar": "Pindutin ang bituin para mag-rate.",
+    "thanks": "Salamat sa iyong feedback!",
+    "googlePrompt": "Maaari mo bang ibahagi ang iyong karanasan sa Google? Malaking tulong ito.",
+    "googleButton": "Mag-iwan ng Google review"
+  },
+  "sms": {
+    "incentive": "Makakuha ng 10% off sa susunod mong bisita 🎉",
+    "namePlaceholder": "Pangalan mo (opsyonal)",
+    "consent": "Oo, padalhan ako ng offers. Magpapadala ang {name} ng paminsanang promo (ilan kada buwan). I-reply ang STOP anumang oras.",
+    "signup": "Padalhan ako ng offers",
+    "signingUp": "Nagsa-sign up…"
+  },
+  "auth": {
+    "loginTitle": "Staff login",
+    "loginSubtitle": "Mag-sign in sa dashboard ng iyong restaurant.",
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Mag-sign in",
+    "signingIn": "Nagsa-sign in…",
+    "signupTitle": "Simulan ang iyong restaurant",
+    "signupSubtitle": "Gumawa ng account — isang minuto lang.",
+    "restaurantName": "Pangalan ng restaurant",
+    "yourEmail": "Iyong email",
+    "createAccount": "Gawin ang aking restaurant",
+    "creating": "Ginagawa…",
+    "haveAccount": "May account ka na?",
+    "checkEmail": "Tingnan ang iyong email",
+    "checkEmailBody": "Nagpadala kami ng confirmation link. I-click ito, pagkatapos mag-sign in para tapusin ang setup ng iyong restaurant.",
+    "goToLogin": "Pumunta sa login →"
+  },
+  "language": "Wika"
+}

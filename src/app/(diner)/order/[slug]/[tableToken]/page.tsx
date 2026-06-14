@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { getLocale } from "next-intl/server";
 import {
   getPublicRestaurantBySlug,
   getTableByToken,
@@ -28,7 +29,8 @@ export default async function DinerOrderPage({
   const table = await getTableByToken(restaurant.id, tableToken);
   if (!table) notFound();
 
-  const categories = await getPublicMenu(restaurant.id);
+  const locale = await getLocale();
+  const categories = await getPublicMenu(restaurant.id, locale);
 
   return (
     <DinerMenu

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { formatPeso, formatDelta } from "@/lib/money";
 import {
   unitPrice,
@@ -28,6 +29,7 @@ export function ItemModal({
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState("");
   const [showError, setShowError] = useState(false);
+  const t = useTranslations("item");
 
   const price = useMemo(() => unitPrice(item, selection), [item, selection]);
   const error = useMemo(
@@ -97,8 +99,8 @@ export function ItemModal({
               <legend className="font-semibold text-brand-ink">
                 {group.name}{" "}
                 <span className="text-xs font-normal text-plum-ink/50">
-                  {group.required ? "(required)" : "(optional)"}
-                  {!single && ` · up to ${group.maxSelect}`}
+                  ({group.required ? t("required") : t("optional")})
+                  {!single && ` · ${t("upTo", { n: group.maxSelect })}`}
                 </span>
               </legend>
               <div className="mt-2 space-y-1">
@@ -135,12 +137,12 @@ export function ItemModal({
 
         <label className="mt-5 block">
           <span className="text-sm font-semibold text-brand-ink">
-            Special request
+            {t("specialRequest")}
           </span>
           <input
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="e.g. no onions"
+            placeholder={t("specialRequestPlaceholder")}
             className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
           />
         </label>
@@ -172,7 +174,7 @@ export function ItemModal({
             disabled={!!error}
             className="flex-1 rounded-full py-3 font-semibold btn-brand disabled:opacity-50"
           >
-            Add · {formatPeso(price * quantity)}
+            {t("add")} · {formatPeso(price * quantity)}
           </button>
         </div>
       </div>

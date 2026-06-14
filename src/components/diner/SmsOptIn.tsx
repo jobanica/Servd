@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { submitSmsOptIn } from "@/server/sms/optin";
 
 /**
@@ -24,6 +25,7 @@ export function SmsOptIn({
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const t = useTranslations("sms");
 
   async function handle() {
     setBusy(true);
@@ -44,9 +46,7 @@ export function SmsOptIn({
 
   return (
     <div>
-      <p className="font-heading font-bold text-brand-ink">
-        Get 10% off your next visit 🎉
-      </p>
+      <p className="font-heading font-bold text-brand-ink">{t("incentive")}</p>
       <div className="mt-3 space-y-2">
         <input
           value={phone}
@@ -58,7 +58,7 @@ export function SmsOptIn({
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Your name (optional)"
+          placeholder={t("namePlaceholder")}
           className="w-full rounded-lg border border-brand-ink/15 px-3 py-2 text-sm"
         />
         {/* Unchecked by default, standalone consent — not bundled with terms. */}
@@ -69,10 +69,7 @@ export function SmsOptIn({
             onChange={(e) => setConsent(e.target.checked)}
             className="mt-0.5"
           />
-          <span>
-            Yes, send me offers. {restaurantName} will text occasional promos (a
-            few a month). Reply STOP anytime.
-          </span>
+          <span>{t("consent", { name: restaurantName })}</span>
         </label>
       </div>
       {msg && <p className="mt-2 text-xs text-guava">{msg}</p>}
@@ -81,7 +78,7 @@ export function SmsOptIn({
         disabled={busy || !consent || phone.trim().length < 7}
         className="mt-3 w-full rounded-full py-2.5 text-sm font-semibold btn-brand disabled:opacity-50"
       >
-        {busy ? "Signing up…" : "Send me offers"}
+        {busy ? t("signingUp") : t("signup")}
       </button>
     </div>
   );
