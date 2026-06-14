@@ -14,10 +14,13 @@ import { DinerMenu } from "@/components/diner/DinerMenu";
  */
 export default async function DinerOrderPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string; tableToken: string }>;
+  searchParams: Promise<{ paid?: string }>;
 }) {
   const { slug, tableToken } = await params;
+  const { paid } = await searchParams;
 
   const restaurant = await getPublicRestaurantBySlug(slug);
   if (!restaurant) notFound();
@@ -39,6 +42,8 @@ export default async function DinerOrderPage({
         tagline: restaurant.tagline,
       }}
       categories={categories}
+      payOnline={restaurant.paymentOnlineEnabled}
+      justPaid={paid === "1"}
     />
   );
 }

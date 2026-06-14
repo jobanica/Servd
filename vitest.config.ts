@@ -9,6 +9,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+      // server-only throws when imported outside an RSC bundle; stub it for tests.
+      "server-only": fileURLToPath(new URL("./tests/stubs/empty.ts", import.meta.url)),
     },
   },
 });

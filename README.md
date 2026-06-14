@@ -46,6 +46,26 @@ tenant-isolated path everything else uses. This avoids needing per-restaurant JW
 claims to satisfy RLS on a streamed table. A 15s polling fallback keeps boards
 fresh even if Supabase Realtime isn't configured (the UI shows Live vs Polling).
 
+## Online payment (connected accounts)
+
+Each restaurant connects its **own** PayMongo account — funds go straight to it,
+Servd never holds the money. Credentials (secret key + webhook signing secret)
+are encrypted at rest with **AES-256-GCM** (`src/lib/crypto/secrets.ts`,
+`CREDENTIALS_ENCRYPTION_KEY`). The gateway is abstracted behind
+`PaymentGateway` (`src/server/payments/gateway.ts`) with a PayMongo impl, so
+swapping to Xendit/HitPay later doesn't touch the order flow.
+
+Flow (pay-after-eating): diner taps **Pay online** → `createTableCheckout`
+builds a hosted checkout for the table's outstanding orders and records a
+*pending* payment per order → diner pays via GCash/card → **PayMongo webhook**
+(`/api/webhooks/paymongo/[restaurantId]`) is the ONLY thing that marks orders
+paid, after verifying the signature with that restaurant's secret. The client is
+never trusted to confirm payment.
+
+Setup per restaurant: enter keys at `/admin/payments`, then register the shown
+webhook URL in the PayMongo dashboard. Restaurant subscription billing to the
+platform remains **stubbed**.
+
 ## Pluggable printing
 
 One ticket model (`src/lib/printing/ticket.ts`) renders to either ESC/POS bytes
@@ -152,7 +172,7 @@ Phase 1; until then provision via Supabase dashboard + seed.
 | 6 | Real-time kitchen display | ✅ |
 | 7 | Cashier dashboard + pluggable printing | ✅ |
 | 8 | Request bill | ✅ |
-| 9 | Online payment (PayMongo, webhooks) — **high risk** | next |
-| 10 | Post-payment feedback + Google review invite | |
+| 9 | Online payment (PayMongo, webhooks) — **high risk** | ✅ |
+| 10 | Post-payment feedback + Google review invite | next |
 | 11 | SMS marketing (post-MVP) — **compliance risk** | |
 ```

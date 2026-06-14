@@ -42,6 +42,8 @@ export default async function AdminHome() {
             ["Menu", "/admin/menu", "Categories, items & add-ons", true],
             ["Tables", "/admin/tables", "Printable QR per table", true],
             ["Modifiers", "/admin/modifiers", "Reusable option sets", true],
+            ["Online payment", "/admin/payments", "Connect PayMongo (GCash & card)", true],
+            ["Printing", "/admin/printing", "Kitchen ticket printer setup", true],
             ["Branding", "/admin/branding", "Logo, colors & display name", false],
             ["Staff", "/admin/staff", "Kitchen, cashier & admin logins", false],
             ["Feedback", "/admin/feedback", "Ratings & comments inbox", false],

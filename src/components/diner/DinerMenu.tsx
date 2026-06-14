@@ -10,6 +10,7 @@ import type { PlaceOrderResult } from "@/lib/validation/order";
 import { ItemModal } from "./ItemModal";
 import { CartDrawer } from "./CartDrawer";
 import { RequestBillButton } from "./RequestBillButton";
+import { PayOnlineButton } from "./PayOnlineButton";
 
 interface RestaurantBrand {
   name: string;
@@ -24,6 +25,8 @@ export function DinerMenu({
   tableNumber,
   brand,
   categories,
+  payOnline,
+  justPaid,
 }: {
   restaurantId: string;
   slug: string;
@@ -31,6 +34,8 @@ export function DinerMenu({
   tableNumber: string;
   brand: RestaurantBrand;
   categories: DinerCategory[];
+  payOnline: boolean;
+  justPaid?: boolean;
 }) {
   const cart = useCart(restaurantId, tableToken);
 
@@ -81,7 +86,14 @@ export function DinerMenu({
         </div>
       </header>
 
-      <div className="mt-3 flex justify-end">
+      {justPaid && (
+        <div className="mt-3 rounded-lg bg-mango/15 px-3 py-2 text-sm text-brand-ink">
+          ✓ Thanks! We&apos;re confirming your payment — it’ll update shortly.
+        </div>
+      )}
+
+      <div className="mt-3 flex flex-wrap justify-end gap-2">
+        {payOnline && <PayOnlineButton slug={slug} tableToken={tableToken} />}
         <RequestBillButton slug={slug} tableToken={tableToken} />
       </div>
 
