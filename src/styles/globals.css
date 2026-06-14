@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * SERVD DESIGN TOKENS
+ *
+ * These :root values are the PLATFORM defaults. They power the Servd chrome
+ * (login, admin/staff shell, super-admin, marketing) AND act as the clean
+ * default theme a brand-new restaurant sees before it customizes anything.
+ *
+ * On diner-facing pages, <BrandProvider> overrides the --brand-* variables
+ * inline with the restaurant's own colors, so the white-label skin takes over
+ * without touching any component.
+ */
+:root {
+  /* Fixed Servd palette */
+  --mango: #ff8a1e;
+  --guava: #ff4d6d;
+  --plum-ink: #2b1124;
+  --cream: #fff6ec;
+  --muted: #a9959f;
+
+  /* Brand-aware tokens — DEFAULT to the Servd identity */
+  --brand-primary: #ff7a1a;
+  --brand-accent: #ff4d6d;
+  --brand-ink: #2b1124;
+  --brand-surface: #fff6ec;
+  --brand-gradient: linear-gradient(
+    135deg,
+    #ff9a2e 0%,
+    #ff7a1a 52%,
+    #ff4d6d 100%
+  );
+}
+
+body {
+  background-color: var(--brand-surface);
+  color: var(--brand-ink);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4,
+.font-heading {
+  font-family: var(--font-outfit), system-ui, sans-serif;
+}
+
+/**
+ * WORDMARK — lowercase "servd" where the missing "e" between v and d is a
+ * small gradient-filled dot sitting near the baseline.
+ * Rendered as: serv + <span class="wordmark-dot"></span> + d
+ */
+.wordmark {
+  font-family: var(--font-outfit), system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  display: inline-flex;
+  align-items: baseline;
+  line-height: 1;
+}
+
+.wordmark-dot {
+  display: inline-block;
+  width: 0.3em;
+  height: 0.3em;
+  margin: 0 0.04em;
+  border-radius: 9999px;
+  background: var(--brand-gradient);
+  /* nudge the dot down toward the baseline */
+  transform: translateY(0.02em);
+}
+
+/* Primary CTA uses the brand gradient sparingly. */
+.btn-brand {
+  background: var(--brand-gradient);
+  color: #fff;
+  font-weight: 600;
+}
