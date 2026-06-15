@@ -35,10 +35,12 @@ export async function tenantDb<T>(
     throw new Error("tenantDb: invalid restaurantId");
   }
   return prisma.$transaction(async (tx) => {
-    // $executeRawUnsafe avoids prepared statements, which PgBouncer transaction
-    // mode rejects with 42P05. restaurantId is UUID-validated above.
+    // Switch to app_user role (no BYPASSRLS) so RLS policies are enforced.
+    // $executeRawUnsafe avoids prepared statements (PgBouncer 42P05 safety).
+    // restaurantId is UUID-validated above so interpolation is safe.
+    await tx.$executeRawUnsafe(`SET LOCAL ROLE app_user`);
     await tx.$executeRawUnsafe(
-      `select set_config('app.current_restaurant_id', '${restaurantId}', true)`,
+      `SELECT set_config('app.current_restaurant_id', '${restaurantId}', true)`,
     );
     return fn(tx);
   });
