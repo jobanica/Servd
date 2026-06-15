@@ -11,6 +11,7 @@
       "Bash(node prisma/seed.mjs)",
       "Bash(node scripts/apply-rls.mjs)",
       "Bash(node scripts/create-user.mjs:*)",
+      "Bash(node scripts/seed-davao-biryani.mjs:*)",
       "Bash(vercel:*)",
       "Bash(npx vercel:*)"
     ]
