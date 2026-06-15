@@ -10,7 +10,9 @@
       "Bash(npm run db:setup)",
       "Bash(node prisma/seed.mjs)",
       "Bash(node scripts/apply-rls.mjs)",
-      "Bash(node scripts/create-user.mjs:*)"
+      "Bash(node scripts/create-user.mjs:*)",
+      "Bash(vercel:*)",
+      "Bash(npx vercel:*)"
     ]
   }
 }
