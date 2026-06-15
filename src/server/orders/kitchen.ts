@@ -49,9 +49,22 @@ export async function getKitchenOrders(): Promise<KitchenOrder[]> {
     tx.order.findMany({
       where: { status: { in: [...ACTIVE] } },
       orderBy: { createdAt: "asc" },
-      include: {
+      // Explicit select so a schema lag (newer columns) can't break this query.
+      select: {
+        id: true,
+        status: true,
+        createdAt: true,
+        total: true,
         table: { select: { tableNumber: true } },
-        items: { include: { modifiers: { select: { nameAtTime: true } } } },
+        items: {
+          select: {
+            id: true,
+            nameAtTime: true,
+            quantity: true,
+            note: true,
+            modifiers: { select: { nameAtTime: true } },
+          },
+        },
       },
     }),
   );

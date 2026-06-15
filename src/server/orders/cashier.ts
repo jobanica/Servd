@@ -31,7 +31,14 @@ export async function getCashierTables(): Promise<CashierTable[]> {
     tx.order.findMany({
       where: { status: { in: [...OPEN] } },
       orderBy: { createdAt: "asc" },
-      include: {
+      // Explicit select so a schema lag (newer columns) can't break this query.
+      select: {
+        id: true,
+        status: true,
+        paymentStatus: true,
+        total: true,
+        billRequested: true,
+        createdAt: true,
         table: { select: { id: true, tableNumber: true } },
         _count: { select: { items: true } },
       },

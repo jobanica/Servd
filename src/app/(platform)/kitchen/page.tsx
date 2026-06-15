@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/server/tenancy/current-user";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { getKitchenOrders } from "@/server/orders/kitchen";
 import { KitchenBoard } from "@/components/kitchen/KitchenBoard";
+import { StaffDataError } from "@/components/StaffDataError";
 import { signOut } from "../login/actions";
 
 export default async function KitchenHome() {
@@ -10,12 +11,26 @@ export default async function KitchenHome() {
   if (!user || user.kind !== "staff" || !["kitchen", "admin"].includes(user.role)) {
     redirect("/login");
   }
-  const r = await tenantDb(user.restaurantId, (tx) =>
-    tx.restaurant.findFirstOrThrow({ select: { status: true } }),
-  );
-  if (r.status === "suspended") redirect("/suspended");
 
-  const initialOrders = await getKitchenOrders();
+  let initialOrders;
+  try {
+    const r = await tenantDb(user.restaurantId, (tx) =>
+      tx.restaurant.findFirstOrThrow({ select: { status: true } }),
+    );
+    if (r.status === "suspended") return redirect("/suspended");
+    initialOrders = await getKitchenOrders();
+  } catch (e) {
+    // Let Next's redirect signal pass through.
+    if (e && typeof e === "object" && "digest" in e && String((e as { digest?: string }).digest).startsWith("NEXT_REDIRECT")) {
+      throw e;
+    }
+    return (
+      <StaffDataError
+        title="Kitchen display"
+        message={e instanceof Error ? e.message : String(e)}
+      />
+    );
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
