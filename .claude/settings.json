@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(supabase:*)",
+      "Bash(npx prisma:*)",
+      "Bash(npm run db:generate)",
+      "Bash(npm run db:push)",
+      "Bash(npm run db:rls)",
+      "Bash(npm run db:seed)",
+      "Bash(npm run db:setup)",
+      "Bash(node prisma/seed.mjs)",
+      "Bash(node scripts/apply-rls.mjs)",
+      "Bash(node scripts/create-user.mjs:*)"
+    ]
+  }
+}
