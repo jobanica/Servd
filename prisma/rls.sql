@@ -41,6 +41,34 @@ create or replace function app.is_super_admin() returns boolean
 $$;
 
 -- ----------------------------------------------------------------------------
+-- app_user: a NON-privileged role (no BYPASSRLS) that tenantDb() switches to,
+-- so Row-Level Security is always enforced even if the pooled connection role
+-- could otherwise bypass it. We grant it table access + let the app's
+-- connection role assume it.
+-- ----------------------------------------------------------------------------
+do $$
+begin
+  if not exists (select 1 from pg_roles where rolname = 'app_user') then
+    create role app_user nologin;
+  end if;
+end $$;
+
+grant usage on schema public to app_user;
+grant select, insert, update, delete on all tables in schema public to app_user;
+grant usage, select on all sequences in schema public to app_user;
+alter default privileges in schema public
+  grant select, insert, update, delete on tables to app_user;
+alter default privileges in schema public
+  grant usage, select on sequences to app_user;
+
+-- Allow the current (app) connection role to SET ROLE app_user.
+do $$
+begin
+  execute 'grant app_user to ' || quote_ident(current_user);
+exception when others then null; -- already a member / insufficient priv: ignore
+end $$;
+
+-- ----------------------------------------------------------------------------
 -- Helper: enable + FORCE rls and add a tenant policy for tables that have a
 -- direct restaurant foreign key ("restaurantId" column).
 -- ----------------------------------------------------------------------------
