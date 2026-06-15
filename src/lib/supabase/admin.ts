@@ -17,3 +17,21 @@ export function createSupabaseAdminClient() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }
+
+/**
+ * Ensures a Storage bucket exists (creating it if missing) so uploads don't fail
+ * with "Bucket not found" on a fresh project. Requires the service-role client.
+ */
+export async function ensureBucket(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  name: string,
+  isPublic: boolean,
+): Promise<void> {
+  const { data } = await supabase.storage.getBucket(name);
+  if (data) return;
+  const { error } = await supabase.storage.createBucket(name, { public: isPublic });
+  // Ignore races where it was created concurrently.
+  if (error && !/already exists|exists/i.test(error.message)) {
+    throw new Error(`Could not create bucket "${name}": ${error.message}`);
+  }
+}

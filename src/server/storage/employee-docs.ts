@@ -1,6 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { createSupabaseAdminClient, ensureBucket } from "@/lib/supabase/admin";
 
 export const EMPLOYEE_DOC_BUCKET = "employee-documents";
 
@@ -30,6 +30,7 @@ export async function uploadEmployeeDoc(
   if (file.size > MAX_BYTES) throw new Error("File too large. Max 10 MB.");
 
   const supabase = createSupabaseAdminClient();
+  await ensureBucket(supabase, EMPLOYEE_DOC_BUCKET, false); // private — HR docs
   const path = `${restaurantId}/${employeeId}/${randomUUID()}.${EXT[file.type]}`;
   const buffer = Buffer.from(await file.arrayBuffer());
   const { error } = await supabase.storage

@@ -1,6 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { createSupabaseAdminClient, ensureBucket } from "@/lib/supabase/admin";
 import { ALLOWED_VIDEO_TYPES, MAX_VIDEO_BYTES } from "@/lib/validation/menu";
 
 export const VIDEO_BUCKET = "menu-videos";
@@ -27,6 +27,7 @@ export async function uploadMenuVideo(
   }
 
   const supabase = createSupabaseAdminClient();
+  await ensureBucket(supabase, VIDEO_BUCKET, true);
   const path = `${restaurantId}/${randomUUID()}.${EXT[file.type]}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 

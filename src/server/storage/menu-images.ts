@@ -1,6 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { createSupabaseAdminClient, ensureBucket } from "@/lib/supabase/admin";
 import {
   ALLOWED_IMAGE_TYPES,
   MAX_IMAGE_BYTES,
@@ -36,6 +36,7 @@ export async function uploadMenuImage(
   }
 
   const supabase = createSupabaseAdminClient();
+  await ensureBucket(supabase, MENU_BUCKET, true);
   const path = `${restaurantId}/${randomUUID()}.${EXT[file.type]}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
