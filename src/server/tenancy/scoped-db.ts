@@ -35,15 +35,21 @@ export async function tenantDb<T>(
     throw new Error("tenantDb: invalid restaurantId");
   }
   return prisma.$transaction(async (tx) => {
-    // set_config(key, value, is_local=true) => scoped to this transaction only.
-    await tx.$executeRaw`select set_config('app.current_restaurant_id', ${restaurantId}, true)`;
+    // Switch to app_user role (no BYPASSRLS) so RLS policies are enforced.
+    // $executeRawUnsafe avoids prepared statements (PgBouncer 42P05 safety).
+    // restaurantId is UUID-validated above so interpolation is safe.
+    await tx.$executeRawUnsafe(`SET LOCAL ROLE app_user`);
+    await tx.$executeRawUnsafe(
+      `SELECT set_config('app.current_restaurant_id', '${restaurantId}', true)`,
+    );
     return fn(tx);
   });
 }
 
 export async function systemDb<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
   return prisma.$transaction(async (tx) => {
-    await tx.$executeRaw`select set_config('app.is_super_admin', 'on', true)`;
+    // $executeRawUnsafe avoids prepared statements (safe: no user input here).
+    await tx.$executeRawUnsafe(`select set_config('app.is_super_admin', 'on', true)`);
     return fn(tx);
   });
 }

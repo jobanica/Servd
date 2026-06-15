@@ -11,9 +11,20 @@ import { PrismaClient } from "@prisma/client";
  */
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
+// Append statement_cache_size=0 so Prisma never creates named prepared
+// statements. Without this, PgBouncer transaction-mode reuses backend
+// connections that already have a statement named "s0"/"s1"/… from a previous
+// serverless instance, causing 42P05 errors on every rolling deployment.
+function buildDatasourceUrl() {
+  const base = process.env.DATABASE_URL ?? "";
+  const sep = base.includes("?") ? "&" : "?";
+  return `${base}${sep}statement_cache_size=0`;
+}
+
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
+    datasourceUrl: buildDatasourceUrl(),
     log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
   });
 
