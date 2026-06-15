@@ -31,8 +31,18 @@ export default async function TimesheetsPage() {
               return (
                 <tr key={e.id} className="border-t border-plum-ink/10">
                   <td className="p-3">{e.employee.fullName}</td>
-                  <td>{e.clockIn.toLocaleString()}</td>
-                  <td>{e.clockOut ? e.clockOut.toLocaleTimeString() : <span className="text-mango">open</span>}</td>
+                  <td>
+                    {e.clockIn.toLocaleString()}
+                    {e.clockInPhotoUrl && (
+                      <a href={`/api/hr/clock-photo?path=${encodeURIComponent(e.clockInPhotoUrl)}`} target="_blank" rel="noopener" className="ml-1 text-brand-primary" title="Clock-in photo">📷</a>
+                    )}
+                  </td>
+                  <td>
+                    {e.clockOut ? e.clockOut.toLocaleTimeString() : <span className="text-mango">open</span>}
+                    {e.clockOutPhotoUrl && (
+                      <a href={`/api/hr/clock-photo?path=${encodeURIComponent(e.clockOutPhotoUrl)}`} target="_blank" rel="noopener" className="ml-1 text-brand-primary" title="Clock-out photo">📷</a>
+                    )}
+                  </td>
                   <td>{e.breakMinutes}m</td>
                   <td>{h.hours}</td>
                   <td>{h.overtime > 0 ? <span className="text-guava">{h.overtime}</span> : "—"}</td>

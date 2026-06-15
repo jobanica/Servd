@@ -658,8 +658,10 @@ model TimeEntry {
   clockIn      DateTime
   clockOut     DateTime?
   breakMinutes Int       @default(0)
-  source       String    @default("qr") // qr | pin
+  source       String    @default("qr") // qr | pin | selfie
   approved     Boolean   @default(false)
+  clockInPhotoUrl  String? // storage path of the clock-in selfie
+  clockOutPhotoUrl String? // storage path of the clock-out selfie
   createdAt    DateTime  @default(now())
 
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)

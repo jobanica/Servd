@@ -23,6 +23,12 @@ export default async function CashierHome() {
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-2xl font-bold">Cashier</h1>
         <div className="flex items-center gap-3">
+          <Link
+            href="/clock/me"
+            className="rounded-full px-4 py-2 text-sm font-semibold btn-brand"
+          >
+            Clock in/out
+          </Link>
           {user.role === "admin" && (
             <Link
               href="/admin/printing"
