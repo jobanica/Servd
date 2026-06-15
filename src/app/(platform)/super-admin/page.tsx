@@ -35,7 +35,7 @@ export default async function SuperAdminHome() {
   const metrics = await getPlatformMetrics();
 
   return (
-    <div>
+    <div className="mx-auto max-w-6xl px-6 py-8">
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-2xl font-bold">
           Servd — platform admin

@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { useTranslations } from "next-intl";
+import { AppIcon, Wordmark } from "@/components/Wordmark";
 import { signIn } from "./actions";
 
 export default function LoginPage() {
@@ -9,7 +11,11 @@ export default function LoginPage() {
   const t = useTranslations("auth");
 
   return (
-    <div className="mx-auto max-w-sm pt-10">
+    <div className="mx-auto max-w-sm px-6 pt-16">
+      <Link href="/" className="mb-8 flex items-center gap-2">
+        <AppIcon size={32} />
+        <Wordmark size="1.4rem" />
+      </Link>
       <h1 className="font-heading text-2xl font-bold">{t("loginTitle")}</h1>
       <p className="mt-1 text-sm text-plum-ink/60">{t("loginSubtitle")}</p>
 

@@ -18,7 +18,7 @@ export default async function KitchenHome() {
   const initialOrders = await getKitchenOrders();
 
   return (
-    <div>
+    <div className="mx-auto max-w-6xl px-6 py-8">
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-2xl font-bold">Kitchen display</h1>
         <form action={signOut}>

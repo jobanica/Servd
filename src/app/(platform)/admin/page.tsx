@@ -1,13 +1,20 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/server/tenancy/current-user";
 import { tenantDb } from "@/server/tenancy/scoped-db";
-import { signOut } from "../login/actions";
+import { getAnalytics } from "@/server/analytics/queries";
+import { formatPeso } from "@/lib/money";
 
-/**
- * Restaurant owner/admin home. Demonstrates the full isolation path:
- *   session → restaurantId (trusted) → tenantDb(restaurantId) → RLS-scoped read.
- * This admin can only ever load THEIR OWN restaurant.
- */
+function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="rounded-tile border border-plum-ink/10 bg-white p-5">
+      <p className="text-xs font-medium text-plum-ink/50">{label}</p>
+      <p className="mt-1 font-heading text-3xl font-extrabold">{value}</p>
+      {hint && <p className="mt-1 text-xs text-plum-ink/40">{hint}</p>}
+    </div>
+  );
+}
+
 export default async function AdminHome() {
   const user = await getCurrentUser();
   if (!user || user.kind !== "staff" || user.role !== "admin") {
@@ -17,72 +24,85 @@ export default async function AdminHome() {
   const restaurant = await tenantDb(user.restaurantId, (tx) =>
     tx.restaurant.findFirstOrThrow(),
   );
+  if (restaurant.status === "suspended") redirect("/admin/billing");
+  if (!restaurant.onboardingCompletedAt) redirect("/admin/onboarding");
 
-  // Non-payment: send the owner to billing to resolve it.
-  if (restaurant.status === "suspended") {
-    redirect("/admin/billing");
-  }
-  // First-run: guide new owners through the onboarding wizard (skippable).
-  if (!restaurant.onboardingCompletedAt) {
-    redirect("/admin/onboarding");
-  }
+  // Today's figures.
+  const now = new Date();
+  const startOfDay = new Date(now);
+  startOfDay.setHours(0, 0, 0, 0);
+  const [today, openOrders] = await Promise.all([
+    getAnalytics(user.restaurantId, startOfDay, now),
+    tenantDb(user.restaurantId, (tx) =>
+      tx.order.count({ where: { status: { in: ["new", "preparing", "done"] } } }),
+    ),
+  ]);
+
+  const quick = [
+    ["Add a menu item", "/admin/menu"],
+    ["Print table QR", "/admin/tables"],
+    ["View analytics", "/admin/analytics"],
+    ["Read feedback", "/admin/feedback"],
+  ];
 
   return (
-    <div>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-heading text-2xl font-bold">
-            {restaurant.displayName || restaurant.name}
-          </h1>
-          <p className="text-sm text-plum-ink/60">
-            /{restaurant.slug} · {restaurant.status}
-          </p>
-        </div>
-        <form action={signOut}>
-          <button className="rounded-full border border-plum-ink/15 px-4 py-2 text-sm font-semibold">
-            Sign out
-          </button>
-        </form>
+    <div className="space-y-7">
+      <div>
+        <h1 className="font-heading text-2xl font-bold">
+          {restaurant.displayName || restaurant.name}
+        </h1>
+        <p className="text-sm text-plum-ink/55">Here&apos;s how today is going.</p>
       </div>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {(
-          [
-            ["Menu", "/admin/menu", "Categories, items & add-ons", true],
-            ["Tables", "/admin/tables", "Printable QR per table", true],
-            ["Modifiers", "/admin/modifiers", "Reusable option sets", true],
-            ["Online payment", "/admin/payments", "Connect PayMongo (GCash & card)", true],
-            ["Printing", "/admin/printing", "Kitchen ticket printer setup", true],
-            ["Branding", "/admin/branding", "Logo, colors & display name", false],
-            ["Staff", "/admin/staff", "Kitchen, cashier & admin logins", false],
-            ["Feedback", "/admin/feedback", "Ratings & comments inbox", true],
-            ["SMS marketing", "/admin/sms", "Promos to opted-in customers", true],
-            ["Billing", "/admin/billing", "Plan, trial & invoices", true],
-            ["Analytics", "/admin/analytics", "Revenue, items & trends", true],
-            ["Custom domain", "/admin/domains", "Branded subdomain or your own domain", true],
-            ["Inventory", "/admin/inventory", "Ingredients, recipes & stock", true],
-            ["HR", "/admin/hr", "Employees, schedule & payroll", true],
-          ] as const
-        ).map(([title, href, body, ready]) => {
-          const card = (
-            <div className="h-full rounded-tile border border-plum-ink/10 bg-white p-5">
-              <h3 className="font-heading font-bold">{title}</h3>
-              <p className="mt-1 text-sm text-plum-ink/60">{body}</p>
-              {!ready && (
-                <p className="mt-3 text-xs text-muted">Coming soon</p>
-              )}
-            </div>
-          );
-          return ready ? (
-            <a key={title} href={href} className="block transition hover:opacity-90">
-              {card}
-            </a>
-          ) : (
-            <div key={title} className="opacity-70">
-              {card}
-            </div>
-          );
-        })}
+      {/* KPIs */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Kpi label="Revenue today" value={formatPeso(today.summary.revenue)} hint="Paid orders" />
+        <Kpi label="Orders today" value={String(today.summary.orders)} />
+        <Kpi label="Open orders" value={String(openOrders)} hint="Awaiting / cooking / to settle" />
+        <Kpi
+          label="Avg rating today"
+          value={today.summary.avgRating !== null ? `${today.summary.avgRating} ★` : "—"}
+        />
+      </div>
+
+      {/* Operations */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Link
+          href="/kitchen"
+          className="flex items-center justify-between rounded-tile bg-plum-ink p-6 text-cream transition hover:opacity-95"
+        >
+          <div>
+            <p className="font-heading text-lg font-bold">Open kitchen display</p>
+            <p className="text-sm text-cream/60">Live incoming orders</p>
+          </div>
+          <span className="text-2xl">→</span>
+        </Link>
+        <Link
+          href="/cashier"
+          className="flex items-center justify-between rounded-tile bg-brand-gradient p-6 text-white transition hover:opacity-95"
+        >
+          <div>
+            <p className="font-heading text-lg font-bold">Open cashier</p>
+            <p className="text-sm text-white/80">Tables, payments &amp; tickets</p>
+          </div>
+          <span className="text-2xl">→</span>
+        </Link>
+      </div>
+
+      {/* Quick actions */}
+      <div>
+        <h2 className="mb-3 font-heading text-lg font-bold">Quick actions</h2>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {quick.map(([label, href]) => (
+            <Link
+              key={href}
+              href={href}
+              className="rounded-tile border border-plum-ink/10 bg-white p-4 text-sm font-semibold transition hover:border-brand-primary hover:shadow-sm"
+            >
+              {label} <span className="text-plum-ink/30">→</span>
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   );

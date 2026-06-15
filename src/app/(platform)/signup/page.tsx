@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
+import { AppIcon, Wordmark } from "@/components/Wordmark";
 import { signUpRestaurant, type SignupState } from "./actions";
 
 export default function SignupPage() {
@@ -14,7 +15,7 @@ export default function SignupPage() {
 
   if (state?.ok) {
     return (
-      <div className="mx-auto max-w-sm pt-10 text-center">
+      <div className="mx-auto max-w-sm px-6 pt-16 text-center">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand-gradient text-2xl text-white">
           ✓
         </div>
@@ -28,7 +29,11 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="mx-auto max-w-sm pt-10">
+    <div className="mx-auto max-w-sm px-6 pt-16">
+      <Link href="/" className="mb-8 flex items-center gap-2">
+        <AppIcon size={32} />
+        <Wordmark size="1.4rem" />
+      </Link>
       <h1 className="font-heading text-2xl font-bold">{t("signupTitle")}</h1>
       <p className="mt-1 text-sm text-plum-ink/60">{t("signupSubtitle")}</p>
 
