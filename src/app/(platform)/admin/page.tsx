@@ -3,7 +3,34 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/server/tenancy/current-user";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { getAnalytics } from "@/server/analytics/queries";
+import { getFeedbackList } from "@/server/feedback/queries";
+import { listInventory } from "@/server/inventory/queries";
+import { hasModule } from "@/server/billing/entitlements";
 import { formatPeso } from "@/lib/money";
+import { RevenueChart } from "@/components/analytics/Charts";
+
+/** Resolves a promise, returning a fallback if it throws (schema-lag safe). */
+async function safe<T>(p: Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await p;
+  } catch {
+    return fallback;
+  }
+}
+
+function Card({ title, href, children, className = "" }: { title?: string; href?: string; children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`rounded-tile border border-plum-ink/10 bg-white p-5 ${className}`}>
+      {title && (
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-heading text-sm font-bold uppercase tracking-wide text-plum-ink/55">{title}</h2>
+          {href && <Link href={href} className="text-xs font-semibold text-brand-primary">View →</Link>}
+        </div>
+      )}
+      {children}
+    </div>
+  );
+}
 
 function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
@@ -15,94 +42,187 @@ function Kpi({ label, value, hint }: { label: string; value: string; hint?: stri
   );
 }
 
+function Stars({ n }: { n: number }) {
+  return <span><span className="text-mango">{"★".repeat(n)}</span><span className="text-plum-ink/20">{"★".repeat(5 - n)}</span></span>;
+}
+
+const OPEN = ["new", "preparing", "done"] as const;
+
 export default async function AdminHome() {
   const user = await getCurrentUser();
-  if (!user || user.kind !== "staff" || user.role !== "admin") {
-    redirect("/login");
-  }
+  if (!user || user.kind !== "staff" || user.role !== "admin") redirect("/login");
+  const rid = user.restaurantId;
 
-  const restaurant = await tenantDb(user.restaurantId, (tx) =>
-    tx.restaurant.findFirstOrThrow(),
-  );
+  const restaurant = await tenantDb(rid, (tx) => tx.restaurant.findFirstOrThrow());
   if (restaurant.status === "suspended") redirect("/admin/billing");
   if (!restaurant.onboardingCompletedAt) redirect("/admin/onboarding");
 
-  // Today's figures.
   const now = new Date();
-  const startOfDay = new Date(now);
-  startOfDay.setHours(0, 0, 0, 0);
-  const [today, openOrders] = await Promise.all([
-    getAnalytics(user.restaurantId, startOfDay, now),
-    tenantDb(user.restaurantId, (tx) =>
-      tx.order.count({ where: { status: { in: ["new", "preparing", "done"] } } }),
+  const startOfDay = new Date(now); startOfDay.setHours(0, 0, 0, 0);
+  const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7);
+
+  const inventoryOn = await safe(hasModule(rid, "inventory"), false);
+
+  const [today, week, counts, recent, feedback, lowStock] = await Promise.all([
+    safe(getAnalytics(rid, startOfDay, now), null),
+    safe(getAnalytics(rid, weekAgo, now), null),
+    safe(
+      tenantDb(rid, async (tx) => {
+        const [open, preparing, ready, tables, activeTables] = await Promise.all([
+          tx.order.count({ where: { status: { in: [...OPEN] } } }),
+          tx.order.count({ where: { status: "preparing" } }),
+          tx.order.count({ where: { status: "done" } }),
+          tx.table.count(),
+          tx.order.findMany({ where: { status: { in: [...OPEN] } }, select: { tableId: true }, distinct: ["tableId"] }),
+        ]);
+        return { open, preparing, ready, tables, activeTables: activeTables.length };
+      }),
+      { open: 0, preparing: 0, ready: 0, tables: 0, activeTables: 0 },
     ),
+    safe(
+      tenantDb(rid, (tx) =>
+        tx.order.findMany({
+          orderBy: { createdAt: "desc" },
+          take: 8,
+          select: {
+            id: true, status: true, paymentStatus: true, total: true, createdAt: true,
+            table: { select: { tableNumber: true } },
+            _count: { select: { items: true } },
+          },
+        }),
+      ),
+      [] as Array<{ id: string; status: string; paymentStatus: string; total: number; createdAt: Date; table: { tableNumber: string } | null; _count: { items: number } }>,
+    ),
+    safe(getFeedbackList(rid), [] as Awaited<ReturnType<typeof getFeedbackList>>),
+    inventoryOn ? safe(listInventory(rid), []) : Promise.resolve([]),
   ]);
 
-  const quick = [
-    ["Add a menu item", "/admin/menu"],
-    ["Print table QR", "/admin/tables"],
-    ["View analytics", "/admin/analytics"],
-    ["Read feedback", "/admin/feedback"],
-  ];
+  const lowItems = lowStock.filter((i) => i.low).slice(0, 5);
+
+  // Smart insights (data-derived, not an LLM).
+  const insights: string[] = [];
+  if (week?.topItems[0]) insights.push(`🔥 Best seller this week: ${week.topItems[0].name} (${week.topItems[0].qty} sold)`);
+  if (week && week.peakHours.length) {
+    const peak = [...week.peakHours].sort((a, b) => b.orders - a.orders)[0];
+    insights.push(`⏰ Busiest hour: ${peak.hour}:00 (UTC)`);
+  }
+  if (lowItems.length) insights.push(`📦 ${lowItems.length} ingredient${lowItems.length > 1 ? "s" : ""} running low`);
+  if (week?.summary.avgRating != null) insights.push(`⭐ 7-day average rating: ${week.summary.avgRating}`);
+  if (insights.length === 0) insights.push("Add menu items and share your table QR codes to start seeing insights here.");
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-5">
       <div>
-        <h1 className="font-heading text-2xl font-bold">
-          {restaurant.displayName || restaurant.name}
-        </h1>
+        <h1 className="font-heading text-2xl font-bold">{restaurant.displayName || restaurant.name}</h1>
         <p className="text-sm text-plum-ink/55">Here&apos;s how today is going.</p>
       </div>
 
-      {/* KPIs */}
+      {/* Top row — KPIs */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Revenue today" value={formatPeso(today.summary.revenue)} hint="Paid orders" />
-        <Kpi label="Orders today" value={String(today.summary.orders)} />
-        <Kpi label="Open orders" value={String(openOrders)} hint="Awaiting / cooking / to settle" />
-        <Kpi
-          label="Avg rating today"
-          value={today.summary.avgRating !== null ? `${today.summary.avgRating} ★` : "—"}
-        />
+        <Kpi label="Revenue today" value={formatPeso(today?.summary.revenue ?? 0)} hint="Paid orders" />
+        <Kpi label="Orders today" value={String(today?.summary.orders ?? 0)} />
+        <Kpi label="Open orders" value={String(counts.open)} hint="Awaiting / cooking / to settle" />
+        <Kpi label="Avg rating today" value={today?.summary.avgRating != null ? `${today.summary.avgRating} ★` : "—"} />
       </div>
 
-      {/* Operations */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Link
-          href="/kitchen"
-          className="flex items-center justify-between rounded-tile bg-plum-ink p-6 text-cream transition hover:opacity-95"
-        >
-          <div>
-            <p className="font-heading text-lg font-bold">Open kitchen display</p>
-            <p className="text-sm text-cream/60">Live incoming orders</p>
-          </div>
-          <span className="text-2xl">→</span>
-        </Link>
-        <Link
-          href="/cashier"
-          className="flex items-center justify-between rounded-tile bg-brand-gradient p-6 text-white transition hover:opacity-95"
-        >
-          <div>
-            <p className="font-heading text-lg font-bold">Open cashier</p>
-            <p className="text-sm text-white/80">Tables, payments &amp; tickets</p>
-          </div>
-          <span className="text-2xl">→</span>
-        </Link>
+      {/* Second row */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card title="Revenue (7 days)" href="/admin/analytics" className="lg:col-span-2">
+          {week ? <RevenueChart data={week.revenueByDay} /> : <p className="py-10 text-center text-sm text-plum-ink/40">No data yet.</p>}
+        </Card>
+        <Card title="Popular items" href="/admin/analytics">
+          {week && week.topItems.length ? (
+            <ul className="space-y-2 text-sm">
+              {week.topItems.map((it) => (
+                <li key={it.name} className="flex justify-between">
+                  <span className="truncate">{it.name}</span>
+                  <span className="font-semibold text-plum-ink/60">×{it.qty}</span>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="py-6 text-center text-sm text-plum-ink/40">No sales yet.</p>}
+        </Card>
       </div>
 
-      {/* Quick actions */}
-      <div>
-        <h2 className="mb-3 font-heading text-lg font-bold">Quick actions</h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {quick.map(([label, href]) => (
-            <Link
-              key={href}
-              href={href}
-              className="rounded-tile border border-plum-ink/10 bg-white p-4 text-sm font-semibold transition hover:border-brand-primary hover:shadow-sm"
-            >
-              {label} <span className="text-plum-ink/30">→</span>
-            </Link>
-          ))}
-        </div>
+      {/* Third row */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card title="Kitchen" href="/kitchen">
+          <div className="grid grid-cols-3 text-center">
+            {[["New", counts.open - counts.preparing - counts.ready], ["Cooking", counts.preparing], ["Ready", counts.ready]].map(([l, v]) => (
+              <div key={l as string}>
+                <p className="font-heading text-2xl font-extrabold">{Math.max(0, v as number)}</p>
+                <p className="text-xs text-plum-ink/50">{l}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+        <Card title="Tables" href="/admin/tables">
+          <p className="font-heading text-2xl font-extrabold">{counts.activeTables}<span className="text-plum-ink/40"> / {counts.tables}</span></p>
+          <p className="text-xs text-plum-ink/50">tables with open orders</p>
+        </Card>
+        <Card title="Feedback" href="/admin/feedback">
+          {feedback.length ? (
+            <ul className="space-y-2 text-sm">
+              {feedback.slice(0, 3).map((f) => (
+                <li key={f.id}>
+                  <Stars n={f.rating} />
+                  {f.comment && <span className="ml-1 text-plum-ink/60">“{f.comment.slice(0, 40)}”</span>}
+                </li>
+              ))}
+            </ul>
+          ) : <p className="py-4 text-center text-sm text-plum-ink/40">No feedback yet.</p>}
+        </Card>
+      </div>
+
+      {/* Fourth row */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card title="Recent orders" className="lg:col-span-2">
+          {recent.length ? (
+            <ul className="divide-y divide-plum-ink/5 text-sm">
+              {recent.map((o) => (
+                <li key={o.id} className="flex items-center justify-between py-2">
+                  <span>
+                    Table {o.table?.tableNumber ?? "—"} · {o._count.items} item{o._count.items === 1 ? "" : "s"}
+                    <span className="ml-2 text-xs text-plum-ink/40">{o.status} · {o.paymentStatus}</span>
+                  </span>
+                  <span className="font-semibold">{formatPeso(o.total)}</span>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="py-6 text-center text-sm text-plum-ink/40">No orders yet.</p>}
+        </Card>
+        <Card title="Inventory alerts" href={inventoryOn ? "/admin/inventory" : undefined}>
+          {!inventoryOn ? (
+            <p className="text-sm text-plum-ink/40">Inventory module off.</p>
+          ) : lowItems.length ? (
+            <ul className="space-y-1 text-sm">
+              {lowItems.map((i) => (
+                <li key={i.id} className="flex justify-between">
+                  <span className="text-guava">{i.name}</span>
+                  <span className="text-plum-ink/50">{i.stockQty} {i.unit}</span>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="text-sm text-plum-ink/40">All stocked up ✓</p>}
+        </Card>
+      </div>
+
+      {/* Bottom row */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card title="Smart insights" className="lg:col-span-2">
+          <ul className="space-y-2 text-sm text-plum-ink/75">
+            {insights.map((t, i) => <li key={i}>{t}</li>)}
+          </ul>
+        </Card>
+        <Card title="Quick actions">
+          <div className="space-y-2">
+            {[["Add a menu item", "/admin/menu"], ["Print table QR", "/admin/tables"], ["Add staff login", "/admin/staff"]].map(([l, h]) => (
+              <Link key={h} href={h} className="block rounded-lg border border-plum-ink/10 px-3 py-2 text-sm font-semibold hover:border-brand-primary">
+                {l} <span className="text-plum-ink/30">→</span>
+              </Link>
+            ))}
+          </div>
+        </Card>
       </div>
     </div>
   );
