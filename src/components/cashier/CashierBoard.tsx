@@ -404,9 +404,16 @@ export function CashierBoard({
               {incoming.map((o) => (
                 <li key={o.id} className="rounded-lg border border-guava/40 bg-guava/5 p-3">
                   <div className="flex items-center justify-between">
-                    <span className="font-heading font-bold">Table {o.tableNumber}</span>
+                    <span className="font-heading font-bold">{o.label}</span>
                     <span className="font-semibold">{formatPeso(o.total)}</span>
                   </div>
+                  {o.channel !== "dine_in" && (
+                    <p className="mt-0.5 text-xs text-plum-ink/55">
+                      {o.channel === "delivery" ? "🛵 Delivery" : "🥡 Pickup"}
+                      {o.customerPhone ? ` · ${o.customerPhone}` : ""}
+                      {o.customerAddress ? ` · ${o.customerAddress}` : ""}
+                    </p>
+                  )}
                   <ul className="mt-2 space-y-1 text-sm text-plum-ink/75">
                     {o.items.map((it, i) => (
                       <li key={i}>

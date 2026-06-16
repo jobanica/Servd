@@ -57,7 +57,7 @@ export default async function AdminHome() {
 
   const restaurant = await tenantDb(rid, (tx) =>
     tx.restaurant.findFirstOrThrow({
-      select: { name: true, displayName: true, status: true, onboardingCompletedAt: true },
+      select: { name: true, displayName: true, slug: true, status: true, onboardingCompletedAt: true },
     }),
   );
   if (restaurant.status === "suspended") redirect("/admin/billing");
@@ -252,6 +252,9 @@ export default async function AdminHome() {
         </Card>
         <Card title="Quick actions">
           <div className="space-y-2">
+            <a href={`/r/${restaurant.slug}`} target="_blank" rel="noopener" className="block rounded-lg border border-brand-primary/30 bg-brand-primary/5 px-3 py-2 text-sm font-semibold text-brand-primary hover:border-brand-primary">
+              🌐 View your online website <span className="opacity-40">→</span>
+            </a>
             {[["Add a menu item", "/admin/menu"], ["Print table QR", "/admin/tables"], ["Add staff login", "/admin/staff"]].map(([l, h]) => (
               <Link key={h} href={h} className="block rounded-lg border border-plum-ink/10 px-3 py-2 text-sm font-semibold hover:border-brand-primary">
                 {l} <span className="text-plum-ink/30">→</span>

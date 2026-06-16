@@ -99,6 +99,10 @@ async function orderMetaMap(
 export interface IncomingOrder {
   id: string;
   tableNumber: string;
+  label: string; // "Table 5" or "🥡 Pickup — Juan" / "🛵 Delivery — Ana"
+  channel: string; // dine_in | takeout | delivery
+  customerPhone: string | null;
+  customerAddress: string | null;
   total: number;
   paymentStatus: string;
   createdAt: string;
@@ -223,19 +227,35 @@ export async function getIncomingOrders(): Promise<IncomingOrder[]> {
       },
     }),
   );
-  return orders.map((o) => ({
-    id: o.id,
-    tableNumber: o.table?.tableNumber ?? "—",
-    total: o.total,
-    paymentStatus: o.paymentStatus,
-    createdAt: o.createdAt.toISOString(),
-    items: o.items.map((it) => ({
-      name: it.nameAtTime,
-      quantity: it.quantity,
-      note: it.note,
-      modifiers: it.modifiers.map((m) => m.nameAtTime),
-    })),
-  }));
+
+  const meta = await orderMetaMap(staff.restaurantId, orders.map((o) => o.id));
+  return orders.map((o) => {
+    const m = meta.get(o.id);
+    const kind = (m?.orderType ?? "dine_in") as string;
+    const isDineIn = kind === "dine_in" || !!o.table;
+    const label = isDineIn
+      ? `Table ${o.table?.tableNumber ?? "—"}`
+      : kind === "delivery"
+        ? `🛵 Delivery — ${m?.customerName ?? "Customer"}`
+        : `🥡 Pickup — ${m?.customerName ?? "Customer"}`;
+    return {
+      id: o.id,
+      tableNumber: o.table?.tableNumber ?? "—",
+      label,
+      channel: isDineIn ? "dine_in" : kind,
+      customerPhone: m?.customerPhone ?? null,
+      customerAddress: m?.customerAddress ?? null,
+      total: o.total,
+      paymentStatus: o.paymentStatus,
+      createdAt: o.createdAt.toISOString(),
+      items: o.items.map((it) => ({
+        name: it.nameAtTime,
+        quantity: it.quantity,
+        note: it.note,
+        modifiers: it.modifiers.map((m) => m.nameAtTime),
+      })),
+    };
+  });
 }
 
 export interface CashierState {
