@@ -48,7 +48,8 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
               <option value="hourly">Hourly</option><option value="monthly">Monthly</option>
             </select>
           </label>
-          <label className="text-sm">Clock PIN<input name="clockPin" defaultValue={employee.clockPin ?? ""} className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2" /></label>
+          <label className="text-sm">Phone (login)<input name="phone" defaultValue={(employee.contactJson as { phone?: string } | null)?.phone ?? ""} className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2" /></label>
+          <label className="text-sm">PIN (login + clock)<input name="clockPin" defaultValue={employee.clockPin ?? ""} className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2" /></label>
           <label className="text-sm">Status
             <select name="status" defaultValue={employee.status} className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2">
               <option value="active">Active</option><option value="inactive">Inactive</option>

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { requireHrPage } from "@/server/hr/guard";
+import { tenantDb } from "@/server/tenancy/scoped-db";
 import { listEmployees } from "@/server/hr/queries";
+import { qrSvg } from "@/lib/qr";
 import { formatPeso } from "@/lib/money";
 import { AddEmployeeForm } from "@/components/admin/hr/AddEmployeeForm";
 
@@ -22,6 +24,13 @@ export default async function HrPage() {
   if (!eligible) return <UpgradePrompt />;
   const employees = await listEmployees(restaurantId);
 
+  const restaurant = await tenantDb(restaurantId, (tx) =>
+    tx.restaurant.findFirstOrThrow({ select: { slug: true } }),
+  );
+  const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const attendUrl = `${base.replace(/\/$/, "")}/attend/${restaurant.slug}`;
+  const attendQr = await qrSvg(attendUrl);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -38,6 +47,20 @@ export default async function HrPage() {
             </Link>
           ))}
         </nav>
+      </div>
+
+      {/* Shared workplace attendance QR */}
+      <div className="flex flex-col items-center gap-4 rounded-tile border border-plum-ink/10 bg-white p-5 sm:flex-row">
+        <div className="h-36 w-36 shrink-0 [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: attendQr }} />
+        <div className="min-w-0 text-center sm:text-left">
+          <h2 className="font-heading text-lg font-bold">Workplace attendance QR</h2>
+          <p className="mt-1 text-sm text-plum-ink/60">
+            Print &amp; post this at your workplace. Employees scan it, sign in with their phone +
+            PIN, then take a selfie to clock in/out. Set each employee&apos;s phone &amp; PIN on
+            their profile.
+          </p>
+          <p className="mt-2 break-all text-xs text-plum-ink/40">{attendUrl}</p>
+        </div>
       </div>
 
       <AddEmployeeForm />

@@ -36,6 +36,7 @@ export async function createEmployee(_p: FormState, formData: FormData): Promise
       emergency: formData.get("emergency") ?? "",
       clockPin: formData.get("clockPin") ?? "",
     });
+    const phone = d.phone ? d.phone.replace(/[^\d+]/g, "").trim() : null;
     await tenantDb(restaurantId, (tx) =>
       tx.employee.create({
         data: {
@@ -46,7 +47,8 @@ export async function createEmployee(_p: FormState, formData: FormData): Promise
           payType: d.payType,
           payRate: pesosToCentavos(d.payPesos),
           clockPin: d.clockPin || null,
-          contactJson: { phone: d.phone || null, emergency: d.emergency || null },
+          // Phone normalized to digits so phone+PIN login matches.
+          contactJson: { phone, emergency: d.emergency || null },
         },
       }),
     );
@@ -61,8 +63,15 @@ export async function createEmployee(_p: FormState, formData: FormData): Promise
 export async function updateEmployee(formData: FormData): Promise<void> {
   const { restaurantId } = await requireHrAction();
   const id = String(formData.get("id"));
-  await tenantDb(restaurantId, (tx) =>
-    tx.employee.update({
+  const phoneRaw = String(formData.get("phone") ?? "").trim();
+  const phone = phoneRaw ? phoneRaw.replace(/[^\d+]/g, "") : null;
+  await tenantDb(restaurantId, async (tx) => {
+    const current = await tx.employee.findFirstOrThrow({
+      where: { id },
+      select: { contactJson: true },
+    });
+    const contact = (current.contactJson as { phone?: string | null; emergency?: string | null } | null) ?? {};
+    await tx.employee.update({
       where: { id },
       data: {
         fullName: String(formData.get("fullName") ?? "").trim() || undefined,
@@ -71,9 +80,10 @@ export async function updateEmployee(formData: FormData): Promise<void> {
         payType: (formData.get("payType") as "hourly" | "monthly") ?? undefined,
         status: (formData.get("status") as "active" | "inactive") ?? undefined,
         clockPin: (String(formData.get("clockPin") ?? "").trim() || null) as string | null,
+        contactJson: { ...contact, phone },
       },
-    }),
-  );
+    });
+  });
   revalidatePath(`/admin/hr/${id}`);
 }
 

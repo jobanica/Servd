@@ -615,7 +615,7 @@ model Employee {
   hiredAt        DateTime?
   contactJson    Json? // phone, address, emergency contact …
   status         EmployeeStatus @default(active)
-  clockPin       String? // for PIN clock-in at a station
+  clockPin       String? // PIN for login + clock-in at a station
   clockToken     String         @unique @default(uuid()) // for personal-QR clock-in
   createdAt      DateTime       @default(now())
 
