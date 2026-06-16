@@ -2,6 +2,9 @@ import type { Prisma } from "@prisma/client";
 import { tenantDb, systemDb } from "@/server/tenancy/scoped-db";
 import { addMonths } from "@/lib/billing/period";
 
+/** Free trial length — full access to every feature. */
+export const TRIAL_DAYS = 30;
+
 /**
  * Picks the default signup plan: the cheapest active plan (e.g. Starter).
  * Returns null if no plans are seeded yet (trial still works, just unlimited).
@@ -23,8 +26,8 @@ export async function startTrial(
 ) {
   const plan = await getDefaultPlan(tx);
   if (!plan) return; // no plans yet — skip; restaurant stays unlimited/active
-  const trialEndsAt = addMonths(new Date(), 0);
-  trialEndsAt.setDate(trialEndsAt.getDate() + plan.trialDays);
+  const trialEndsAt = new Date();
+  trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_DAYS);
 
   await tx.restaurant.update({ where: { id: restaurantId }, data: { planId: plan.id } });
   await tx.subscription.create({

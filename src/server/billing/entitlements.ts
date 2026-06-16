@@ -7,6 +7,9 @@ export interface PlanLimits {
   smsIncluded?: number;
 }
 
+/** Every add-on module — unlocked for all during the free trial. */
+const ALL_MODULES: PlanModuleType[] = ["hris", "inventory", "custom_domain"];
+
 export interface Entitlements {
   planName: string | null;
   limits: PlanLimits;
@@ -33,6 +36,30 @@ export async function getEntitlements(restaurantId: string): Promise<Entitlement
         },
       },
     });
+
+    // Free trial = full access: all modules, no limits, for 30 days.
+    let onTrial = false;
+    try {
+      const sub = await tx.subscription.findFirst({
+        orderBy: { createdAt: "desc" },
+        select: { status: true, trialEndsAt: true },
+      });
+      onTrial =
+        sub?.status === "trialing" &&
+        sub.trialEndsAt != null &&
+        sub.trialEndsAt.getTime() > Date.now();
+    } catch {
+      /* no subscription row — fall through to plan entitlements */
+    }
+    if (onTrial) {
+      return {
+        planName: restaurant.plan?.name ?? "Free trial",
+        limits: {}, // unlimited during the trial
+        modules: new Set(ALL_MODULES),
+        status: restaurant.status,
+      };
+    }
+
     const limits = (restaurant.plan?.limits as PlanLimits | null) ?? {};
     return {
       planName: restaurant.plan?.name ?? null,
