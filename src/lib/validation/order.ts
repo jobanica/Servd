@@ -8,6 +8,7 @@ import { z } from "zod";
 export const placeOrderSchema = z.object({
   slug: z.string().min(1),
   tableToken: z.string().min(1),
+  loyaltyPhone: z.string().trim().max(30).optional(),
   lines: z
     .array(
       z.object({

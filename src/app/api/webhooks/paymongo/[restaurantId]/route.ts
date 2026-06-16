@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { getRestaurantGateway } from "@/server/payments/credentials";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
+import { awardPointsForOrder } from "@/server/loyalty/loyalty";
 
 /**
  * PayMongo webhook — the authoritative source of payment truth.
@@ -54,7 +55,25 @@ export async function POST(
       return ids;
     });
 
-    if (orderIds.length > 0) await notifyOrdersChanged(restaurantId);
+    if (orderIds.length > 0) {
+      await notifyOrdersChanged(restaurantId);
+      // Award loyalty points for paid online orders (best-effort).
+      if (event.status === "paid") {
+        try {
+          const orders = await systemDb((tx) =>
+            tx.order.findMany({
+              where: { id: { in: orderIds } },
+              select: { id: true, total: true, customerPhone: true },
+            }),
+          );
+          for (const o of orders) {
+            await awardPointsForOrder(restaurantId, o.id, o.total, o.customerPhone);
+          }
+        } catch {
+          /* loyalty never blocks the webhook */
+        }
+      }
+    }
   }
 
   return new Response("ok", { status: 200 });

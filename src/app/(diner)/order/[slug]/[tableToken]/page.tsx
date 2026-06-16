@@ -6,6 +6,7 @@ import {
 } from "@/server/restaurants/get-public";
 import { getPublicMenu } from "@/server/menu/public-menu";
 import { getActivePromotions } from "@/server/promotions/queries";
+import { getLoyaltyConfig } from "@/server/loyalty/loyalty";
 import { DinerMenu } from "@/components/diner/DinerMenu";
 
 /**
@@ -31,9 +32,10 @@ export default async function DinerOrderPage({
   if (!table) notFound();
 
   const locale = await getLocale();
-  const [categories, promotions] = await Promise.all([
+  const [categories, promotions, loyalty] = await Promise.all([
     getPublicMenu(restaurant.id, locale),
     getActivePromotions(restaurant.id),
+    getLoyaltyConfig(restaurant.id),
   ]);
 
   return (
@@ -52,6 +54,7 @@ export default async function DinerOrderPage({
       justPaid={paid === "1"}
       googleReviewUrl={restaurant.googleReviewUrl}
       promotions={promotions}
+      loyaltyEnabled={loyalty.enabled}
     />
   );
 }

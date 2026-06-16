@@ -29,7 +29,7 @@ export async function placeOrder(
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid order" };
   }
-  const { slug, tableToken, lines } = parsed.data;
+  const { slug, tableToken, lines, loyaltyPhone } = parsed.data;
 
   // Resolve the restaurant + table (public lookups, scoped by slug/token).
   const ctx = await systemDb(async (tx) => {
@@ -56,24 +56,39 @@ export async function placeOrder(
   }
 
   // Persist atomically, tenant-scoped (RLS WITH CHECK enforces the boundary).
+  const baseData = {
+    restaurantId: ctx.restaurantId,
+    tableId: ctx.tableId,
+    status: "pending" as const, // awaiting cashier acceptance
+    paymentStatus: "unpaid" as const,
+    total: built.total,
+    items: { create: orderItemsCreate(built.items) },
+  };
+  const phone = loyaltyPhone?.trim() || null;
+
   let order;
   try {
     order = await tenantDb(ctx.restaurantId, (tx) =>
       tx.order.create({
-        data: {
-          restaurantId: ctx.restaurantId,
-          tableId: ctx.tableId,
-          status: "pending", // awaiting cashier acceptance
-          paymentStatus: "unpaid",
-          total: built.total,
-          items: { create: orderItemsCreate(built.items) },
-        },
+        data: phone ? { ...baseData, customerPhone: phone } : baseData,
         select: { id: true },
       }),
     );
   } catch (e) {
-    console.error("placeOrder: failed to create order", e);
-    return { ok: false, error: "We couldn't place your order. Please try again." };
+    // customerPhone column may not exist yet on a lagging DB — retry without it.
+    if (phone) {
+      try {
+        order = await tenantDb(ctx.restaurantId, (tx) =>
+          tx.order.create({ data: baseData, select: { id: true } }),
+        );
+      } catch (e2) {
+        console.error("placeOrder: failed to create order", e2);
+        return { ok: false, error: "We couldn't place your order. Please try again." };
+      }
+    } else {
+      console.error("placeOrder: failed to create order", e);
+      return { ok: false, error: "We couldn't place your order. Please try again." };
+    }
   }
 
   // Alert the live cashier screen (the kitchen ticket prints on acceptance).

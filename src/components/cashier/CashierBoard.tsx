@@ -18,6 +18,7 @@ import { chime } from "@/lib/sound";
 import { PrintTicketButton } from "./PrintTicketButton";
 import { NewOrderModal } from "./NewOrderModal";
 import { DiscountModal } from "./DiscountModal";
+import { LoyaltyRedeemModal } from "./LoyaltyRedeemModal";
 
 export function CashierBoard({
   restaurantId,
@@ -34,6 +35,7 @@ export function CashierBoard({
   const [busy, setBusy] = useState<string | null>(null);
   const [newOrderOpen, setNewOrderOpen] = useState(false);
   const [discountOrder, setDiscountOrder] = useState<CashierTable["orders"][number] | null>(null);
+  const [loyaltyOrderId, setLoyaltyOrderId] = useState<string | null>(null);
   const [waiterCalls, setWaiterCalls] = useState<{ id: string; tableNumber: string }[]>([]);
   const [popupDismissed, setPopupDismissed] = useState(false);
   const [readyDismissed, setReadyDismissed] = useState(false);
@@ -340,6 +342,13 @@ export function CashierBoard({
                           {o.discountAmount > 0 ? "Edit discount" : "Discount"}
                         </button>
                         <button
+                          onClick={() => setLoyaltyOrderId(o.id)}
+                          disabled={busy === o.id}
+                          className="rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
+                        >
+                          ⭐ Points
+                        </button>
+                        <button
                           onClick={() => pay(o.id, "cash")}
                           disabled={busy === o.id}
                           className="rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
@@ -530,6 +539,14 @@ export function CashierBoard({
         <DiscountModal
           order={discountOrder}
           onClose={() => setDiscountOrder(null)}
+          onApplied={(t) => setTables(t)}
+        />
+      )}
+
+      {loyaltyOrderId && (
+        <LoyaltyRedeemModal
+          orderId={loyaltyOrderId}
+          onClose={() => setLoyaltyOrderId(null)}
           onApplied={(t) => setTables(t)}
         />
       )}

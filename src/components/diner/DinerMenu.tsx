@@ -14,6 +14,7 @@ import { CartDrawer } from "./CartDrawer";
 import { RequestBillButton } from "./RequestBillButton";
 import { PayOnlineButton } from "./PayOnlineButton";
 import { CallWaiterButton } from "./CallWaiterButton";
+import { RewardsPanel } from "./RewardsPanel";
 import { OrderStatusTracker } from "./OrderStatusTracker";
 
 interface RestaurantBrand {
@@ -119,6 +120,7 @@ export function DinerMenu({
   justPaid,
   googleReviewUrl = null,
   promotions = [],
+  loyaltyEnabled = false,
 }: {
   restaurantId: string;
   slug: string;
@@ -130,6 +132,7 @@ export function DinerMenu({
   justPaid?: boolean;
   googleReviewUrl?: string | null;
   promotions?: PromoItem[];
+  loyaltyEnabled?: boolean;
 }) {
   const cart = useCart(restaurantId, tableToken);
   const t = useTranslations("diner");
@@ -164,10 +167,30 @@ export function DinerMenu({
     }
   }
 
+  // Loyalty phone (remembered so orders earn points automatically).
+  const loyaltyKey = `servd:loyaltyPhone:${restaurantId}`;
+  const [loyaltyPhone, setLoyaltyPhone] = useState("");
+  useEffect(() => {
+    try {
+      setLoyaltyPhone(localStorage.getItem(loyaltyKey) ?? "");
+    } catch {
+      /* ignore */
+    }
+  }, [loyaltyKey]);
+  function saveLoyaltyPhone(p: string) {
+    setLoyaltyPhone(p);
+    try {
+      localStorage.setItem(loyaltyKey, p);
+    } catch {
+      /* ignore */
+    }
+  }
+
   async function submitOrder(): Promise<PlaceOrderResult> {
     return placeOrder({
       slug,
       tableToken,
+      loyaltyPhone: loyaltyPhone || undefined,
       lines: cart.lines.map((l) => ({
         itemId: l.itemId,
         quantity: l.quantity,
@@ -424,6 +447,9 @@ export function DinerMenu({
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-brand-ink/15" />
             <h2 className="font-heading text-lg font-bold text-brand-ink">{t("moreOptions")}</h2>
             <div className="mt-4 flex flex-col gap-3">
+              {loyaltyEnabled && (
+                <RewardsPanel slug={slug} phone={loyaltyPhone} onPhone={saveLoyaltyPhone} />
+              )}
               <CallWaiterButton slug={slug} tableToken={tableToken} />
               {payOnline && <PayOnlineButton slug={slug} tableToken={tableToken} />}
               <RequestBillButton slug={slug} tableToken={tableToken} />

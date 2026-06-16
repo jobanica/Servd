@@ -13,6 +13,7 @@ import {
 } from "@/server/orders/build-order";
 import type { DinerCategory } from "@/lib/cart/types";
 import { computeDiscount, netTotal, type DiscountKind } from "@/lib/discount";
+import { awardPointsForOrder, getBalance, getLoyaltyConfig, redeemPoints } from "@/server/loyalty/loyalty";
 
 export interface CashierOrder {
   id: string;
@@ -294,12 +295,14 @@ export async function markOrderPaid(
 
   // Charge the discounted (net) amount if a discount was applied.
   const disc = (await discountMap(staff.restaurantId, [orderId])).get(orderId);
+  let netPaid = 0;
 
   try {
     await tenantDb(staff.restaurantId, async (tx) => {
       const order = await tx.order.findFirst({ where: { id: orderId }, select: { total: true } });
       if (!order) throw new Error("Order not found");
       const amount = netTotal(order.total, disc?.amount ?? 0);
+      netPaid = amount;
       // updateMany (not update) so it doesn't read the whole row back — keeps
       // working even if the prod schema lags (e.g. missing newer columns).
       await tx.order.updateMany({
@@ -315,6 +318,10 @@ export async function markOrderPaid(
     console.error("markOrderPaid failed", e);
     return { ok: false, error: e instanceof Error ? e.message : "Could not record the payment." };
   }
+
+  // Award loyalty points (best-effort) to the order's customer phone.
+  const phone = (await orderMetaMap(staff.restaurantId, [orderId])).get(orderId)?.customerPhone ?? null;
+  await awardPointsForOrder(staff.restaurantId, orderId, netPaid, phone);
 
   await notifyOrdersChanged(staff.restaurantId);
   return { ok: true, tables: await getCashierTables() };
@@ -403,6 +410,60 @@ export async function applyDiscount(
             ? e.message
             : "Could not apply the discount.",
     };
+  }
+  await notifyOrdersChanged(staff.restaurantId);
+  return { ok: true, tables: await getCashierTables() };
+}
+
+// ---------------------------------------------------------------------------
+// Loyalty redemption at the cashier
+// ---------------------------------------------------------------------------
+
+/** Loyalty info for an order's customer (for the redeem UI). */
+export async function getOrderLoyalty(
+  orderId: string,
+): Promise<{ enabled: boolean; phone: string | null; points: number; pointValue: number }> {
+  const staff = await requireStaff(["cashier", "admin"]);
+  const cfg = await getLoyaltyConfig(staff.restaurantId);
+  const phone = (await orderMetaMap(staff.restaurantId, [orderId])).get(orderId)?.customerPhone ?? null;
+  const points = phone ? await getBalance(staff.restaurantId, phone) : 0;
+  return { enabled: cfg.enabled, phone, points, pointValue: cfg.pointValue };
+}
+
+/** Redeem a customer's points on an order — applied as a discount. */
+export async function redeemLoyalty(
+  orderId: string,
+  points: number,
+): Promise<{ ok: boolean; tables?: CashierTable[]; error?: string }> {
+  let staff;
+  try {
+    staff = await requireStaff(["cashier", "admin"]);
+  } catch {
+    return { ok: false, error: "Not allowed." };
+  }
+  const phone = (await orderMetaMap(staff.restaurantId, [orderId])).get(orderId)?.customerPhone ?? null;
+  if (!phone) return { ok: false, error: "This order has no customer phone for loyalty." };
+
+  const order = await tenantDb(staff.restaurantId, (tx) =>
+    tx.order.findFirst({ where: { id: orderId }, select: { total: true } }),
+  );
+  if (!order) return { ok: false, error: "Order not found." };
+
+  const res = await redeemPoints(staff.restaurantId, phone, points);
+  if (!res.ok) return { ok: false, error: res.error };
+
+  // Apply the redeemed value as the order discount (capped at the total).
+  const amount = Math.min(order.total, res.value ?? 0);
+  try {
+    await tenantDb(staff.restaurantId, (tx) =>
+      tx.order.updateMany({
+        where: { id: orderId },
+        data: { discountAmount: amount, discountLabel: `Loyalty (${points} pts)` },
+      }),
+    );
+  } catch (e) {
+    console.error("redeemLoyalty discount failed", e);
+    return { ok: false, error: "Redeemed, but couldn't apply the discount. Please retry." };
   }
   await notifyOrdersChanged(staff.restaurantId);
   return { ok: true, tables: await getCashierTables() };

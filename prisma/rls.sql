@@ -77,7 +77,8 @@ declare
   t text;
   tenant_tables text[] := array[
     'staff_users', 'subscriptions', 'tables', 'categories', 'menu_items',
-    'modifier_groups', 'orders', 'promotions', 'feedback', 'customer_contacts',
+    'modifier_groups', 'orders', 'promotions', 'loyalty_accounts',
+    'loyalty_transactions', 'feedback', 'customer_contacts',
     'sms_campaigns', 'sms_credit_ledger', 'print_jobs', 'restaurant_invoices',
     'menu_item_translations', 'category_translations',
     'suppliers', 'inventory_items', 'recipe_components', 'stock_movements',

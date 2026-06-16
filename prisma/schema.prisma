@@ -196,6 +196,11 @@ model Restaurant {
   // Inventory: auto-flip a menu item to out-of-stock when an ingredient hits 0.
   autoOutOfStock Boolean @default(false)
 
+  // --- Loyalty & rewards (points per peso) ---
+  loyaltyEnabled       Boolean @default(false)
+  loyaltyPesosPerPoint Int     @default(20) // ₱ spent to earn 1 point
+  loyaltyPointValue    Int     @default(100) // centavos a point is worth on redeem
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -218,8 +223,42 @@ model Restaurant {
   inventoryItems  InventoryItem[]
   purchaseOrders  PurchaseOrder[]
   employees       Employee[]
+  loyaltyAccounts LoyaltyAccount[]
+  loyaltyTxns     LoyaltyTransaction[]
 
   @@map("restaurants")
+}
+
+/// A customer's loyalty balance at a restaurant, keyed by phone number.
+model LoyaltyAccount {
+  id           String   @id @default(uuid())
+  restaurantId String
+  phone        String
+  points       Int      @default(0)
+  totalEarned  Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, phone])
+  @@map("loyalty_accounts")
+}
+
+/// An audit trail of points earned / redeemed / adjusted.
+model LoyaltyTransaction {
+  id           String   @id @default(uuid())
+  restaurantId String
+  phone        String
+  orderId      String?
+  points       Int // signed: + earned, - redeemed
+  kind         String // earn | redeem | adjust
+  createdAt    DateTime @default(now())
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, phone])
+  @@map("loyalty_transactions")
 }
 
 model StaffUser {
