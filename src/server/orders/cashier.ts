@@ -190,18 +190,23 @@ export async function markOrderPaid(
     return { ok: false, error: "Not allowed." };
   }
 
-  await tenantDb(staff.restaurantId, async (tx) => {
-    const order = await tx.order.findFirst({ where: { id: orderId }, select: { total: true } });
-    if (!order) throw new Error("Order not found");
-    await tx.order.update({
-      where: { id: orderId },
-      // Paying in person settles the order: mark paid AND close it.
-      data: { paymentStatus: "paid", billRequested: false, status: "closed" },
+  try {
+    await tenantDb(staff.restaurantId, async (tx) => {
+      const order = await tx.order.findFirst({ where: { id: orderId }, select: { total: true } });
+      if (!order) throw new Error("Order not found");
+      await tx.order.update({
+        where: { id: orderId },
+        // Paying in person settles the order: mark paid AND close it.
+        data: { paymentStatus: "paid", billRequested: false, status: "closed" },
+      });
+      await tx.payment.create({
+        data: { orderId, amount: order.total, method, gateway: "manual", status: "paid" },
+      });
     });
-    await tx.payment.create({
-      data: { orderId, amount: order.total, method, gateway: "manual", status: "paid" },
-    });
-  });
+  } catch (e) {
+    console.error("markOrderPaid failed", e);
+    return { ok: false, error: e instanceof Error ? e.message : "Could not record the payment." };
+  }
 
   await notifyOrdersChanged(staff.restaurantId);
   return { ok: true, tables: await getCashierTables() };

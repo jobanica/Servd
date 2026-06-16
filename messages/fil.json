@@ -1,6 +1,14 @@
 {
   "diner": {
     "table": "Mesa",
+    "searchPlaceholder": "Maghanap sa menu",
+    "all": "Lahat",
+    "noResults": "Walang tumugmang item.",
+    "moreOptions": "Iba pang opsyon",
+    "navHome": "Home",
+    "navMenu": "Menu",
+    "navPromos": "Promo",
+    "navMyOrder": "Order ko",
     "leaveFeedback": "Mag-iwan ng feedback",
     "requestBill": "Hingin ang bill",
     "requesting": "Hinihiling…",

@@ -21,6 +21,86 @@ interface RestaurantBrand {
   tagline: string | null;
 }
 
+/** Product card — image, "+" affordance, price pill, name. */
+function ProductCard({
+  item,
+  soldOutLabel,
+  onPick,
+}: {
+  item: DinerItem;
+  soldOutLabel: string;
+  onPick: (item: DinerItem) => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={!item.isAvailable}
+      onClick={() => onPick(item)}
+      className="group relative flex flex-col overflow-hidden rounded-2xl bg-white text-left shadow-sm ring-1 ring-brand-ink/5 transition active:scale-[0.98] disabled:opacity-60"
+    >
+      <div className="relative aspect-square w-full bg-cream">
+        {item.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-brand-gradient text-3xl font-bold text-white">
+            {item.name.charAt(0)}
+          </div>
+        )}
+
+        {/* + add affordance */}
+        {item.isAvailable && (
+          <span className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-brand-primary text-xl font-bold leading-none text-white shadow-md">
+            +
+          </span>
+        )}
+
+        {/* price pill */}
+        <span className="absolute bottom-2 right-2 rounded-full bg-brand-primary px-2.5 py-1 text-xs font-extrabold text-white shadow">
+          {formatPeso(item.price)}
+        </span>
+
+        {!item.isAvailable && (
+          <span className="absolute inset-0 flex items-center justify-center bg-white/70 text-sm font-bold text-brand-ink">
+            {soldOutLabel}
+          </span>
+        )}
+      </div>
+
+      <div className="p-2.5">
+        <p className="text-sm font-semibold leading-snug text-brand-ink">{item.name}</p>
+        {item.description && (
+          <p className="mt-0.5 line-clamp-1 text-xs text-brand-ink/50">{item.description}</p>
+        )}
+      </div>
+    </button>
+  );
+}
+
+function NavButton({
+  label,
+  active,
+  onClick,
+  children,
+}: {
+  label: string;
+  active?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium ${
+        active ? "text-brand-primary" : "text-brand-ink/50"
+      }`}
+    >
+      {children}
+      {label}
+    </button>
+  );
+}
+
 export function DinerMenu({
   restaurantId,
   slug,
@@ -43,7 +123,7 @@ export function DinerMenu({
   const cart = useCart(restaurantId, tableToken);
   const t = useTranslations("diner");
 
-  // The diner's most recent order, tracked live (survives a page refresh).
+  // Live tracking of the diner's most recent order (survives a refresh).
   const trackKey = `servd:order:${tableToken}`;
   const [trackedOrderId, setTrackedOrderId] = useState<string | null>(null);
   useEffect(() => {
@@ -72,8 +152,6 @@ export function DinerMenu({
     }
   }
 
-  // Build the untrusted payload (ids + quantities only) and submit it. The
-  // server re-validates and recomputes the real total.
   async function submitOrder(): Promise<PlaceOrderResult> {
     return placeOrder({
       slug,
@@ -86,151 +164,181 @@ export function DinerMenu({
       })),
     });
   }
+
   const [activeItem, setActiveItem] = useState<DinerItem | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [activeCat, setActiveCat] = useState("all");
 
   const count = cartCount(cart.lines);
   const total = cartTotal(cart.lines);
-  const nonEmptyCategories = categories.filter((c) => c.items.length > 0);
+  const nonEmpty = categories.filter((c) => c.items.length > 0);
+
+  // Flatten for searching / filtering.
+  const flat = nonEmpty.flatMap((c) => c.items.map((it) => ({ it, catId: c.id, catName: c.name })));
+  const q = search.trim().toLowerCase();
+  const shown = q
+    ? flat.filter(({ it }) => it.name.toLowerCase().includes(q))
+    : activeCat === "all"
+      ? flat
+      : flat.filter(({ catId }) => catId === activeCat);
+
+  function scrollTop() {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
   return (
-    <div className="mx-auto max-w-md px-4 pb-28 pt-5">
-      {/* Brand header — the restaurant's identity, not Servd's */}
-      <header className="flex items-center gap-3">
-        {brand.logoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={brand.logoUrl}
-            alt={brand.name}
-            className="h-12 w-12 rounded-xl object-cover"
-          />
-        ) : (
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-gradient text-lg font-bold text-white">
-            {brand.name.charAt(0)}
+    <div className="relative mx-auto min-h-screen max-w-md bg-brand-surface pb-24">
+      {/* App bar */}
+      <header className="sticky top-0 z-20 border-b border-brand-ink/10 bg-brand-surface/95 backdrop-blur">
+        <div className="flex items-center gap-3 px-4 py-3">
+          {brand.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={brand.logoUrl} alt={brand.name} className="h-9 w-9 rounded-lg object-cover" />
+          ) : (
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-gradient text-sm font-bold text-white">
+              {brand.name.charAt(0)}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate font-heading text-base font-bold text-brand-ink">{brand.name}</h1>
+            <p className="truncate text-xs text-brand-ink/55">
+              {t("table")} {tableNumber}
+            </p>
+          </div>
+          <LanguageSwitcher />
+          <button
+            onClick={() => setSheetOpen(true)}
+            aria-label="More"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-brand-ink"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="px-4 pb-3">
+          <div className="flex items-center gap-2 rounded-full border border-brand-ink/10 bg-white px-3 py-2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-brand-ink/40">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m21 21-4.3-4.3" strokeLinecap="round" />
+            </svg>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t("searchPlaceholder")}
+              className="w-full bg-transparent text-sm outline-none placeholder:text-brand-ink/40"
+            />
+          </div>
+        </div>
+
+        {/* Category chips */}
+        {nonEmpty.length > 1 && !q && (
+          <div className="flex gap-2 overflow-x-auto px-4 pb-3">
+            <button
+              onClick={() => setActiveCat("all")}
+              className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-semibold ${
+                activeCat === "all" ? "bg-brand-primary text-white" : "bg-white text-brand-ink/70 ring-1 ring-brand-ink/10"
+              }`}
+            >
+              {t("all")}
+            </button>
+            {nonEmpty.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setActiveCat(c.id)}
+                className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-semibold ${
+                  activeCat === c.id ? "bg-brand-primary text-white" : "bg-white text-brand-ink/70 ring-1 ring-brand-ink/10"
+                }`}
+              >
+                {c.name}
+              </button>
+            ))}
           </div>
         )}
-        <div className="min-w-0 flex-1">
-          <h1 className="font-heading text-xl font-bold text-brand-ink">
-            {brand.name}
-          </h1>
-          <p className="text-sm text-brand-ink/60">
-            {brand.tagline
-              ? `${brand.tagline} · ${t("table")} ${tableNumber}`
-              : `${t("table")} ${tableNumber}`}
-          </p>
-        </div>
-        <LanguageSwitcher />
       </header>
 
       {justPaid && (
-        <div className="mt-3 rounded-lg bg-mango/15 px-3 py-2 text-sm text-brand-ink">
+        <div className="mx-4 mt-3 rounded-lg bg-mango/15 px-3 py-2 text-sm text-brand-ink">
           {t("paymentConfirming")}
         </div>
       )}
 
       {trackedOrderId && (
-        <OrderStatusTracker
-          restaurantId={restaurantId}
-          slug={slug}
-          tableToken={tableToken}
-          orderId={trackedOrderId}
-          onDismiss={stopTracking}
-        />
-      )}
-
-      <div className="mt-3 flex flex-wrap items-center justify-end gap-3">
-        <a
-          href={`/order/${slug}/${tableToken}/feedback`}
-          className="text-sm font-semibold text-brand-primary"
-        >
-          {t("leaveFeedback")}
-        </a>
-        {payOnline && <PayOnlineButton slug={slug} tableToken={tableToken} />}
-        <RequestBillButton slug={slug} tableToken={tableToken} />
-      </div>
-
-      {/* Sticky category nav */}
-      {nonEmptyCategories.length > 1 && (
-        <nav className="sticky top-0 z-10 -mx-4 mt-4 flex gap-2 overflow-x-auto bg-brand-surface/90 px-4 py-2 backdrop-blur">
-          {nonEmptyCategories.map((c) => (
-            <a
-              key={c.id}
-              href={`#cat-${c.id}`}
-              className="whitespace-nowrap rounded-full border border-brand-ink/15 px-3 py-1 text-sm"
-            >
-              {c.name}
-            </a>
-          ))}
-        </nav>
-      )}
-
-      {nonEmptyCategories.length === 0 && (
-        <p className="mt-10 text-center text-sm text-brand-ink/50">
-          {t("menuUnavailable")}
-        </p>
-      )}
-
-      {nonEmptyCategories.map((category) => (
-        <section key={category.id} id={`cat-${category.id}`} className="mt-6 scroll-mt-16">
-          <h2 className="font-heading text-lg font-bold text-brand-ink">
-            {category.name}
-          </h2>
-          <ul className="mt-2 space-y-2">
-            {category.items.map((item) => (
-              <li key={item.id}>
-                <button
-                  disabled={!item.isAvailable}
-                  onClick={() => setActiveItem(item)}
-                  className="flex w-full items-center gap-3 rounded-tile border border-brand-ink/10 bg-white p-3 text-left disabled:opacity-50"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-brand-ink">
-                        {item.name}
-                      </span>
-                      {!item.isAvailable && (
-                        <span className="rounded-full bg-muted/20 px-2 py-0.5 text-xs text-muted">
-                          {t("soldOut")}
-                        </span>
-                      )}
-                    </div>
-                    {item.description && (
-                      <p className="truncate text-sm text-brand-ink/50">
-                        {item.description}
-                      </p>
-                    )}
-                    <p className="mt-1 font-semibold text-brand-ink">
-                      {formatPeso(item.price)}
-                    </p>
-                  </div>
-                  {item.imageUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={item.imageUrl}
-                      alt={item.name}
-                      className="h-16 w-16 rounded-lg object-cover"
-                    />
-                  )}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
-
-      {/* Sticky cart bar */}
-      {cart.hydrated && count > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-md p-4">
-          <button
-            onClick={() => setCartOpen(true)}
-            className="flex w-full items-center justify-between rounded-full px-5 py-3 font-semibold text-white shadow-lg btn-brand"
-          >
-            <span>{t("items", { count })}</span>
-            <span>{t("viewOrder")} · {formatPeso(total)}</span>
-          </button>
+        <div className="px-4">
+          <OrderStatusTracker
+            restaurantId={restaurantId}
+            slug={slug}
+            tableToken={tableToken}
+            orderId={trackedOrderId}
+            onDismiss={stopTracking}
+          />
         </div>
       )}
 
+      {/* Product grid */}
+      <main className="px-4 pt-4">
+        {shown.length === 0 ? (
+          <p className="mt-16 text-center text-sm text-brand-ink/50">
+            {q ? t("noResults") : t("menuUnavailable")}
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            {shown.map(({ it }) => (
+              <ProductCard key={it.id} item={it} soldOutLabel={t("soldOut")} onPick={setActiveItem} />
+            ))}
+          </div>
+        )}
+      </main>
+
+      {/* Bottom navigation */}
+      <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto flex max-w-md items-end justify-around border-t border-brand-ink/10 bg-white px-2 pb-1 pt-1 shadow-[0_-4px_16px_rgba(0,0,0,0.06)]">
+        <NavButton label={t("navHome")} onClick={scrollTop}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 10.5 12 3l9 7.5" />
+            <path d="M5 9.5V21h14V9.5" />
+          </svg>
+        </NavButton>
+        <NavButton label={t("navMenu")} onClick={scrollTop}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </NavButton>
+
+        {/* Center cart */}
+        <button onClick={() => setCartOpen(true)} className="relative -mt-6 flex flex-col items-center">
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-primary text-white shadow-lg ring-4 ring-white">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="9" cy="20" r="1.5" />
+              <circle cx="18" cy="20" r="1.5" />
+              <path d="M2 3h3l2.4 12.2a1.5 1.5 0 0 0 1.5 1.3h8.2a1.5 1.5 0 0 0 1.5-1.2L22 7H6" />
+            </svg>
+          </span>
+          {count > 0 && (
+            <span className="absolute -right-0.5 -top-7 flex h-5 min-w-5 items-center justify-center rounded-full bg-mango px-1 text-[11px] font-bold text-white ring-2 ring-white">
+              {count}
+            </span>
+          )}
+        </button>
+
+        <NavButton label={t("navPromos")} onClick={() => setSheetOpen(true)}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0l-7-7V4h9.6l7.4 7.4a2 2 0 0 1 0 2.8Z" />
+            <circle cx="7.5" cy="7.5" r="1.3" />
+          </svg>
+        </NavButton>
+        <NavButton label={t("navMyOrder")} active={!!trackedOrderId} onClick={() => (trackedOrderId ? scrollTop() : setSheetOpen(true))}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 2h12v20l-3-2-3 2-3-2-3 2Z" />
+            <path d="M9 7h6M9 11h6" />
+          </svg>
+        </NavButton>
+      </nav>
+
+      {/* Item detail / add modal */}
       {activeItem && (
         <ItemModal
           item={activeItem}
@@ -242,6 +350,7 @@ export function DinerMenu({
         />
       )}
 
+      {/* Cart drawer */}
       {cartOpen && (
         <CartDrawer
           lines={cart.lines}
@@ -254,6 +363,29 @@ export function DinerMenu({
             startTracking(orderId);
           }}
         />
+      )}
+
+      {/* More sheet — pay online, request bill, feedback */}
+      {sheetOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setSheetOpen(false)}>
+          <div
+            className="w-full max-w-md rounded-t-tile bg-white p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-brand-ink/15" />
+            <h2 className="font-heading text-lg font-bold text-brand-ink">{t("moreOptions")}</h2>
+            <div className="mt-4 flex flex-col gap-3">
+              {payOnline && <PayOnlineButton slug={slug} tableToken={tableToken} />}
+              <RequestBillButton slug={slug} tableToken={tableToken} />
+              <a
+                href={`/order/${slug}/${tableToken}/feedback`}
+                className="rounded-full border border-brand-ink/15 py-3 text-center text-sm font-semibold text-brand-ink"
+              >
+                {t("leaveFeedback")}
+              </a>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

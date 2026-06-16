@@ -119,16 +119,38 @@ export function CashierBoard({
 
   async function pay(orderId: string, method: "cash" | "card_terminal") {
     setBusy(orderId);
-    const res = await markOrderPaid(orderId, method);
-    setBusy(null);
-    if (res.ok && res.tables) setTables(res.tables);
+    try {
+      const res = await markOrderPaid(orderId, method);
+      if (res.ok && res.tables) {
+        setTables(res.tables);
+        showToast("Payment recorded — order closed.");
+      } else if (!res.ok) {
+        showToast(res.error ?? "Couldn't record the payment.");
+        refresh();
+      }
+    } catch {
+      showToast("Something went wrong. Please try again.");
+      refresh();
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function close(orderId: string) {
     setBusy(orderId);
-    const res = await closeOrder(orderId);
-    setBusy(null);
-    if (res.ok && res.tables) setTables(res.tables);
+    try {
+      const res = await closeOrder(orderId);
+      if (res.ok && res.tables) setTables(res.tables);
+      else if (!res.ok) {
+        showToast(res.error ?? "Couldn't close the order.");
+        refresh();
+      }
+    } catch {
+      showToast("Something went wrong. Please try again.");
+      refresh();
+    } finally {
+      setBusy(null);
+    }
   }
 
   const showPopup = incoming.length > 0 && !popupDismissed;

@@ -1,6 +1,14 @@
 {
   "diner": {
     "table": "Table",
+    "searchPlaceholder": "Search the menu",
+    "all": "All",
+    "noResults": "No items match your search.",
+    "moreOptions": "More options",
+    "navHome": "Home",
+    "navMenu": "Menu",
+    "navPromos": "Promos",
+    "navMyOrder": "My order",
     "leaveFeedback": "Leave feedback",
     "requestBill": "Request bill",
     "requesting": "Requesting…",
