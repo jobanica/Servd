@@ -21,7 +21,15 @@ export function PrintSettingsForm({
   initial,
   cloudPollUrl,
 }: {
-  initial: { printMethod: Method; autoPrint: boolean; bridgeUrl: string };
+  initial: {
+    printMethod: Method;
+    autoPrint: boolean;
+    bridgeUrl: string;
+    receiptAddress: string;
+    receiptPhone: string;
+    receiptWebsite: string;
+    receiptFooter: string;
+  };
   cloudPollUrl: string | null;
 }) {
   const [state, action] = useActionState<FormState, FormData>(
@@ -29,6 +37,10 @@ export function PrintSettingsForm({
     null,
   );
   const [method, setMethod] = useState<Method>(initial.printMethod);
+  const [address, setAddress] = useState(initial.receiptAddress);
+  const [phone, setPhone] = useState(initial.receiptPhone);
+  const [website, setWebsite] = useState(initial.receiptWebsite);
+  const [footer, setFooter] = useState(initial.receiptFooter);
 
   return (
     <form
@@ -90,6 +102,82 @@ export function PrintSettingsForm({
         <input type="checkbox" name="autoPrint" defaultChecked={initial.autoPrint} />
         Auto-print each new order (server-driven methods only)
       </label>
+
+      {/* Receipt design */}
+      <div className="border-t border-plum-ink/10 pt-5">
+        <h2 className="font-heading text-sm font-bold uppercase tracking-wide text-plum-ink/55">
+          Receipt design
+        </h2>
+        <p className="mt-1 text-sm text-plum-ink/55">
+          These appear on printed receipts. The restaurant name comes from your branding.
+        </p>
+
+        <div className="mt-3 space-y-3">
+          <div>
+            <label className="block text-sm font-semibold">Address</label>
+            <input
+              name="receiptAddress"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              maxLength={120}
+              placeholder="123 Culinary Avenue, Davao City"
+              className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2"
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-semibold">Phone</label>
+              <input
+                name="receiptPhone"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                maxLength={60}
+                placeholder="(082) 123-4567"
+                className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold">Website</label>
+              <input
+                name="receiptWebsite"
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+                maxLength={120}
+                placeholder="www.yourrestaurant.com"
+                className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold">Footer message</label>
+            <textarea
+              name="receiptFooter"
+              value={footer}
+              onChange={(e) => setFooter(e.target.value)}
+              rows={2}
+              maxLength={300}
+              placeholder="Thank you for dining with us! Please come again."
+              className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2"
+            />
+            <p className="mt-1 text-xs text-plum-ink/50">Tip: use a new line for a second footer line.</p>
+          </div>
+        </div>
+
+        {/* Live preview */}
+        <div className="mt-4">
+          <p className="mb-1 text-xs font-semibold text-plum-ink/50">Preview</p>
+          <pre className="mx-auto max-w-[280px] whitespace-pre-wrap rounded-lg border border-plum-ink/15 bg-white p-3 text-center font-mono text-[11px] leading-snug text-black">
+{`${(address || phone || website || footer ? "YOUR RESTAURANT" : "YOUR RESTAURANT")}
+${[address, phone, website].filter(Boolean).join("\n")}
+TABLE 12
+--------------------------------
+2x Caesar Salad           ₱24.00
+Grilled Salmon            ₱22.00
+--------------------------------
+TOTAL                     ₱46.00${footer ? `\n\n${footer}` : ""}`}
+          </pre>
+        </div>
+      </div>
 
       {state?.error && <p className="text-sm text-guava">{state.error}</p>}
       {state?.ok && <p className="text-sm text-mango">Saved.</p>}

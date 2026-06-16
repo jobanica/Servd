@@ -1,4 +1,9 @@
-import { type Ticket, ticketLines } from "./ticket";
+import {
+  type Ticket,
+  ticketHeaderLines,
+  ticketBodyLines,
+  ticketFooterLines,
+} from "./ticket";
 
 /**
  * Minimal ESC/POS encoder — the de-facto command language of thermal receipt
@@ -59,13 +64,22 @@ class EscPosBuilder {
 export function encodeTicket(ticket: Ticket): Uint8Array {
   const b = new EscPosBuilder().init().align("center");
 
-  // Header: restaurant + big table number.
-  b.bold(true).line(ticket.restaurantName).bold(false);
+  // Header: restaurant name (bold) + contact lines, then a big table number.
+  const header = ticketHeaderLines(ticket);
+  b.bold(true).line(header[0]).bold(false);
+  for (const line of header.slice(1)) b.line(line);
   b.size(true).line(`TABLE ${ticket.tableNumber}`).size(false);
 
+  // Body — order meta, items, totals.
   b.align("left");
-  // Body (skip the first two lines already printed as the header).
-  for (const line of ticketLines(ticket).slice(2)) b.line(line);
+  for (const line of ticketBodyLines(ticket)) b.line(line);
+
+  // Footer — custom thank-you message, centered.
+  const footer = ticketFooterLines(ticket);
+  if (footer.length) {
+    b.align("center").line();
+    for (const line of footer) b.line(line);
+  }
 
   b.line().line().cut();
   return b.build();

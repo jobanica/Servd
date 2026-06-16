@@ -1,7 +1,8 @@
 /**
- * The kitchen ticket — built ONCE as structured data, then rendered to either
- * ESC/POS bytes (thermal printers) or printable HTML (OS dialog / AirPrint).
- * Keeping it as a plain model means every transport prints the same thing.
+ * The order ticket / receipt — built ONCE as structured data, then rendered to
+ * either ESC/POS bytes (thermal printers) or printable HTML (OS dialog). The
+ * header (restaurant name + contact lines) and footer message are customizable
+ * by the restaurant in Printer settings.
  */
 
 import { formatPeso } from "@/lib/money";
@@ -13,8 +14,19 @@ export interface TicketLine {
   note?: string | null;
 }
 
+export interface ReceiptBranding {
+  address?: string | null;
+  phone?: string | null;
+  website?: string | null;
+  footer?: string | null;
+}
+
 export interface Ticket {
   restaurantName: string;
+  address: string | null;
+  phone: string | null;
+  website: string | null;
+  footer: string | null;
   tableNumber: string;
   orderRef: string; // short, human-readable
   placedAt: string; // ISO
@@ -24,7 +36,7 @@ export interface Ticket {
   discountLabel: string | null;
 }
 
-export interface TicketSource {
+export interface TicketSource extends ReceiptBranding {
   restaurantName: string;
   tableNumber: string;
   orderId: string;
@@ -38,6 +50,10 @@ export interface TicketSource {
 export function buildTicket(src: TicketSource): Ticket {
   return {
     restaurantName: src.restaurantName,
+    address: src.address ?? null,
+    phone: src.phone ?? null,
+    website: src.website ?? null,
+    footer: src.footer ?? null,
     tableNumber: src.tableNumber,
     orderRef: src.orderId.slice(0, 8).toUpperCase(),
     placedAt: src.createdAt,
@@ -53,27 +69,54 @@ export function buildTicket(src: TicketSource): Ticket {
   };
 }
 
-/** Plain-text rendering shared by the HTML fallback and as ESC/POS body text. */
-export function ticketLines(ticket: Ticket): string[] {
+/** Centered header: restaurant name + any contact lines. */
+export function ticketHeaderLines(t: Ticket): string[] {
+  const lines = [t.restaurantName];
+  if (t.address) lines.push(t.address);
+  if (t.phone) lines.push(t.phone);
+  if (t.website) lines.push(t.website);
+  return lines;
+}
+
+/** Left-aligned body: order meta, items, totals. */
+export function ticketBodyLines(t: Ticket): string[] {
   const lines: string[] = [];
-  lines.push(ticket.restaurantName);
-  lines.push(`TABLE ${ticket.tableNumber}`);
-  lines.push(`Order #${ticket.orderRef}`);
-  lines.push(new Date(ticket.placedAt).toLocaleString());
+  lines.push(`Order #${t.orderRef}`);
+  lines.push(new Date(t.placedAt).toLocaleString());
   lines.push("--------------------------------");
-  for (const item of ticket.items) {
+  for (const item of t.items) {
     lines.push(`${item.quantity}x ${item.name}`);
     for (const mod of item.modifiers) lines.push(`   + ${mod}`);
     if (item.note) lines.push(`   ! ${item.note}`);
   }
   lines.push("--------------------------------");
-  if (ticket.discountAmount > 0) {
-    lines.push(`SUBTOTAL  ${formatPeso(ticket.total)}`);
-    lines.push(`DISCOUNT  -${formatPeso(ticket.discountAmount)}`);
-    if (ticket.discountLabel) lines.push(`  (${ticket.discountLabel})`);
-    lines.push(`TOTAL DUE  ${formatPeso(Math.max(0, ticket.total - ticket.discountAmount))}`);
+  if (t.discountAmount > 0) {
+    lines.push(`SUBTOTAL  ${formatPeso(t.total)}`);
+    lines.push(`DISCOUNT  -${formatPeso(t.discountAmount)}`);
+    if (t.discountLabel) lines.push(`  (${t.discountLabel})`);
+    lines.push(`TOTAL DUE  ${formatPeso(Math.max(0, t.total - t.discountAmount))}`);
   } else {
-    lines.push(`TOTAL  ${formatPeso(ticket.total)}`);
+    lines.push(`TOTAL  ${formatPeso(t.total)}`);
   }
   return lines;
+}
+
+/** Centered footer (custom message), split across lines. */
+export function ticketFooterLines(t: Ticket): string[] {
+  if (!t.footer) return [];
+  return t.footer
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/** Full plain-text rendering (HTML fallback / preview). */
+export function ticketLines(ticket: Ticket): string[] {
+  const footer = ticketFooterLines(ticket);
+  return [
+    ...ticketHeaderLines(ticket),
+    `TABLE ${ticket.tableNumber}`,
+    ...ticketBodyLines(ticket),
+    ...(footer.length ? ["", ...footer] : []),
+  ];
 }

@@ -32,6 +32,12 @@ export interface PrintDispatch {
 type PrinterConfig = {
   bridgeUrl?: string;
   pollToken?: string;
+  receipt?: {
+    address?: string | null;
+    phone?: string | null;
+    website?: string | null;
+    footer?: string | null;
+  };
 };
 
 async function loadTicket(restaurantId: string, orderId: string) {
@@ -61,8 +67,15 @@ async function dispatch(restaurantId: string, orderId: string): Promise<PrintDis
   const { restaurant, order } = await loadTicket(restaurantId, orderId);
   if (!order) return { ok: false, handledOnServer: false, message: "Order not found." };
 
+  const config = (restaurant.printerConfig as PrinterConfig | null) ?? {};
+  const r = config.receipt ?? {};
+
   const ticket = buildTicket({
     restaurantName: restaurant.displayName || restaurant.name,
+    address: r.address,
+    phone: r.phone,
+    website: r.website,
+    footer: r.footer,
     tableNumber: order.table?.tableNumber ?? "—",
     orderId: order.id,
     createdAt: order.createdAt.toISOString(),
@@ -74,8 +87,6 @@ async function dispatch(restaurantId: string, orderId: string): Promise<PrintDis
       note: i.note,
     })),
   });
-
-  const config = (restaurant.printerConfig as PrinterConfig | null) ?? {};
   const base64 = encodeTicketBase64(ticket);
 
   switch (restaurant.printMethod) {

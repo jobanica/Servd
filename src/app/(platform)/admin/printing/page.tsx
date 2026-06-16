@@ -13,8 +13,13 @@ export default async function PrintingSettingsPage() {
   );
 
   const cfg = (restaurant.printerConfig as
-    | { bridgeUrl?: string; pollToken?: string }
+    | {
+        bridgeUrl?: string;
+        pollToken?: string;
+        receipt?: { address?: string | null; phone?: string | null; website?: string | null; footer?: string | null };
+      }
     | null) ?? {};
+  const receipt = cfg.receipt ?? {};
   const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const cloudPollUrl = cfg.pollToken
     ? `${base}/api/print/cloud/${restaurant.id}?token=${cfg.pollToken}`
@@ -38,6 +43,10 @@ export default async function PrintingSettingsPage() {
           printMethod: restaurant.printMethod,
           autoPrint: restaurant.autoPrint,
           bridgeUrl: cfg.bridgeUrl ?? "",
+          receiptAddress: receipt.address ?? "",
+          receiptPhone: receipt.phone ?? "",
+          receiptWebsite: receipt.website ?? "",
+          receiptFooter: receipt.footer ?? "",
         }}
         cloudPollUrl={cloudPollUrl}
       />

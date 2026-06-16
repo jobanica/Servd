@@ -8,8 +8,11 @@ export async function getOrderTicket(
 ): Promise<Ticket | null> {
   return tenantDb(restaurantId, async (tx) => {
     const restaurant = await tx.restaurant.findFirstOrThrow({
-      select: { name: true, displayName: true },
+      select: { name: true, displayName: true, printerConfig: true },
     });
+    const receipt =
+      ((restaurant.printerConfig as { receipt?: Record<string, string | null> } | null)?.receipt) ??
+      {};
     const order = await tx.order.findFirst({
       where: { id: orderId },
       // Explicit select (no SELECT *) so a lagging schema can't break printing.
@@ -46,6 +49,10 @@ export async function getOrderTicket(
 
     return buildTicket({
       restaurantName: restaurant.displayName || restaurant.name,
+      address: receipt.address,
+      phone: receipt.phone,
+      website: receipt.website,
+      footer: receipt.footer,
       tableNumber: order.table?.tableNumber ?? "—",
       orderId: order.id,
       createdAt: order.createdAt.toISOString(),

@@ -13,6 +13,10 @@ const schema = z.object({
   printMethod: z.enum(["network", "cloud", "bluetooth", "os_dialog"]),
   autoPrint: z.coerce.boolean().default(false),
   bridgeUrl: z.string().url().optional().or(z.literal("")),
+  receiptAddress: z.string().max(120).optional(),
+  receiptPhone: z.string().max(60).optional(),
+  receiptWebsite: z.string().max(120).optional(),
+  receiptFooter: z.string().max(300).optional(),
 });
 
 export async function updatePrintSettings(
@@ -24,6 +28,10 @@ export async function updatePrintSettings(
     printMethod: formData.get("printMethod"),
     autoPrint: formData.get("autoPrint") === "on",
     bridgeUrl: formData.get("bridgeUrl") ?? "",
+    receiptAddress: formData.get("receiptAddress") ?? "",
+    receiptPhone: formData.get("receiptPhone") ?? "",
+    receiptWebsite: formData.get("receiptWebsite") ?? "",
+    receiptFooter: formData.get("receiptFooter") ?? "",
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid settings" };
@@ -40,6 +48,18 @@ export async function updatePrintSettings(
       cfg.pollToken = randomBytes(16).toString("hex");
     }
     if (parsed.data.bridgeUrl) cfg.bridgeUrl = parsed.data.bridgeUrl;
+
+    // Receipt branding (trim to null so blanks don't print empty lines).
+    const trimOrNull = (s?: string) => {
+      const v = (s ?? "").trim();
+      return v.length ? v : null;
+    };
+    cfg.receipt = {
+      address: trimOrNull(parsed.data.receiptAddress),
+      phone: trimOrNull(parsed.data.receiptPhone),
+      website: trimOrNull(parsed.data.receiptWebsite),
+      footer: trimOrNull(parsed.data.receiptFooter),
+    };
 
     await tx.restaurant.update({
       where: { id: restaurantId },
