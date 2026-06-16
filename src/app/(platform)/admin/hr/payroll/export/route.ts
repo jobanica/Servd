@@ -27,7 +27,9 @@ export async function GET(req: NextRequest) {
 
   const header = [
     "employee", "pay_type", "hours", "overtime_hours", "base_php",
-    "absent_days", "late_minutes", "deductions_php", "net_php",
+    "absent_days", "late_minutes", "absence_late_php",
+    "sss_php", "philhealth_php", "pagibig_php", "bir_php",
+    "deductions_php", "net_php", "13th_month_accrual_php",
   ];
   const rows = payroll.map((r) => [
     r.name,
@@ -38,7 +40,13 @@ export async function GET(req: NextRequest) {
     r.absentDays,
     r.lateMinutes,
     ((r.absenceDeduction + r.lateDeduction) / 100).toFixed(2),
+    (r.sss / 100).toFixed(2),
+    (r.philhealth / 100).toFixed(2),
+    (r.pagibig / 100).toFixed(2),
+    (r.bir / 100).toFixed(2),
+    ((r.absenceDeduction + r.lateDeduction + r.sss + r.philhealth + r.pagibig + r.bir) / 100).toFixed(2),
     (r.net / 100).toFixed(2),
+    (r.thirteenthAccrual / 100).toFixed(2),
   ]);
 
   const csv = [header, ...rows].map((r) => r.map(cell).join(",")).join("\n");

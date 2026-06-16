@@ -7,6 +7,7 @@ import {
   absenceDeduction,
   lateDeduction,
 } from "@/lib/hr/hours";
+import { getPayrollConfig, computeStatutory } from "@/server/hr/payroll-config";
 
 export interface PayrollRow {
   employeeId: string;
@@ -19,6 +20,11 @@ export interface PayrollRow {
   absenceDeduction: number;
   lateMinutes: number;
   lateDeduction: number;
+  sss: number;
+  philhealth: number;
+  pagibig: number;
+  bir: number;
+  thirteenthAccrual: number;
   net: number;
 }
 
@@ -89,6 +95,7 @@ export async function getPayroll(
 ): Promise<PayrollRow[]> {
   const raw = await load(restaurantId, from, to);
   const d = deriveByEmployee(raw, graceMinutes);
+  const cfg = await getPayrollConfig(restaurantId);
 
   return raw.employees.map((e) => {
     const agg = d.hours.get(e.id) ?? { hours: 0, ot: 0 };
@@ -114,6 +121,7 @@ export async function getPayroll(
       const base = e.payRate;
       const absDed = absenceDeduction(base, absentDays);
       const lateDed = lateDeduction(base, lateMinutes);
+      const stat = computeStatutory(base, cfg);
       return {
         employeeId: e.id,
         name: e.fullName,
@@ -125,11 +133,17 @@ export async function getPayroll(
         absenceDeduction: absDed,
         lateMinutes,
         lateDeduction: lateDed,
-        net: Math.max(0, base - absDed - lateDed),
+        sss: stat.sss,
+        philhealth: stat.philhealth,
+        pagibig: stat.pagibig,
+        bir: stat.bir,
+        thirteenthAccrual: stat.thirteenthAccrual,
+        net: Math.max(0, base - absDed - lateDed - stat.total),
       };
     }
-    // Hourly: paid for hours worked; no absence/late deduction.
+    // Hourly: paid for hours worked; statutory deductions on the gross.
     const gross = grossPay("hourly", e.payRate, agg.hours);
+    const stat = computeStatutory(gross, cfg);
     return {
       employeeId: e.id,
       name: e.fullName,
@@ -141,7 +155,12 @@ export async function getPayroll(
       absenceDeduction: 0,
       lateMinutes,
       lateDeduction: 0,
-      net: gross,
+      sss: stat.sss,
+      philhealth: stat.philhealth,
+      pagibig: stat.pagibig,
+      bir: stat.bir,
+      thirteenthAccrual: stat.thirteenthAccrual,
+      net: Math.max(0, gross - stat.total),
     };
   });
 }

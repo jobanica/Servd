@@ -102,15 +102,28 @@ export async function getVatReport(restaurantId: string, from: Date, to: Date): 
   });
 }
 
-/** COGS from inventory 'sale' stock movements (best-effort; 0 if no inventory). */
+/**
+ * COGS = sum of (menu item food cost × quantity) for items in paid orders.
+ * Food cost is set per item in the menu editor. Best-effort (0 if not set).
+ */
 export async function getCogs(restaurantId: string, from: Date, to: Date): Promise<number> {
   try {
     return await tenantDb(restaurantId, async (tx) => {
-      const moves = await tx.stockMovement.findMany({
-        where: { reason: "sale", createdAt: { gte: from, lte: to } },
-        select: { changeQty: true, unitCost: true },
+      const payments = await tx.payment.findMany({
+        where: { status: "paid", createdAt: { gte: from, lte: to } },
+        select: { orderId: true },
       });
-      return Math.round(moves.reduce((s, m) => s + Math.abs(m.changeQty) * (m.unitCost ?? 0), 0));
+      const orderIds = [...new Set(payments.map((p) => p.orderId))];
+      if (orderIds.length === 0) return 0;
+      const [items, costs] = await Promise.all([
+        tx.orderItem.findMany({
+          where: { orderId: { in: orderIds } },
+          select: { menuItemId: true, quantity: true },
+        }),
+        tx.menuItemCost.findMany({ select: { menuItemId: true, cost: true } }),
+      ]);
+      const costMap = new Map(costs.map((c) => [c.menuItemId, c.cost]));
+      return items.reduce((s, it) => s + (costMap.get(it.menuItemId) ?? 0) * it.quantity, 0);
     });
   } catch {
     return 0;

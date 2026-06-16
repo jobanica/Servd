@@ -125,7 +125,7 @@ export async function createItem(
     return { error: e instanceof Error ? e.message : "Image upload failed" };
   }
 
-  await tenantDb(restaurantId, (tx) =>
+  const created = await tenantDb(restaurantId, (tx) =>
     tx.menuItem.create({
       data: {
         restaurantId,
@@ -136,8 +136,10 @@ export async function createItem(
         isAvailable: parsed.data.isAvailable,
         imageUrl,
       },
+      select: { id: true },
     }),
   );
+  await saveFoodCost(restaurantId, created.id, formData.get("costPesos"));
   await refresh();
   return { ok: true };
 }
@@ -181,9 +183,27 @@ export async function updateItem(
       },
     }),
   );
+  await saveFoodCost(restaurantId, id, formData.get("costPesos"));
   await refresh();
   revalidatePath(`/admin/menu/${id}`);
   return { ok: true };
+}
+
+/** Upsert a menu item's food cost (for accounting COGS). Best-effort. */
+async function saveFoodCost(restaurantId: string, menuItemId: string, raw: FormDataEntryValue | null): Promise<void> {
+  if (raw == null || String(raw).trim() === "") return;
+  const cost = pesosToCentavos(Number(raw) || 0);
+  try {
+    await tenantDb(restaurantId, (tx) =>
+      tx.menuItemCost.upsert({
+        where: { menuItemId },
+        create: { restaurantId, menuItemId, cost },
+        update: { cost },
+      }),
+    );
+  } catch {
+    /* menu_item_costs table not migrated yet — ignore */
+  }
 }
 
 /** Out-of-stock toggle, used straight from the menu list. */

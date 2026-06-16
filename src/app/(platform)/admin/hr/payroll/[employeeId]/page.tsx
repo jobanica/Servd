@@ -33,7 +33,8 @@ export default async function PayslipPage({
   const slip = await getPayslip(restaurantId, employeeId, from, to);
   if (!slip) notFound();
   const { row, days } = slip;
-  const totalDed = row.absenceDeduction + row.lateDeduction;
+  const totalDed =
+    row.absenceDeduction + row.lateDeduction + row.sss + row.philhealth + row.pagibig + row.bir;
 
   return (
     <div className="space-y-6">
@@ -53,8 +54,15 @@ export default async function PayslipPage({
               <div className="flex justify-between"><dt className="text-plum-ink/60">Late ({row.lateMinutes} min)</dt><dd className="text-guava">−{formatPeso(row.lateDeduction)}</dd></div>
             </>
           )}
+          {row.sss > 0 && <div className="flex justify-between"><dt className="text-plum-ink/60">SSS</dt><dd className="text-guava">−{formatPeso(row.sss)}</dd></div>}
+          {row.philhealth > 0 && <div className="flex justify-between"><dt className="text-plum-ink/60">PhilHealth</dt><dd className="text-guava">−{formatPeso(row.philhealth)}</dd></div>}
+          {row.pagibig > 0 && <div className="flex justify-between"><dt className="text-plum-ink/60">Pag-IBIG</dt><dd className="text-guava">−{formatPeso(row.pagibig)}</dd></div>}
+          {row.bir > 0 && <div className="flex justify-between"><dt className="text-plum-ink/60">BIR withholding</dt><dd className="text-guava">−{formatPeso(row.bir)}</dd></div>}
           <div className="flex justify-between border-t border-plum-ink/10 pt-2"><dt className="text-plum-ink/60">Total deductions</dt><dd className="text-guava">−{formatPeso(totalDed)}</dd></div>
           <div className="flex justify-between font-heading text-lg font-bold"><dt>Net pay</dt><dd>{formatPeso(row.net)}</dd></div>
+          {row.thirteenthAccrual > 0 && (
+            <div className="flex justify-between border-t border-plum-ink/10 pt-2 text-plum-ink/50"><dt>13th-month accrual (this period)</dt><dd>{formatPeso(row.thirteenthAccrual)}</dd></div>
+          )}
         </dl>
       </div>
 

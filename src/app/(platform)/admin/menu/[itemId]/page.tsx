@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { getItem, getCategories, getModifierGroups } from "@/server/menu/queries";
+import { getMenuItemCost } from "@/server/menu/cost";
 import { formatDelta } from "@/lib/money";
 import { EditItemForm } from "@/components/admin/EditItemForm";
 import { ItemTranslationForm } from "@/components/admin/ItemTranslationForm";
@@ -30,6 +31,7 @@ export default async function EditItemPage({
   ]);
   if (!item) notFound();
 
+  const foodCost = await getMenuItemCost(restaurantId, itemId);
   const translationByLocale = new Map(translations.map((tr) => [tr.locale, tr]));
 
   // Recipe (inventory module).
@@ -56,6 +58,7 @@ export default async function EditItemPage({
           name: item.name,
           description: item.description,
           price: item.price,
+          cost: foodCost,
           isAvailable: item.isAvailable,
           imageUrl: item.imageUrl,
           videoUrl: item.videoUrl,

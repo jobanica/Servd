@@ -226,8 +226,40 @@ model Restaurant {
   loyaltyAccounts LoyaltyAccount[]
   loyaltyTxns     LoyaltyTransaction[]
   expenses        Expense[]
+  payrollSetting  PayrollSetting?
+  menuItemCosts   MenuItemCost[]
 
   @@map("restaurants")
+}
+
+/// Customizable statutory payroll deductions per restaurant (PH).
+model PayrollSetting {
+  id              String  @id @default(uuid())
+  restaurantId    String  @unique
+  sssRate         Float   @default(0) // % of base (employee share)
+  philhealthRate  Float   @default(0) // %
+  pagibigRate     Float   @default(0) // %
+  birRate         Float   @default(0) // % withholding on taxable pay
+  thirteenthMonth Boolean @default(false) // accrue 1/12 of base
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("payroll_settings")
+}
+
+/// Food cost per menu item (for accounting COGS). Stored separately so adding it
+/// never affects the hot menu read paths.
+model MenuItemCost {
+  id           String @id @default(uuid())
+  restaurantId String
+  menuItemId   String @unique
+  cost         Int    @default(0) // centavos per item
+
+  menuItem   MenuItem   @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@map("menu_item_costs")
 }
 
 /// A business expense for the accounting section (rent, supplies, payroll, …).
@@ -405,6 +437,7 @@ model MenuItem {
   orderItems       OrderItem[]
   translations     MenuItemTranslation[]
   recipeComponents RecipeComponent[]
+  foodCost         MenuItemCost?
 
   @@index([restaurantId])
   @@index([categoryId])

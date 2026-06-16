@@ -23,11 +23,10 @@ export default async function PayrollPage({
   const period = (await searchParams).period === "last" ? "last" : "this";
   const { from, to } = monthRange(period);
   const rows = await getPayroll(restaurantId, from, to);
+  const dedOf = (r: (typeof rows)[number]) =>
+    r.absenceDeduction + r.lateDeduction + r.sss + r.philhealth + r.pagibig + r.bir;
   const totals = rows.reduce(
-    (s, r) => ({
-      ded: s.ded + r.absenceDeduction + r.lateDeduction,
-      net: s.net + r.net,
-    }),
+    (s, r) => ({ ded: s.ded + dedOf(r), net: s.net + r.net }),
     { ded: 0, net: 0 },
   );
 
@@ -42,6 +41,7 @@ export default async function PayrollPage({
         <div className="flex gap-2">
           <Link href="/admin/hr/payroll?period=this" className={`rounded-full px-3 py-1 text-sm font-semibold ${period === "this" ? "btn-brand text-white" : "border border-plum-ink/15"}`}>This month</Link>
           <Link href="/admin/hr/payroll?period=last" className={`rounded-full px-3 py-1 text-sm font-semibold ${period === "last" ? "btn-brand text-white" : "border border-plum-ink/15"}`}>Last month</Link>
+          <Link href="/admin/hr/payroll/settings" className="rounded-full border border-plum-ink/15 px-3 py-1 text-sm font-semibold">Deductions ⚙</Link>
           <a href={`/admin/hr/payroll/export?period=${period}`} className="rounded-full border border-plum-ink/15 px-3 py-1 text-sm font-semibold">Export CSV</a>
         </div>
       </div>
@@ -70,7 +70,7 @@ export default async function PayrollPage({
                 <td className="text-right">{r.absentDays > 0 ? `${r.absentDays}d` : "—"}</td>
                 <td className="text-right">{r.lateMinutes > 0 ? `${r.lateMinutes}m` : "—"}</td>
                 <td className="text-right text-guava">
-                  {r.absenceDeduction + r.lateDeduction > 0 ? `−${formatPeso(r.absenceDeduction + r.lateDeduction)}` : "—"}
+                  {dedOf(r) > 0 ? `−${formatPeso(dedOf(r))}` : "—"}
                 </td>
                 <td className="text-right font-semibold">{formatPeso(r.net)}</td>
                 <td className="pr-3 text-right">

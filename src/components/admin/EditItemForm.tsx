@@ -11,6 +11,7 @@ type Item = {
   name: string;
   description: string | null;
   price: number;
+  cost: number;
   isAvailable: boolean;
   imageUrl: string | null;
   videoUrl: string | null;
@@ -67,6 +68,18 @@ export function EditItemForm({
             required
             className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2"
           />
+        </label>
+        <label className="block text-sm">
+          <span className="font-medium">Food cost (₱)</span>
+          <input
+            name="costPesos"
+            type="number"
+            step="0.01"
+            min="0"
+            defaultValue={(item.cost / 100).toFixed(2)}
+            className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2"
+          />
+          <span className="mt-1 block text-xs text-plum-ink/40">Used for accounting COGS &amp; margins.</span>
         </label>
         <label className="flex items-center gap-2 self-end text-sm">
           <input
