@@ -31,13 +31,18 @@ export function CartDrawer({
   async function handlePlace() {
     setSubmitting(true);
     setError(null);
-    const result = await onPlaceOrder();
-    setSubmitting(false);
-    if (result.ok) {
-      setPlacedId(result.orderId);
-      onPlaced(result.orderId); // clear the cart + start tracking the order
-    } else {
-      setError(result.error);
+    try {
+      const result = await onPlaceOrder();
+      if (result.ok) {
+        setPlacedId(result.orderId);
+        onPlaced(result.orderId); // clear the cart + start tracking the order
+      } else {
+        setError(result.error);
+      }
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false); // never leave the button stuck on "Sending…"
     }
   }
 

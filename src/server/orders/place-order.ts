@@ -56,19 +56,25 @@ export async function placeOrder(
   }
 
   // Persist atomically, tenant-scoped (RLS WITH CHECK enforces the boundary).
-  const order = await tenantDb(ctx.restaurantId, (tx) =>
-    tx.order.create({
-      data: {
-        restaurantId: ctx.restaurantId,
-        tableId: ctx.tableId,
-        status: "pending", // awaiting cashier acceptance
-        paymentStatus: "unpaid",
-        total: built.total,
-        items: { create: orderItemsCreate(built.items) },
-      },
-      select: { id: true },
-    }),
-  );
+  let order;
+  try {
+    order = await tenantDb(ctx.restaurantId, (tx) =>
+      tx.order.create({
+        data: {
+          restaurantId: ctx.restaurantId,
+          tableId: ctx.tableId,
+          status: "pending", // awaiting cashier acceptance
+          paymentStatus: "unpaid",
+          total: built.total,
+          items: { create: orderItemsCreate(built.items) },
+        },
+        select: { id: true },
+      }),
+    );
+  } catch (e) {
+    console.error("placeOrder: failed to create order", e);
+    return { ok: false, error: "We couldn't place your order. Please try again." };
+  }
 
   // Alert the live cashier screen (the kitchen ticket prints on acceptance).
   await notifyOrdersChanged(ctx.restaurantId);
