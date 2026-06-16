@@ -16,6 +16,11 @@ export async function GET() {
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL ?? null,
   };
 
+  // Optional features (present-or-not, never required for `healthy`).
+  const features = {
+    aiInsights: !!process.env.ANTHROPIC_API_KEY,
+  };
+
   let db: Record<string, unknown> = { connected: false };
   try {
     db = await systemDb(async (tx) => {
@@ -68,5 +73,5 @@ export async function GET() {
     db.schemaCurrent === true &&
     (db.planCount as number) > 0;
 
-  return Response.json({ healthy, env, db }, { status: healthy ? 200 : 503 });
+  return Response.json({ healthy, env, features, db }, { status: healthy ? 200 : 503 });
 }
