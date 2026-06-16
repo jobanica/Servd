@@ -9,6 +9,7 @@ import {
 } from "@/server/orders/build-order";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
 import { getPublicStorefront, isOpenNow } from "@/server/storefront/storefront";
+import { getLoyaltyConfig, enrollAccount } from "@/server/loyalty/loyalty";
 import { formatPeso } from "@/lib/money";
 
 const schema = z.object({
@@ -117,5 +118,14 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
   }
 
   await notifyOrdersChanged(restaurant.id);
+
+  // Auto-enroll the customer into loyalty (they gave name + phone). Best-effort.
+  try {
+    const cfg = await getLoyaltyConfig(restaurant.id);
+    if (cfg.enabled) await enrollAccount(restaurant.id, d.customerPhone, d.customerName);
+  } catch {
+    /* loyalty must never block the order */
+  }
+
   return { ok: true, orderId: order.id };
 }

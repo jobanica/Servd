@@ -13,7 +13,7 @@ import {
 } from "@/server/orders/build-order";
 import type { DinerCategory } from "@/lib/cart/types";
 import { computeDiscount, netTotal, type DiscountKind } from "@/lib/discount";
-import { awardPointsForOrder, getBalance, getLoyaltyConfig, redeemPoints } from "@/server/loyalty/loyalty";
+import { awardPointsForOrder, getBalance, getLoyaltyConfig, redeemPoints, enrollAccount } from "@/server/loyalty/loyalty";
 
 export interface CashierOrder {
   id: string;
@@ -595,5 +595,15 @@ export async function createCashierOrder(input: {
 
   await notifyOrdersChanged(staff.restaurantId);
   await autoPrintIfEnabled(staff.restaurantId, orderId);
+
+  // Auto-enroll pickup/delivery customers into loyalty (name + phone given).
+  if (orderType !== "dine_in" && input.customerPhone?.trim()) {
+    try {
+      const cfg = await getLoyaltyConfig(staff.restaurantId);
+      if (cfg.enabled) await enrollAccount(staff.restaurantId, input.customerPhone, input.customerName);
+    } catch {
+      /* best-effort */
+    }
+  }
   return { ok: true, tables: await getCashierTables() };
 }
