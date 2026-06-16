@@ -55,7 +55,11 @@ export default async function AdminHome() {
   if (!user || user.kind !== "staff" || user.role !== "admin") redirect("/login");
   const rid = user.restaurantId;
 
-  const restaurant = await tenantDb(rid, (tx) => tx.restaurant.findFirstOrThrow());
+  const restaurant = await tenantDb(rid, (tx) =>
+    tx.restaurant.findFirstOrThrow({
+      select: { name: true, displayName: true, status: true, onboardingCompletedAt: true },
+    }),
+  );
   if (restaurant.status === "suspended") redirect("/admin/billing");
   if (!restaurant.onboardingCompletedAt) redirect("/admin/onboarding");
 
