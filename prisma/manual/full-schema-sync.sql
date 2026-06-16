@@ -105,6 +105,11 @@ ALTER TYPE "SwapStatus" ADD VALUE IF NOT EXISTS 'pending';
 ALTER TYPE "SwapStatus" ADD VALUE IF NOT EXISTS 'approved';
 ALTER TYPE "SwapStatus" ADD VALUE IF NOT EXISTS 'rejected';
 
+DO $$ BEGIN CREATE TYPE "OrderType" AS ENUM ('dine_in', 'takeout', 'delivery'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+ALTER TYPE "OrderType" ADD VALUE IF NOT EXISTS 'dine_in';
+ALTER TYPE "OrderType" ADD VALUE IF NOT EXISTS 'takeout';
+ALTER TYPE "OrderType" ADD VALUE IF NOT EXISTS 'delivery';
+
 CREATE TABLE IF NOT EXISTS "platform_admins" (
     "id" TEXT NOT NULL,
     "authUserId" TEXT NOT NULL,
@@ -182,6 +187,9 @@ CREATE TABLE IF NOT EXISTS "restaurants" (
     "onboardingCompletedAt" TIMESTAMP(3),
     "defaultLocale" TEXT NOT NULL DEFAULT 'en',
     "autoOutOfStock" BOOLEAN NOT NULL DEFAULT false,
+    "loyaltyEnabled" BOOLEAN NOT NULL DEFAULT false,
+    "loyaltyPesosPerPoint" INTEGER NOT NULL DEFAULT 20,
+    "loyaltyPointValue" INTEGER NOT NULL DEFAULT 100,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -216,8 +224,73 @@ ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "customDomainVerifiedAt" TIME
 ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "onboardingCompletedAt" TIMESTAMP(3);
 ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "defaultLocale" TEXT NOT NULL DEFAULT 'en';
 ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "autoOutOfStock" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "loyaltyEnabled" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "loyaltyPesosPerPoint" INTEGER NOT NULL DEFAULT 20;
+ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "loyaltyPointValue" INTEGER NOT NULL DEFAULT 100;
 ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
 ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP(3);
+
+CREATE TABLE IF NOT EXISTS "expenses" (
+    "id" TEXT NOT NULL,
+    "restaurantId" TEXT NOT NULL,
+    "date" TIMESTAMP(3) NOT NULL,
+    "category" TEXT NOT NULL,
+    "amount" INTEGER NOT NULL,
+    "note" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "expenses_pkey" PRIMARY KEY ("id")
+);
+
+ALTER TABLE "expenses" ADD COLUMN IF NOT EXISTS "id" TEXT;
+ALTER TABLE "expenses" ADD COLUMN IF NOT EXISTS "restaurantId" TEXT;
+ALTER TABLE "expenses" ADD COLUMN IF NOT EXISTS "date" TIMESTAMP(3);
+ALTER TABLE "expenses" ADD COLUMN IF NOT EXISTS "category" TEXT;
+ALTER TABLE "expenses" ADD COLUMN IF NOT EXISTS "amount" INTEGER;
+ALTER TABLE "expenses" ADD COLUMN IF NOT EXISTS "note" TEXT;
+ALTER TABLE "expenses" ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+
+CREATE TABLE IF NOT EXISTS "loyalty_accounts" (
+    "id" TEXT NOT NULL,
+    "restaurantId" TEXT NOT NULL,
+    "phone" TEXT NOT NULL,
+    "name" TEXT,
+    "points" INTEGER NOT NULL DEFAULT 0,
+    "totalEarned" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "loyalty_accounts_pkey" PRIMARY KEY ("id")
+);
+
+ALTER TABLE "loyalty_accounts" ADD COLUMN IF NOT EXISTS "id" TEXT;
+ALTER TABLE "loyalty_accounts" ADD COLUMN IF NOT EXISTS "restaurantId" TEXT;
+ALTER TABLE "loyalty_accounts" ADD COLUMN IF NOT EXISTS "phone" TEXT;
+ALTER TABLE "loyalty_accounts" ADD COLUMN IF NOT EXISTS "name" TEXT;
+ALTER TABLE "loyalty_accounts" ADD COLUMN IF NOT EXISTS "points" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "loyalty_accounts" ADD COLUMN IF NOT EXISTS "totalEarned" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "loyalty_accounts" ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE "loyalty_accounts" ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP(3);
+
+CREATE TABLE IF NOT EXISTS "loyalty_transactions" (
+    "id" TEXT NOT NULL,
+    "restaurantId" TEXT NOT NULL,
+    "phone" TEXT NOT NULL,
+    "orderId" TEXT,
+    "points" INTEGER NOT NULL,
+    "kind" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "loyalty_transactions_pkey" PRIMARY KEY ("id")
+);
+
+ALTER TABLE "loyalty_transactions" ADD COLUMN IF NOT EXISTS "id" TEXT;
+ALTER TABLE "loyalty_transactions" ADD COLUMN IF NOT EXISTS "restaurantId" TEXT;
+ALTER TABLE "loyalty_transactions" ADD COLUMN IF NOT EXISTS "phone" TEXT;
+ALTER TABLE "loyalty_transactions" ADD COLUMN IF NOT EXISTS "orderId" TEXT;
+ALTER TABLE "loyalty_transactions" ADD COLUMN IF NOT EXISTS "points" INTEGER;
+ALTER TABLE "loyalty_transactions" ADD COLUMN IF NOT EXISTS "kind" TEXT;
+ALTER TABLE "loyalty_transactions" ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
 CREATE TABLE IF NOT EXISTS "staff_users" (
     "id" TEXT NOT NULL,
@@ -752,12 +825,19 @@ ALTER TABLE "leave_balances" ADD COLUMN IF NOT EXISTS "balance" DOUBLE PRECISION
 CREATE TABLE IF NOT EXISTS "orders" (
     "id" TEXT NOT NULL,
     "restaurantId" TEXT NOT NULL,
-    "tableId" TEXT NOT NULL,
+    "tableId" TEXT,
+    "orderType" "OrderType" NOT NULL DEFAULT 'dine_in',
+    "customerName" TEXT,
+    "customerPhone" TEXT,
+    "customerAddress" TEXT,
     "status" "OrderStatus" NOT NULL DEFAULT 'new',
     "billRequested" BOOLEAN NOT NULL DEFAULT false,
     "paymentStatus" "PaymentStatus" NOT NULL DEFAULT 'unpaid',
     "total" INTEGER NOT NULL DEFAULT 0,
+    "discountAmount" INTEGER NOT NULL DEFAULT 0,
+    "discountLabel" TEXT,
     "inventoryDeductedAt" TIMESTAMP(3),
+    "servedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -767,13 +847,42 @@ CREATE TABLE IF NOT EXISTS "orders" (
 ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "id" TEXT;
 ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "restaurantId" TEXT;
 ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "tableId" TEXT;
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "orderType" "OrderType" NOT NULL DEFAULT 'dine_in';
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "customerName" TEXT;
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "customerPhone" TEXT;
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "customerAddress" TEXT;
 ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "status" "OrderStatus" NOT NULL DEFAULT 'new';
 ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "billRequested" BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "paymentStatus" "PaymentStatus" NOT NULL DEFAULT 'unpaid';
 ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "total" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "discountAmount" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "discountLabel" TEXT;
 ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "inventoryDeductedAt" TIMESTAMP(3);
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "servedAt" TIMESTAMP(3);
 ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
 ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP(3);
+
+CREATE TABLE IF NOT EXISTS "promotions" (
+    "id" TEXT NOT NULL,
+    "restaurantId" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "description" TEXT,
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "promotions_pkey" PRIMARY KEY ("id")
+);
+
+ALTER TABLE "promotions" ADD COLUMN IF NOT EXISTS "id" TEXT;
+ALTER TABLE "promotions" ADD COLUMN IF NOT EXISTS "restaurantId" TEXT;
+ALTER TABLE "promotions" ADD COLUMN IF NOT EXISTS "title" TEXT;
+ALTER TABLE "promotions" ADD COLUMN IF NOT EXISTS "description" TEXT;
+ALTER TABLE "promotions" ADD COLUMN IF NOT EXISTS "active" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "promotions" ADD COLUMN IF NOT EXISTS "sortOrder" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "promotions" ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE "promotions" ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP(3);
 
 CREATE TABLE IF NOT EXISTS "order_items" (
     "id" TEXT NOT NULL,
@@ -968,6 +1077,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS "platform_admins_email_key" ON "platform_admin
 CREATE UNIQUE INDEX IF NOT EXISTS "restaurants_slug_key" ON "restaurants"("slug");
 CREATE UNIQUE INDEX IF NOT EXISTS "restaurants_subdomain_key" ON "restaurants"("subdomain");
 CREATE UNIQUE INDEX IF NOT EXISTS "restaurants_customDomain_key" ON "restaurants"("customDomain");
+CREATE INDEX IF NOT EXISTS "expenses_restaurantId_date_idx" ON "expenses"("restaurantId", "date");
+CREATE UNIQUE INDEX IF NOT EXISTS "loyalty_accounts_restaurantId_phone_key" ON "loyalty_accounts"("restaurantId", "phone");
+CREATE INDEX IF NOT EXISTS "loyalty_transactions_restaurantId_phone_idx" ON "loyalty_transactions"("restaurantId", "phone");
 CREATE UNIQUE INDEX IF NOT EXISTS "staff_users_authUserId_key" ON "staff_users"("authUserId");
 CREATE INDEX IF NOT EXISTS "staff_users_restaurantId_idx" ON "staff_users"("restaurantId");
 CREATE UNIQUE INDEX IF NOT EXISTS "staff_users_restaurantId_email_key" ON "staff_users"("restaurantId", "email");
@@ -1009,6 +1121,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS "leave_balances_employeeId_leaveTypeId_key" ON
 CREATE INDEX IF NOT EXISTS "orders_restaurantId_status_idx" ON "orders"("restaurantId", "status");
 CREATE INDEX IF NOT EXISTS "orders_restaurantId_createdAt_idx" ON "orders"("restaurantId", "createdAt");
 CREATE INDEX IF NOT EXISTS "orders_tableId_idx" ON "orders"("tableId");
+CREATE INDEX IF NOT EXISTS "promotions_restaurantId_active_idx" ON "promotions"("restaurantId", "active");
 CREATE INDEX IF NOT EXISTS "order_items_orderId_idx" ON "order_items"("orderId");
 CREATE INDEX IF NOT EXISTS "order_item_modifiers_orderItemId_idx" ON "order_item_modifiers"("orderItemId");
 CREATE INDEX IF NOT EXISTS "print_jobs_restaurantId_status_idx" ON "print_jobs"("restaurantId", "status");
@@ -1022,6 +1135,9 @@ CREATE INDEX IF NOT EXISTS "sms_messages_campaignId_idx" ON "sms_messages"("camp
 CREATE INDEX IF NOT EXISTS "sms_credit_ledger_restaurantId_idx" ON "sms_credit_ledger"("restaurantId");
 DO $$ BEGIN ALTER TABLE "plan_modules" ADD CONSTRAINT "plan_modules_planId_fkey" FOREIGN KEY ("planId") REFERENCES "plans"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN ALTER TABLE "restaurants" ADD CONSTRAINT "restaurants_planId_fkey" FOREIGN KEY ("planId") REFERENCES "plans"("id") ON DELETE SET NULL ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN ALTER TABLE "expenses" ADD CONSTRAINT "expenses_restaurantId_fkey" FOREIGN KEY ("restaurantId") REFERENCES "restaurants"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN ALTER TABLE "loyalty_accounts" ADD CONSTRAINT "loyalty_accounts_restaurantId_fkey" FOREIGN KEY ("restaurantId") REFERENCES "restaurants"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN ALTER TABLE "loyalty_transactions" ADD CONSTRAINT "loyalty_transactions_restaurantId_fkey" FOREIGN KEY ("restaurantId") REFERENCES "restaurants"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN ALTER TABLE "staff_users" ADD CONSTRAINT "staff_users_restaurantId_fkey" FOREIGN KEY ("restaurantId") REFERENCES "restaurants"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN ALTER TABLE "subscriptions" ADD CONSTRAINT "subscriptions_restaurantId_fkey" FOREIGN KEY ("restaurantId") REFERENCES "restaurants"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN ALTER TABLE "subscriptions" ADD CONSTRAINT "subscriptions_planId_fkey" FOREIGN KEY ("planId") REFERENCES "plans"("id") ON DELETE RESTRICT ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
@@ -1058,7 +1174,8 @@ DO $$ BEGIN ALTER TABLE "leave_requests" ADD CONSTRAINT "leave_requests_leaveTyp
 DO $$ BEGIN ALTER TABLE "leave_balances" ADD CONSTRAINT "leave_balances_employeeId_fkey" FOREIGN KEY ("employeeId") REFERENCES "employees"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN ALTER TABLE "leave_balances" ADD CONSTRAINT "leave_balances_leaveTypeId_fkey" FOREIGN KEY ("leaveTypeId") REFERENCES "leave_types"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN ALTER TABLE "orders" ADD CONSTRAINT "orders_restaurantId_fkey" FOREIGN KEY ("restaurantId") REFERENCES "restaurants"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
-DO $$ BEGIN ALTER TABLE "orders" ADD CONSTRAINT "orders_tableId_fkey" FOREIGN KEY ("tableId") REFERENCES "tables"("id") ON DELETE RESTRICT ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN ALTER TABLE "orders" ADD CONSTRAINT "orders_tableId_fkey" FOREIGN KEY ("tableId") REFERENCES "tables"("id") ON DELETE SET NULL ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN ALTER TABLE "promotions" ADD CONSTRAINT "promotions_restaurantId_fkey" FOREIGN KEY ("restaurantId") REFERENCES "restaurants"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN ALTER TABLE "order_items" ADD CONSTRAINT "order_items_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "orders"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN ALTER TABLE "order_items" ADD CONSTRAINT "order_items_menuItemId_fkey" FOREIGN KEY ("menuItemId") REFERENCES "menu_items"("id") ON DELETE RESTRICT ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN ALTER TABLE "order_item_modifiers" ADD CONSTRAINT "order_item_modifiers_orderItemId_fkey" FOREIGN KEY ("orderItemId") REFERENCES "order_items"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
@@ -1071,3 +1188,21 @@ DO $$ BEGIN ALTER TABLE "sms_campaigns" ADD CONSTRAINT "sms_campaigns_restaurant
 DO $$ BEGIN ALTER TABLE "sms_messages" ADD CONSTRAINT "sms_messages_campaignId_fkey" FOREIGN KEY ("campaignId") REFERENCES "sms_campaigns"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN ALTER TABLE "sms_messages" ADD CONSTRAINT "sms_messages_contactId_fkey" FOREIGN KEY ("contactId") REFERENCES "customer_contacts"("id") ON DELETE RESTRICT ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN ALTER TABLE "sms_credit_ledger" ADD CONSTRAINT "sms_credit_ledger_restaurantId_fkey" FOREIGN KEY ("restaurantId") REFERENCES "restaurants"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
+-- ============================================================
+-- Row-Level Security for newer tenant tables
+-- ============================================================
+DO $$
+declare t text;
+begin
+  foreach t in array array['promotions','loyalty_accounts','loyalty_transactions','expenses'] loop
+    execute format('alter table %I enable row level security;', t);
+    execute format('alter table %I force row level security;', t);
+    execute format('drop policy if exists tenant_isolation on %I;', t);
+    execute format($f$
+      create policy tenant_isolation on %I
+      using (app.is_super_admin() or "restaurantId" = app.current_restaurant_id())
+      with check (app.is_super_admin() or "restaurantId" = app.current_restaurant_id());
+    $f$, t);
+  end loop;
+exception when others then null;
+end $$;

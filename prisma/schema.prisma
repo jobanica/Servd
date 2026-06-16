@@ -225,8 +225,25 @@ model Restaurant {
   employees       Employee[]
   loyaltyAccounts LoyaltyAccount[]
   loyaltyTxns     LoyaltyTransaction[]
+  expenses        Expense[]
 
   @@map("restaurants")
+}
+
+/// A business expense for the accounting section (rent, supplies, payroll, …).
+model Expense {
+  id           String   @id @default(uuid())
+  restaurantId String
+  date         DateTime
+  category     String
+  amount       Int // centavos
+  note         String?
+  createdAt    DateTime @default(now())
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, date])
+  @@map("expenses")
 }
 
 /// A customer's loyalty balance at a restaurant, keyed by phone number.

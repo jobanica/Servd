@@ -42,7 +42,7 @@ export async function GET() {
       const tables = await tx.$queryRaw<{ table_name: string }[]>`
         select table_name from information_schema.tables
         where table_schema = 'public' and table_name in
-          ('plan_modules','restaurant_invoices','menu_item_translations','inventory_items','employees','promotions','loyalty_accounts')`;
+          ('plan_modules','restaurant_invoices','menu_item_translations','inventory_items','employees','promotions','loyalty_accounts','expenses')`;
 
       const have = new Set([
         ...cols.map((c) => `${c.table_name}.${c.column_name}`),
@@ -65,6 +65,7 @@ export async function GET() {
         "employees",
         "promotions",
         "loyalty_accounts",
+        "expenses",
       ];
       const missing = expected.filter((e) => !have.has(e));
 
