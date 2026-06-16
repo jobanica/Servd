@@ -25,6 +25,9 @@ interface LoyaltyInfo {
   pointValue: number;
 }
 
+interface DayHours { open: string; close: string; closed: boolean }
+interface DeliveryZone { name: string; fee: number }
+
 export interface WebOrderProps {
   slug: string;
   restaurantName: string;
@@ -33,8 +36,13 @@ export interface WebOrderProps {
   contact?: { address: string | null; phone: string | null };
   payOnline?: boolean;
   loyalty?: LoyaltyInfo | null;
+  hours?: DayHours[];
+  zones?: DeliveryZone[];
+  openNow?: boolean;
   homeHref?: string;
 }
+
+const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /** Inline modifier/quantity picker (no i18n dependency). */
 function ItemConfig({ item, onAdd, onCancel }: { item: DinerItem; onAdd: (l: CartLine) => void; onCancel: () => void }) {
@@ -144,7 +152,7 @@ function ProductCard({ item, onPick }: { item: DinerItem; onPick: (i: DinerItem)
 }
 
 export function WebOrder(props: WebOrderProps) {
-  const { slug, restaurantName, logoUrl, categories, contact, payOnline, loyalty } = props;
+  const { slug, restaurantName, logoUrl, categories, contact, payOnline, loyalty, hours, zones = [], openNow } = props;
   const home = props.homeHref ?? `/r/${slug}`;
 
   const [lines, setLines] = useState<CartLine[]>([]);
@@ -153,6 +161,7 @@ export function WebOrder(props: WebOrderProps) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [zone, setZone] = useState("");
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -161,7 +170,9 @@ export function WebOrder(props: WebOrderProps) {
   const [checkout, setCheckout] = useState(false);
 
   const count = cartCount(lines);
-  const total = cartTotal(lines);
+  const subtotal = cartTotal(lines);
+  const deliveryFee = orderType === "delivery" ? zones.find((z) => z.name === zone)?.fee ?? 0 : 0;
+  const total = subtotal + deliveryFee;
   const vat = Math.round(total - total / (1 + VAT_RATE));
   const nonEmpty = categories.filter((c) => c.items.length > 0);
   const q = search.trim().toLowerCase();
@@ -192,6 +203,7 @@ export function WebOrder(props: WebOrderProps) {
       customerName: name,
       customerPhone: phone,
       customerAddress: orderType === "delivery" ? address : undefined,
+      deliveryZone: orderType === "delivery" ? zone || undefined : undefined,
       lines: lines.map((l) => ({ itemId: l.itemId, quantity: l.quantity, note: l.note, modifierIds: l.modifiers.map((m) => m.modifierId) })),
     });
     setBusy(false);
@@ -256,12 +268,30 @@ export function WebOrder(props: WebOrderProps) {
             </div>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
             <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="Phone number" className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
-            {orderType === "delivery" && <textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={2} placeholder="Delivery address" className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />}
+            {orderType === "delivery" && (
+              <>
+                {zones.length > 0 && (
+                  <select value={zone} onChange={(e) => setZone(e.target.value)} className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm">
+                    <option value="">Select delivery zone…</option>
+                    {zones.map((z) => (
+                      <option key={z.name} value={z.name}>{z.name} — {formatPeso(z.fee)}</option>
+                    ))}
+                  </select>
+                )}
+                <textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={2} placeholder="Delivery address" className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
+              </>
+            )}
           </div>
         )}
       </div>
 
       <div className="border-t border-black/5 px-4 py-3">
+        {checkout && orderType === "delivery" && (
+          <div className="mb-1 space-y-0.5 text-sm text-plum-ink/60">
+            <div className="flex justify-between"><span>Subtotal</span><span>{formatPeso(subtotal)}</span></div>
+            <div className="flex justify-between"><span>Delivery fee</span><span>{deliveryFee > 0 ? formatPeso(deliveryFee) : "—"}</span></div>
+          </div>
+        )}
         <div className="flex items-center justify-between font-heading text-xl font-extrabold text-plum-ink">
           <span>TOTAL</span><span>{formatPeso(total)}</span>
         </div>
@@ -278,7 +308,7 @@ export function WebOrder(props: WebOrderProps) {
         ) : (
           <button
             onClick={submit}
-            disabled={busy || lines.length === 0 || !name.trim() || !phone.trim() || (orderType === "delivery" && !address.trim())}
+            disabled={busy || lines.length === 0 || !name.trim() || !phone.trim() || (orderType === "delivery" && (!address.trim() || (zones.length > 0 && !zone)))}
             className="mt-3 w-full rounded-lg bg-green-600 py-3 font-semibold text-white disabled:opacity-50"
           >
             {busy ? "Placing…" : `Place ${orderType === "delivery" ? "delivery" : "pickup"} order`}
@@ -301,6 +331,11 @@ export function WebOrder(props: WebOrderProps) {
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-600 font-bold">{restaurantName.charAt(0)}</div>
           )}
           <span className="font-heading text-lg font-extrabold">{restaurantName}</span>
+          {openNow != null && (
+            <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${openNow ? "bg-green-500/20 text-green-300" : "bg-white/10 text-white/60"}`}>
+              {openNow ? "● Open now" : "Closed"}
+            </span>
+          )}
           <nav className="ml-auto hidden items-center gap-5 text-sm font-semibold text-white/80 md:flex">
             <a href="#menu" className="hover:text-white">MENU</a>
             <a href="#info" className="hover:text-white">PAYMENT</a>
@@ -371,8 +406,35 @@ export function WebOrder(props: WebOrderProps) {
           {/* Info / footer */}
           <section id="info" className="mt-8 grid gap-4 rounded-xl bg-white p-5 text-sm text-plum-ink/70 shadow-sm sm:grid-cols-2">
             <div>
+              <p className="font-heading font-bold text-plum-ink">Store hours</p>
+              {hours && hours.length === 7 ? (
+                <ul className="mt-1 space-y-0.5">
+                  {hours.map((h, i) => (
+                    <li key={i} className="flex justify-between">
+                      <span>{DAY_LABELS[i]}</span>
+                      <span>{h.closed ? "Closed" : `${h.open}–${h.close}`}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-1">Contact us for hours.</p>
+              )}
+            </div>
+            <div>
+              <p className="font-heading font-bold text-plum-ink">Delivery</p>
+              {zones.length > 0 ? (
+                <ul className="mt-1 space-y-0.5">
+                  {zones.map((z) => (
+                    <li key={z.name} className="flex justify-between"><span>{z.name}</span><span>{formatPeso(z.fee)}</span></li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-1">Pickup available. Ask us about delivery.</p>
+              )}
+            </div>
+            <div>
               <p className="font-heading font-bold text-plum-ink">Payment methods</p>
-              <p className="mt-1">Cash on {orderType === "delivery" ? "delivery" : "pickup"}.{payOnline ? " GCash & card available." : ""}</p>
+              <p className="mt-1">Cash on pickup / delivery.{payOnline ? " GCash & card available." : ""}</p>
             </div>
             <div>
               <p className="font-heading font-bold text-plum-ink">Contact</p>

@@ -230,6 +230,20 @@ ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "loyaltyPointValue" INTEGER N
 ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
 ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP(3);
 
+CREATE TABLE IF NOT EXISTS "storefront_settings" (
+    "id" TEXT NOT NULL,
+    "restaurantId" TEXT NOT NULL,
+    "hours" JSONB,
+    "deliveryZones" JSONB,
+
+    CONSTRAINT "storefront_settings_pkey" PRIMARY KEY ("id")
+);
+
+ALTER TABLE "storefront_settings" ADD COLUMN IF NOT EXISTS "id" TEXT;
+ALTER TABLE "storefront_settings" ADD COLUMN IF NOT EXISTS "restaurantId" TEXT;
+ALTER TABLE "storefront_settings" ADD COLUMN IF NOT EXISTS "hours" JSONB;
+ALTER TABLE "storefront_settings" ADD COLUMN IF NOT EXISTS "deliveryZones" JSONB;
+
 CREATE TABLE IF NOT EXISTS "payroll_settings" (
     "id" TEXT NOT NULL,
     "restaurantId" TEXT NOT NULL,
@@ -1111,6 +1125,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS "platform_admins_email_key" ON "platform_admin
 CREATE UNIQUE INDEX IF NOT EXISTS "restaurants_slug_key" ON "restaurants"("slug");
 CREATE UNIQUE INDEX IF NOT EXISTS "restaurants_subdomain_key" ON "restaurants"("subdomain");
 CREATE UNIQUE INDEX IF NOT EXISTS "restaurants_customDomain_key" ON "restaurants"("customDomain");
+CREATE UNIQUE INDEX IF NOT EXISTS "storefront_settings_restaurantId_key" ON "storefront_settings"("restaurantId");
 CREATE UNIQUE INDEX IF NOT EXISTS "payroll_settings_restaurantId_key" ON "payroll_settings"("restaurantId");
 CREATE UNIQUE INDEX IF NOT EXISTS "menu_item_costs_menuItemId_key" ON "menu_item_costs"("menuItemId");
 CREATE INDEX IF NOT EXISTS "menu_item_costs_restaurantId_idx" ON "menu_item_costs"("restaurantId");
@@ -1172,6 +1187,7 @@ CREATE INDEX IF NOT EXISTS "sms_messages_campaignId_idx" ON "sms_messages"("camp
 CREATE INDEX IF NOT EXISTS "sms_credit_ledger_restaurantId_idx" ON "sms_credit_ledger"("restaurantId");
 DO $$ BEGIN ALTER TABLE "plan_modules" ADD CONSTRAINT "plan_modules_planId_fkey" FOREIGN KEY ("planId") REFERENCES "plans"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN ALTER TABLE "restaurants" ADD CONSTRAINT "restaurants_planId_fkey" FOREIGN KEY ("planId") REFERENCES "plans"("id") ON DELETE SET NULL ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN ALTER TABLE "storefront_settings" ADD CONSTRAINT "storefront_settings_restaurantId_fkey" FOREIGN KEY ("restaurantId") REFERENCES "restaurants"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN ALTER TABLE "payroll_settings" ADD CONSTRAINT "payroll_settings_restaurantId_fkey" FOREIGN KEY ("restaurantId") REFERENCES "restaurants"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN ALTER TABLE "menu_item_costs" ADD CONSTRAINT "menu_item_costs_menuItemId_fkey" FOREIGN KEY ("menuItemId") REFERENCES "menu_items"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN ALTER TABLE "menu_item_costs" ADD CONSTRAINT "menu_item_costs_restaurantId_fkey" FOREIGN KEY ("restaurantId") REFERENCES "restaurants"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
@@ -1234,7 +1250,7 @@ DO $$ BEGIN ALTER TABLE "sms_credit_ledger" ADD CONSTRAINT "sms_credit_ledger_re
 DO $$
 declare t text;
 begin
-  foreach t in array array['promotions','loyalty_accounts','loyalty_transactions','expenses','payroll_settings','menu_item_costs'] loop
+  foreach t in array array['promotions','loyalty_accounts','loyalty_transactions','expenses','payroll_settings','menu_item_costs','storefront_settings'] loop
     execute format('alter table %I enable row level security;', t);
     execute format('alter table %I force row level security;', t);
     execute format('drop policy if exists tenant_isolation on %I;', t);

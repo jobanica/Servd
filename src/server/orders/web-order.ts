@@ -8,6 +8,8 @@ import {
   OrderValidationError,
 } from "@/server/orders/build-order";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
+import { getPublicStorefront } from "@/server/storefront/storefront";
+import { formatPeso } from "@/lib/money";
 
 const schema = z.object({
   slug: z.string().min(1),
@@ -15,6 +17,7 @@ const schema = z.object({
   customerName: z.string().trim().min(1, "Enter your name").max(80),
   customerPhone: z.string().trim().min(7, "Enter your phone number").max(30),
   customerAddress: z.string().trim().max(300).optional(),
+  deliveryZone: z.string().trim().max(80).optional(),
   lines: z
     .array(
       z.object({
@@ -59,6 +62,18 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
     return { ok: false, error: "We couldn't build your order. Please try again." };
   }
 
+  // Delivery fee — looked up server-side from the restaurant's zones (never
+  // trust the client for money). Encoded into the address so staff see it.
+  let deliveryFee = 0;
+  let addressLine: string | null = null;
+  if (d.orderType === "delivery") {
+    const sf = await getPublicStorefront(restaurant.id);
+    const zone = d.deliveryZone ? sf.zones.find((z) => z.name === d.deliveryZone) : undefined;
+    deliveryFee = zone?.fee ?? 0;
+    const prefix = zone ? `[${zone.name}${deliveryFee > 0 ? ` · delivery ${formatPeso(deliveryFee)}` : ""}] ` : "";
+    addressLine = `${prefix}${d.customerAddress?.trim() ?? ""}`.trim() || null;
+  }
+
   let order;
   try {
     order = await tenantDb(restaurant.id, (tx) =>
@@ -68,10 +83,10 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
           orderType: d.orderType,
           customerName: d.customerName.trim(),
           customerPhone: d.customerPhone.replace(/[^\d+]/g, ""),
-          customerAddress: d.orderType === "delivery" ? d.customerAddress?.trim() || null : null,
+          customerAddress: addressLine,
           status: "pending",
           paymentStatus: "unpaid",
-          total: built.total,
+          total: built.total + deliveryFee,
           items: { create: orderItemsCreate(built.items) },
         },
         select: { id: true },

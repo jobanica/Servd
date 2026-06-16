@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getRestaurantByHost } from "@/server/restaurants/get-by-host";
 import { getPublicMenu } from "@/server/menu/public-menu";
 import { getLoyaltyConfig } from "@/server/loyalty/loyalty";
+import { getPublicStorefront, isOpenNow } from "@/server/storefront/storefront";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { WebOrder } from "@/components/site/WebOrder";
 
@@ -11,9 +12,10 @@ export default async function SiteHomePage({ params }: { params: Promise<{ host:
   const restaurant = await getRestaurantByHost(decodeURIComponent(host));
   if (!restaurant) notFound();
 
-  const [categories, loyalty, contactRow] = await Promise.all([
+  const [categories, loyalty, sf, contactRow] = await Promise.all([
     getPublicMenu(restaurant.id),
     getLoyaltyConfig(restaurant.id),
+    getPublicStorefront(restaurant.id),
     systemDb((tx) => tx.restaurant.findFirst({ where: { id: restaurant.id }, select: { printerConfig: true } })).catch(() => null),
   ]);
   const c = (contactRow?.printerConfig as { receipt?: { address?: string; phone?: string } } | null)?.receipt;
@@ -27,6 +29,9 @@ export default async function SiteHomePage({ params }: { params: Promise<{ host:
       contact={{ address: c?.address ?? null, phone: c?.phone ?? null }}
       payOnline={restaurant.paymentOnlineEnabled}
       loyalty={loyalty}
+      hours={sf.hours}
+      zones={sf.zones}
+      openNow={isOpenNow(sf.hours)}
       homeHref="/"
     />
   );

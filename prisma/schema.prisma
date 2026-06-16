@@ -228,8 +228,21 @@ model Restaurant {
   expenses        Expense[]
   payrollSetting  PayrollSetting?
   menuItemCosts   MenuItemCost[]
+  storefront      StorefrontSetting?
 
   @@map("restaurants")
+}
+
+/// Public website settings: store hours + delivery zones/fees.
+model StorefrontSetting {
+  id            String @id @default(uuid())
+  restaurantId  String @unique
+  hours         Json? // [{open,close,closed}] index 0=Sun … 6=Sat
+  deliveryZones Json? // [{name, fee}] fee in centavos
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("storefront_settings")
 }
 
 /// Customizable statutory payroll deductions per restaurant (PH).

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getPublicRestaurantBySlug } from "@/server/restaurants/get-public";
 import { getPublicMenu } from "@/server/menu/public-menu";
 import { getLoyaltyConfig } from "@/server/loyalty/loyalty";
+import { getPublicStorefront, isOpenNow } from "@/server/storefront/storefront";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { WebOrder } from "@/components/site/WebOrder";
 
@@ -29,10 +30,11 @@ export default async function RestaurantSite({ params }: { params: Promise<{ slu
   const restaurant = await getPublicRestaurantBySlug(slug);
   if (!restaurant) notFound();
 
-  const [categories, loyalty, contact] = await Promise.all([
+  const [categories, loyalty, contact, sf] = await Promise.all([
     getPublicMenu(restaurant.id),
     getLoyaltyConfig(restaurant.id),
     getContact(restaurant.id),
+    getPublicStorefront(restaurant.id),
   ]);
 
   return (
@@ -44,6 +46,9 @@ export default async function RestaurantSite({ params }: { params: Promise<{ slu
       contact={contact}
       payOnline={restaurant.paymentOnlineEnabled}
       loyalty={loyalty}
+      hours={sf.hours}
+      zones={sf.zones}
+      openNow={isOpenNow(sf.hours)}
       homeHref={`/r/${slug}`}
     />
   );
