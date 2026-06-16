@@ -32,6 +32,7 @@ export async function GET() {
           (table_name = 'restaurants' and column_name = 'onboardingCompletedAt') or
           (table_name = 'subscriptions' and column_name = 'trialEndsAt') or
           (table_name = 'menu_items' and column_name = 'videoUrl') or
+          (table_name = 'orders' and column_name = 'inventoryDeductedAt') or
           (table_name = 'restaurants' and column_name = 'customDomain')
         )`;
       const tables = await tx.$queryRaw<{ table_name: string }[]>`
@@ -47,6 +48,7 @@ export async function GET() {
         "restaurants.onboardingCompletedAt",
         "subscriptions.trialEndsAt",
         "menu_items.videoUrl",
+        "orders.inventoryDeductedAt",
         "restaurants.customDomain",
         "plan_modules",
         "restaurant_invoices",

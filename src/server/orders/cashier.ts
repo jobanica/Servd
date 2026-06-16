@@ -194,7 +194,9 @@ export async function markOrderPaid(
     await tenantDb(staff.restaurantId, async (tx) => {
       const order = await tx.order.findFirst({ where: { id: orderId }, select: { total: true } });
       if (!order) throw new Error("Order not found");
-      await tx.order.update({
+      // updateMany (not update) so it doesn't read the whole row back — keeps
+      // working even if the prod schema lags (e.g. missing newer columns).
+      await tx.order.updateMany({
         where: { id: orderId },
         // Paying in person settles the order: mark paid AND close it.
         data: { paymentStatus: "paid", billRequested: false, status: "closed" },
@@ -222,12 +224,17 @@ export async function closeOrder(
   } catch {
     return { ok: false, error: "Not allowed." };
   }
-  await tenantDb(staff.restaurantId, (tx) =>
-    tx.order.update({
-      where: { id: orderId },
-      data: { status: "closed", billRequested: false },
-    }),
-  );
+  try {
+    await tenantDb(staff.restaurantId, (tx) =>
+      tx.order.updateMany({
+        where: { id: orderId },
+        data: { status: "closed", billRequested: false },
+      }),
+    );
+  } catch (e) {
+    console.error("closeOrder failed", e);
+    return { ok: false, error: e instanceof Error ? e.message : "Could not close the order." };
+  }
   await notifyOrdersChanged(staff.restaurantId);
   return { ok: true, tables: await getCashierTables() };
 }
