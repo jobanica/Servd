@@ -8,6 +8,7 @@ import { listInventory } from "@/server/inventory/queries";
 import { hasModule } from "@/server/billing/entitlements";
 import { formatPeso } from "@/lib/money";
 import { RevenueChart } from "@/components/analytics/Charts";
+import { getAiInsights, aiInsightsEnabled } from "@/server/ai/insights";
 
 /** Resolves a promise, returning a fallback if it throws (schema-lag safe). */
 async function safe<T>(p: Promise<T>, fallback: T): Promise<T> {
@@ -99,16 +100,32 @@ export default async function AdminHome() {
 
   const lowItems = lowStock.filter((i) => i.low).slice(0, 5);
 
-  // Smart insights (data-derived, not an LLM).
-  const insights: string[] = [];
-  if (week?.topItems[0]) insights.push(`🔥 Best seller this week: ${week.topItems[0].name} (${week.topItems[0].qty} sold)`);
+  // Rule-based insights — used as a fallback when Claude AI is unavailable.
+  const ruleInsights: string[] = [];
+  if (week?.topItems[0]) ruleInsights.push(`🔥 Best seller this week: ${week.topItems[0].name} (${week.topItems[0].qty} sold)`);
   if (week && week.peakHours.length) {
     const peak = [...week.peakHours].sort((a, b) => b.orders - a.orders)[0];
-    insights.push(`⏰ Busiest hour: ${peak.hour}:00 (UTC)`);
+    ruleInsights.push(`⏰ Busiest hour: ${peak.hour}:00 (UTC)`);
   }
-  if (lowItems.length) insights.push(`📦 ${lowItems.length} ingredient${lowItems.length > 1 ? "s" : ""} running low`);
-  if (week?.summary.avgRating != null) insights.push(`⭐ 7-day average rating: ${week.summary.avgRating}`);
-  if (insights.length === 0) insights.push("Add menu items and share your table QR codes to start seeing insights here.");
+  if (lowItems.length) ruleInsights.push(`📦 ${lowItems.length} ingredient${lowItems.length > 1 ? "s" : ""} running low`);
+  if (week?.summary.avgRating != null) ruleInsights.push(`⭐ 7-day average rating: ${week.summary.avgRating}`);
+  if (ruleInsights.length === 0) ruleInsights.push("Add menu items and share your table QR codes to start seeing insights here.");
+
+  // Real Claude-generated insights (falls back to rule-based on any failure).
+  const aiOn = aiInsightsEnabled();
+  const aiInsights = aiOn
+    ? await safe(
+        getAiInsights(rid, {
+          restaurantName: restaurant.displayName || restaurant.name,
+          week,
+          today,
+          lowStockCount: lowItems.length,
+        }),
+        null,
+      )
+    : null;
+  const insights = aiInsights && aiInsights.length ? aiInsights : ruleInsights;
+  const insightsAreAi = !!(aiInsights && aiInsights.length);
 
   return (
     <div className="space-y-5">
@@ -210,6 +227,12 @@ export default async function AdminHome() {
       {/* Bottom row */}
       <div className="grid gap-4 lg:grid-cols-3">
         <Card title="Smart insights" className="lg:col-span-2">
+          <div className="mb-3 flex items-center gap-2">
+            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${insightsAreAi ? "bg-brand-primary/10 text-brand-primary" : "bg-plum-ink/5 text-plum-ink/45"}`}>
+              {insightsAreAi ? "✨ Claude AI" : "Rule-based"}
+            </span>
+            {!aiOn && <span className="text-[11px] text-plum-ink/40">Set ANTHROPIC_API_KEY to enable AI insights</span>}
+          </div>
           <ul className="space-y-2 text-sm text-plum-ink/75">
             {insights.map((t, i) => <li key={i}>{t}</li>)}
           </ul>

@@ -25,6 +25,7 @@
     "user:create": "node scripts/create-user.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.2",
     "@prisma/client": "^6.2.1",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.47.10",
