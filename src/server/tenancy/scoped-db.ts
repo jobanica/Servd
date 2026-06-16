@@ -35,17 +35,14 @@ export async function tenantDb<T>(
     throw new Error("tenantDb: invalid restaurantId");
   }
   return prisma.$transaction(async (tx) => {
-    // Prefer the non-privileged `app_user` role so RLS is enforced even if the
-    // connection role could bypass it. This is crash-safe: if the role doesn't
-    // exist yet it leaves the current role untouched (isolation is still
-    // enforced by FORCE ROW LEVEL SECURITY + the GUC below). $executeRawUnsafe
-    // avoids prepared statements (PgBouncer 42P05 safety); the only literals are
-    // a hardcoded role name and the UUID-validated restaurantId.
+    // Set the role + restaurant GUC in a SINGLE round-trip (latency matters:
+    // this runs on every tenant-scoped query). Prefer the non-privileged
+    // `app_user` role so RLS is enforced even if the connection role could
+    // bypass it; crash-safe if the role doesn't exist yet. $executeRawUnsafe
+    // avoids prepared statements (PgBouncer 42P05 safety); the only literals
+    // are a hardcoded role name and the UUID-validated restaurantId.
     await tx.$executeRawUnsafe(
-      `SELECT set_config('role', CASE WHEN EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_user') THEN 'app_user' ELSE current_setting('role') END, true)`,
-    );
-    await tx.$executeRawUnsafe(
-      `SELECT set_config('app.current_restaurant_id', '${restaurantId}', true)`,
+      `SELECT set_config('role', CASE WHEN EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_user') THEN 'app_user' ELSE current_setting('role') END, true), set_config('app.current_restaurant_id', '${restaurantId}', true)`,
     );
     return fn(tx);
   });
