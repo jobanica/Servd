@@ -37,6 +37,8 @@ export default async function HrPage() {
         <h1 className="font-heading text-2xl font-bold">HR · Employees</h1>
         <nav className="flex flex-wrap gap-2 text-sm">
           {[
+            ["Attendance", "/admin/hr/attendance"],
+            ["Late report", "/admin/hr/late"],
             ["Schedule", "/admin/hr/schedule"],
             ["Timesheets", "/admin/hr/timesheets"],
             ["Leave", "/admin/hr/leave"],
