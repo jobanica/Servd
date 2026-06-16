@@ -1,6 +1,6 @@
 import "server-only";
 
-import { tenantDb, systemDb } from "@/server/tenancy/scoped-db";
+import { systemDb } from "@/server/tenancy/scoped-db";
 
 export interface LoyaltyConfig {
   enabled: boolean;
@@ -97,11 +97,45 @@ export interface LoyaltyMember {
   joinedAt: string;
 }
 
+export interface LoyaltyActivity {
+  id: string;
+  phone: string;
+  points: number; // signed: + earned, − redeemed
+  kind: string; // earn | redeem | adjust
+  createdAt: string;
+}
+
+/** Recent points activity (earn/redeem) for the admin dashboard. */
+export async function getLoyaltyActivity(restaurantId: string): Promise<LoyaltyActivity[]> {
+  try {
+    // systemDb + explicit restaurantId: works even if the loyalty tables'
+    // tenant RLS policy is missing (writes go through systemDb too).
+    const rows = await systemDb((tx) =>
+      tx.loyaltyTransaction.findMany({
+        where: { restaurantId },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+        select: { id: true, phone: true, points: true, kind: true, createdAt: true },
+      }),
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      phone: r.phone,
+      points: r.points,
+      kind: r.kind,
+      createdAt: r.createdAt.toISOString(),
+    }));
+  } catch {
+    return [];
+  }
+}
+
 /** All loyalty members for the admin dashboard (resilient to a missing table/column). */
 export async function getLoyaltyMembers(restaurantId: string): Promise<LoyaltyMember[]> {
   try {
     // Base fields only (no name) so a lagging schema can't blank the list.
-    const rows = await tenantDb(restaurantId, (tx) =>
+    // systemDb so it isn't blocked by a missing loyalty-table RLS policy.
+    const rows = await systemDb((tx) =>
       tx.loyaltyAccount.findMany({
         where: { restaurantId },
         orderBy: [{ points: "desc" }, { createdAt: "desc" }],
@@ -113,7 +147,7 @@ export async function getLoyaltyMembers(restaurantId: string): Promise<LoyaltyMe
     // Names are best-effort (column may not be migrated yet).
     const names = new Map<string, string | null>();
     try {
-      const withNames = await tenantDb(restaurantId, (tx) =>
+      const withNames = await systemDb((tx) =>
         tx.loyaltyAccount.findMany({ where: { restaurantId }, select: { phone: true, name: true } }),
       );
       for (const r of withNames) names.set(r.phone, r.name);
@@ -152,10 +186,10 @@ export async function awardPointsForOrder(
     const points = Math.floor(pesos / cfg.pesosPerPoint);
     if (points <= 0) return;
 
-    await tenantDb(restaurantId, async (tx) => {
+    await systemDb(async (tx) => {
       // Idempotency: skip if we already awarded for this order.
       const existing = await tx.loyaltyTransaction.findFirst({
-        where: { orderId, kind: "earn" },
+        where: { restaurantId, orderId, kind: "earn" },
         select: { id: true },
       });
       if (existing) return;
@@ -188,7 +222,7 @@ export async function redeemPoints(
   if (!cfg.enabled) return { ok: false, error: "Loyalty isn't enabled." };
 
   try {
-    return await tenantDb(restaurantId, async (tx) => {
+    return await systemDb(async (tx) => {
       const acct = await tx.loyaltyAccount.findFirst({ where: { restaurantId, phone: p } });
       if (!acct || acct.points < points) {
         return { ok: false, error: `Not enough points (balance: ${acct?.points ?? 0}).` };
