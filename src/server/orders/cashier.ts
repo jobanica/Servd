@@ -59,6 +59,7 @@ export interface CashierTable {
   label: string; // header label ("Table 5", "Pickup — Juan", "Delivery — Ana")
   customerPhone: string | null;
   customerAddress: string | null;
+  mapUrl: string | null;
   orders: CashierOrder[];
   outstanding: number; // sum of unpaid order totals (centavos)
   billRequested: boolean;
@@ -69,14 +70,14 @@ async function orderMetaMap(
   restaurantId: string,
   ids: string[],
 ): Promise<
-  Map<string, { orderType: string; customerName: string | null; customerPhone: string | null; customerAddress: string | null }>
+  Map<string, { orderType: string; customerName: string | null; customerPhone: string | null; customerAddress: string | null; mapUrl: string | null }>
 > {
   if (ids.length === 0) return new Map();
   try {
     const rows = await tenantDb(restaurantId, (tx) =>
       tx.order.findMany({
         where: { id: { in: ids } },
-        select: { id: true, orderType: true, customerName: true, customerPhone: true, customerAddress: true },
+        select: { id: true, orderType: true, customerName: true, customerPhone: true, customerAddress: true, customerLat: true, customerLng: true },
       }),
     );
     return new Map(
@@ -87,6 +88,7 @@ async function orderMetaMap(
           customerName: o.customerName,
           customerPhone: o.customerPhone,
           customerAddress: o.customerAddress,
+          mapUrl: o.customerLat != null && o.customerLng != null ? `https://maps.google.com/?q=${o.customerLat},${o.customerLng}` : null,
         },
       ]),
     );
@@ -103,6 +105,7 @@ export interface IncomingOrder {
   channel: string; // dine_in | takeout | delivery
   customerPhone: string | null;
   customerAddress: string | null;
+  mapUrl: string | null;
   total: number;
   paymentStatus: string;
   createdAt: string;
@@ -173,6 +176,7 @@ export async function getCashierTables(): Promise<CashierTable[]> {
         label,
         customerPhone: m?.customerPhone ?? null,
         customerAddress: m?.customerAddress ?? null,
+        mapUrl: m?.mapUrl ?? null,
         orders: [],
         outstanding: 0,
         billRequested: false,
@@ -245,6 +249,7 @@ export async function getIncomingOrders(): Promise<IncomingOrder[]> {
       channel: isDineIn ? "dine_in" : kind,
       customerPhone: m?.customerPhone ?? null,
       customerAddress: m?.customerAddress ?? null,
+      mapUrl: m?.mapUrl ?? null,
       total: o.total,
       paymentStatus: o.paymentStatus,
       createdAt: o.createdAt.toISOString(),

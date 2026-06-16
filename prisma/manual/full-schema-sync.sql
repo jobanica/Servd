@@ -235,6 +235,7 @@ CREATE TABLE IF NOT EXISTS "storefront_settings" (
     "restaurantId" TEXT NOT NULL,
     "hours" JSONB,
     "deliveryZones" JSONB,
+    "pauseWhenClosed" BOOLEAN NOT NULL DEFAULT false,
 
     CONSTRAINT "storefront_settings_pkey" PRIMARY KEY ("id")
 );
@@ -243,6 +244,7 @@ ALTER TABLE "storefront_settings" ADD COLUMN IF NOT EXISTS "id" TEXT;
 ALTER TABLE "storefront_settings" ADD COLUMN IF NOT EXISTS "restaurantId" TEXT;
 ALTER TABLE "storefront_settings" ADD COLUMN IF NOT EXISTS "hours" JSONB;
 ALTER TABLE "storefront_settings" ADD COLUMN IF NOT EXISTS "deliveryZones" JSONB;
+ALTER TABLE "storefront_settings" ADD COLUMN IF NOT EXISTS "pauseWhenClosed" BOOLEAN NOT NULL DEFAULT false;
 
 CREATE TABLE IF NOT EXISTS "payroll_settings" (
     "id" TEXT NOT NULL,
@@ -878,6 +880,8 @@ CREATE TABLE IF NOT EXISTS "orders" (
     "customerName" TEXT,
     "customerPhone" TEXT,
     "customerAddress" TEXT,
+    "customerLat" DOUBLE PRECISION,
+    "customerLng" DOUBLE PRECISION,
     "status" "OrderStatus" NOT NULL DEFAULT 'new',
     "billRequested" BOOLEAN NOT NULL DEFAULT false,
     "paymentStatus" "PaymentStatus" NOT NULL DEFAULT 'unpaid',
@@ -899,6 +903,8 @@ ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "orderType" "OrderType" NOT NULL D
 ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "customerName" TEXT;
 ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "customerPhone" TEXT;
 ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "customerAddress" TEXT;
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "customerLat" DOUBLE PRECISION;
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "customerLng" DOUBLE PRECISION;
 ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "status" "OrderStatus" NOT NULL DEFAULT 'new';
 ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "billRequested" BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "paymentStatus" "PaymentStatus" NOT NULL DEFAULT 'unpaid';

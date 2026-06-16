@@ -14,6 +14,7 @@ export interface DeliveryZone {
 export interface Storefront {
   hours: DayHours[]; // always length 7, index 0=Sun … 6=Sat
   zones: DeliveryZone[];
+  pauseWhenClosed: boolean;
 }
 
 export const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -50,11 +51,11 @@ function normalizeZones(raw: unknown): DeliveryZone[] {
 export async function getStorefront(restaurantId: string): Promise<Storefront> {
   try {
     const s = await tenantDb(restaurantId, (tx) =>
-      tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { hours: true, deliveryZones: true } }),
+      tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { hours: true, deliveryZones: true, pauseWhenClosed: true } }),
     );
-    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones) };
+    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones), pauseWhenClosed: !!s?.pauseWhenClosed };
   } catch {
-    return { hours: defaultHours(), zones: [] };
+    return { hours: defaultHours(), zones: [], pauseWhenClosed: false };
   }
 }
 
@@ -62,11 +63,11 @@ export async function getStorefront(restaurantId: string): Promise<Storefront> {
 export async function getPublicStorefront(restaurantId: string): Promise<Storefront> {
   try {
     const s = await systemDb((tx) =>
-      tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { hours: true, deliveryZones: true } }),
+      tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { hours: true, deliveryZones: true, pauseWhenClosed: true } }),
     );
-    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones) };
+    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones), pauseWhenClosed: !!s?.pauseWhenClosed };
   } catch {
-    return { hours: defaultHours(), zones: [] };
+    return { hours: defaultHours(), zones: [], pauseWhenClosed: false };
   }
 }
 

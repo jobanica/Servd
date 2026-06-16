@@ -14,7 +14,7 @@ interface DayHours {
 export function StorefrontForm({
   initial,
 }: {
-  initial: { hours: DayHours[]; zones: { name: string; feePesos: number }[] };
+  initial: { hours: DayHours[]; zones: { name: string; feePesos: number }[]; pauseWhenClosed: boolean };
 }) {
   const [state, action] = useActionState<StorefrontState, FormData>(updateStorefront, null);
   const [zones, setZones] = useState(initial.zones.length ? initial.zones : [{ name: "", feePesos: 0 }]);
@@ -38,6 +38,10 @@ export function StorefrontForm({
             </div>
           ))}
         </div>
+        <label className="mt-4 flex items-center gap-2 text-sm font-semibold">
+          <input type="checkbox" name="pauseWhenClosed" defaultChecked={initial.pauseWhenClosed} />
+          Pause online ordering when closed
+        </label>
       </div>
 
       {/* Delivery zones */}

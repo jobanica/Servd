@@ -29,14 +29,15 @@ export async function updateStorefront(
     .map((name, i) => ({ name, fee: pesosToCentavos(Math.max(0, fees[i] ?? 0)) }))
     .filter((z) => z.name);
 
+  const pauseWhenClosed = formData.get("pauseWhenClosed") === "on";
   const hoursJson = hours as unknown as Prisma.InputJsonValue;
   const zonesJson = zones as unknown as Prisma.InputJsonValue;
   try {
     await tenantDb(restaurantId, (tx) =>
       tx.storefrontSetting.upsert({
         where: { restaurantId },
-        create: { restaurantId, hours: hoursJson, deliveryZones: zonesJson },
-        update: { hours: hoursJson, deliveryZones: zonesJson },
+        create: { restaurantId, hours: hoursJson, deliveryZones: zonesJson, pauseWhenClosed },
+        update: { hours: hoursJson, deliveryZones: zonesJson, pauseWhenClosed },
       }),
     );
   } catch (e) {

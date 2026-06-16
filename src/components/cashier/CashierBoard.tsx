@@ -266,9 +266,15 @@ export function CashierBoard({
                 </span>
               )}
             </div>
-            {(t.customerPhone || t.customerAddress) && (
+            {(t.customerPhone || t.customerAddress || t.mapUrl) && (
               <p className="mt-0.5 text-xs text-plum-ink/50">
                 {[t.customerPhone, t.customerAddress].filter(Boolean).join(" · ")}
+                {t.mapUrl && (
+                  <>
+                    {(t.customerPhone || t.customerAddress) ? " · " : ""}
+                    <a href={t.mapUrl} target="_blank" rel="noopener" className="font-semibold text-brand-primary underline">📍 Map</a>
+                  </>
+                )}
               </p>
             )}
             <p className="mt-1 text-sm text-plum-ink/60">
@@ -412,6 +418,12 @@ export function CashierBoard({
                       {o.channel === "delivery" ? "🛵 Delivery" : "🥡 Pickup"}
                       {o.customerPhone ? ` · ${o.customerPhone}` : ""}
                       {o.customerAddress ? ` · ${o.customerAddress}` : ""}
+                      {o.mapUrl && (
+                        <>
+                          {" · "}
+                          <a href={o.mapUrl} target="_blank" rel="noopener" className="font-semibold text-brand-primary underline">📍 Map</a>
+                        </>
+                      )}
                     </p>
                   )}
                   <ul className="mt-2 space-y-1 text-sm text-plum-ink/75">

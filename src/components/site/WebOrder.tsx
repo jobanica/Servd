@@ -12,6 +12,7 @@ import {
 } from "@/lib/cart/pricing";
 import type { CartLine, DinerCategory, DinerItem, Selection } from "@/lib/cart/types";
 import { placeWebOrder } from "@/server/orders/web-order";
+import { LocationPicker } from "./LocationPicker";
 
 function lineId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -39,6 +40,7 @@ export interface WebOrderProps {
   hours?: DayHours[];
   zones?: DeliveryZone[];
   openNow?: boolean;
+  pauseWhenClosed?: boolean;
   homeHref?: string;
 }
 
@@ -152,8 +154,9 @@ function ProductCard({ item, onPick }: { item: DinerItem; onPick: (i: DinerItem)
 }
 
 export function WebOrder(props: WebOrderProps) {
-  const { slug, restaurantName, logoUrl, categories, contact, payOnline, loyalty, hours, zones = [], openNow } = props;
+  const { slug, restaurantName, logoUrl, categories, contact, payOnline, loyalty, hours, zones = [], openNow, pauseWhenClosed } = props;
   const home = props.homeHref ?? `/r/${slug}`;
+  const paused = !!pauseWhenClosed && openNow === false;
 
   const [lines, setLines] = useState<CartLine[]>([]);
   const [configItem, setConfigItem] = useState<DinerItem | null>(null);
@@ -162,6 +165,7 @@ export function WebOrder(props: WebOrderProps) {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [zone, setZone] = useState("");
+  const [geo, setGeo] = useState<{ lat: number; lng: number } | null>(null);
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -204,6 +208,8 @@ export function WebOrder(props: WebOrderProps) {
       customerPhone: phone,
       customerAddress: orderType === "delivery" ? address : undefined,
       deliveryZone: orderType === "delivery" ? zone || undefined : undefined,
+      lat: orderType === "delivery" ? geo?.lat : undefined,
+      lng: orderType === "delivery" ? geo?.lng : undefined,
       lines: lines.map((l) => ({ itemId: l.itemId, quantity: l.quantity, note: l.note, modifierIds: l.modifiers.map((m) => m.modifierId) })),
     });
     setBusy(false);
@@ -279,6 +285,10 @@ export function WebOrder(props: WebOrderProps) {
                   </select>
                 )}
                 <textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={2} placeholder="Delivery address" className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
+                <div>
+                  <p className="mb-1 text-xs font-semibold text-plum-ink/60">Pin your location (for the rider)</p>
+                  <LocationPicker onChange={(lat, lng) => setGeo({ lat, lng })} />
+                </div>
               </>
             )}
           </div>
@@ -297,7 +307,11 @@ export function WebOrder(props: WebOrderProps) {
         </div>
         <p className="text-xs text-plum-ink/45">VAT (12%) included · {formatPeso(vat)}</p>
         {error && <p className="mt-2 text-sm text-guava">{error}</p>}
-        {!checkout ? (
+        {paused ? (
+          <div className="mt-3 rounded-lg bg-plum-ink/5 px-3 py-2 text-center text-sm font-semibold text-plum-ink/60">
+            🔒 Online ordering is paused — we&apos;re closed right now.
+          </div>
+        ) : !checkout ? (
           <button
             onClick={() => setCheckout(true)}
             disabled={lines.length === 0}

@@ -8,7 +8,7 @@ import {
   OrderValidationError,
 } from "@/server/orders/build-order";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
-import { getPublicStorefront } from "@/server/storefront/storefront";
+import { getPublicStorefront, isOpenNow } from "@/server/storefront/storefront";
 import { formatPeso } from "@/lib/money";
 
 const schema = z.object({
@@ -18,6 +18,8 @@ const schema = z.object({
   customerPhone: z.string().trim().min(7, "Enter your phone number").max(30),
   customerAddress: z.string().trim().max(300).optional(),
   deliveryZone: z.string().trim().max(80).optional(),
+  lat: z.number().optional(),
+  lng: z.number().optional(),
   lines: z
     .array(
       z.object({
@@ -54,6 +56,11 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
   );
   if (!restaurant) return { ok: false, error: "This restaurant is unavailable." };
 
+  const storefront = await getPublicStorefront(restaurant.id);
+  if (storefront.pauseWhenClosed && !isOpenNow(storefront.hours)) {
+    return { ok: false, error: "We're currently closed. Please order during store hours." };
+  }
+
   let built;
   try {
     built = await buildValidatedOrder(restaurant.id, d.lines);
@@ -67,34 +74,43 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
   let deliveryFee = 0;
   let addressLine: string | null = null;
   if (d.orderType === "delivery") {
-    const sf = await getPublicStorefront(restaurant.id);
-    const zone = d.deliveryZone ? sf.zones.find((z) => z.name === d.deliveryZone) : undefined;
+    const zone = d.deliveryZone ? storefront.zones.find((z) => z.name === d.deliveryZone) : undefined;
     deliveryFee = zone?.fee ?? 0;
     const prefix = zone ? `[${zone.name}${deliveryFee > 0 ? ` · delivery ${formatPeso(deliveryFee)}` : ""}] ` : "";
     addressLine = `${prefix}${d.customerAddress?.trim() ?? ""}`.trim() || null;
   }
 
+  const base = {
+    restaurantId: restaurant.id,
+    orderType: d.orderType,
+    customerName: d.customerName.trim(),
+    customerPhone: d.customerPhone.replace(/[^\d+]/g, ""),
+    customerAddress: addressLine,
+    status: "pending" as const,
+    paymentStatus: "unpaid" as const,
+    total: built.total + deliveryFee,
+    items: { create: orderItemsCreate(built.items) },
+  };
+  const geo = d.orderType === "delivery" && d.lat != null && d.lng != null ? { customerLat: d.lat, customerLng: d.lng } : null;
+
   let order;
   try {
     order = await tenantDb(restaurant.id, (tx) =>
-      tx.order.create({
-        data: {
-          restaurantId: restaurant.id,
-          orderType: d.orderType,
-          customerName: d.customerName.trim(),
-          customerPhone: d.customerPhone.replace(/[^\d+]/g, ""),
-          customerAddress: addressLine,
-          status: "pending",
-          paymentStatus: "unpaid",
-          total: built.total + deliveryFee,
-          items: { create: orderItemsCreate(built.items) },
-        },
-        select: { id: true },
-      }),
+      tx.order.create({ data: geo ? { ...base, ...geo } : base, select: { id: true } }),
     );
   } catch (e) {
-    console.error("placeWebOrder failed", e);
-    return { ok: false, error: "We couldn't place your order. Please try again." };
+    // customerLat/Lng columns may lag — retry without them.
+    if (geo) {
+      try {
+        order = await tenantDb(restaurant.id, (tx) => tx.order.create({ data: base, select: { id: true } }));
+      } catch (e2) {
+        console.error("placeWebOrder failed", e2);
+        return { ok: false, error: "We couldn't place your order. Please try again." };
+      }
+    } else {
+      console.error("placeWebOrder failed", e);
+      return { ok: false, error: "We couldn't place your order. Please try again." };
+    }
   }
 
   await notifyOrdersChanged(restaurant.id);

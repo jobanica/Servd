@@ -1,0 +1,104 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import type * as LType from "leaflet";
+
+/**
+ * Lets a delivery customer pin their exact location. Uses Leaflet +
+ * OpenStreetMap tiles (no API key) and the browser Geolocation API. Leaflet is
+ * dynamically imported so it never runs during SSR (it touches `window`).
+ */
+export function LocationPicker({ onChange }: { onChange: (lat: number, lng: number) => void }) {
+  const mapEl = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<LType.Map | null>(null);
+  const markerRef = useRef<LType.Marker | null>(null);
+  const LRef = useRef<typeof LType | null>(null);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [locating, setLocating] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const L = (await import("leaflet")) as typeof LType;
+      LRef.current = L;
+      // Inject Leaflet CSS (CDN) once.
+      if (!document.getElementById("leaflet-css")) {
+        const link = document.createElement("link");
+        link.id = "leaflet-css";
+        link.rel = "stylesheet";
+        link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+        document.head.appendChild(link);
+      }
+      if (cancelled || !mapEl.current || mapRef.current) return;
+
+      const start = { lat: 7.0731, lng: 125.6128 }; // Davao default
+      const map = L.map(mapEl.current).setView([start.lat, start.lng], 13);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap",
+        maxZoom: 19,
+      }).addTo(map);
+
+      const icon = L.divIcon({ html: '<div style="font-size:30px;line-height:1">📍</div>', className: "", iconSize: [30, 30], iconAnchor: [15, 30] });
+      const marker = L.marker([start.lat, start.lng], { draggable: true, icon }).addTo(map);
+      function set(lat: number, lng: number) {
+        setCoords({ lat, lng });
+        onChange(lat, lng);
+      }
+      marker.on("dragend", () => {
+        const p = marker.getLatLng();
+        set(p.lat, p.lng);
+      });
+      map.on("click", (e: LType.LeafletMouseEvent) => {
+        marker.setLatLng(e.latlng);
+        set(e.latlng.lat, e.latlng.lng);
+      });
+      mapRef.current = map;
+      markerRef.current = marker;
+      // Fix sizing inside flex/sheet layouts.
+      setTimeout(() => map.invalidateSize(), 200);
+    })();
+    return () => {
+      cancelled = true;
+      mapRef.current?.remove();
+      mapRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function useMyLocation() {
+    if (!navigator.geolocation) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocating(false);
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setCoords({ lat, lng });
+        onChange(lat, lng);
+        mapRef.current?.setView([lat, lng], 16);
+        markerRef.current?.setLatLng([lat, lng]);
+      },
+      () => {
+        setLocating(false);
+        alert("Couldn't get your location. Drag the pin to your spot instead.");
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={useMyLocation}
+        className="mb-2 w-full rounded-lg border border-plum-ink/15 py-2 text-sm font-semibold"
+      >
+        {locating ? "Locating…" : "📍 Use my current location"}
+      </button>
+      <div ref={mapEl} className="h-44 w-full overflow-hidden rounded-lg border border-plum-ink/10" />
+      <p className="mt-1 text-xs text-plum-ink/50">
+        {coords ? `Pinned: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}` : "Tap the map or drag the 📍 to your exact location."}
+      </p>
+    </div>
+  );
+}

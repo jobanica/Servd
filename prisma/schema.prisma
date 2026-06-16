@@ -235,10 +235,11 @@ model Restaurant {
 
 /// Public website settings: store hours + delivery zones/fees.
 model StorefrontSetting {
-  id            String @id @default(uuid())
-  restaurantId  String @unique
-  hours         Json? // [{open,close,closed}] index 0=Sun … 6=Sat
-  deliveryZones Json? // [{name, fee}] fee in centavos
+  id             String  @id @default(uuid())
+  restaurantId   String  @unique
+  hours          Json? // [{open,close,closed}] index 0=Sun … 6=Sat
+  deliveryZones  Json? // [{name, fee}] fee in centavos
+  pauseWhenClosed Boolean @default(false) // block online orders outside hours
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
@@ -841,6 +842,8 @@ model Order {
   customerName  String? // for pickup / delivery
   customerPhone String?
   customerAddress String? // for delivery
+  customerLat   Float? // pinned delivery location
+  customerLng   Float?
   status        OrderStatus   @default(new)
   billRequested Boolean       @default(false)
   paymentStatus PaymentStatus @default(unpaid)
