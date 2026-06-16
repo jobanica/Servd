@@ -37,6 +37,11 @@ export default function SignupPage() {
       <h1 className="font-heading text-2xl font-bold">{t("signupTitle")}</h1>
       <p className="mt-1 text-sm text-plum-ink/60">{t("signupSubtitle")}</p>
 
+      <div className="mt-4 rounded-lg border border-brand-primary/20 bg-brand-primary/5 px-4 py-3 text-sm text-plum-ink/75">
+        <span className="font-semibold text-brand-primary">✨ 30 days free</span> — every feature
+        unlocked. No card required.
+      </div>
+
       <form action={action} className="mt-6 space-y-4">
         <div>
           <label className="block text-sm font-medium" htmlFor="restaurantName">

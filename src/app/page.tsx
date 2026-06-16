@@ -186,8 +186,8 @@ export default function Home() {
         <div className="pointer-events-none absolute -right-32 -top-32 h-96 w-96 rounded-full bg-brand-gradient opacity-20 blur-3xl" />
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 py-16 lg:grid-cols-2 lg:py-24">
           <div>
-            <span className="inline-flex items-center gap-2 rounded-full border border-plum-ink/10 bg-white px-3 py-1 text-xs font-semibold text-plum-ink/70">
-              🇵🇭 Built for Philippine restaurants
+            <span className="inline-flex items-center gap-2 rounded-full border border-brand-primary/20 bg-brand-primary/10 px-3 py-1 text-xs font-semibold text-brand-primary">
+              ✨ 30 days free — every feature unlocked
             </span>
             <h1 className="mt-5 font-heading text-5xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
               The QR ordering system that{" "}
@@ -205,7 +205,9 @@ export default function Home() {
                 See how it works
               </a>
             </div>
-            <p className="mt-4 text-sm text-plum-ink/50">No card required · Set up in minutes</p>
+            <p className="mt-4 text-sm text-plum-ink/50">
+              All features free for 30 days · No card required · Set up in minutes
+            </p>
           </div>
           <PhoneMockup />
         </div>
@@ -328,7 +330,10 @@ export default function Home() {
       <section id="pricing" className="mx-auto max-w-6xl px-6 py-20">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="font-heading text-4xl font-extrabold tracking-tight">Simple, honest pricing</h2>
-          <p className="mt-3 text-plum-ink/70">Every plan starts with a 30-day free trial. No card to start.</p>
+          <p className="mt-3 text-plum-ink/70">
+            Every plan starts with a 30-day free trial — <strong>all features unlocked</strong>,
+            no card to start.
+          </p>
         </div>
         <div className="mt-12 grid items-start gap-5 lg:grid-cols-3">
           {[
@@ -386,7 +391,7 @@ export default function Home() {
             ["Do diners need to download an app?", "No. They scan the QR on the table and your menu opens in their browser — order and pay right there."],
             ["Where does the money go?", "Straight to your own PayMongo account. Servd uses connected accounts, so we never hold your funds."],
             ["Can I use my own branding?", "Yes — your logo, colors, tagline, and even your own domain. Diners only ever see your brand."],
-            ["Is there a free trial?", "Every plan includes a 30-day free trial, and you don't need a card to start."],
+            ["Is there a free trial?", "Yes — 30 days free with every feature unlocked (inventory, HR, custom domain, AI insights and more), and you don't need a card to start."],
             ["Does it work on iPad for the cashier?", "Yes. Printing supports cloud/poll printers and AirPrint so it works on any device."],
           ].map(([q, a]) => (
             <details key={q} className="group rounded-tile border border-plum-ink/10 bg-white p-5">
