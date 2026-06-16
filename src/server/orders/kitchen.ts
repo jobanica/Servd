@@ -86,18 +86,25 @@ export async function advanceOrderStatus(
     return { ok: false, error: "Not allowed." };
   }
 
-  await tenantDb(staff.restaurantId, (tx) =>
-    tx.order.update({ where: { id: orderId }, data: { status: toStatus } }),
-  );
+  try {
+    // updateMany never throws on a no-match (unlike update), so a stale tap or a
+    // race with another tablet can't crash the action.
+    const res = await tenantDb(staff.restaurantId, (tx) =>
+      tx.order.updateMany({ where: { id: orderId }, data: { status: toStatus } }),
+    );
+    if (res.count === 0) return { ok: false, error: "That order is no longer active." };
 
-  // Consumption happens when the kitchen finishes the order.
-  if (toStatus === "done") {
-    await deductForOrder(staff.restaurantId, orderId);
+    // Consumption happens when the kitchen finishes the order (best-effort).
+    if (toStatus === "done") {
+      await deductForOrder(staff.restaurantId, orderId);
+    }
+
+    // Signal other screens (cashier, diner phones, other kitchen tablets).
+    await notifyOrdersChanged(staff.restaurantId);
+
+    return { ok: true, orders: await getKitchenOrders() };
+  } catch (e) {
+    console.error("advanceOrderStatus failed", e);
+    return { ok: false, error: e instanceof Error ? e.message : "Could not update the order." };
   }
-
-  // Signal other screens (cashier, other kitchen tablets) to refresh.
-  await notifyOrdersChanged(staff.restaurantId);
-
-  const orders = await getKitchenOrders();
-  return { ok: true, orders };
 }

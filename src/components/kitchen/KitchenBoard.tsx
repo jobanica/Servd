@@ -21,7 +21,7 @@ function OrderCard({
   busy: boolean;
 }) {
   const next = order.status === "new" ? "preparing" : "done";
-  const label = order.status === "new" ? "Start preparing" : "Mark done";
+  const label = order.status === "new" ? "Start preparing" : "Mark ready 🔔";
   return (
     <div className="rounded-tile border border-plum-ink/10 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between">
@@ -66,6 +66,7 @@ export function KitchenBoard({
   const [orders, setOrders] = useState<KitchenOrder[]>(initialOrders);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [live, setLive] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -94,9 +95,20 @@ export function KitchenBoard({
 
   async function handleAdvance(id: string, to: "preparing" | "done") {
     setBusyId(id);
-    const res = await advanceOrderStatus(id, to);
-    setBusyId(null);
-    if (res.ok && res.orders) setOrders(res.orders);
+    setError(null);
+    try {
+      const res = await advanceOrderStatus(id, to);
+      if (res.ok && res.orders) {
+        setOrders(res.orders);
+      } else if (!res.ok) {
+        setError(res.error ?? "Couldn't update the order.");
+        refresh(); // resync in case another tablet already moved it
+      }
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setBusyId(null); // never leave the button stuck
+    }
   }
 
   const incoming = orders.filter((o) => o.status === "new");
@@ -112,6 +124,12 @@ export function KitchenBoard({
         />
         {live ? "Live" : "Polling (realtime offline)"}
       </div>
+
+      {error && (
+        <div className="mb-4 rounded-lg border border-guava/40 bg-guava/10 px-4 py-2 text-sm text-guava">
+          {error}
+        </div>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2">
         <section>
