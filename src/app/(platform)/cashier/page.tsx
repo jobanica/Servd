@@ -42,6 +42,12 @@ export default async function CashierHome() {
         <h1 className="font-heading text-2xl font-bold">Cashier</h1>
         <div className="flex items-center gap-3">
           <Link
+            href="/cashier/delivery"
+            className="rounded-full border border-plum-ink/15 px-4 py-2 text-sm font-semibold"
+          >
+            🛵 Delivery orders
+          </Link>
+          <Link
             href="/clock/me"
             className="rounded-full px-4 py-2 text-sm font-semibold btn-brand"
           >
