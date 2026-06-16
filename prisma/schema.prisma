@@ -209,6 +209,7 @@ model Restaurant {
   orders          Order[]
   printJobs       PrintJob[]
   feedback        Feedback[]
+  promotions      Promotion[]
   customers       CustomerContact[]
   smsCampaigns    SmsCampaign[]
   smsCreditLedger SmsCreditLedger[]
@@ -730,7 +731,9 @@ model Order {
   status        OrderStatus   @default(new)
   billRequested Boolean       @default(false)
   paymentStatus PaymentStatus @default(unpaid)
-  total         Int           @default(0) // centavos
+  total         Int           @default(0) // centavos (gross subtotal)
+  discountAmount Int          @default(0) // centavos taken off (senior/PWD/custom)
+  discountLabel String? // e.g. "Senior Citizen (20%)"
   inventoryDeductedAt DateTime? // set once stock is deducted (idempotency)
   servedAt      DateTime? // set when the cashier confirms the food was served
   createdAt     DateTime      @default(now())
@@ -746,6 +749,24 @@ model Order {
   @@index([restaurantId, createdAt]) // date-range analytics
   @@index([tableId])
   @@map("orders")
+}
+
+/// Marketing promotions shown to diners in the app's "Promos" section. Managed
+/// by the restaurant from the admin dashboard.
+model Promotion {
+  id           String   @id @default(uuid())
+  restaurantId String
+  title        String
+  description  String?
+  active       Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, active])
+  @@map("promotions")
 }
 
 model OrderItem {

@@ -12,18 +12,46 @@ export async function getOrderTicket(
     });
     const order = await tx.order.findFirst({
       where: { id: orderId },
-      include: {
+      // Explicit select (no SELECT *) so a lagging schema can't break printing.
+      select: {
+        id: true,
+        total: true,
+        createdAt: true,
         table: { select: { tableNumber: true } },
-        items: { include: { modifiers: { select: { nameAtTime: true } } } },
+        items: {
+          select: {
+            quantity: true,
+            nameAtTime: true,
+            note: true,
+            modifiers: { select: { nameAtTime: true } },
+          },
+        },
       },
     });
     if (!order) return null;
+
+    // Discount columns may not exist on a lagging DB — read best-effort.
+    let discountAmount = 0;
+    let discountLabel: string | null = null;
+    try {
+      const disc = await tx.order.findFirst({
+        where: { id: orderId },
+        select: { discountAmount: true, discountLabel: true },
+      });
+      discountAmount = disc?.discountAmount ?? 0;
+      discountLabel = disc?.discountLabel ?? null;
+    } catch {
+      /* not migrated yet */
+    }
+
     return buildTicket({
       restaurantName: restaurant.displayName || restaurant.name,
       tableNumber: order.table?.tableNumber ?? "—",
       orderId: order.id,
       createdAt: order.createdAt.toISOString(),
       total: order.total,
+      discountAmount,
+      discountLabel,
       items: order.items.map((i) => ({
         quantity: i.quantity,
         name: i.nameAtTime,

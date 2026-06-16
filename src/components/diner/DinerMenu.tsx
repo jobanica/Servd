@@ -21,6 +21,12 @@ interface RestaurantBrand {
   tagline: string | null;
 }
 
+interface PromoItem {
+  id: string;
+  title: string;
+  description: string | null;
+}
+
 /** Product card — image, "+" affordance, price pill, name. */
 function ProductCard({
   item,
@@ -111,6 +117,7 @@ export function DinerMenu({
   payOnline,
   justPaid,
   googleReviewUrl = null,
+  promotions = [],
 }: {
   restaurantId: string;
   slug: string;
@@ -121,6 +128,7 @@ export function DinerMenu({
   payOnline: boolean;
   justPaid?: boolean;
   googleReviewUrl?: string | null;
+  promotions?: PromoItem[];
 }) {
   const cart = useCart(restaurantId, tableToken);
   const t = useTranslations("diner");
@@ -171,6 +179,7 @@ export function DinerMenu({
   const [activeItem, setActiveItem] = useState<DinerItem | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [promosOpen, setPromosOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [activeCat, setActiveCat] = useState("all");
 
@@ -336,7 +345,7 @@ export function DinerMenu({
           </span>
         </button>
 
-        <NavButton label={t("navPromos")} onClick={() => setSheetOpen(true)}>
+        <NavButton label={t("navPromos")} onClick={() => setPromosOpen(true)}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0l-7-7V4h9.6l7.4 7.4a2 2 0 0 1 0 2.8Z" />
             <circle cx="7.5" cy="7.5" r="1.3" />
@@ -375,6 +384,33 @@ export function DinerMenu({
             startTracking(orderId);
           }}
         />
+      )}
+
+      {/* Promotions sheet */}
+      {promosOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setPromosOpen(false)}>
+          <div
+            className="max-h-[80vh] w-full max-w-md overflow-y-auto rounded-t-tile bg-white p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-brand-ink/15" />
+            <h2 className="font-heading text-lg font-bold text-brand-ink">🎁 {t("navPromos")}</h2>
+            {promotions.length === 0 ? (
+              <p className="mt-3 text-sm text-brand-ink/55">{t("noPromos")}</p>
+            ) : (
+              <ul className="mt-4 space-y-3">
+                {promotions.map((p) => (
+                  <li key={p.id} className="rounded-tile border border-brand-primary/20 bg-brand-primary/5 p-4">
+                    <p className="font-heading font-bold text-brand-ink">{p.title}</p>
+                    {p.description && (
+                      <p className="mt-1 text-sm text-brand-ink/65">{p.description}</p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
       )}
 
       {/* More sheet — pay online, request bill, feedback */}

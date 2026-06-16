@@ -17,6 +17,7 @@ import { formatPeso } from "@/lib/money";
 import { chime } from "@/lib/sound";
 import { PrintTicketButton } from "./PrintTicketButton";
 import { NewOrderModal } from "./NewOrderModal";
+import { DiscountModal } from "./DiscountModal";
 
 export function CashierBoard({
   restaurantId,
@@ -32,6 +33,7 @@ export function CashierBoard({
   const [live, setLive] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [newOrderOpen, setNewOrderOpen] = useState(false);
+  const [discountOrder, setDiscountOrder] = useState<CashierTable["orders"][number] | null>(null);
   const [popupDismissed, setPopupDismissed] = useState(false);
   const [readyDismissed, setReadyDismissed] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -262,8 +264,20 @@ export function CashierBoard({
                       {o.itemCount} item{o.itemCount > 1 ? "s" : ""} ·{" "}
                       <span className="text-plum-ink/50">{o.status}</span>
                     </span>
-                    <span className="font-semibold">{formatPeso(o.total)}</span>
+                    {o.discountAmount > 0 ? (
+                      <span className="text-right">
+                        <span className="block text-xs text-plum-ink/40 line-through">{formatPeso(o.total)}</span>
+                        <span className="font-semibold">{formatPeso(o.net)}</span>
+                      </span>
+                    ) : (
+                      <span className="font-semibold">{formatPeso(o.total)}</span>
+                    )}
                   </div>
+                  {o.discountAmount > 0 && (
+                    <p className="mt-0.5 text-xs font-semibold text-guava">
+                      {o.discountLabel ?? "Discount"} · −{formatPeso(o.discountAmount)}
+                    </p>
+                  )}
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
                     <span>
                       Payment:{" "}
@@ -301,6 +315,13 @@ export function CashierBoard({
                     )}
                     {o.paymentStatus !== "paid" && (
                       <>
+                        <button
+                          onClick={() => setDiscountOrder(o)}
+                          disabled={busy === o.id}
+                          className="rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
+                        >
+                          {o.discountAmount > 0 ? "Edit discount" : "Discount"}
+                        </button>
                         <button
                           onClick={() => pay(o.id, "cash")}
                           disabled={busy === o.id}
@@ -450,6 +471,14 @@ export function CashierBoard({
         <NewOrderModal
           onClose={() => setNewOrderOpen(false)}
           onCreated={(t) => setTables(t)}
+        />
+      )}
+
+      {discountOrder && (
+        <DiscountModal
+          order={discountOrder}
+          onClose={() => setDiscountOrder(null)}
+          onApplied={(t) => setTables(t)}
         />
       )}
     </div>

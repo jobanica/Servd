@@ -5,6 +5,7 @@ import {
   getTableByToken,
 } from "@/server/restaurants/get-public";
 import { getPublicMenu } from "@/server/menu/public-menu";
+import { getActivePromotions } from "@/server/promotions/queries";
 import { DinerMenu } from "@/components/diner/DinerMenu";
 
 /**
@@ -30,7 +31,10 @@ export default async function DinerOrderPage({
   if (!table) notFound();
 
   const locale = await getLocale();
-  const categories = await getPublicMenu(restaurant.id, locale);
+  const [categories, promotions] = await Promise.all([
+    getPublicMenu(restaurant.id, locale),
+    getActivePromotions(restaurant.id),
+  ]);
 
   return (
     <DinerMenu
@@ -47,6 +51,7 @@ export default async function DinerOrderPage({
       payOnline={restaurant.paymentOnlineEnabled}
       justPaid={paid === "1"}
       googleReviewUrl={restaurant.googleReviewUrl}
+      promotions={promotions}
     />
   );
 }

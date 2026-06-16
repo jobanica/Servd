@@ -58,6 +58,7 @@ const NAV: { group: string; items: Item[] }[] = [
     items: [
       { label: "Analytics", href: "/admin/analytics", d: I.chart },
       { label: "Feedback", href: "/admin/feedback", d: I.star },
+      { label: "Promotions", href: "/admin/promotions", d: I.star },
       { label: "SMS marketing", href: "/admin/sms", d: I.chat },
     ],
   },

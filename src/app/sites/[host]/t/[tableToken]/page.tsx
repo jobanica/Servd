@@ -3,6 +3,7 @@ import { getLocale } from "next-intl/server";
 import { getRestaurantByHost } from "@/server/restaurants/get-by-host";
 import { getTableByToken } from "@/server/restaurants/get-public";
 import { getPublicMenu } from "@/server/menu/public-menu";
+import { getActivePromotions } from "@/server/promotions/queries";
 import { DinerMenu } from "@/components/diner/DinerMenu";
 
 /**
@@ -23,7 +24,10 @@ export default async function SiteTablePage({
   if (!table) notFound();
 
   const locale = await getLocale();
-  const categories = await getPublicMenu(restaurant.id, locale);
+  const [categories, promotions] = await Promise.all([
+    getPublicMenu(restaurant.id, locale),
+    getActivePromotions(restaurant.id),
+  ]);
 
   return (
     <DinerMenu
@@ -39,6 +43,7 @@ export default async function SiteTablePage({
       categories={categories}
       payOnline={restaurant.paymentOnlineEnabled}
       googleReviewUrl={restaurant.googleReviewUrl}
+      promotions={promotions}
     />
   );
 }

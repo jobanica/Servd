@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getOrderStatus } from "@/server/orders/order-status";
 import { chime } from "@/lib/sound";
+import { formatPeso } from "@/lib/money";
 import { FeedbackForm } from "./FeedbackForm";
 
 type Stage = {
@@ -87,6 +88,12 @@ export function OrderStatusTracker({
   const t = useTranslations("feedback");
   const [status, setStatus] = useState<string>("pending");
   const [paymentStatus, setPaymentStatus] = useState<string>("unpaid");
+  const [bill, setBill] = useState<{ total: number; discountAmount: number; discountLabel: string | null; net: number }>({
+    total: 0,
+    discountAmount: 0,
+    discountLabel: null,
+    net: 0,
+  });
   const [showFeedback, setShowFeedback] = useState(false);
   const prevStatus = useRef<string>("pending");
   const promptedRef = useRef(false);
@@ -99,6 +106,12 @@ export function OrderStatusTracker({
     if (!res) return;
     setStatus(res.status);
     setPaymentStatus(res.paymentStatus);
+    setBill({
+      total: res.total,
+      discountAmount: res.discountAmount,
+      discountLabel: res.discountLabel,
+      net: res.net,
+    });
     onStatus?.(res.status);
 
     // Fire a phone notification + chime on the important transitions.
@@ -193,6 +206,33 @@ export function OrderStatusTracker({
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Bill summary — reflects any discount the cashier applied. */}
+        {bill.total > 0 && status !== "cancelled" && (
+          <div className="mt-3 border-t border-brand-ink/10 pt-2 text-sm">
+            {bill.discountAmount > 0 ? (
+              <>
+                <div className="flex justify-between text-brand-ink/60">
+                  <span>Subtotal</span>
+                  <span>{formatPeso(bill.total)}</span>
+                </div>
+                <div className="flex justify-between text-brand-primary">
+                  <span>{bill.discountLabel ?? "Discount"}</span>
+                  <span>−{formatPeso(bill.discountAmount)}</span>
+                </div>
+                <div className="mt-1 flex justify-between font-heading font-bold text-brand-ink">
+                  <span>Total due</span>
+                  <span>{formatPeso(bill.net)}</span>
+                </div>
+              </>
+            ) : (
+              <div className="flex justify-between font-heading font-bold text-brand-ink">
+                <span>Total</span>
+                <span>{formatPeso(bill.total)}</span>
+              </div>
+            )}
           </div>
         )}
 

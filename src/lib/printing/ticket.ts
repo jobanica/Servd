@@ -19,7 +19,9 @@ export interface Ticket {
   orderRef: string; // short, human-readable
   placedAt: string; // ISO
   items: TicketLine[];
-  total: number; // centavos
+  total: number; // centavos (gross subtotal)
+  discountAmount: number; // centavos off
+  discountLabel: string | null;
 }
 
 export interface TicketSource {
@@ -28,6 +30,8 @@ export interface TicketSource {
   orderId: string;
   createdAt: string;
   total: number;
+  discountAmount?: number;
+  discountLabel?: string | null;
   items: { quantity: number; name: string; modifiers: string[]; note?: string | null }[];
 }
 
@@ -44,6 +48,8 @@ export function buildTicket(src: TicketSource): Ticket {
       note: i.note ?? null,
     })),
     total: src.total,
+    discountAmount: src.discountAmount ?? 0,
+    discountLabel: src.discountLabel ?? null,
   };
 }
 
@@ -61,6 +67,13 @@ export function ticketLines(ticket: Ticket): string[] {
     if (item.note) lines.push(`   ! ${item.note}`);
   }
   lines.push("--------------------------------");
-  lines.push(`TOTAL  ${formatPeso(ticket.total)}`);
+  if (ticket.discountAmount > 0) {
+    lines.push(`SUBTOTAL  ${formatPeso(ticket.total)}`);
+    lines.push(`DISCOUNT  -${formatPeso(ticket.discountAmount)}`);
+    if (ticket.discountLabel) lines.push(`  (${ticket.discountLabel})`);
+    lines.push(`TOTAL DUE  ${formatPeso(Math.max(0, ticket.total - ticket.discountAmount))}`);
+  } else {
+    lines.push(`TOTAL  ${formatPeso(ticket.total)}`);
+  }
   return lines;
 }

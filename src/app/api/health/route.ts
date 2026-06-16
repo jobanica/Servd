@@ -34,12 +34,13 @@ export async function GET() {
           (table_name = 'menu_items' and column_name = 'videoUrl') or
           (table_name = 'orders' and column_name = 'inventoryDeductedAt') or
           (table_name = 'orders' and column_name = 'servedAt') or
+          (table_name = 'orders' and column_name = 'discountAmount') or
           (table_name = 'restaurants' and column_name = 'customDomain')
         )`;
       const tables = await tx.$queryRaw<{ table_name: string }[]>`
         select table_name from information_schema.tables
         where table_schema = 'public' and table_name in
-          ('plan_modules','restaurant_invoices','menu_item_translations','inventory_items','employees')`;
+          ('plan_modules','restaurant_invoices','menu_item_translations','inventory_items','employees','promotions')`;
 
       const have = new Set([
         ...cols.map((c) => `${c.table_name}.${c.column_name}`),
@@ -51,12 +52,14 @@ export async function GET() {
         "menu_items.videoUrl",
         "orders.inventoryDeductedAt",
         "orders.servedAt",
+        "orders.discountAmount",
         "restaurants.customDomain",
         "plan_modules",
         "restaurant_invoices",
         "menu_item_translations",
         "inventory_items",
         "employees",
+        "promotions",
       ];
       const missing = expected.filter((e) => !have.has(e));
 

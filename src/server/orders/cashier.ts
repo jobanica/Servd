@@ -12,17 +12,43 @@ import {
   type OrderLineInput,
 } from "@/server/orders/build-order";
 import type { DinerCategory } from "@/lib/cart/types";
+import { computeDiscount, netTotal, type DiscountKind } from "@/lib/discount";
 
 export interface CashierOrder {
   id: string;
   status: string;
   paymentStatus: string;
   total: number;
+  discountAmount: number;
+  discountLabel: string | null;
+  net: number; // total - discount
   billRequested: boolean;
   paidOnline: boolean; // a confirmed gateway (PayMongo) payment exists
   served: boolean; // cashier confirmed the food was served
   createdAt: string;
   itemCount: number;
+}
+
+/**
+ * Best-effort per-order discount lookup. The discount columns may not exist yet
+ * on a lagging prod DB — return an empty map then (treated as no discount).
+ */
+async function discountMap(
+  restaurantId: string,
+  ids: string[],
+): Promise<Map<string, { amount: number; label: string | null }>> {
+  if (ids.length === 0) return new Map();
+  try {
+    const rows = await tenantDb(restaurantId, (tx) =>
+      tx.order.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, discountAmount: true, discountLabel: true },
+      }),
+    );
+    return new Map(rows.map((o) => [o.id, { amount: o.discountAmount, label: o.discountLabel }]));
+  } catch {
+    return new Map();
+  }
 }
 
 export interface CashierTable {
@@ -82,6 +108,8 @@ export async function getCashierTables(): Promise<CashierTable[]> {
     /* column not migrated yet — leave servedIds empty */
   }
 
+  const discounts = await discountMap(staff.restaurantId, orders.map((o) => o.id));
+
   const byTable = new Map<string, CashierTable>();
   for (const o of orders) {
     const key = o.table.id;
@@ -95,18 +123,24 @@ export async function getCashierTables(): Promise<CashierTable[]> {
       });
     }
     const t = byTable.get(key)!;
+    const disc = discounts.get(o.id);
+    const discountAmount = disc?.amount ?? 0;
+    const net = netTotal(o.total, discountAmount);
     t.orders.push({
       id: o.id,
       status: o.status,
       paymentStatus: o.paymentStatus,
       total: o.total,
+      discountAmount,
+      discountLabel: disc?.label ?? null,
+      net,
       billRequested: o.billRequested,
       paidOnline: o.payments.some((p) => p.gateway === "paymongo"),
       served: servedIds.has(o.id),
       createdAt: o.createdAt.toISOString(),
       itemCount: o._count.items,
     });
-    if (o.paymentStatus !== "paid") t.outstanding += o.total;
+    if (o.paymentStatus !== "paid") t.outstanding += net;
     if (o.billRequested) t.billRequested = true;
   }
 
@@ -207,10 +241,14 @@ export async function markOrderPaid(
     return { ok: false, error: "Not allowed." };
   }
 
+  // Charge the discounted (net) amount if a discount was applied.
+  const disc = (await discountMap(staff.restaurantId, [orderId])).get(orderId);
+
   try {
     await tenantDb(staff.restaurantId, async (tx) => {
       const order = await tx.order.findFirst({ where: { id: orderId }, select: { total: true } });
       if (!order) throw new Error("Order not found");
+      const amount = netTotal(order.total, disc?.amount ?? 0);
       // updateMany (not update) so it doesn't read the whole row back — keeps
       // working even if the prod schema lags (e.g. missing newer columns).
       await tx.order.updateMany({
@@ -219,7 +257,7 @@ export async function markOrderPaid(
         data: { paymentStatus: "paid", billRequested: false, status: "closed" },
       });
       await tx.payment.create({
-        data: { orderId, amount: order.total, method, gateway: "manual", status: "paid" },
+        data: { orderId, amount, method, gateway: "manual", status: "paid" },
       });
     });
   } catch (e) {
@@ -273,6 +311,47 @@ export async function markServed(
   } catch (e) {
     console.error("markServed failed", e);
     return { ok: false, error: e instanceof Error ? e.message : "Could not mark as served." };
+  }
+  await notifyOrdersChanged(staff.restaurantId);
+  return { ok: true, tables: await getCashierTables() };
+}
+
+/**
+ * Apply (or clear) a discount on an order — Senior Citizen / PWD / custom.
+ * Recomputed server-side from the order's gross total.
+ */
+export async function applyDiscount(
+  orderId: string,
+  kind: DiscountKind,
+  value?: number,
+): Promise<{ ok: boolean; tables?: CashierTable[]; error?: string }> {
+  let staff;
+  try {
+    staff = await requireStaff(["cashier", "admin"]);
+  } catch {
+    return { ok: false, error: "Not allowed." };
+  }
+  try {
+    await tenantDb(staff.restaurantId, async (tx) => {
+      const order = await tx.order.findFirst({ where: { id: orderId }, select: { total: true } });
+      if (!order) throw new Error("Order not found");
+      const { amount, label } = computeDiscount(order.total, kind, value);
+      await tx.order.updateMany({
+        where: { id: orderId },
+        data: { discountAmount: amount, discountLabel: label },
+      });
+    });
+  } catch (e) {
+    console.error("applyDiscount failed", e);
+    return {
+      ok: false,
+      error:
+        e instanceof Error && /discountAmount|discountLabel|column/i.test(e.message)
+          ? "Discounts need a quick database update. Run the discount migration, then try again."
+          : e instanceof Error
+            ? e.message
+            : "Could not apply the discount.",
+    };
   }
   await notifyOrdersChanged(staff.restaurantId);
   return { ok: true, tables: await getCashierTables() };

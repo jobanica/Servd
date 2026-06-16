@@ -10,6 +10,10 @@ import { systemDb } from "@/server/tenancy/scoped-db";
 export interface OrderStatusResult {
   status: string; // pending | new | preparing | done | closed | cancelled
   paymentStatus: string;
+  total: number; // gross subtotal (centavos)
+  discountAmount: number; // centavos off
+  discountLabel: string | null;
+  net: number; // total - discount
 }
 
 export async function getOrderStatus(
@@ -29,10 +33,35 @@ export async function getOrderStatus(
       select: { id: true },
     });
     if (!table) return null;
+
+    // Base fields always exist; discount columns may lag on prod — read them
+    // best-effort so the tracker never breaks before the migration.
     const order = await tx.order.findFirst({
       where: { id: orderId, restaurantId: restaurant.id, tableId: table.id },
-      select: { status: true, paymentStatus: true },
+      select: { status: true, paymentStatus: true, total: true },
     });
-    return order ? { status: order.status, paymentStatus: order.paymentStatus } : null;
+    if (!order) return null;
+
+    let discountAmount = 0;
+    let discountLabel: string | null = null;
+    try {
+      const disc = await tx.order.findFirst({
+        where: { id: orderId },
+        select: { discountAmount: true, discountLabel: true },
+      });
+      discountAmount = disc?.discountAmount ?? 0;
+      discountLabel = disc?.discountLabel ?? null;
+    } catch {
+      /* columns not migrated yet */
+    }
+
+    return {
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      total: order.total,
+      discountAmount,
+      discountLabel,
+      net: Math.max(0, order.total - discountAmount),
+    };
   });
 }
