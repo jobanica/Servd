@@ -61,13 +61,28 @@ export async function enrollAccount(
   if (!p || p.replace(/\D/g, "").length < 7) return { ok: false, error: "Enter a valid phone number." };
   const cleanName = name?.trim() || null;
   try {
+    // Create/find WITHOUT name first, so it works even if the name column lags.
     const acct = await systemDb((tx) =>
       tx.loyaltyAccount.upsert({
         where: { restaurantId_phone: { restaurantId, phone: p } },
-        create: { restaurantId, phone: p, name: cleanName },
-        update: cleanName ? { name: cleanName } : {},
+        create: { restaurantId, phone: p },
+        update: {},
+        select: { points: true },
       }),
     );
+    // Best-effort: set the name if the column exists.
+    if (cleanName) {
+      try {
+        await systemDb((tx) =>
+          tx.loyaltyAccount.update({
+            where: { restaurantId_phone: { restaurantId, phone: p } },
+            data: { name: cleanName },
+          }),
+        );
+      } catch {
+        /* name column not migrated yet */
+      }
+    }
     return { ok: true, points: acct.points };
   } catch {
     return { ok: false, error: "Couldn't join rewards. Please try again." };
@@ -82,20 +97,33 @@ export interface LoyaltyMember {
   joinedAt: string;
 }
 
-/** All loyalty members for the admin dashboard (resilient to a missing table). */
+/** All loyalty members for the admin dashboard (resilient to a missing table/column). */
 export async function getLoyaltyMembers(restaurantId: string): Promise<LoyaltyMember[]> {
   try {
+    // Base fields only (no name) so a lagging schema can't blank the list.
     const rows = await tenantDb(restaurantId, (tx) =>
       tx.loyaltyAccount.findMany({
         where: { restaurantId },
         orderBy: [{ points: "desc" }, { createdAt: "desc" }],
         take: 500,
-        select: { phone: true, name: true, points: true, totalEarned: true, createdAt: true },
+        select: { phone: true, points: true, totalEarned: true, createdAt: true },
       }),
     );
+
+    // Names are best-effort (column may not be migrated yet).
+    const names = new Map<string, string | null>();
+    try {
+      const withNames = await tenantDb(restaurantId, (tx) =>
+        tx.loyaltyAccount.findMany({ where: { restaurantId }, select: { phone: true, name: true } }),
+      );
+      for (const r of withNames) names.set(r.phone, r.name);
+    } catch {
+      /* name column not migrated yet */
+    }
+
     return rows.map((r) => ({
       phone: r.phone,
-      name: r.name,
+      name: names.get(r.phone) ?? null,
       points: r.points,
       totalEarned: r.totalEarned,
       joinedAt: r.createdAt.toISOString(),
