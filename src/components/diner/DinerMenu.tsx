@@ -439,6 +439,11 @@ export function DinerMenu({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-brand-ink/15" />
+            {loyaltyEnabled && (
+              <div className="mb-4">
+                <RewardsPanel slug={slug} phone={loyaltyPhone} name={loyaltyName} onPhone={saveLoyaltyPhone} />
+              </div>
+            )}
             <h2 className="font-heading text-lg font-bold text-brand-ink">🎁 {t("navPromos")}</h2>
             {promotions.length === 0 ? (
               <p className="mt-3 text-sm text-brand-ink/55">{t("noPromos")}</p>
