@@ -1,8 +1,7 @@
 import { NextRequest } from "next/server";
 import { getCurrentUser } from "@/server/tenancy/current-user";
 import { hasModule } from "@/server/billing/entitlements";
-import { listEmployees, payrollEntries } from "@/server/hr/queries";
-import { computeHours, grossPay } from "@/lib/hr/hours";
+import { getPayroll } from "@/server/hr/payroll";
 
 function cell(v: string | number) {
   const s = String(v);
@@ -24,26 +23,23 @@ export async function GET(req: NextRequest) {
   const from = new Date(now.getFullYear(), m, 1);
   const to = period === "last" ? new Date(now.getFullYear(), m + 1, 0, 23, 59, 59) : now;
 
-  const [employees, entries] = await Promise.all([
-    listEmployees(user.restaurantId),
-    payrollEntries(user.restaurantId, from, to),
+  const payroll = await getPayroll(user.restaurantId, from, to);
+
+  const header = [
+    "employee", "pay_type", "hours", "overtime_hours", "base_php",
+    "absent_days", "late_minutes", "deductions_php", "net_php",
+  ];
+  const rows = payroll.map((r) => [
+    r.name,
+    r.payType,
+    r.hours.toFixed(2),
+    r.ot.toFixed(2),
+    (r.base / 100).toFixed(2),
+    r.absentDays,
+    r.lateMinutes,
+    ((r.absenceDeduction + r.lateDeduction) / 100).toFixed(2),
+    (r.net / 100).toFixed(2),
   ]);
-
-  const byEmp = new Map<string, { hours: number; ot: number }>();
-  for (const e of entries) {
-    const h = computeHours(e.clockIn, e.clockOut, e.breakMinutes);
-    const cur = byEmp.get(e.employeeId) ?? { hours: 0, ot: 0 };
-    byEmp.set(e.employeeId, { hours: cur.hours + h.hours, ot: cur.ot + h.overtime });
-  }
-
-  const header = ["employee", "pay_type", "hours", "overtime_hours", "gross_php"];
-  const rows = employees
-    .filter((e) => e.status === "active")
-    .map((e) => {
-      const agg = byEmp.get(e.id) ?? { hours: 0, ot: 0 };
-      const gross = grossPay(e.payType, e.payRate, agg.hours);
-      return [e.fullName, e.payType, agg.hours.toFixed(2), agg.ot.toFixed(2), (gross / 100).toFixed(2)];
-    });
 
   const csv = [header, ...rows].map((r) => r.map(cell).join(",")).join("\n");
   return new Response(csv, {

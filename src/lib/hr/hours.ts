@@ -44,3 +44,25 @@ export function grossPay(
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
+
+// --- Fixed-salary deduction math (centavos) ------------------------------
+// Standard PH-ish assumptions; deductions only apply when shifts are scheduled.
+export const PAYROLL_WORKDAYS_PER_MONTH = 26;
+export const PAYROLL_HOURS_PER_DAY = 8;
+
+/** A monthly salary's equivalent daily rate (centavos). */
+export function dailyRate(monthlyRate: number): number {
+  return Math.round(monthlyRate / PAYROLL_WORKDAYS_PER_MONTH);
+}
+
+/** Deduction for an absent scheduled day (centavos). */
+export function absenceDeduction(monthlyRate: number, absentDays: number): number {
+  return dailyRate(monthlyRate) * Math.max(0, absentDays);
+}
+
+/** Deduction for accumulated late minutes (centavos), pro-rated from daily rate. */
+export function lateDeduction(monthlyRate: number, lateMinutes: number): number {
+  if (lateMinutes <= 0) return 0;
+  const perMinute = dailyRate(monthlyRate) / (PAYROLL_HOURS_PER_DAY * 60);
+  return Math.round(perMinute * lateMinutes);
+}
