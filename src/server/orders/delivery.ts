@@ -2,11 +2,15 @@
 
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireStaff } from "@/server/tenancy/current-user";
+import { notifyOrdersChanged } from "@/server/realtime/notify";
+import { awardPointsForOrder } from "@/server/loyalty/loyalty";
+import { getSmsProvider } from "@/server/sms";
 
 export interface DeliveryOrder {
   id: string;
   status: string;
   paymentStatus: string;
+  deliveryStatus: string | null;
   customerName: string | null;
   customerPhone: string | null;
   customerAddress: string | null;
@@ -46,6 +50,7 @@ export async function getDeliveryOrders(): Promise<DeliveryOrder[]> {
     customerAddress: string | null;
     customerLat?: number | null;
     customerLng?: number | null;
+    deliveryStatus?: string | null;
     items: { nameAtTime: string; quantity: number }[];
   };
 
@@ -55,7 +60,7 @@ export async function getDeliveryOrders(): Promise<DeliveryOrder[]> {
       tx.order.findMany({
         where: { orderType: "delivery", status: { in: [...ACTIVE] } },
         orderBy: { createdAt: "desc" },
-        select: { ...baseSelect, customerLat: true, customerLng: true },
+        select: { ...baseSelect, customerLat: true, customerLng: true, deliveryStatus: true },
       }),
     );
   } catch {
@@ -76,6 +81,7 @@ export async function getDeliveryOrders(): Promise<DeliveryOrder[]> {
     id: o.id,
     status: o.status,
     paymentStatus: o.paymentStatus,
+    deliveryStatus: o.deliveryStatus ?? null,
     customerName: o.customerName,
     customerPhone: o.customerPhone,
     customerAddress: o.customerAddress,
@@ -86,4 +92,82 @@ export async function getDeliveryOrders(): Promise<DeliveryOrder[]> {
     items: o.items.map((i) => ({ name: i.nameAtTime, quantity: i.quantity })),
     createdAt: o.createdAt.toISOString(),
   }));
+}
+
+type Result = { ok: boolean; orders?: DeliveryOrder[]; error?: string };
+
+/** Mark a delivery order out for delivery — and text the customer (best-effort). */
+export async function markOutForDelivery(orderId: string): Promise<Result> {
+  let staff;
+  try {
+    staff = await requireStaff(["cashier", "admin"]);
+  } catch {
+    return { ok: false, error: "Not allowed." };
+  }
+  let order: { customerName: string | null; customerPhone: string | null } | null = null;
+  try {
+    order = await tenantDb(staff.restaurantId, async (tx) => {
+      const o = await tx.order.findFirst({ where: { id: orderId }, select: { customerName: true, customerPhone: true } });
+      await tx.order.updateMany({ where: { id: orderId }, data: { deliveryStatus: "out_for_delivery" } });
+      return o;
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Could not update.";
+    return { ok: false, error: /deliveryStatus|column/i.test(msg) ? "Needs a quick database update. Run the migration, then try again." : msg };
+  }
+
+  // Best-effort SMS to the customer.
+  try {
+    const provider = getSmsProvider();
+    const phone = order?.customerPhone;
+    if (provider && phone) {
+      const restaurant = await tenantDb(staff.restaurantId, (tx) =>
+        tx.restaurant.findFirstOrThrow({ select: { name: true, displayName: true, smsSenderName: true } }),
+      );
+      const sender = restaurant.smsSenderName || "Servd";
+      const who = restaurant.displayName || restaurant.name;
+      const name = order?.customerName ? `Hi ${order.customerName}, ` : "";
+      await provider.send(sender, phone, `${name}your order from ${who} is on the way! 🛵`);
+    }
+  } catch {
+    /* SMS is best-effort */
+  }
+
+  await notifyOrdersChanged(staff.restaurantId);
+  return { ok: true, orders: await getDeliveryOrders() };
+}
+
+/** Mark a delivery order delivered — settles it (paid, closed) + awards points. */
+export async function markDelivered(orderId: string): Promise<Result> {
+  let staff;
+  try {
+    staff = await requireStaff(["cashier", "admin"]);
+  } catch {
+    return { ok: false, error: "Not allowed." };
+  }
+  let amount = 0;
+  let phone: string | null = null;
+  try {
+    await tenantDb(staff.restaurantId, async (tx) => {
+      const o = await tx.order.findFirst({ where: { id: orderId }, select: { total: true, customerPhone: true } });
+      if (!o) throw new Error("Order not found");
+      amount = o.total;
+      phone = o.customerPhone;
+      await tx.order.updateMany({
+        where: { id: orderId },
+        data: { deliveryStatus: "delivered", status: "closed", paymentStatus: "paid", billRequested: false },
+      });
+      const existing = await tx.payment.findFirst({ where: { orderId }, select: { id: true } });
+      if (!existing) {
+        await tx.payment.create({ data: { orderId, amount: o.total, method: "cash", gateway: "manual", status: "paid" } });
+      }
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Could not update.";
+    return { ok: false, error: /deliveryStatus|column/i.test(msg) ? "Needs a quick database update. Run the migration, then try again." : msg };
+  }
+
+  await awardPointsForOrder(staff.restaurantId, orderId, amount, phone);
+  await notifyOrdersChanged(staff.restaurantId);
+  return { ok: true, orders: await getDeliveryOrders() };
 }

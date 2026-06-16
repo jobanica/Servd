@@ -882,6 +882,7 @@ CREATE TABLE IF NOT EXISTS "orders" (
     "customerAddress" TEXT,
     "customerLat" DOUBLE PRECISION,
     "customerLng" DOUBLE PRECISION,
+    "deliveryStatus" TEXT,
     "status" "OrderStatus" NOT NULL DEFAULT 'new',
     "billRequested" BOOLEAN NOT NULL DEFAULT false,
     "paymentStatus" "PaymentStatus" NOT NULL DEFAULT 'unpaid',
@@ -905,6 +906,7 @@ ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "customerPhone" TEXT;
 ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "customerAddress" TEXT;
 ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "customerLat" DOUBLE PRECISION;
 ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "customerLng" DOUBLE PRECISION;
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "deliveryStatus" TEXT;
 ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "status" "OrderStatus" NOT NULL DEFAULT 'new';
 ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "billRequested" BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "paymentStatus" "PaymentStatus" NOT NULL DEFAULT 'unpaid';

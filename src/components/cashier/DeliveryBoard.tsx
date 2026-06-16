@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { getDeliveryOrders, type DeliveryOrder } from "@/server/orders/delivery";
+import { getDeliveryOrders, markOutForDelivery, markDelivered, type DeliveryOrder } from "@/server/orders/delivery";
 import { acceptOrder } from "@/server/orders/cashier";
 import { formatPeso } from "@/lib/money";
 import { MiniMap } from "./MiniMap";
@@ -65,6 +65,20 @@ export function DeliveryBoard({
     setBusy(null);
     refresh();
   }
+  async function dispatch(id: string) {
+    setBusy(id);
+    const res = await markOutForDelivery(id);
+    setBusy(null);
+    if (res.ok && res.orders) setOrders(res.orders);
+    else if (res.error) alert(res.error);
+  }
+  async function deliver(id: string) {
+    setBusy(id);
+    const res = await markDelivered(id);
+    setBusy(null);
+    if (res.ok && res.orders) setOrders(res.orders);
+    else if (res.error) alert(res.error);
+  }
 
   return (
     <div>
@@ -89,7 +103,13 @@ export function DeliveryBoard({
                   </div>
                   <div className="text-right">
                     <span className="font-semibold">{formatPeso(o.total)}</span>
-                    <p className="text-xs text-plum-ink/45">{o.status} · {o.paymentStatus}</p>
+                    <p className="text-xs text-plum-ink/45">
+                      {o.deliveryStatus === "out_for_delivery" ? (
+                        <span className="font-semibold text-brand-primary">🛵 Out for delivery</span>
+                      ) : (
+                        <>{o.status} · {o.paymentStatus}</>
+                      )}
+                    </p>
                   </div>
                 </div>
 
@@ -112,7 +132,16 @@ export function DeliveryBoard({
                   <p className="mt-3 rounded-lg bg-cream px-3 py-2 text-xs text-plum-ink/50">No map pin — use the address above.</p>
                 )}
 
-                {o.status === "pending" && (
+                {/* Status flow */}
+                {o.deliveryStatus === "out_for_delivery" ? (
+                  <button
+                    onClick={() => deliver(o.id)}
+                    disabled={busy === o.id}
+                    className="mt-3 w-full rounded-full bg-green-600 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    ✓ Mark delivered (paid on delivery)
+                  </button>
+                ) : o.status === "pending" ? (
                   <button
                     onClick={() => accept(o.id)}
                     disabled={busy === o.id}
@@ -120,6 +149,16 @@ export function DeliveryBoard({
                   >
                     Accept order
                   </button>
+                ) : o.status === "done" ? (
+                  <button
+                    onClick={() => dispatch(o.id)}
+                    disabled={busy === o.id}
+                    className="mt-3 w-full rounded-full bg-brand-primary py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    🛵 Out for delivery
+                  </button>
+                ) : (
+                  <p className="mt-3 text-center text-xs text-plum-ink/40">Preparing — waiting for the kitchen to finish.</p>
                 )}
               </section>
             );

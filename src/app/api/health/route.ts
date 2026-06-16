@@ -37,6 +37,7 @@ export async function GET() {
           (table_name = 'orders' and column_name = 'discountAmount') or
           (table_name = 'orders' and column_name = 'orderType') or
           (table_name = 'orders' and column_name = 'customerLat') or
+          (table_name = 'orders' and column_name = 'deliveryStatus') or
           (table_name = 'restaurants' and column_name = 'loyaltyEnabled') or
           (table_name = 'restaurants' and column_name = 'customDomain')
         )`;
@@ -58,6 +59,7 @@ export async function GET() {
         "orders.discountAmount",
         "orders.orderType",
         "orders.customerLat",
+        "orders.deliveryStatus",
         "restaurants.loyaltyEnabled",
         "restaurants.customDomain",
         "plan_modules",

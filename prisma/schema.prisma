@@ -844,6 +844,7 @@ model Order {
   customerAddress String? // for delivery
   customerLat   Float? // pinned delivery location
   customerLng   Float?
+  deliveryStatus String? // null → out_for_delivery → delivered
   status        OrderStatus   @default(new)
   billRequested Boolean       @default(false)
   paymentStatus PaymentStatus @default(unpaid)
