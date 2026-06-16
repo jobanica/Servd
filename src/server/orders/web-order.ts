@@ -50,6 +50,9 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
   if (d.orderType === "delivery" && !d.customerAddress?.trim()) {
     return { ok: false, error: "A delivery address is required." };
   }
+  if (d.orderType === "delivery" && (d.lat == null || d.lng == null)) {
+    return { ok: false, error: "Please pin your delivery location on the map." };
+  }
 
   const restaurant = await systemDb((tx) =>
     tx.restaurant.findFirst({ where: { slug: d.slug, status: "active" }, select: { id: true } }),

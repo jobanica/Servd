@@ -286,8 +286,9 @@ export function WebOrder(props: WebOrderProps) {
                 )}
                 <textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={2} placeholder="Delivery address" className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
                 <div>
-                  <p className="mb-1 text-xs font-semibold text-plum-ink/60">Pin your location (for the rider)</p>
+                  <p className="mb-1 text-xs font-semibold text-plum-ink/60">Pin your location (required for delivery)</p>
                   <LocationPicker onChange={(lat, lng) => setGeo({ lat, lng })} />
+                  {!geo && <p className="mt-1 text-xs text-guava">Please pin your location to place a delivery order.</p>}
                 </div>
               </>
             )}
@@ -322,7 +323,7 @@ export function WebOrder(props: WebOrderProps) {
         ) : (
           <button
             onClick={submit}
-            disabled={busy || lines.length === 0 || !name.trim() || !phone.trim() || (orderType === "delivery" && (!address.trim() || (zones.length > 0 && !zone)))}
+            disabled={busy || lines.length === 0 || !name.trim() || !phone.trim() || (orderType === "delivery" && (!address.trim() || !geo || (zones.length > 0 && !zone)))}
             className="mt-3 w-full rounded-lg bg-green-600 py-3 font-semibold text-white disabled:opacity-50"
           >
             {busy ? "Placing…" : `Place ${orderType === "delivery" ? "delivery" : "pickup"} order`}
