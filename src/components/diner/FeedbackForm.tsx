@@ -8,10 +8,12 @@ export function FeedbackForm({
   slug,
   tableToken,
   googleReviewUrl,
+  onDone,
 }: {
   slug: string;
   tableToken: string;
   googleReviewUrl: string | null;
+  onDone?: () => void;
 }) {
   const [rating, setRating] = useState(0);
   const [hover, setHover] = useState(0);
@@ -34,6 +36,7 @@ export function FeedbackForm({
     if (res.ok) {
       setFeedbackId(res.feedbackId ?? null);
       setDone(true);
+      onDone?.();
     } else {
       setError(res.error ?? "Couldn't submit feedback.");
     }

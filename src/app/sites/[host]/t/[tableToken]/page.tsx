@@ -38,6 +38,7 @@ export default async function SiteTablePage({
       }}
       categories={categories}
       payOnline={restaurant.paymentOnlineEnabled}
+      googleReviewUrl={restaurant.googleReviewUrl}
     />
   );
 }

@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getOrderStatus } from "@/server/orders/order-status";
 import { chime } from "@/lib/sound";
+import { FeedbackForm } from "./FeedbackForm";
 
 type Stage = {
   label: string;
@@ -73,17 +75,25 @@ export function OrderStatusTracker({
   slug,
   tableToken,
   orderId,
+  googleReviewUrl = null,
   onDismiss,
 }: {
   restaurantId: string;
   slug: string;
   tableToken: string;
   orderId: string;
+  googleReviewUrl?: string | null;
   onDismiss: () => void;
 }) {
+  const t = useTranslations("feedback");
   const [status, setStatus] = useState<string>("pending");
   const [paymentStatus, setPaymentStatus] = useState<string>("unpaid");
+  const [showFeedback, setShowFeedback] = useState(false);
   const prevStatus = useRef<string>("pending");
+  const promptedRef = useRef(false);
+
+  // Whether this order has already been rated/prompted (don't nag on reload).
+  const ratedKey = `servd:rated:${orderId}`;
 
   const refresh = useCallback(async () => {
     const res = await getOrderStatus(slug, tableToken, orderId);
@@ -102,7 +112,19 @@ export function OrderStatusTracker({
       }
       prevStatus.current = res.status;
     }
-  }, [slug, tableToken, orderId]);
+
+    // Order completed → automatically ask for feedback (once).
+    if (res.status === "closed" && !promptedRef.current) {
+      promptedRef.current = true;
+      let rated = false;
+      try {
+        rated = localStorage.getItem(ratedKey) === "1";
+      } catch {
+        /* ignore */
+      }
+      if (!rated) setShowFeedback(true);
+    }
+  }, [slug, tableToken, orderId, ratedKey]);
 
   useEffect(() => {
     // Ask for notification permission so we can ping the phone when ready.
@@ -130,40 +152,86 @@ export function OrderStatusTracker({
   const stage = stageFor(status, paymentStatus);
   const terminal = status === "closed" || status === "cancelled";
 
+  function markRated() {
+    try {
+      localStorage.setItem(ratedKey, "1");
+    } catch {
+      /* ignore */
+    }
+  }
+
   return (
-    <div className={`mt-3 rounded-tile border p-4 ${TONE_CLASSES[stage.tone]}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-heading text-base font-bold text-brand-ink">{stage.label}</p>
-          {stage.detail && <p className="mt-0.5 text-sm text-brand-ink/70">{stage.detail}</p>}
-          <p className="mt-1 text-xs text-brand-ink/40">Order #{orderId.slice(0, 8)}</p>
+    <>
+      <div className={`mt-3 rounded-tile border p-4 ${TONE_CLASSES[stage.tone]}`}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-heading text-base font-bold text-brand-ink">{stage.label}</p>
+            {stage.detail && <p className="mt-0.5 text-sm text-brand-ink/70">{stage.detail}</p>}
+            <p className="mt-1 text-xs text-brand-ink/40">Order #{orderId.slice(0, 8)}</p>
+          </div>
+          {terminal && (
+            <button onClick={onDismiss} className="text-sm font-semibold text-brand-ink/50">
+              Dismiss
+            </button>
+          )}
         </div>
-        {terminal && (
-          <button onClick={onDismiss} className="text-sm font-semibold text-brand-ink/50">
-            Dismiss
+
+        {/* Progress steps */}
+        {!terminal && (
+          <div className="mt-3 flex items-center gap-1">
+            {["Sent", "Preparing", "Ready"].map((label, i) => {
+              const reached =
+                (i === 0) ||
+                (i === 1 && (status === "new" || status === "preparing" || status === "done")) ||
+                (i === 2 && status === "done");
+              return (
+                <div key={label} className="flex-1">
+                  <div
+                    className={`h-1.5 rounded-full ${reached ? "bg-brand-primary" : "bg-brand-ink/15"}`}
+                  />
+                  <p className="mt-1 text-center text-[10px] text-brand-ink/50">{label}</p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Completed → invite to rate (in case the auto popup was dismissed). */}
+        {status === "closed" && (
+          <button
+            onClick={() => setShowFeedback(true)}
+            className="mt-3 w-full rounded-full py-2.5 text-sm font-semibold btn-brand"
+          >
+            ⭐ {t("rateExperience")}
           </button>
         )}
       </div>
 
-      {/* Progress steps */}
-      {!terminal && (
-        <div className="mt-3 flex items-center gap-1">
-          {["Sent", "Preparing", "Ready"].map((label, i) => {
-            const reached =
-              (i === 0) ||
-              (i === 1 && (status === "new" || status === "preparing" || status === "done")) ||
-              (i === 2 && status === "done");
-            return (
-              <div key={label} className="flex-1">
-                <div
-                  className={`h-1.5 rounded-full ${reached ? "bg-brand-primary" : "bg-brand-ink/15"}`}
-                />
-                <p className="mt-1 text-center text-[10px] text-brand-ink/50">{label}</p>
-              </div>
-            );
-          })}
+      {/* Auto feedback popup on completion */}
+      {showFeedback && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-tile bg-white p-6 sm:rounded-tile">
+            <div className="mb-2 flex justify-end">
+              <button
+                onClick={() => {
+                  setShowFeedback(false);
+                  markRated();
+                }}
+                aria-label="Close"
+                className="text-2xl leading-none text-plum-ink/40"
+              >
+                ×
+              </button>
+            </div>
+            <FeedbackForm
+              slug={slug}
+              tableToken={tableToken}
+              googleReviewUrl={googleReviewUrl}
+              onDone={markRated}
+            />
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

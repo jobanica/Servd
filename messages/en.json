@@ -44,7 +44,8 @@
     "remove": "Remove"
   },
   "feedback": {
-    "howWasVisit": "How was your visit?",
+    "howWasVisit": "How was your experience?",
+    "rateExperience": "Rate your experience",
     "ratingNote": "Your rating goes straight to the restaurant.",
     "commentPlaceholder": "Anything you'd like to tell us? (optional)",
     "submit": "Submit feedback",

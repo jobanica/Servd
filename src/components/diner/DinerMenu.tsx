@@ -110,6 +110,7 @@ export function DinerMenu({
   categories,
   payOnline,
   justPaid,
+  googleReviewUrl = null,
 }: {
   restaurantId: string;
   slug: string;
@@ -119,6 +120,7 @@ export function DinerMenu({
   categories: DinerCategory[];
   payOnline: boolean;
   justPaid?: boolean;
+  googleReviewUrl?: string | null;
 }) {
   const cart = useCart(restaurantId, tableToken);
   const t = useTranslations("diner");
@@ -274,6 +276,7 @@ export function DinerMenu({
             slug={slug}
             tableToken={tableToken}
             orderId={trackedOrderId}
+            googleReviewUrl={googleReviewUrl}
             onDismiss={stopTracking}
           />
         </div>

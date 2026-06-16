@@ -46,6 +46,7 @@ export default async function DinerOrderPage({
       categories={categories}
       payOnline={restaurant.paymentOnlineEnabled}
       justPaid={paid === "1"}
+      googleReviewUrl={restaurant.googleReviewUrl}
     />
   );
 }

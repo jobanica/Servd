@@ -44,7 +44,8 @@
     "remove": "Alisin"
   },
   "feedback": {
-    "howWasVisit": "Kumusta ang iyong pagbisita?",
+    "howWasVisit": "Kumusta ang iyong karanasan?",
+    "rateExperience": "I-rate ang iyong karanasan",
     "ratingNote": "Direktang mapupunta sa restaurant ang iyong rating.",
     "commentPlaceholder": "May gusto ka bang sabihin? (opsyonal)",
     "submit": "Ipasa ang feedback",
