@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
 import { getPublicRestaurantBySlug } from "@/server/restaurants/get-public";
 import { getPublicMenu } from "@/server/menu/public-menu";
+import { getLoyaltyConfig } from "@/server/loyalty/loyalty";
 import { systemDb } from "@/server/tenancy/scoped-db";
-import { BrandProvider } from "@/components/diner/BrandProvider";
-import { SiteHome } from "@/components/site/SiteHome";
+import { WebOrder } from "@/components/site/WebOrder";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -29,22 +29,22 @@ export default async function RestaurantSite({ params }: { params: Promise<{ slu
   const restaurant = await getPublicRestaurantBySlug(slug);
   if (!restaurant) notFound();
 
-  const [categories, contact] = await Promise.all([
+  const [categories, loyalty, contact] = await Promise.all([
     getPublicMenu(restaurant.id),
+    getLoyaltyConfig(restaurant.id),
     getContact(restaurant.id),
   ]);
 
   return (
-    <BrandProvider brand={{ brandPrimaryColor: restaurant.brandPrimaryColor, brandAccentColor: restaurant.brandAccentColor }}>
-      <SiteHome
-        name={restaurant.displayName || restaurant.name}
-        logoUrl={restaurant.logoUrl}
-        coverImageUrl={restaurant.coverImageUrl}
-        tagline={restaurant.tagline}
-        categories={categories}
-        contact={contact}
-        orderHref={`/r/${slug}/order`}
-      />
-    </BrandProvider>
+    <WebOrder
+      slug={slug}
+      restaurantName={restaurant.displayName || restaurant.name}
+      logoUrl={restaurant.logoUrl}
+      categories={categories}
+      contact={contact}
+      payOnline={restaurant.paymentOnlineEnabled}
+      loyalty={loyalty}
+      homeHref={`/r/${slug}`}
+    />
   );
 }
