@@ -33,14 +33,15 @@ function Card({ title, href, children, className = "" }: { title?: string; href?
   );
 }
 
-function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <div className="rounded-tile border border-plum-ink/10 bg-white p-5">
-      <p className="text-xs font-medium text-plum-ink/50">{label}</p>
-      <p className="mt-1 font-heading text-3xl font-extrabold">{value}</p>
+function Kpi({ label, value, hint, href, accent }: { label: string; value: string; hint?: string; href?: string; accent?: boolean }) {
+  const inner = (
+    <div className={`h-full rounded-tile border p-5 ${accent ? "border-guava bg-guava/5" : "border-plum-ink/10 bg-white"} ${href ? "transition hover:border-brand-primary" : ""}`}>
+      <p className={`text-xs font-medium ${accent ? "text-guava" : "text-plum-ink/50"}`}>{label}</p>
+      <p className={`mt-1 font-heading text-3xl font-extrabold ${accent ? "text-guava" : ""}`}>{value}</p>
       {hint && <p className="mt-1 text-xs text-plum-ink/40">{hint}</p>}
     </div>
   );
+  return href ? <Link href={href} className="block">{inner}</Link> : inner;
 }
 
 function Stars({ n }: { n: number }) {
@@ -69,16 +70,17 @@ export default async function AdminHome() {
     safe(getAnalytics(rid, weekAgo, now), null),
     safe(
       tenantDb(rid, async (tx) => {
-        const [open, preparing, ready, tables, activeTables] = await Promise.all([
+        const [pending, open, preparing, ready, tables, activeTables] = await Promise.all([
+          tx.order.count({ where: { status: "pending" } }),
           tx.order.count({ where: { status: { in: [...OPEN] } } }),
           tx.order.count({ where: { status: "preparing" } }),
           tx.order.count({ where: { status: "done" } }),
           tx.table.count(),
           tx.order.findMany({ where: { status: { in: [...OPEN] } }, select: { tableId: true }, distinct: ["tableId"] }),
         ]);
-        return { open, preparing, ready, tables, activeTables: activeTables.length };
+        return { pending, open, preparing, ready, tables, activeTables: activeTables.length };
       }),
-      { open: 0, preparing: 0, ready: 0, tables: 0, activeTables: 0 },
+      { pending: 0, open: 0, preparing: 0, ready: 0, tables: 0, activeTables: 0 },
     ),
     safe(
       tenantDb(rid, (tx) =>
@@ -135,7 +137,14 @@ export default async function AdminHome() {
       </div>
 
       {/* Top row — KPIs */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <Kpi
+          label="Pending acceptance"
+          value={String(counts.pending)}
+          hint={counts.pending > 0 ? "Tap to accept in cashier" : "QR orders awaiting accept"}
+          href="/cashier"
+          accent={counts.pending > 0}
+        />
         <Kpi label="Revenue today" value={formatPeso(today?.summary.revenue ?? 0)} hint="Paid orders" />
         <Kpi label="Orders today" value={String(today?.summary.orders ?? 0)} />
         <Kpi label="Open orders" value={String(counts.open)} hint="Awaiting / cooking / to settle" />
