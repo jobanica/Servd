@@ -59,7 +59,6 @@ export async function getCashierTables(): Promise<CashierTable[]> {
         paymentStatus: true,
         total: true,
         billRequested: true,
-        servedAt: true,
         createdAt: true,
         table: { select: { id: true, tableNumber: true } },
         _count: { select: { items: true } },
@@ -67,6 +66,21 @@ export async function getCashierTables(): Promise<CashierTable[]> {
       },
     }),
   );
+
+  // Which finished orders are already served. Best-effort: the servedAt column
+  // may not exist yet on a lagging production DB — treat all as not-served then.
+  let servedIds = new Set<string>();
+  try {
+    const served = await tenantDb(staff.restaurantId, (tx) =>
+      tx.order.findMany({
+        where: { status: "done", servedAt: { not: null } },
+        select: { id: true },
+      }),
+    );
+    servedIds = new Set(served.map((o) => o.id));
+  } catch {
+    /* column not migrated yet — leave servedIds empty */
+  }
 
   const byTable = new Map<string, CashierTable>();
   for (const o of orders) {
@@ -88,7 +102,7 @@ export async function getCashierTables(): Promise<CashierTable[]> {
       total: o.total,
       billRequested: o.billRequested,
       paidOnline: o.payments.some((p) => p.gateway === "paymongo"),
-      served: o.servedAt != null,
+      served: servedIds.has(o.id),
       createdAt: o.createdAt.toISOString(),
       itemCount: o._count.items,
     });
