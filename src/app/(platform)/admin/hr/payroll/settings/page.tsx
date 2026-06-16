@@ -15,7 +15,15 @@ export default async function PayrollSettingsPage() {
         <h1 className="font-heading text-2xl font-bold">Payroll deductions</h1>
         <p className="text-sm text-plum-ink/50">Statutory contributions applied to each payslip.</p>
       </div>
-      <PayrollSettingsForm initial={cfg} />
+      <PayrollSettingsForm
+        initial={{
+          sss: cfg.sssAmount / 100,
+          philhealth: cfg.philhealthAmount / 100,
+          pagibig: cfg.pagibigAmount / 100,
+          bir: cfg.birAmount / 100,
+          thirteenthMonth: cfg.thirteenthMonth,
+        }}
+      />
     </div>
   );
 }

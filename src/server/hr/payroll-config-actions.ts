@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireHrAction } from "@/server/hr/guard";
 import { tenantDb } from "@/server/tenancy/scoped-db";
+import { pesosToCentavos } from "@/lib/money";
 
 export type PayrollCfgState = { ok?: boolean; error?: string } | null;
 
@@ -11,12 +12,12 @@ export async function updatePayrollConfig(
   formData: FormData,
 ): Promise<PayrollCfgState> {
   const { restaurantId } = await requireHrAction();
-  const num = (k: string) => Math.max(0, Number(formData.get(k)) || 0);
+  const amt = (k: string) => pesosToCentavos(Math.max(0, Number(formData.get(k)) || 0));
   const data = {
-    sssRate: num("sssRate"),
-    philhealthRate: num("philhealthRate"),
-    pagibigRate: num("pagibigRate"),
-    birRate: num("birRate"),
+    sssAmount: amt("sss"),
+    philhealthAmount: amt("philhealth"),
+    pagibigAmount: amt("pagibig"),
+    birAmount: amt("bir"),
     thirteenthMonth: formData.get("thirteenthMonth") === "on",
   };
   try {

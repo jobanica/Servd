@@ -236,10 +236,10 @@ model Restaurant {
 model PayrollSetting {
   id              String  @id @default(uuid())
   restaurantId    String  @unique
-  sssRate         Float   @default(0) // % of base (employee share)
-  philhealthRate  Float   @default(0) // %
-  pagibigRate     Float   @default(0) // %
-  birRate         Float   @default(0) // % withholding on taxable pay
+  sssAmount        Int    @default(0) // fixed centavos per pay period (employee share)
+  philhealthAmount Int    @default(0)
+  pagibigAmount    Int    @default(0)
+  birAmount        Int    @default(0)
   thirteenthMonth Boolean @default(false) // accrue 1/12 of base
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)

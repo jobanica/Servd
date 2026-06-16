@@ -3,32 +3,32 @@ import "server-only";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 
 export interface PayrollConfig {
-  sssRate: number;
-  philhealthRate: number;
-  pagibigRate: number;
-  birRate: number;
+  sssAmount: number; // fixed centavos per pay period
+  philhealthAmount: number;
+  pagibigAmount: number;
+  birAmount: number;
   thirteenthMonth: boolean;
 }
 
 export const DEFAULT_PAYROLL_CONFIG: PayrollConfig = {
-  sssRate: 0,
-  philhealthRate: 0,
-  pagibigRate: 0,
-  birRate: 0,
+  sssAmount: 0,
+  philhealthAmount: 0,
+  pagibigAmount: 0,
+  birAmount: 0,
   thirteenthMonth: false,
 };
 
-/** Statutory deduction settings for a restaurant (best-effort; table may lag). */
+/** Fixed statutory deduction settings for a restaurant (best-effort; table may lag). */
 export async function getPayrollConfig(restaurantId: string): Promise<PayrollConfig> {
   try {
     const s = await tenantDb(restaurantId, (tx) =>
       tx.payrollSetting.findFirst({
         where: { restaurantId },
         select: {
-          sssRate: true,
-          philhealthRate: true,
-          pagibigRate: true,
-          birRate: true,
+          sssAmount: true,
+          philhealthAmount: true,
+          pagibigAmount: true,
+          birAmount: true,
           thirteenthMonth: true,
         },
       }),
@@ -48,14 +48,12 @@ export interface StatutoryDeductions {
   total: number; // sss + philhealth + pagibig + bir (deducted from pay)
 }
 
-/** Compute statutory deductions (centavos) on a base pay (centavos). */
+/** Fixed statutory deductions (centavos). 13th-month accrual is 1/12 of base. */
 export function computeStatutory(base: number, cfg: PayrollConfig): StatutoryDeductions {
-  const pct = (rate: number) => Math.round((base * rate) / 100);
-  const sss = pct(cfg.sssRate);
-  const philhealth = pct(cfg.philhealthRate);
-  const pagibig = pct(cfg.pagibigRate);
-  const taxable = Math.max(0, base - sss - philhealth - pagibig);
-  const bir = Math.round((taxable * cfg.birRate) / 100);
+  const sss = cfg.sssAmount;
+  const philhealth = cfg.philhealthAmount;
+  const pagibig = cfg.pagibigAmount;
+  const bir = cfg.birAmount;
   const thirteenthAccrual = cfg.thirteenthMonth ? Math.round(base / 12) : 0;
   return { sss, philhealth, pagibig, bir, thirteenthAccrual, total: sss + philhealth + pagibig + bir };
 }
