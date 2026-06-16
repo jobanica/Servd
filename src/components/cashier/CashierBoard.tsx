@@ -8,6 +8,7 @@ import {
   acceptOrder,
   declineOrder,
   markOrderPaid,
+  markServed,
   closeOrder,
   type CashierTable,
   type IncomingOrder,
@@ -32,11 +33,13 @@ export function CashierBoard({
   const [busy, setBusy] = useState<string | null>(null);
   const [newOrderOpen, setNewOrderOpen] = useState(false);
   const [popupDismissed, setPopupDismissed] = useState(false);
+  const [readyDismissed, setReadyDismissed] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   // Track what we've already seen so we can chime on genuinely new arrivals.
   const seenIncoming = useRef<Set<string>>(new Set(initialIncoming.map((o) => o.id)));
   const seenOnlinePaid = useRef<Set<string>>(new Set());
+  const seenReady = useRef<Set<string>>(new Set());
 
   function showToast(msg: string) {
     setToast(msg);
@@ -57,6 +60,8 @@ export function CashierBoard({
       seenIncoming.current = new Set(inc.map((o) => o.id));
 
       // New confirmed ONLINE payments → alert the cashier to verify the gateway.
+      // Newly READY orders (kitchen pressed "Mark ready") → chime + serve popup.
+      let freshReady = false;
       for (const tbl of t) {
         for (const o of tbl.orders) {
           if (o.paidOnline && !seenOnlinePaid.current.has(o.id)) {
@@ -64,8 +69,15 @@ export function CashierBoard({
             chime();
             showToast(`💳 Online payment received — Table ${tbl.tableNumber}. Verify it in your gateway.`);
           }
+          if (o.status === "done" && !o.served && !seenReady.current.has(o.id)) {
+            seenReady.current.add(o.id);
+            freshReady = true;
+            chime();
+            showToast(`🍽️ Food ready for Table ${tbl.tableNumber}`);
+          }
         }
       }
+      if (freshReady) setReadyDismissed(false);
 
       setTables(t);
       setIncoming(inc);
@@ -75,9 +87,12 @@ export function CashierBoard({
   }, []);
 
   useEffect(() => {
-    // Seed the online-paid set from the initial data (don't alert on first load).
+    // Seed the seen sets from the initial data (don't alert on first load).
     for (const tbl of initialTables) {
-      for (const o of tbl.orders) if (o.paidOnline) seenOnlinePaid.current.add(o.id);
+      for (const o of tbl.orders) {
+        if (o.paidOnline) seenOnlinePaid.current.add(o.id);
+        if (o.status === "done" && !o.served) seenReady.current.add(o.id);
+      }
     }
     const supabase = createSupabaseBrowserClient();
     const channel = supabase
@@ -153,7 +168,34 @@ export function CashierBoard({
     }
   }
 
+  async function serve(orderId: string) {
+    setBusy(orderId);
+    try {
+      const res = await markServed(orderId);
+      if (res.ok && res.tables) {
+        setTables(res.tables);
+        showToast("Marked as served.");
+      } else if (!res.ok) {
+        showToast(res.error ?? "Couldn't mark as served.");
+        refresh();
+      }
+    } catch {
+      showToast("Something went wrong. Please try again.");
+      refresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  // Orders the kitchen finished that haven't been served yet.
+  const readyOrders = tables.flatMap((t) =>
+    t.orders
+      .filter((o) => o.status === "done" && !o.served)
+      .map((o) => ({ ...o, tableNumber: t.tableNumber })),
+  );
+
   const showPopup = incoming.length > 0 && !popupDismissed;
+  const showReady = readyOrders.length > 0 && !readyDismissed && !showPopup;
 
   return (
     <div>
@@ -169,6 +211,14 @@ export function CashierBoard({
               className="rounded-full border border-guava bg-guava/10 px-4 py-2 text-sm font-semibold text-guava"
             >
               {incoming.length} incoming
+            </button>
+          )}
+          {readyOrders.length > 0 && (
+            <button
+              onClick={() => setReadyDismissed(false)}
+              className="rounded-full border border-mango bg-mango/10 px-4 py-2 text-sm font-semibold text-mango"
+            >
+              🍽️ {readyOrders.length} ready
             </button>
           )}
           <button
@@ -226,10 +276,29 @@ export function CashierBoard({
                         💳 Paid online — verify in gateway
                       </span>
                     )}
+                    {o.status === "done" && !o.served && (
+                      <span className="rounded-full bg-mango/15 px-2 py-0.5 font-semibold text-mango">
+                        🍽️ Ready to serve
+                      </span>
+                    )}
+                    {o.served && (
+                      <span className="rounded-full bg-plum-ink/5 px-2 py-0.5 font-semibold text-plum-ink/50">
+                        ✓ Served
+                      </span>
+                    )}
                   </div>
 
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <PrintTicketButton orderId={o.id} />
+                    {o.status === "done" && !o.served && (
+                      <button
+                        onClick={() => serve(o.id)}
+                        disabled={busy === o.id}
+                        className="rounded-lg bg-mango px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                      >
+                        Mark served
+                      </button>
+                    )}
                     {o.paymentStatus !== "paid" && (
                       <>
                         <button
@@ -321,6 +390,48 @@ export function CashierBoard({
                       Decline
                     </button>
                   </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {/* Food-ready / serve popup */}
+      {showReady && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
+          <div className="mt-6 w-full max-w-md rounded-tile bg-white p-5 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h2 className="font-heading text-lg font-extrabold">
+                🍽️ {readyOrders.length === 1 ? "Food ready" : `${readyOrders.length} orders ready`}
+              </h2>
+              <button
+                onClick={() => setReadyDismissed(true)}
+                className="text-sm font-semibold text-plum-ink/50"
+              >
+                View board
+              </button>
+            </div>
+            <p className="mt-1 text-sm text-plum-ink/55">
+              The kitchen finished these orders. Serve them, then confirm.
+            </p>
+
+            <ul className="mt-4 space-y-3">
+              {readyOrders.map((o) => (
+                <li key={o.id} className="rounded-lg border border-mango/40 bg-mango/5 p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-heading font-bold">Table {o.tableNumber}</span>
+                    <span className="text-sm text-plum-ink/60">
+                      {o.itemCount} item{o.itemCount > 1 ? "s" : ""}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => serve(o.id)}
+                    disabled={busy === o.id}
+                    className="mt-3 w-full rounded-full bg-mango py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    Confirm served
+                  </button>
                 </li>
               ))}
             </ul>

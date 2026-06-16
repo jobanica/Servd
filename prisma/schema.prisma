@@ -732,6 +732,7 @@ model Order {
   paymentStatus PaymentStatus @default(unpaid)
   total         Int           @default(0) // centavos
   inventoryDeductedAt DateTime? // set once stock is deducted (idempotency)
+  servedAt      DateTime? // set when the cashier confirms the food was served
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 

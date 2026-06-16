@@ -20,6 +20,7 @@ export interface CashierOrder {
   total: number;
   billRequested: boolean;
   paidOnline: boolean; // a confirmed gateway (PayMongo) payment exists
+  served: boolean; // cashier confirmed the food was served
   createdAt: string;
   itemCount: number;
 }
@@ -58,6 +59,7 @@ export async function getCashierTables(): Promise<CashierTable[]> {
         paymentStatus: true,
         total: true,
         billRequested: true,
+        servedAt: true,
         createdAt: true,
         table: { select: { id: true, tableNumber: true } },
         _count: { select: { items: true } },
@@ -86,6 +88,7 @@ export async function getCashierTables(): Promise<CashierTable[]> {
       total: o.total,
       billRequested: o.billRequested,
       paidOnline: o.payments.some((p) => p.gateway === "paymongo"),
+      served: o.servedAt != null,
       createdAt: o.createdAt.toISOString(),
       itemCount: o._count.items,
     });
@@ -234,6 +237,28 @@ export async function closeOrder(
   } catch (e) {
     console.error("closeOrder failed", e);
     return { ok: false, error: e instanceof Error ? e.message : "Could not close the order." };
+  }
+  await notifyOrdersChanged(staff.restaurantId);
+  return { ok: true, tables: await getCashierTables() };
+}
+
+/** Confirm a ready order's food was served to the table. */
+export async function markServed(
+  orderId: string,
+): Promise<{ ok: boolean; tables?: CashierTable[]; error?: string }> {
+  let staff;
+  try {
+    staff = await requireStaff(["cashier", "admin"]);
+  } catch {
+    return { ok: false, error: "Not allowed." };
+  }
+  try {
+    await tenantDb(staff.restaurantId, (tx) =>
+      tx.order.updateMany({ where: { id: orderId }, data: { servedAt: new Date() } }),
+    );
+  } catch (e) {
+    console.error("markServed failed", e);
+    return { ok: false, error: e instanceof Error ? e.message : "Could not mark as served." };
   }
   await notifyOrdersChanged(staff.restaurantId);
   return { ok: true, tables: await getCashierTables() };
