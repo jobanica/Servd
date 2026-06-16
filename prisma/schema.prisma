@@ -234,6 +234,7 @@ model LoyaltyAccount {
   id           String   @id @default(uuid())
   restaurantId String
   phone        String
+  name         String?
   points       Int      @default(0)
   totalEarned  Int      @default(0)
   createdAt    DateTime @default(now())

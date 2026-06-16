@@ -167,20 +167,27 @@ export function DinerMenu({
     }
   }
 
-  // Loyalty phone (remembered so orders earn points automatically).
+  // Loyalty phone/name (remembered so orders earn points automatically).
   const loyaltyKey = `servd:loyaltyPhone:${restaurantId}`;
+  const loyaltyNameKey = `servd:loyaltyName:${restaurantId}`;
   const [loyaltyPhone, setLoyaltyPhone] = useState("");
+  const [loyaltyName, setLoyaltyName] = useState("");
   useEffect(() => {
     try {
       setLoyaltyPhone(localStorage.getItem(loyaltyKey) ?? "");
+      setLoyaltyName(localStorage.getItem(loyaltyNameKey) ?? "");
     } catch {
       /* ignore */
     }
-  }, [loyaltyKey]);
-  function saveLoyaltyPhone(p: string) {
+  }, [loyaltyKey, loyaltyNameKey]);
+  function saveLoyaltyPhone(p: string, n?: string) {
     setLoyaltyPhone(p);
     try {
       localStorage.setItem(loyaltyKey, p);
+      if (n) {
+        setLoyaltyName(n);
+        localStorage.setItem(loyaltyNameKey, n);
+      }
     } catch {
       /* ignore */
     }
@@ -204,6 +211,7 @@ export function DinerMenu({
   const [cartOpen, setCartOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [promosOpen, setPromosOpen] = useState(false);
+  const [rewardsOpen, setRewardsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [activeCat, setActiveCat] = useState("all");
 
@@ -334,8 +342,21 @@ export function DinerMenu({
 
       {/* Floating "Request bill" — appears once the food is ready */}
       {trackedOrderId && orderStatus === "done" && (
-        <div className="fixed inset-x-0 bottom-24 z-30 mx-auto flex max-w-md justify-center px-4">
-          <RequestBillButton slug={slug} tableToken={tableToken} prominent />
+        <div className="fixed inset-x-0 bottom-24 z-30 mx-auto flex max-w-md flex-col items-center gap-2 px-4">
+          <RequestBillButton
+            slug={slug}
+            tableToken={tableToken}
+            prominent
+            onRequested={loyaltyEnabled ? () => setRewardsOpen(true) : undefined}
+          />
+          {loyaltyEnabled && (
+            <button
+              onClick={() => setRewardsOpen(true)}
+              className="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-brand-primary shadow-lg ring-1 ring-brand-primary/20"
+            >
+              ⭐ Earn loyalty points
+            </button>
+          )}
         </div>
       )}
 
@@ -437,6 +458,22 @@ export function DinerMenu({
         </div>
       )}
 
+      {/* Rewards sheet — prompted after requesting the bill */}
+      {rewardsOpen && loyaltyEnabled && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setRewardsOpen(false)}>
+          <div className="w-full max-w-md rounded-t-tile bg-white p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-brand-ink/15" />
+            <RewardsPanel slug={slug} phone={loyaltyPhone} name={loyaltyName} onPhone={saveLoyaltyPhone} />
+            <button
+              onClick={() => setRewardsOpen(false)}
+              className="mt-4 w-full rounded-full border border-brand-ink/15 py-2.5 text-sm font-semibold"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* More sheet — pay online, request bill, feedback */}
       {sheetOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setSheetOpen(false)}>
@@ -448,7 +485,12 @@ export function DinerMenu({
             <h2 className="font-heading text-lg font-bold text-brand-ink">{t("moreOptions")}</h2>
             <div className="mt-4 flex flex-col gap-3">
               {loyaltyEnabled && (
-                <RewardsPanel slug={slug} phone={loyaltyPhone} onPhone={saveLoyaltyPhone} />
+                <RewardsPanel
+                  slug={slug}
+                  phone={loyaltyPhone}
+                  name={loyaltyName}
+                  onPhone={saveLoyaltyPhone}
+                />
               )}
               <CallWaiterButton slug={slug} tableToken={tableToken} />
               {payOnline && <PayOnlineButton slug={slug} tableToken={tableToken} />}

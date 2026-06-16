@@ -51,6 +51,60 @@ export async function getBalance(restaurantId: string, phone: string): Promise<n
   }
 }
 
+/** Enroll (or update) a member by phone + optional name. */
+export async function enrollAccount(
+  restaurantId: string,
+  phone: string,
+  name?: string | null,
+): Promise<{ ok: boolean; points?: number; error?: string }> {
+  const p = normalizePhone(phone);
+  if (!p || p.replace(/\D/g, "").length < 7) return { ok: false, error: "Enter a valid phone number." };
+  const cleanName = name?.trim() || null;
+  try {
+    const acct = await systemDb((tx) =>
+      tx.loyaltyAccount.upsert({
+        where: { restaurantId_phone: { restaurantId, phone: p } },
+        create: { restaurantId, phone: p, name: cleanName },
+        update: cleanName ? { name: cleanName } : {},
+      }),
+    );
+    return { ok: true, points: acct.points };
+  } catch {
+    return { ok: false, error: "Couldn't join rewards. Please try again." };
+  }
+}
+
+export interface LoyaltyMember {
+  phone: string;
+  name: string | null;
+  points: number;
+  totalEarned: number;
+  joinedAt: string;
+}
+
+/** All loyalty members for the admin dashboard (resilient to a missing table). */
+export async function getLoyaltyMembers(restaurantId: string): Promise<LoyaltyMember[]> {
+  try {
+    const rows = await tenantDb(restaurantId, (tx) =>
+      tx.loyaltyAccount.findMany({
+        where: { restaurantId },
+        orderBy: [{ points: "desc" }, { createdAt: "desc" }],
+        take: 500,
+        select: { phone: true, name: true, points: true, totalEarned: true, createdAt: true },
+      }),
+    );
+    return rows.map((r) => ({
+      phone: r.phone,
+      name: r.name,
+      points: r.points,
+      totalEarned: r.totalEarned,
+      joinedAt: r.createdAt.toISOString(),
+    }));
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Award points for a paid order. Idempotent per order (won't double-award).
  * Best-effort: never throws into the payment flow.

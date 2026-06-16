@@ -8,10 +8,12 @@ export function RequestBillButton({
   slug,
   tableToken,
   prominent = false,
+  onRequested,
 }: {
   slug: string;
   tableToken: string;
   prominent?: boolean;
+  onRequested?: () => void;
 }) {
   const [state, setState] = useState<"idle" | "busy" | "done">("idle");
   const [msg, setMsg] = useState<string | null>(null);
@@ -23,6 +25,7 @@ export function RequestBillButton({
     const res = await requestBill({ slug, tableToken });
     if (res.ok) {
       setState("done");
+      onRequested?.();
     } else {
       setState("idle");
       setMsg(res.error ?? t("billError"));
