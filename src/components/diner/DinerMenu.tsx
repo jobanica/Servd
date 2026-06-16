@@ -13,6 +13,7 @@ import { ItemModal } from "./ItemModal";
 import { CartDrawer } from "./CartDrawer";
 import { RequestBillButton } from "./RequestBillButton";
 import { PayOnlineButton } from "./PayOnlineButton";
+import { CallWaiterButton } from "./CallWaiterButton";
 import { OrderStatusTracker } from "./OrderStatusTracker";
 
 interface RestaurantBrand {
@@ -423,6 +424,7 @@ export function DinerMenu({
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-brand-ink/15" />
             <h2 className="font-heading text-lg font-bold text-brand-ink">{t("moreOptions")}</h2>
             <div className="mt-4 flex flex-col gap-3">
+              <CallWaiterButton slug={slug} tableToken={tableToken} />
               {payOnline && <PayOnlineButton slug={slug} tableToken={tableToken} />}
               <RequestBillButton slug={slug} tableToken={tableToken} />
               <a

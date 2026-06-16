@@ -34,6 +34,7 @@ export function CashierBoard({
   const [busy, setBusy] = useState<string | null>(null);
   const [newOrderOpen, setNewOrderOpen] = useState(false);
   const [discountOrder, setDiscountOrder] = useState<CashierTable["orders"][number] | null>(null);
+  const [waiterCalls, setWaiterCalls] = useState<{ id: string; tableNumber: string }[]>([]);
   const [popupDismissed, setPopupDismissed] = useState(false);
   const [readyDismissed, setReadyDismissed] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -100,6 +101,17 @@ export function CashierBoard({
     const channel = supabase
       .channel(`orders-${restaurantId}`)
       .on("broadcast", { event: "refresh" }, () => refresh())
+      .on("broadcast", { event: "waiter" }, (msg) => {
+        const tableNumber = String(
+          (msg as { payload?: { tableNumber?: string } }).payload?.tableNumber ?? "—",
+        );
+        chime();
+        setToast(`🔔 Table ${tableNumber} is calling a waiter`);
+        setWaiterCalls((prev) => [
+          ...prev,
+          { id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, tableNumber },
+        ]);
+      })
       .subscribe((status) => setLive(status === "SUBSCRIBED"));
     const poll = setInterval(refresh, 15000);
     return () => {
@@ -452,6 +464,41 @@ export function CashierBoard({
                     className="mt-3 w-full rounded-full bg-mango py-2 text-sm font-semibold text-white disabled:opacity-60"
                   >
                     Confirm served
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {/* Waiter-call popup */}
+      {waiterCalls.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
+          <div className="mt-6 w-full max-w-md rounded-tile bg-white p-5 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h2 className="font-heading text-lg font-extrabold">
+                🔔 {waiterCalls.length === 1 ? "Waiter requested" : `${waiterCalls.length} waiter calls`}
+              </h2>
+              <button
+                onClick={() => setWaiterCalls([])}
+                className="text-sm font-semibold text-plum-ink/50"
+              >
+                Clear all
+              </button>
+            </div>
+            <ul className="mt-4 space-y-2">
+              {waiterCalls.map((c) => (
+                <li
+                  key={c.id}
+                  className="flex items-center justify-between rounded-lg border border-mango/40 bg-mango/5 p-3"
+                >
+                  <span className="font-heading font-bold">Table {c.tableNumber}</span>
+                  <button
+                    onClick={() => setWaiterCalls((prev) => prev.filter((x) => x.id !== c.id))}
+                    className="rounded-full bg-mango px-4 py-1.5 text-sm font-semibold text-white"
+                  >
+                    Got it
                   </button>
                 </li>
               ))}

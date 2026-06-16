@@ -15,7 +15,12 @@ export function ordersChannel(restaurantId: string): string {
   return `orders-${restaurantId}`;
 }
 
-export async function notifyOrdersChanged(restaurantId: string): Promise<void> {
+/** Fire-and-forget broadcast of an event on a restaurant's orders channel. */
+async function broadcast(
+  restaurantId: string,
+  event: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return; // not configured (e.g. local without Supabase)
@@ -29,16 +34,22 @@ export async function notifyOrdersChanged(restaurantId: string): Promise<void> {
         Authorization: `Bearer ${key}`,
       },
       body: JSON.stringify({
-        messages: [
-          {
-            topic: ordersChannel(restaurantId),
-            event: "refresh",
-            payload: {},
-          },
-        ],
+        messages: [{ topic: ordersChannel(restaurantId), event, payload }],
       }),
     });
   } catch {
-    // ignore — polling fallback will still pick up the change
+    // ignore — best-effort
   }
+}
+
+export async function notifyOrdersChanged(restaurantId: string): Promise<void> {
+  await broadcast(restaurantId, "refresh", {});
+}
+
+/** Alert staff screens that a table is calling for a waiter. */
+export async function notifyWaiterCall(
+  restaurantId: string,
+  tableNumber: string,
+): Promise<void> {
+  await broadcast(restaurantId, "waiter", { tableNumber, at: Date.now() });
 }
