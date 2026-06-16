@@ -1,0 +1,169 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { getOrderStatus } from "@/server/orders/order-status";
+import { chime } from "@/lib/sound";
+
+type Stage = {
+  label: string;
+  detail: string;
+  tone: "wait" | "go" | "ready" | "done" | "bad";
+};
+
+function stageFor(status: string, paymentStatus: string): Stage {
+  switch (status) {
+    case "pending":
+      return {
+        label: "Order sent",
+        detail: "Waiting for the restaurant to confirm…",
+        tone: "wait",
+      };
+    case "new":
+    case "preparing":
+      return {
+        label: "Order accepted 🎉",
+        detail: "The kitchen is preparing your order. Keep this page open!",
+        tone: "go",
+      };
+    case "done":
+      return {
+        label: "Your order is ready! 🍽️",
+        detail:
+          paymentStatus === "paid"
+            ? "Enjoy your meal!"
+            : "Please get ready to pay. Enjoy your meal!",
+        tone: "ready",
+      };
+    case "closed":
+      return { label: "Order completed", detail: "Thanks for dining with us!", tone: "done" };
+    case "cancelled":
+      return {
+        label: "Order cancelled",
+        detail: "This order was cancelled. Please ask a staff member.",
+        tone: "bad",
+      };
+    default:
+      return { label: "Order placed", detail: "", tone: "wait" };
+  }
+}
+
+const TONE_CLASSES: Record<Stage["tone"], string> = {
+  wait: "border-mango/40 bg-mango/10",
+  go: "border-brand-primary/40 bg-brand-primary/10",
+  ready: "border-green-500/40 bg-green-500/10",
+  done: "border-plum-ink/15 bg-cream",
+  bad: "border-guava/40 bg-guava/10",
+};
+
+/** Browser push notification (best-effort; requires the user's permission). */
+function notify(title: string, body: string) {
+  try {
+    if (typeof Notification === "undefined") return;
+    if (Notification.permission === "granted") {
+      new Notification(title, { body });
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+export function OrderStatusTracker({
+  restaurantId,
+  slug,
+  tableToken,
+  orderId,
+  onDismiss,
+}: {
+  restaurantId: string;
+  slug: string;
+  tableToken: string;
+  orderId: string;
+  onDismiss: () => void;
+}) {
+  const [status, setStatus] = useState<string>("pending");
+  const [paymentStatus, setPaymentStatus] = useState<string>("unpaid");
+  const prevStatus = useRef<string>("pending");
+
+  const refresh = useCallback(async () => {
+    const res = await getOrderStatus(slug, tableToken, orderId);
+    if (!res) return;
+    setStatus(res.status);
+    setPaymentStatus(res.paymentStatus);
+
+    // Fire a phone notification + chime on the important transitions.
+    if (res.status !== prevStatus.current) {
+      if ((res.status === "new" || res.status === "preparing") && prevStatus.current === "pending") {
+        chime();
+        notify("Order accepted 🎉", "The kitchen is preparing your order.");
+      } else if (res.status === "done") {
+        chime();
+        notify("Your order is ready! 🍽️", "Please collect / get ready to pay.");
+      }
+      prevStatus.current = res.status;
+    }
+  }, [slug, tableToken, orderId]);
+
+  useEffect(() => {
+    // Ask for notification permission so we can ping the phone when ready.
+    try {
+      if (typeof Notification !== "undefined" && Notification.permission === "default") {
+        Notification.requestPermission().catch(() => {});
+      }
+    } catch {
+      /* ignore */
+    }
+
+    refresh();
+    const supabase = createSupabaseBrowserClient();
+    const channel = supabase
+      .channel(`orders-${restaurantId}`)
+      .on("broadcast", { event: "refresh" }, () => refresh())
+      .subscribe();
+    const poll = setInterval(refresh, 10000);
+    return () => {
+      clearInterval(poll);
+      supabase.removeChannel(channel);
+    };
+  }, [restaurantId, refresh]);
+
+  const stage = stageFor(status, paymentStatus);
+  const terminal = status === "closed" || status === "cancelled";
+
+  return (
+    <div className={`mt-3 rounded-tile border p-4 ${TONE_CLASSES[stage.tone]}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-heading text-base font-bold text-brand-ink">{stage.label}</p>
+          {stage.detail && <p className="mt-0.5 text-sm text-brand-ink/70">{stage.detail}</p>}
+          <p className="mt-1 text-xs text-brand-ink/40">Order #{orderId.slice(0, 8)}</p>
+        </div>
+        {terminal && (
+          <button onClick={onDismiss} className="text-sm font-semibold text-brand-ink/50">
+            Dismiss
+          </button>
+        )}
+      </div>
+
+      {/* Progress steps */}
+      {!terminal && (
+        <div className="mt-3 flex items-center gap-1">
+          {["Sent", "Preparing", "Ready"].map((label, i) => {
+            const reached =
+              (i === 0) ||
+              (i === 1 && (status === "new" || status === "preparing" || status === "done")) ||
+              (i === 2 && status === "done");
+            return (
+              <div key={label} className="flex-1">
+                <div
+                  className={`h-1.5 rounded-full ${reached ? "bg-brand-primary" : "bg-brand-ink/15"}`}
+                />
+                <p className="mt-1 text-center text-[10px] text-brand-ink/50">{label}</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

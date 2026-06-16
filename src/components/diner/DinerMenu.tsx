@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { formatPeso } from "@/lib/money";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -13,6 +13,7 @@ import { ItemModal } from "./ItemModal";
 import { CartDrawer } from "./CartDrawer";
 import { RequestBillButton } from "./RequestBillButton";
 import { PayOnlineButton } from "./PayOnlineButton";
+import { OrderStatusTracker } from "./OrderStatusTracker";
 
 interface RestaurantBrand {
   name: string;
@@ -41,6 +42,35 @@ export function DinerMenu({
 }) {
   const cart = useCart(restaurantId, tableToken);
   const t = useTranslations("diner");
+
+  // The diner's most recent order, tracked live (survives a page refresh).
+  const trackKey = `servd:order:${tableToken}`;
+  const [trackedOrderId, setTrackedOrderId] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(trackKey);
+      if (saved) setTrackedOrderId(saved);
+    } catch {
+      /* ignore */
+    }
+  }, [trackKey]);
+
+  function startTracking(orderId: string) {
+    setTrackedOrderId(orderId);
+    try {
+      localStorage.setItem(trackKey, orderId);
+    } catch {
+      /* ignore */
+    }
+  }
+  function stopTracking() {
+    setTrackedOrderId(null);
+    try {
+      localStorage.removeItem(trackKey);
+    } catch {
+      /* ignore */
+    }
+  }
 
   // Build the untrusted payload (ids + quantities only) and submit it. The
   // server re-validates and recomputes the real total.
@@ -96,6 +126,16 @@ export function DinerMenu({
         <div className="mt-3 rounded-lg bg-mango/15 px-3 py-2 text-sm text-brand-ink">
           {t("paymentConfirming")}
         </div>
+      )}
+
+      {trackedOrderId && (
+        <OrderStatusTracker
+          restaurantId={restaurantId}
+          slug={slug}
+          tableToken={tableToken}
+          orderId={trackedOrderId}
+          onDismiss={stopTracking}
+        />
       )}
 
       <div className="mt-3 flex flex-wrap items-center justify-end gap-3">
@@ -209,7 +249,10 @@ export function DinerMenu({
           onRemove={cart.removeLine}
           onClose={() => setCartOpen(false)}
           onPlaceOrder={submitOrder}
-          onPlaced={cart.clear}
+          onPlaced={(orderId) => {
+            cart.clear();
+            startTracking(orderId);
+          }}
         />
       )}
     </div>

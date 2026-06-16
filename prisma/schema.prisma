@@ -38,6 +38,7 @@ enum RestaurantStatus {
 }
 
 enum OrderStatus {
+  pending // diner placed via QR; awaiting cashier acceptance (not yet in kitchen)
   new
   preparing
   done

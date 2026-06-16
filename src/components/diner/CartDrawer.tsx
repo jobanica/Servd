@@ -20,7 +20,7 @@ export function CartDrawer({
   onRemove: (lineId: string) => void;
   onClose: () => void;
   onPlaceOrder: () => Promise<PlaceOrderResult>;
-  onPlaced: () => void;
+  onPlaced: (orderId: string) => void;
 }) {
   const total = cartTotal(lines);
   const [submitting, setSubmitting] = useState(false);
@@ -35,7 +35,7 @@ export function CartDrawer({
     setSubmitting(false);
     if (result.ok) {
       setPlacedId(result.orderId);
-      onPlaced(); // clear the cart
+      onPlaced(result.orderId); // clear the cart + start tracking the order
     } else {
       setError(result.error);
     }

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/server/tenancy/current-user";
 import { tenantDb } from "@/server/tenancy/scoped-db";
-import { getCashierTables } from "@/server/orders/cashier";
+import { getCashierTables, getIncomingOrders, type IncomingOrder } from "@/server/orders/cashier";
 import { CashierBoard } from "@/components/cashier/CashierBoard";
 import { StaffDataError } from "@/components/StaffDataError";
 import { signOut } from "../login/actions";
@@ -14,12 +14,16 @@ export default async function CashierHome() {
   }
 
   let initialTables;
+  let initialIncoming: IncomingOrder[] = [];
   try {
     const r = await tenantDb(user.restaurantId, (tx) =>
       tx.restaurant.findFirstOrThrow({ select: { status: true } }),
     );
     if (r.status === "suspended") return redirect("/suspended");
-    initialTables = await getCashierTables();
+    [initialTables, initialIncoming] = await Promise.all([
+      getCashierTables(),
+      getIncomingOrders(),
+    ]);
   } catch (e) {
     if (e && typeof e === "object" && "digest" in e && String((e as { digest?: string }).digest).startsWith("NEXT_REDIRECT")) {
       throw e;
@@ -62,7 +66,11 @@ export default async function CashierHome() {
         Open tables, payments, bill requests, and ticket printing.
       </p>
 
-      <CashierBoard restaurantId={user.restaurantId} initialTables={initialTables} />
+      <CashierBoard
+        restaurantId={user.restaurantId}
+        initialTables={initialTables}
+        initialIncoming={initialIncoming}
+      />
     </div>
   );
 }
