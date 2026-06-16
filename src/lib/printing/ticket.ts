@@ -28,6 +28,9 @@ export interface Ticket {
   website: string | null;
   footer: string | null;
   tableNumber: string;
+  orderType: "dine_in" | "takeout" | "delivery";
+  customerName: string | null;
+  customerAddress: string | null;
   orderRef: string; // short, human-readable
   placedAt: string; // ISO
   items: TicketLine[];
@@ -39,6 +42,9 @@ export interface Ticket {
 export interface TicketSource extends ReceiptBranding {
   restaurantName: string;
   tableNumber: string;
+  orderType?: "dine_in" | "takeout" | "delivery";
+  customerName?: string | null;
+  customerAddress?: string | null;
   orderId: string;
   createdAt: string;
   total: number;
@@ -55,6 +61,9 @@ export function buildTicket(src: TicketSource): Ticket {
     website: src.website ?? null,
     footer: src.footer ?? null,
     tableNumber: src.tableNumber,
+    orderType: src.orderType ?? "dine_in",
+    customerName: src.customerName ?? null,
+    customerAddress: src.customerAddress ?? null,
     orderRef: src.orderId.slice(0, 8).toUpperCase(),
     placedAt: src.createdAt,
     items: src.items.map((i) => ({
@@ -67,6 +76,13 @@ export function buildTicket(src: TicketSource): Ticket {
     discountAmount: src.discountAmount ?? 0,
     discountLabel: src.discountLabel ?? null,
   };
+}
+
+/** The big heading line: table number, or PICKUP/DELIVERY + customer. */
+export function ticketHeading(t: Ticket): string {
+  if (t.orderType === "takeout") return `PICKUP - ${t.customerName ?? ""}`.trim();
+  if (t.orderType === "delivery") return `DELIVERY - ${t.customerName ?? ""}`.trim();
+  return `TABLE ${t.tableNumber}`;
 }
 
 /** Centered header: restaurant name + any contact lines. */
@@ -113,9 +129,14 @@ export function ticketFooterLines(t: Ticket): string[] {
 /** Full plain-text rendering (HTML fallback / preview). */
 export function ticketLines(ticket: Ticket): string[] {
   const footer = ticketFooterLines(ticket);
+  const contact: string[] = [];
+  if (ticket.orderType === "delivery" && ticket.customerAddress) {
+    contact.push(ticket.customerAddress);
+  }
   return [
     ...ticketHeaderLines(ticket),
-    `TABLE ${ticket.tableNumber}`,
+    ticketHeading(ticket),
+    ...contact,
     ...ticketBodyLines(ticket),
     ...(footer.length ? ["", ...footer] : []),
   ];

@@ -1,6 +1,7 @@
 import {
   type Ticket,
   ticketHeaderLines,
+  ticketHeading,
   ticketBodyLines,
   ticketFooterLines,
 } from "./ticket";
@@ -68,7 +69,10 @@ export function encodeTicket(ticket: Ticket): Uint8Array {
   const header = ticketHeaderLines(ticket);
   b.bold(true).line(header[0]).bold(false);
   for (const line of header.slice(1)) b.line(line);
-  b.size(true).line(`TABLE ${ticket.tableNumber}`).size(false);
+  b.size(true).line(ticketHeading(ticket)).size(false);
+  if (ticket.orderType === "delivery" && ticket.customerAddress) {
+    b.line(ticket.customerAddress);
+  }
 
   // Body — order meta, items, totals.
   b.align("left");

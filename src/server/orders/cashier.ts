@@ -52,11 +52,46 @@ async function discountMap(
 }
 
 export interface CashierTable {
-  tableId: string;
-  tableNumber: string;
+  tableId: string; // group key (table id, or "order:<id>" for pickup/delivery)
+  tableNumber: string; // dine-in table label
+  kind: "dine_in" | "takeout" | "delivery";
+  label: string; // header label ("Table 5", "Pickup — Juan", "Delivery — Ana")
+  customerPhone: string | null;
+  customerAddress: string | null;
   orders: CashierOrder[];
   outstanding: number; // sum of unpaid order totals (centavos)
   billRequested: boolean;
+}
+
+/** Best-effort per-order type/customer lookup (columns may lag on prod). */
+async function orderMetaMap(
+  restaurantId: string,
+  ids: string[],
+): Promise<
+  Map<string, { orderType: string; customerName: string | null; customerPhone: string | null; customerAddress: string | null }>
+> {
+  if (ids.length === 0) return new Map();
+  try {
+    const rows = await tenantDb(restaurantId, (tx) =>
+      tx.order.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, orderType: true, customerName: true, customerPhone: true, customerAddress: true },
+      }),
+    );
+    return new Map(
+      rows.map((o) => [
+        o.id,
+        {
+          orderType: o.orderType,
+          customerName: o.customerName,
+          customerPhone: o.customerPhone,
+          customerAddress: o.customerAddress,
+        },
+      ]),
+    );
+  } catch {
+    return new Map();
+  }
 }
 
 /** A QR order awaiting the cashier's acceptance. */
@@ -109,14 +144,30 @@ export async function getCashierTables(): Promise<CashierTable[]> {
   }
 
   const discounts = await discountMap(staff.restaurantId, orders.map((o) => o.id));
+  const meta = await orderMetaMap(staff.restaurantId, orders.map((o) => o.id));
 
   const byTable = new Map<string, CashierTable>();
   for (const o of orders) {
-    const key = o.table.id;
+    const m = meta.get(o.id);
+    const kind = (m?.orderType ?? "dine_in") as CashierTable["kind"];
+    // Dine-in groups by table; pickup/delivery is one card per order.
+    const isDineIn = kind === "dine_in" || !!o.table;
+    const key = isDineIn ? `table:${o.table?.id ?? o.id}` : `order:${o.id}`;
+    const customerName = m?.customerName ?? null;
+    const label = isDineIn
+      ? `Table ${o.table?.tableNumber ?? "—"}`
+      : kind === "delivery"
+        ? `🛵 Delivery — ${customerName ?? "Customer"}`
+        : `🥡 Pickup — ${customerName ?? "Customer"}`;
+
     if (!byTable.has(key)) {
       byTable.set(key, {
-        tableId: o.table.id,
-        tableNumber: o.table.tableNumber,
+        tableId: key,
+        tableNumber: o.table?.tableNumber ?? "",
+        kind: isDineIn ? "dine_in" : kind,
+        label,
+        customerPhone: m?.customerPhone ?? null,
+        customerAddress: m?.customerAddress ?? null,
         orders: [],
         outstanding: 0,
         billRequested: false,
@@ -380,7 +431,11 @@ export async function getPosTables(): Promise<{ id: string; tableNumber: string 
  * accepted, so they go straight to the kitchen (status "new") and print.
  */
 export async function createCashierOrder(input: {
-  tableId: string;
+  orderType?: "dine_in" | "takeout" | "delivery";
+  tableId?: string;
+  customerName?: string;
+  customerPhone?: string;
+  customerAddress?: string;
   lines: OrderLineInput[];
 }): Promise<{ ok: boolean; tables?: CashierTable[]; error?: string }> {
   let staff;
@@ -389,7 +444,14 @@ export async function createCashierOrder(input: {
   } catch {
     return { ok: false, error: "Not allowed." };
   }
-  if (!input.tableId) return { ok: false, error: "Pick a table first." };
+  const orderType = input.orderType ?? "dine_in";
+  if (orderType === "dine_in" && !input.tableId) return { ok: false, error: "Pick a table first." };
+  if (orderType !== "dine_in" && !input.customerName?.trim()) {
+    return { ok: false, error: "Enter the customer's name." };
+  }
+  if (orderType === "delivery" && !input.customerAddress?.trim()) {
+    return { ok: false, error: "Enter the delivery address." };
+  }
   if (!input.lines?.length) return { ok: false, error: "Add at least one item." };
 
   let built;
@@ -403,26 +465,46 @@ export async function createCashierOrder(input: {
   let orderId: string;
   try {
     const order = await tenantDb(staff.restaurantId, async (tx) => {
-      const table = await tx.table.findFirst({
-        where: { id: input.tableId },
-        select: { id: true },
-      });
-      if (!table) throw new Error("That table doesn't exist.");
+      // Dine-in keeps the data minimal so it still works before the
+      // pickup/delivery migration runs (orderType defaults to dine_in in DB).
+      const base = {
+        restaurantId: staff.restaurantId,
+        status: "new" as const,
+        paymentStatus: "unpaid" as const,
+        total: built.total,
+        items: { create: orderItemsCreate(built.items) },
+      };
+
+      if (orderType === "dine_in") {
+        const table = await tx.table.findFirst({
+          where: { id: input.tableId },
+          select: { id: true },
+        });
+        if (!table) throw new Error("That table doesn't exist.");
+        return tx.order.create({ data: { ...base, tableId: table.id }, select: { id: true } });
+      }
+
       return tx.order.create({
         data: {
-          restaurantId: staff.restaurantId,
-          tableId: table.id,
-          status: "new",
-          paymentStatus: "unpaid",
-          total: built.total,
-          items: { create: orderItemsCreate(built.items) },
+          ...base,
+          orderType,
+          customerName: input.customerName?.trim() || null,
+          customerPhone: input.customerPhone?.trim() || null,
+          customerAddress: input.customerAddress?.trim() || null,
         },
         select: { id: true },
       });
     });
     orderId = order.id;
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Could not create the order." };
+    const msg = e instanceof Error ? e.message : "Could not create the order.";
+    if (/orderType|customer|column/i.test(msg)) {
+      return {
+        ok: false,
+        error: "Pickup/delivery needs a quick database update. Run the migration, then try again.",
+      };
+    }
+    return { ok: false, error: msg };
   }
 
   await notifyOrdersChanged(staff.restaurantId);

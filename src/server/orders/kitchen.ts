@@ -68,7 +68,40 @@ export async function getKitchenOrders(): Promise<KitchenOrder[]> {
       },
     }),
   );
-  return toKitchenOrders(orders);
+
+  // Best-effort pickup/delivery labels (columns may lag on prod).
+  const labels = new Map<string, string>();
+  try {
+    const meta = await tenantDb(staff.restaurantId, (tx) =>
+      tx.order.findMany({
+        where: { id: { in: orders.map((o) => o.id) }, orderType: { not: "dine_in" } },
+        select: { id: true, orderType: true, customerName: true },
+      }),
+    );
+    for (const m of meta) {
+      labels.set(
+        m.id,
+        `${m.orderType === "delivery" ? "🛵 Delivery" : "🥡 Pickup"} — ${m.customerName ?? "Customer"}`,
+      );
+    }
+  } catch {
+    /* not migrated yet */
+  }
+
+  return orders.map((o) => ({
+    id: o.id,
+    tableNumber: labels.get(o.id) ?? o.table?.tableNumber ?? "—",
+    status: o.status as KitchenOrder["status"],
+    createdAt: o.createdAt.toISOString(),
+    total: o.total,
+    items: o.items.map((it) => ({
+      id: it.id,
+      name: it.nameAtTime,
+      quantity: it.quantity,
+      note: it.note,
+      modifiers: it.modifiers.map((m) => m.nameAtTime),
+    })),
+  }));
 }
 
 /**

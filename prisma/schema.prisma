@@ -724,10 +724,20 @@ model LeaveBalance {
 // Orders
 // ----------------------------------------------------------------------------
 
+enum OrderType {
+  dine_in
+  takeout
+  delivery
+}
+
 model Order {
   id            String        @id @default(uuid())
   restaurantId  String
-  tableId       String
+  tableId       String?
+  orderType     OrderType     @default(dine_in)
+  customerName  String? // for pickup / delivery
+  customerPhone String?
+  customerAddress String? // for delivery
   status        OrderStatus   @default(new)
   billRequested Boolean       @default(false)
   paymentStatus PaymentStatus @default(unpaid)
@@ -740,7 +750,7 @@ model Order {
   updatedAt     DateTime      @updatedAt
 
   restaurant Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  table      Table       @relation(fields: [tableId], references: [id])
+  table      Table?      @relation(fields: [tableId], references: [id])
   items      OrderItem[]
   payments   Payment[]
   feedback   Feedback[]

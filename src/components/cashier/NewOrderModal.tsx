@@ -148,6 +148,10 @@ export function NewOrderModal({
   const [menu, setMenu] = useState<DinerCategory[] | null>(null);
   const [tables, setTables] = useState<{ id: string; tableNumber: string }[]>([]);
   const [tableId, setTableId] = useState("");
+  const [orderType, setOrderType] = useState<"dine_in" | "takeout" | "delivery">("dine_in");
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerAddress, setCustomerAddress] = useState("");
   const [lines, setLines] = useState<CartLine[]>([]);
   const [configItem, setConfigItem] = useState<DinerItem | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -195,7 +199,11 @@ export function NewOrderModal({
     setSubmitError(null);
     setSubmitting(true);
     const res = await createCashierOrder({
-      tableId,
+      orderType,
+      tableId: orderType === "dine_in" ? tableId : undefined,
+      customerName: orderType === "dine_in" ? undefined : customerName,
+      customerPhone: orderType === "dine_in" ? undefined : customerPhone,
+      customerAddress: orderType === "delivery" ? customerAddress : undefined,
       lines: lines.map((l) => ({
         itemId: l.itemId,
         quantity: l.quantity,
@@ -273,22 +281,64 @@ export function NewOrderModal({
 
             {/* Order summary */}
             <div className="flex flex-col border-t border-plum-ink/10 md:border-l md:border-t-0">
-              <div className="border-b border-plum-ink/10 p-4">
-                <label className="block text-xs font-semibold uppercase tracking-wide text-plum-ink/50">
-                  Table
-                </label>
-                <select
-                  value={tableId}
-                  onChange={(e) => setTableId(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
-                >
-                  <option value="">Select a table…</option>
-                  {tables.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      Table {t.tableNumber}
-                    </option>
+              <div className="space-y-3 border-b border-plum-ink/10 p-4">
+                {/* Order type */}
+                <div className="grid grid-cols-3 gap-1 rounded-lg bg-cream/60 p-1">
+                  {([
+                    ["dine_in", "Dine-in"],
+                    ["takeout", "Pickup"],
+                    ["delivery", "Delivery"],
+                  ] as const).map(([k, label]) => (
+                    <button
+                      key={k}
+                      onClick={() => setOrderType(k)}
+                      className={`rounded-md py-1.5 text-xs font-semibold ${
+                        orderType === k ? "bg-white text-brand-primary shadow-sm" : "text-plum-ink/60"
+                      }`}
+                    >
+                      {label}
+                    </button>
                   ))}
-                </select>
+                </div>
+
+                {orderType === "dine_in" ? (
+                  <select
+                    value={tableId}
+                    onChange={(e) => setTableId(e.target.value)}
+                    className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+                  >
+                    <option value="">Select a table…</option>
+                    {tables.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        Table {t.tableNumber}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="space-y-2">
+                    <input
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder="Customer name"
+                      className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+                    />
+                    <input
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      placeholder="Phone (optional)"
+                      className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+                    />
+                    {orderType === "delivery" && (
+                      <textarea
+                        value={customerAddress}
+                        onChange={(e) => setCustomerAddress(e.target.value)}
+                        rows={2}
+                        placeholder="Delivery address"
+                        className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+                      />
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="flex-1 overflow-y-auto p-4">
@@ -332,7 +382,13 @@ export function NewOrderModal({
                 </div>
                 <button
                   onClick={submit}
-                  disabled={submitting || lines.length === 0 || !tableId}
+                  disabled={
+                    submitting ||
+                    lines.length === 0 ||
+                    (orderType === "dine_in" && !tableId) ||
+                    (orderType !== "dine_in" && !customerName.trim()) ||
+                    (orderType === "delivery" && !customerAddress.trim())
+                  }
                   className="w-full rounded-full py-3 font-semibold btn-brand disabled:opacity-50"
                 >
                   {submitting ? "Sending to kitchen…" : "Send to kitchen"}

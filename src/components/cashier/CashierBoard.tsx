@@ -257,13 +257,18 @@ export function CashierBoard({
             }`}
           >
             <div className="flex items-center justify-between">
-              <h2 className="font-heading text-lg font-extrabold">Table {t.tableNumber}</h2>
+              <h2 className="font-heading text-lg font-extrabold">{t.label}</h2>
               {t.billRequested && (
                 <span className="rounded-full bg-guava/15 px-2 py-0.5 text-xs font-semibold text-guava">
                   Bill requested
                 </span>
               )}
             </div>
+            {(t.customerPhone || t.customerAddress) && (
+              <p className="mt-0.5 text-xs text-plum-ink/50">
+                {[t.customerPhone, t.customerAddress].filter(Boolean).join(" · ")}
+              </p>
+            )}
             <p className="mt-1 text-sm text-plum-ink/60">
               Outstanding: <span className="font-semibold">{formatPeso(t.outstanding)}</span>
             </p>

@@ -21,6 +21,7 @@ export async function getOrderTicket(
         total: true,
         createdAt: true,
         table: { select: { tableNumber: true } },
+        // orderType / customer columns may lag — read separately below.
         items: {
           select: {
             quantity: true,
@@ -33,9 +34,12 @@ export async function getOrderTicket(
     });
     if (!order) return null;
 
-    // Discount columns may not exist on a lagging DB — read best-effort.
+    // Discount + order-type columns may not exist on a lagging DB — best-effort.
     let discountAmount = 0;
     let discountLabel: string | null = null;
+    let orderType: "dine_in" | "takeout" | "delivery" = "dine_in";
+    let customerName: string | null = null;
+    let customerAddress: string | null = null;
     try {
       const disc = await tx.order.findFirst({
         where: { id: orderId },
@@ -43,6 +47,17 @@ export async function getOrderTicket(
       });
       discountAmount = disc?.discountAmount ?? 0;
       discountLabel = disc?.discountLabel ?? null;
+    } catch {
+      /* not migrated yet */
+    }
+    try {
+      const meta = await tx.order.findFirst({
+        where: { id: orderId },
+        select: { orderType: true, customerName: true, customerAddress: true },
+      });
+      orderType = (meta?.orderType ?? "dine_in") as typeof orderType;
+      customerName = meta?.customerName ?? null;
+      customerAddress = meta?.customerAddress ?? null;
     } catch {
       /* not migrated yet */
     }
@@ -54,6 +69,9 @@ export async function getOrderTicket(
       website: receipt.website,
       footer: receipt.footer,
       tableNumber: order.table?.tableNumber ?? "—",
+      orderType,
+      customerName,
+      customerAddress,
       orderId: order.id,
       createdAt: order.createdAt.toISOString(),
       total: order.total,

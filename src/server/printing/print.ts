@@ -51,20 +51,65 @@ async function loadTicket(restaurantId: string, orderId: string) {
         autoPrint: true,
       },
     });
+    // Explicit select (no SELECT *) so a lagging schema can't break printing.
     const order = await tx.order.findFirst({
       where: { id: orderId },
-      include: {
+      select: {
+        id: true,
+        total: true,
+        createdAt: true,
         table: { select: { tableNumber: true } },
-        items: { include: { modifiers: { select: { nameAtTime: true } } } },
+        items: {
+          select: {
+            quantity: true,
+            nameAtTime: true,
+            note: true,
+            modifiers: { select: { nameAtTime: true } },
+          },
+        },
       },
     });
-    return { restaurant, order };
+
+    // Newer columns (discount / order type) — read best-effort.
+    let meta: {
+      discountAmount: number;
+      discountLabel: string | null;
+      orderType: "dine_in" | "takeout" | "delivery";
+      customerName: string | null;
+      customerAddress: string | null;
+    } = { discountAmount: 0, discountLabel: null, orderType: "dine_in", customerName: null, customerAddress: null };
+    if (order) {
+      try {
+        const m = await tx.order.findFirst({
+          where: { id: orderId },
+          select: {
+            discountAmount: true,
+            discountLabel: true,
+            orderType: true,
+            customerName: true,
+            customerAddress: true,
+          },
+        });
+        if (m) {
+          meta = {
+            discountAmount: m.discountAmount ?? 0,
+            discountLabel: m.discountLabel ?? null,
+            orderType: (m.orderType ?? "dine_in") as typeof meta.orderType,
+            customerName: m.customerName ?? null,
+            customerAddress: m.customerAddress ?? null,
+          };
+        }
+      } catch {
+        /* not migrated yet */
+      }
+    }
+    return { restaurant, order, meta };
   });
 }
 
 /** Core dispatch usable both from the cashier action and from auto-print. */
 async function dispatch(restaurantId: string, orderId: string): Promise<PrintDispatch> {
-  const { restaurant, order } = await loadTicket(restaurantId, orderId);
+  const { restaurant, order, meta } = await loadTicket(restaurantId, orderId);
   if (!order) return { ok: false, handledOnServer: false, message: "Order not found." };
 
   const config = (restaurant.printerConfig as PrinterConfig | null) ?? {};
@@ -77,9 +122,14 @@ async function dispatch(restaurantId: string, orderId: string): Promise<PrintDis
     website: r.website,
     footer: r.footer,
     tableNumber: order.table?.tableNumber ?? "—",
+    orderType: meta.orderType,
+    customerName: meta.customerName,
+    customerAddress: meta.customerAddress,
     orderId: order.id,
     createdAt: order.createdAt.toISOString(),
     total: order.total,
+    discountAmount: meta.discountAmount,
+    discountLabel: meta.discountLabel,
     items: order.items.map((i) => ({
       quantity: i.quantity,
       name: i.nameAtTime,
