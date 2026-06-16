@@ -31,10 +31,7 @@ function stageFor(status: string, paymentStatus: string): Stage {
     case "done":
       return {
         label: "Your order is ready! 🍽️",
-        detail:
-          paymentStatus === "paid"
-            ? "Enjoy your meal!"
-            : "Please get ready to pay. Enjoy your meal!",
+        detail: "Enjoy your meal!",
         tone: "ready",
       };
     case "closed":
@@ -77,6 +74,7 @@ export function OrderStatusTracker({
   orderId,
   googleReviewUrl = null,
   onDismiss,
+  onStatus,
 }: {
   restaurantId: string;
   slug: string;
@@ -84,6 +82,7 @@ export function OrderStatusTracker({
   orderId: string;
   googleReviewUrl?: string | null;
   onDismiss: () => void;
+  onStatus?: (status: string) => void;
 }) {
   const t = useTranslations("feedback");
   const [status, setStatus] = useState<string>("pending");
@@ -100,6 +99,7 @@ export function OrderStatusTracker({
     if (!res) return;
     setStatus(res.status);
     setPaymentStatus(res.paymentStatus);
+    onStatus?.(res.status);
 
     // Fire a phone notification + chime on the important transitions.
     if (res.status !== prevStatus.current) {
@@ -108,7 +108,7 @@ export function OrderStatusTracker({
         notify("Order accepted 🎉", "The kitchen is preparing your order.");
       } else if (res.status === "done") {
         chime();
-        notify("Your order is ready! 🍽️", "Please collect / get ready to pay.");
+        notify("Your order is ready! 🍽️", "Enjoy your meal!");
       }
       prevStatus.current = res.status;
     }
@@ -124,7 +124,7 @@ export function OrderStatusTracker({
       }
       if (!rated) setShowFeedback(true);
     }
-  }, [slug, tableToken, orderId, ratedKey]);
+  }, [slug, tableToken, orderId, ratedKey, onStatus]);
 
   useEffect(() => {
     // Ask for notification permission so we can ping the phone when ready.

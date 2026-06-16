@@ -7,9 +7,11 @@ import { requestBill } from "@/server/orders/request-bill";
 export function RequestBillButton({
   slug,
   tableToken,
+  prominent = false,
 }: {
   slug: string;
   tableToken: string;
+  prominent?: boolean;
 }) {
   const [state, setState] = useState<"idle" | "busy" | "done">("idle");
   const [msg, setMsg] = useState<string | null>(null);
@@ -29,9 +31,27 @@ export function RequestBillButton({
 
   if (state === "done") {
     return (
-      <span className="text-sm font-semibold text-brand-primary">
+      <span
+        className={
+          prominent
+            ? "block rounded-full bg-white px-5 py-3 text-center text-sm font-semibold text-brand-primary shadow-lg ring-1 ring-brand-primary/20"
+            : "text-sm font-semibold text-brand-primary"
+        }
+      >
         {t("billRequested")}
       </span>
+    );
+  }
+
+  if (prominent) {
+    return (
+      <button
+        onClick={handle}
+        disabled={state === "busy"}
+        className="rounded-full px-6 py-3 text-sm font-semibold text-white shadow-lg btn-brand disabled:opacity-60"
+      >
+        {state === "busy" ? t("requesting") : `🧾 ${t("requestBill")}`}
+      </button>
     );
   }
 

@@ -128,6 +128,7 @@ export function DinerMenu({
   // Live tracking of the diner's most recent order (survives a refresh).
   const trackKey = `servd:order:${tableToken}`;
   const [trackedOrderId, setTrackedOrderId] = useState<string | null>(null);
+  const [orderStatus, setOrderStatus] = useState<string>("pending");
   useEffect(() => {
     try {
       const saved = localStorage.getItem(trackKey);
@@ -278,6 +279,7 @@ export function DinerMenu({
             orderId={trackedOrderId}
             googleReviewUrl={googleReviewUrl}
             onDismiss={stopTracking}
+            onStatus={setOrderStatus}
           />
         </div>
       )}
@@ -297,6 +299,13 @@ export function DinerMenu({
         )}
       </main>
 
+      {/* Floating "Request bill" — appears once the food is ready */}
+      {trackedOrderId && orderStatus === "done" && (
+        <div className="fixed inset-x-0 bottom-24 z-30 mx-auto flex max-w-md justify-center px-4">
+          <RequestBillButton slug={slug} tableToken={tableToken} prominent />
+        </div>
+      )}
+
       {/* Bottom navigation */}
       <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto flex max-w-md items-end justify-around border-t border-brand-ink/10 bg-white px-2 pb-1 pt-1 shadow-[0_-4px_16px_rgba(0,0,0,0.06)]">
         <NavButton label={t("navHome")} onClick={scrollTop}>
@@ -313,18 +322,18 @@ export function DinerMenu({
 
         {/* Center cart */}
         <button onClick={() => setCartOpen(true)} className="relative -mt-6 flex flex-col items-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-primary text-white shadow-lg ring-4 ring-white">
+          <span className="relative flex h-14 w-14 items-center justify-center rounded-full bg-brand-primary text-white shadow-lg ring-4 ring-white">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="9" cy="20" r="1.5" />
               <circle cx="18" cy="20" r="1.5" />
               <path d="M2 3h3l2.4 12.2a1.5 1.5 0 0 0 1.5 1.3h8.2a1.5 1.5 0 0 0 1.5-1.2L22 7H6" />
             </svg>
+            {count > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-mango px-1 text-[11px] font-bold text-white ring-2 ring-white">
+                {count}
+              </span>
+            )}
           </span>
-          {count > 0 && (
-            <span className="absolute -right-0.5 -top-7 flex h-5 min-w-5 items-center justify-center rounded-full bg-mango px-1 text-[11px] font-bold text-white ring-2 ring-white">
-              {count}
-            </span>
-          )}
         </button>
 
         <NavButton label={t("navPromos")} onClick={() => setSheetOpen(true)}>
