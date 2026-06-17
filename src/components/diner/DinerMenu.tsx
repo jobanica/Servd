@@ -11,7 +11,6 @@ import { placeOrder } from "@/server/orders/place-order";
 import type { PlaceOrderResult } from "@/lib/validation/order";
 import { ItemModal } from "./ItemModal";
 import { CartDrawer } from "./CartDrawer";
-import { DrinkUpsellSheet } from "./DrinkUpsellSheet";
 import { RequestBillButton } from "./RequestBillButton";
 import { PayOnlineButton } from "./PayOnlineButton";
 import { CallWaiterButton } from "./CallWaiterButton";
@@ -215,13 +214,14 @@ export function DinerMenu({
   const [rewardsOpen, setRewardsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [activeCat, setActiveCat] = useState("all");
-  const [upsellOpen, setUpsellOpen] = useState(false);
+  // Whether the drinks upsell has been resolved for the current cart session.
+  const [upsellDone, setUpsellDone] = useState(false);
 
   const count = cartCount(cart.lines);
   const total = cartTotal(cart.lines);
   const nonEmpty = categories.filter((c) => c.items.length > 0);
 
-  // Drinks / desserts, detected by category name — powers the post-order upsell.
+  // Drinks / desserts, detected by category name — powers the place-order upsell.
   const DRINK_RE = /drink|beverage|juice|coffee|tea|shake|soda|smoothie|frappe|lemonade|water|cola/i;
   const DESSERT_RE = /dessert|sweet|cake|ice ?cream|pastry|gelato|halo/i;
   const drinkItemIds = new Set(
@@ -231,6 +231,9 @@ export function DinerMenu({
     .filter((c) => DRINK_RE.test(c.name) || DESSERT_RE.test(c.name))
     .flatMap((c) => c.items.filter((i) => i.isAvailable))
     .slice(0, 6);
+  const cartHasDrink = cart.lines.some((l) => drinkItemIds.has(l.itemId));
+  // Show the upsell before sending the order when there's no drink yet.
+  const showUpsellFirst = upsellItems.length > 0 && !cartHasDrink && !upsellDone;
 
   // Flatten for searching / filtering.
   const flat = nonEmpty.flatMap((c) => c.items.map((it) => ({ it, catId: c.id, catName: c.name })));
@@ -417,6 +420,27 @@ export function DinerMenu({
         </NavButton>
       </nav>
 
+      {/* Cart drawer (rendered before the item modal so the modal stacks on top
+          when adding an upsell drink to the same order) */}
+      {cartOpen && (
+        <CartDrawer
+          lines={cart.lines}
+          onSetQty={cart.setQty}
+          onRemove={cart.removeLine}
+          onClose={() => setCartOpen(false)}
+          onPlaceOrder={submitOrder}
+          onPlaced={(orderId) => {
+            cart.clear();
+            startTracking(orderId);
+            setUpsellDone(false); // reset for the next order
+          }}
+          upsellItems={upsellItems}
+          showUpsellFirst={showUpsellFirst}
+          onPickUpsell={(it) => setActiveItem(it)}
+          onUpsellResolved={() => setUpsellDone(true)}
+        />
+      )}
+
       {/* Item detail / add modal */}
       {activeItem && (
         <ItemModal
@@ -426,36 +450,6 @@ export function DinerMenu({
             setActiveItem(null);
           }}
           onClose={() => setActiveItem(null)}
-        />
-      )}
-
-      {/* Cart drawer */}
-      {cartOpen && (
-        <CartDrawer
-          lines={cart.lines}
-          onSetQty={cart.setQty}
-          onRemove={cart.removeLine}
-          onClose={() => setCartOpen(false)}
-          onPlaceOrder={submitOrder}
-          onPlaced={(orderId) => {
-            // If they didn't order any drinks, nudge an add-on order.
-            const hadDrink = cart.lines.some((l) => drinkItemIds.has(l.itemId));
-            cart.clear();
-            startTracking(orderId);
-            if (!hadDrink && upsellItems.length > 0) setUpsellOpen(true);
-          }}
-        />
-      )}
-
-      {/* Post-order drinks & desserts upsell */}
-      {upsellOpen && (
-        <DrinkUpsellSheet
-          items={upsellItems}
-          onPick={(it) => {
-            setUpsellOpen(false);
-            setActiveItem(it);
-          }}
-          onClose={() => setUpsellOpen(false)}
         />
       )}
 

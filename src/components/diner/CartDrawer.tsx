@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { formatPeso } from "@/lib/money";
 import { cartTotal } from "@/lib/cart/pricing";
-import type { CartLine } from "@/lib/cart/types";
+import type { CartLine, DinerItem } from "@/lib/cart/types";
 import type { PlaceOrderResult } from "@/lib/validation/order";
 
 export function CartDrawer({
@@ -14,6 +14,10 @@ export function CartDrawer({
   onClose,
   onPlaceOrder,
   onPlaced,
+  upsellItems,
+  showUpsellFirst,
+  onPickUpsell,
+  onUpsellResolved,
 }: {
   lines: CartLine[];
   onSetQty: (lineId: string, qty: number) => void;
@@ -21,14 +25,21 @@ export function CartDrawer({
   onClose: () => void;
   onPlaceOrder: () => Promise<PlaceOrderResult>;
   onPlaced: (orderId: string) => void;
+  upsellItems: DinerItem[];
+  // True when the cart has no drink yet and the upsell hasn't been resolved.
+  showUpsellFirst: boolean;
+  onPickUpsell: (item: DinerItem) => void;
+  onUpsellResolved: () => void;
 }) {
   const total = cartTotal(lines);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [placedId, setPlacedId] = useState<string | null>(null);
+  const [view, setView] = useState<"cart" | "upsell">("cart");
   const t = useTranslations("cart");
 
-  async function handlePlace() {
+  // The actual order send — only happens once the upsell is resolved.
+  async function submit() {
     setSubmitting(true);
     setError(null);
     try {
@@ -44,6 +55,16 @@ export function CartDrawer({
     } finally {
       setSubmitting(false); // never leave the button stuck on "Sending…"
     }
+  }
+
+  // Tapping "Place order": offer the drinks upsell FIRST (so we don't send the
+  // order to the cashier until the diner decides — avoids a second order).
+  function handlePlaceClick() {
+    if (showUpsellFirst) {
+      setView("upsell");
+      return;
+    }
+    submit();
   }
 
   return (
@@ -66,6 +87,55 @@ export function CartDrawer({
               className="mt-6 w-full rounded-full py-3 font-semibold btn-brand"
             >
               {t("done")}
+            </button>
+          </div>
+        ) : view === "upsell" ? (
+          // Drinks & desserts upsell — shown before the order is sent.
+          <div>
+            <div className="flex items-center justify-between">
+              <h2 className="font-heading text-xl font-bold text-brand-ink">Anything to drink? 🥤</h2>
+              <button onClick={onClose} aria-label="Close" className="text-2xl leading-none text-plum-ink/40">×</button>
+            </div>
+            <p className="mt-1 text-sm text-plum-ink/60">
+              Add a drink or dessert to your order before we send it to the kitchen.
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              {upsellItems.map((it) => (
+                <button
+                  key={it.id}
+                  onClick={() => {
+                    // Keep the order pending — open the add modal so the diner can
+                    // add this drink to the SAME order, then place once.
+                    setView("cart");
+                    onUpsellResolved();
+                    onPickUpsell(it);
+                  }}
+                  className="overflow-hidden rounded-tile border border-plum-ink/10 bg-white text-left transition hover:shadow-md"
+                >
+                  {it.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={it.imageUrl} alt={it.name} className="h-24 w-full object-cover" />
+                  ) : (
+                    <div className="h-24 w-full" style={{ background: "var(--brand-gradient)", opacity: 0.12 }} />
+                  )}
+                  <div className="p-2.5">
+                    <p className="line-clamp-1 text-sm font-semibold text-brand-ink">{it.name}</p>
+                    <p className="mt-0.5 text-sm font-bold text-brand-primary">{formatPeso(it.price)}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => {
+                // Declined — NOW send the order to the cashier.
+                setView("cart");
+                onUpsellResolved();
+                submit();
+              }}
+              disabled={submitting}
+              className="mt-4 w-full rounded-full py-3 font-semibold btn-brand disabled:opacity-60"
+            >
+              {submitting ? t("sending") : "No thanks — place order"}
             </button>
           </div>
         ) : (
@@ -150,7 +220,7 @@ export function CartDrawer({
                   <span>{formatPeso(total)}</span>
                 </div>
                 <button
-                  onClick={handlePlace}
+                  onClick={handlePlaceClick}
                   disabled={submitting}
                   className="mt-4 w-full rounded-full py-3 font-semibold btn-brand disabled:opacity-60"
                 >
