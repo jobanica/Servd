@@ -1,4 +1,4 @@
-import "server-only";
+"use server";
 
 import { requireStaff } from "@/server/tenancy/current-user";
 import { getSalesReport, getExpenses } from "@/server/accounting/queries";
