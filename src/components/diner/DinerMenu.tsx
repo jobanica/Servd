@@ -16,6 +16,7 @@ import { PayOnlineButton } from "./PayOnlineButton";
 import { CallWaiterButton } from "./CallWaiterButton";
 import { RewardsPanel } from "./RewardsPanel";
 import { OrderStatusTracker } from "./OrderStatusTracker";
+import { BrandSplash } from "./BrandSplash";
 
 interface RestaurantBrand {
   name: string;
@@ -216,6 +217,8 @@ export function DinerMenu({
   const [activeCat, setActiveCat] = useState("all");
   // Whether the drinks upsell has been resolved for the current cart session.
   const [upsellDone, setUpsellDone] = useState(false);
+  // Branded welcome splash shown right after the QR scan, before the menu.
+  const [splashDone, setSplashDone] = useState(false);
 
   const count = cartCount(cart.lines);
   const total = cartTotal(cart.lines);
@@ -250,6 +253,16 @@ export function DinerMenu({
 
   return (
     <div className="relative mx-auto min-h-screen max-w-md bg-brand-surface pb-24">
+      {/* Branded welcome splash — shown first, before the menu */}
+      {!splashDone && (
+        <BrandSplash
+          name={brand.name}
+          logoUrl={brand.logoUrl}
+          tagline={brand.tagline}
+          onDone={() => setSplashDone(true)}
+        />
+      )}
+
       {/* App bar */}
       <header className="sticky top-0 z-20 border-b border-brand-ink/10 bg-brand-surface/95 backdrop-blur">
         <div className="flex items-center gap-3 px-4 py-3">
