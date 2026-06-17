@@ -24,6 +24,7 @@ export function AddEmployeeForm() {
         </select>
         <select name="payType" className="rounded-lg border border-plum-ink/15 px-3 py-2 text-sm">
           <option value="hourly">Hourly</option>
+          <option value="daily">Daily</option>
           <option value="monthly">Monthly</option>
         </select>
         <input name="payPesos" type="number" step="0.01" min="0" placeholder="Pay rate (₱)" className="rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />

@@ -33,7 +33,7 @@ const PLANS = [
   {
     id: "00000000-0000-0000-0000-0000000000a1",
     name: "Starter",
-    priceMonthly: 199900, // ₱1,999
+    priceMonthly: 99900, // ₱999
     limits: { maxTables: 10, maxStaff: 5, smsIncluded: 0 },
     modules: [],
   },
@@ -47,7 +47,7 @@ const PLANS = [
   {
     id: "00000000-0000-0000-0000-0000000000a3",
     name: "Business",
-    priceMonthly: 499900, // ₱4,999 — every feature (accounting, inventory, HR…)
+    priceMonthly: 349900, // ₱3,499 — every feature (accounting, inventory, HR…)
     limits: { smsIncluded: 1000 }, // unlimited tables & staff
     modules: ["inventory", "hris", "custom_domain"],
   },

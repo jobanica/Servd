@@ -5,7 +5,7 @@
 -- ordering/marketing) → Business ₱4,999 (every feature).
 
 -- 1) Prices + limits ---------------------------------------------------------
-UPDATE "plans" SET "priceMonthly" = 199900,
+UPDATE "plans" SET "priceMonthly" = 99900,
   "limits" = '{"maxTables":10,"maxStaff":5,"smsIncluded":0}'::jsonb
   WHERE "name" = 'Starter';
 
@@ -13,7 +13,7 @@ UPDATE "plans" SET "priceMonthly" = 299900,
   "limits" = '{"maxTables":30,"maxStaff":20,"smsIncluded":200}'::jsonb
   WHERE "name" = 'Pro';
 
-UPDATE "plans" SET "priceMonthly" = 499900,
+UPDATE "plans" SET "priceMonthly" = 349900,
   "limits" = '{"smsIncluded":1000}'::jsonb  -- unlimited tables & staff
   WHERE "name" = 'Business';
 

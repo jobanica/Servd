@@ -21,7 +21,7 @@ export interface TierInfo {
 export const TIER_INFO: Record<Tier, TierInfo> = {
   Starter: {
     name: "Starter",
-    pricePesos: 1999,
+    pricePesos: 999,
     tagline: "Everything to take orders and run service.",
     highlights: [
       "Up to 10 tables",
@@ -46,7 +46,7 @@ export const TIER_INFO: Record<Tier, TierInfo> = {
   },
   Business: {
     name: "Business",
-    pricePesos: 4999,
+    pricePesos: 3499,
     tagline: "The complete suite — every feature included.",
     highlights: [
       "Unlimited tables & staff",
@@ -60,7 +60,7 @@ export const TIER_INFO: Record<Tier, TierInfo> = {
 };
 
 /** The tier we visually highlight as the best value. */
-export const POPULAR_TIER: Tier = "Pro";
+export const POPULAR_TIER: Tier = "Business";
 
 /** A feature cell: included (true), not included (false), or a value label. */
 export type Cell = boolean | string;

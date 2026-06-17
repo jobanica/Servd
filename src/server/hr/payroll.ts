@@ -12,10 +12,10 @@ import { getPayrollConfig, computeStatutory } from "@/server/hr/payroll-config";
 export interface PayrollRow {
   employeeId: string;
   name: string;
-  payType: "hourly" | "monthly";
+  payType: "hourly" | "daily" | "monthly";
   hours: number;
   ot: number;
-  base: number; // monthly salary, or hourly gross
+  base: number; // monthly salary, daily gross, or hourly gross
   absentDays: number;
   absenceDeduction: number;
   lateMinutes: number;
@@ -31,7 +31,7 @@ export interface PayrollRow {
 const dayKey = (d: Date) => d.toISOString().slice(0, 10);
 
 interface Raw {
-  employees: { id: string; fullName: string; payType: "hourly" | "monthly"; payRate: number }[];
+  employees: { id: string; fullName: string; payType: "hourly" | "daily" | "monthly"; payRate: number }[];
   entries: { employeeId: string; clockIn: Date; clockOut: Date | null; breakMinutes: number }[];
   shifts: { employeeId: string | null; startsAt: Date }[];
 }
@@ -141,6 +141,31 @@ export async function getPayroll(
         net: Math.max(0, base - absDed - lateDed - stat.total),
       };
     }
+    if (e.payType === "daily") {
+      // Daily: paid the day rate for each day actually present (no absence
+      // deduction — you simply don't pay for days not worked).
+      const gross = e.payRate * present.size;
+      const stat = computeStatutory(gross, cfg);
+      return {
+        employeeId: e.id,
+        name: e.fullName,
+        payType: "daily" as const,
+        hours: agg.hours,
+        ot: agg.ot,
+        base: gross,
+        absentDays,
+        absenceDeduction: 0,
+        lateMinutes,
+        lateDeduction: 0,
+        sss: stat.sss,
+        philhealth: stat.philhealth,
+        pagibig: stat.pagibig,
+        bir: stat.bir,
+        thirteenthAccrual: stat.thirteenthAccrual,
+        net: Math.max(0, gross - stat.total),
+      };
+    }
+
     // Hourly: paid for hours worked; statutory deductions on the gross.
     const gross = grossPay("hourly", e.payRate, agg.hours);
     const stat = computeStatutory(gross, cfg);

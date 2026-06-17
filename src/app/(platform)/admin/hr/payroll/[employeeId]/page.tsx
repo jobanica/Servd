@@ -47,7 +47,7 @@ export default async function PayslipPage({
       {/* Summary */}
       <div className="rounded-tile border border-plum-ink/10 bg-white p-5">
         <dl className="space-y-2 text-sm">
-          <div className="flex justify-between"><dt className="text-plum-ink/60">{row.payType === "monthly" ? "Monthly salary" : `Hours (${row.hours})`}</dt><dd className="font-semibold">{formatPeso(row.base)}</dd></div>
+          <div className="flex justify-between"><dt className="text-plum-ink/60">{row.payType === "monthly" ? "Monthly salary" : row.payType === "daily" ? "Daily pay" : `Hours (${row.hours})`}</dt><dd className="font-semibold">{formatPeso(row.base)}</dd></div>
           {row.payType === "monthly" && (
             <>
               <div className="flex justify-between"><dt className="text-plum-ink/60">Absences ({row.absentDays} day{row.absentDays === 1 ? "" : "s"})</dt><dd className="text-guava">−{formatPeso(row.absenceDeduction)}</dd></div>

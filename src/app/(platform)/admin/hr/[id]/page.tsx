@@ -45,7 +45,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
           <label className="text-sm">Pay rate (₱)<input name="payPesos" type="number" step="0.01" defaultValue={(employee.payRate / 100).toFixed(2)} className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2" /></label>
           <label className="text-sm">Pay type
             <select name="payType" defaultValue={employee.payType} className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2">
-              <option value="hourly">Hourly</option><option value="monthly">Monthly</option>
+              <option value="hourly">Hourly</option><option value="daily">Daily</option><option value="monthly">Monthly</option>
             </select>
           </label>
           <label className="text-sm">Phone (login)<input name="phone" defaultValue={(employee.contactJson as { phone?: string } | null)?.phone ?? ""} className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2" /></label>
