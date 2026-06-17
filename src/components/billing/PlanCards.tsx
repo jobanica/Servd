@@ -20,15 +20,19 @@ export function PlanCards({
   mode,
   currentPlanName,
   planIdByName,
+  priceByTier,
 }: {
   mode: "signup" | "switch";
   currentPlanName?: string | null;
   planIdByName?: Record<string, string>;
+  // Live prices (pesos) per tier from the DB; falls back to catalog defaults.
+  priceByTier?: Partial<Record<Tier, number>>;
 }) {
   return (
     <div className="grid items-start gap-5 lg:grid-cols-3">
       {TIERS.map((tier: Tier) => {
         const info = TIER_INFO[tier];
+        const price = priceByTier?.[tier] ?? info.pricePesos;
         const featured = tier === POPULAR_TIER;
         const isCurrent = mode === "switch" && currentPlanName === tier;
         const planId = planIdByName?.[tier];
@@ -55,7 +59,7 @@ export function PlanCards({
             </div>
 
             <p className="mt-3">
-              <span className="font-heading text-4xl font-extrabold">₱{info.pricePesos.toLocaleString()}</span>
+              <span className="font-heading text-4xl font-extrabold">₱{price.toLocaleString()}</span>
               <span className="text-plum-ink/50">/month</span>
             </p>
             <p className="mt-1 text-sm text-plum-ink/60">{info.tagline}</p>

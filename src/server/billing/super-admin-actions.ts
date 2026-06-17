@@ -58,29 +58,34 @@ async function syncModules(tx: Prisma.TransactionClient, planId: string, modules
   }
 }
 
+function buildLimits(d: { maxTables?: number; maxStaff?: number; smsIncluded?: number }): Prisma.InputJsonValue {
+  // Only include defined keys — Prisma rejects `undefined` inside a Json value,
+  // and an omitted key means "unlimited" to the entitlements helper.
+  const limits: Record<string, number> = {};
+  if (d.maxTables !== undefined) limits.maxTables = d.maxTables;
+  if (d.maxStaff !== undefined) limits.maxStaff = d.maxStaff;
+  if (d.smsIncluded !== undefined) limits.smsIncluded = d.smsIncluded;
+  return limits;
+}
+
 export async function createPlan(_prev: ActionState, formData: FormData): Promise<ActionState> {
   await requireSuperAdmin();
   const parsed = parsePlan(formData);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   const { name, price, trialDays, maxTables, maxStaff, smsIncluded } = parsed.data;
   const priceMonthly = Math.round(price * 100);
-  const limits = { maxTables, maxStaff, smsIncluded };
+  const limits = buildLimits({ maxTables, maxStaff, smsIncluded });
   try {
     await systemDb(async (tx) => {
       const plan = await tx.plan.create({
-        data: {
-          name,
-          priceMonthly,
-          trialDays,
-          limits: limits as unknown as Prisma.InputJsonValue,
-          isActive: true,
-        },
+        data: { name, priceMonthly, trialDays, limits, isActive: true },
         select: { id: true },
       });
       await syncModules(tx, plan.id, modulesFromForm(formData));
     });
-  } catch {
-    return { error: "Couldn't create the plan." };
+  } catch (e) {
+    console.error("createPlan failed", e);
+    return { error: e instanceof Error ? e.message : "Couldn't create the plan." };
   }
   refresh();
   return { ok: true, message: `Plan “${name}” created.` };
@@ -93,7 +98,7 @@ export async function updatePlan(_prev: ActionState, formData: FormData): Promis
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   const { name, price, trialDays, maxTables, maxStaff, smsIncluded } = parsed.data;
   const priceMonthly = Math.round(price * 100);
-  const limits = { maxTables, maxStaff, smsIncluded };
+  const limits = buildLimits({ maxTables, maxStaff, smsIncluded });
   try {
     await systemDb(async (tx) => {
       await tx.plan.update({
@@ -102,13 +107,14 @@ export async function updatePlan(_prev: ActionState, formData: FormData): Promis
           name,
           priceMonthly,
           trialDays,
-          limits: limits as unknown as Prisma.InputJsonValue,
+          limits,
         },
       });
       await syncModules(tx, id, modulesFromForm(formData));
     });
-  } catch {
-    return { error: "Couldn't update the plan." };
+  } catch (e) {
+    console.error("updatePlan failed", e);
+    return { error: e instanceof Error ? e.message : "Couldn't update the plan." };
   }
   refresh();
   return { ok: true, message: "Plan updated." };

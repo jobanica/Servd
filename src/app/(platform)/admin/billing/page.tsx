@@ -6,6 +6,7 @@ import { cancelSubscription } from "@/server/billing/portal-actions";
 import { PayNowButton } from "@/components/admin/PayNowButton";
 import { PlanCards } from "@/components/billing/PlanCards";
 import { PlanComparisonTable } from "@/components/billing/PlanComparisonTable";
+import { getPublicPricing } from "@/server/billing/public-catalog";
 import { formatPeso } from "@/lib/money";
 
 function daysLeft(date: Date | null): number | null {
@@ -16,17 +17,19 @@ function daysLeft(date: Date | null): number | null {
 export default async function BillingPage() {
   // allowSuspended so an owner can pay their way out of suspension here.
   const { restaurantId } = await requireAdminPage({ allowSuspended: true });
-  const [sub, plans, invoices] = await Promise.all([
+  const [sub, plans, invoices, pricing] = await Promise.all([
     getCurrentSubscription(restaurantId),
     listPlans(),
     tenantDb(restaurantId, (tx) =>
       tx.restaurantInvoice.findMany({ orderBy: { createdAt: "desc" }, take: 12 }),
     ),
+    getPublicPricing(),
   ]);
 
   // Map each tier name to its real plan row so the cards can switch plans.
   const planIdByName: Record<string, string> = {};
   for (const p of plans) planIdByName[p.name] = p.id;
+  const priceByTier = { Starter: pricing.Starter.pricePesos, Pro: pricing.Pro.pricePesos, Business: pricing.Business.pricePesos };
 
   const trialDays = sub?.status === "trialing" ? daysLeft(sub.trialEndsAt) : null;
   const needsPayment = sub?.status === "past_due" || (sub?.status === "trialing" && !sub.providerPaymentMethodId);
@@ -93,13 +96,13 @@ export default async function BillingPage() {
         <p className="mb-4 text-sm text-plum-ink/55">
           Switch any time — changes apply to your next renewal.
         </p>
-        <PlanCards mode="switch" currentPlanName={sub?.plan.name ?? null} planIdByName={planIdByName} />
+        <PlanCards mode="switch" currentPlanName={sub?.plan.name ?? null} planIdByName={planIdByName} priceByTier={priceByTier} />
       </div>
 
       {/* Full comparison */}
       <div>
         <h2 className="mb-3 font-heading text-lg font-bold">Compare plans</h2>
-        <PlanComparisonTable />
+        <PlanComparisonTable limitsByTier={pricing} />
       </div>
 
       {/* Invoices */}

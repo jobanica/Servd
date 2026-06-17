@@ -1,5 +1,20 @@
 import { TIERS, POPULAR_TIER, FEATURE_GROUPS, type Cell, type FeatureRow, type Tier } from "@/lib/billing/catalog";
 
+export interface TierLimits {
+  maxTables?: number;
+  maxStaff?: number;
+  smsIncluded?: number;
+}
+
+/** Override the limit rows with live DB values when provided. */
+function liveCell(label: string, tier: Tier, limits: TierLimits | undefined, fallback: Cell): Cell {
+  if (!limits) return fallback;
+  if (label === "Tables included") return limits.maxTables != null ? String(limits.maxTables) : "Unlimited";
+  if (label === "Staff accounts") return limits.maxStaff != null ? String(limits.maxStaff) : "Unlimited";
+  if (label === "SMS marketing credits") return limits.smsIncluded ? `${limits.smsIncluded.toLocaleString()} / mo` : "—";
+  return fallback;
+}
+
 function CellView({ cell }: { cell: Cell }) {
   if (cell === true) {
     return (
@@ -13,7 +28,7 @@ function CellView({ cell }: { cell: Cell }) {
 }
 
 /** Full feature matrix across all three tiers (columns follow TIERS order). */
-export function PlanComparisonTable() {
+export function PlanComparisonTable({ limitsByTier }: { limitsByTier?: Partial<Record<Tier, TierLimits>> }) {
   return (
     <div className="overflow-x-auto rounded-tile border border-plum-ink/10 bg-white">
       <table className="w-full min-w-[520px] text-left text-sm">
@@ -34,7 +49,7 @@ export function PlanComparisonTable() {
         </thead>
         <tbody>
           {FEATURE_GROUPS.map((g) => (
-            <FeatureGroupRows key={g.group} group={g.group} rows={g.rows} />
+            <FeatureGroupRows key={g.group} group={g.group} rows={g.rows} limitsByTier={limitsByTier} />
           ))}
         </tbody>
       </table>
@@ -42,7 +57,15 @@ export function PlanComparisonTable() {
   );
 }
 
-function FeatureGroupRows({ group, rows }: { group: string; rows: FeatureRow[] }) {
+function FeatureGroupRows({
+  group,
+  rows,
+  limitsByTier,
+}: {
+  group: string;
+  rows: FeatureRow[];
+  limitsByTier?: Partial<Record<Tier, TierLimits>>;
+}) {
   return (
     <>
       <tr className="bg-cream/60">
@@ -58,7 +81,7 @@ function FeatureGroupRows({ group, rows }: { group: string; rows: FeatureRow[] }
               key={t}
               className={`px-4 py-2.5 text-center ${t === POPULAR_TIER ? "bg-brand-primary/[0.03]" : ""}`}
             >
-              <CellView cell={r[t]} />
+              <CellView cell={liveCell(r.label, t, limitsByTier?.[t], r[t])} />
             </td>
           ))}
         </tr>

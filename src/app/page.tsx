@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AppIcon, Wordmark } from "@/components/Wordmark";
 import { PlanCards } from "@/components/billing/PlanCards";
 import { PlanComparisonTable } from "@/components/billing/PlanComparisonTable";
+import { getPublicPricing } from "@/server/billing/public-catalog";
 
 /* ------------------------------------------------------------------ icons */
 function Icon({ path }: { path: string }) {
@@ -178,7 +179,10 @@ function AnalyticsMock() {
 }
 
 /* ------------------------------------------------------------------ page */
-export default function Home() {
+export default async function Home() {
+  const pricing = await getPublicPricing();
+  const priceByTier = { Starter: pricing.Starter.pricePesos, Pro: pricing.Pro.pricePesos, Business: pricing.Business.pricePesos };
+
   return (
     <main className="bg-cream text-plum-ink">
       <Nav />
@@ -338,7 +342,7 @@ export default function Home() {
           </p>
         </div>
         <div className="mt-12">
-          <PlanCards mode="signup" />
+          <PlanCards mode="signup" priceByTier={priceByTier} />
         </div>
 
         {/* Full feature comparison */}
@@ -346,7 +350,7 @@ export default function Home() {
           <h3 className="mb-4 text-center font-heading text-2xl font-extrabold tracking-tight">
             Compare every feature
           </h3>
-          <PlanComparisonTable />
+          <PlanComparisonTable limitsByTier={pricing} />
         </div>
       </section>
 
