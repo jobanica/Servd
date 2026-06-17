@@ -4,19 +4,21 @@ Supabase sends the **signup confirmation email**, so its look is configured in
 the Supabase dashboard — not in app code. This folder holds the branded HTML to
 paste in.
 
-## Apply the confirmation template
+## Apply the templates
 
-1. Supabase Dashboard → **Authentication → Emails** (Email Templates).
-2. Select **"Confirm signup"**.
-3. Paste the contents of [`confirm-signup.html`](./confirm-signup.html) into the
-   message body and **Save**. It already uses Supabase's `{{ .ConfirmationURL }}`
-   variable, so the confirm button works as-is.
-4. (Optional) Set the **Subject** to something like:
-   `Confirm your email · Servd`
+Supabase Dashboard → **Authentication → Emails** (Email Templates). For each
+template below, select it, paste the matching file's contents into the message
+body, and **Save**. They already use Supabase's `{{ .ConfirmationURL }}`
+variable, so the buttons work as-is.
 
-> The same branded layout can be reused for the other templates ("Magic Link",
-> "Reset password", "Change email") — just swap the heading/body copy and keep
-> the relevant variable (`{{ .ConfirmationURL }}` / `{{ .Token }}`).
+| Supabase template       | File                                                   | Suggested subject                |
+| ----------------------- | ------------------------------------------------------ | -------------------------------- |
+| Confirm signup          | [`confirm-signup.html`](./confirm-signup.html)         | `Confirm your email · Servd`     |
+| Reset password          | [`reset-password.html`](./reset-password.html)         | `Reset your password · Servd`    |
+| Magic Link              | [`magic-link.html`](./magic-link.html)                 | `Your sign-in link · Servd`      |
+| Change email address    | [`change-email.html`](./change-email.html)             | `Confirm your new email · Servd` |
+
+All four share the same branded layout, so every auth email matches.
 
 ## Make the email come "from" your brand (sender name)
 
