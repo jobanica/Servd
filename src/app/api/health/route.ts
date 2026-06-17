@@ -1,4 +1,5 @@
 import { systemDb } from "@/server/tenancy/scoped-db";
+import { getBillingStatus } from "@/server/billing/platform-settings";
 
 /**
  * Diagnostics: confirms env vars are present, the DB is reachable, the schema is
@@ -39,13 +40,23 @@ export async function GET() {
           (table_name = 'orders' and column_name = 'orderType') or
           (table_name = 'orders' and column_name = 'customerLat') or
           (table_name = 'orders' and column_name = 'deliveryStatus') or
+          (table_name = 'orders' and column_name = 'voidedAt') or
           (table_name = 'restaurants' and column_name = 'loyaltyEnabled') or
+          (table_name = 'restaurants' and column_name = 'cashierVoidPin') or
           (table_name = 'restaurants' and column_name = 'customDomain')
         )`;
       const tables = await tx.$queryRaw<{ table_name: string }[]>`
         select table_name from information_schema.tables
         where table_schema = 'public' and table_name in
-          ('plan_modules','restaurant_invoices','menu_item_translations','inventory_items','employees','promotions','loyalty_accounts','expenses','payroll_settings','menu_item_costs','storefront_settings')`;
+          ('plan_modules','restaurant_invoices','menu_item_translations','inventory_items','employees','promotions','loyalty_accounts','expenses','payroll_settings','menu_item_costs','storefront_settings','cash_movements','platform_settings')`;
+
+      // Is the "daily" pay type present on the PayType enum?
+      const enumRows = await tx.$queryRaw<{ ok: boolean }[]>`
+        select exists(
+          select 1 from pg_type t join pg_enum e on e.enumtypid = t.oid
+          where t.typname = 'PayType' and e.enumlabel = 'daily'
+        ) as ok`;
+      const hasDailyPayType = enumRows[0]?.ok === true;
 
       const have = new Set([
         ...cols.map((c) => `${c.table_name}.${c.column_name}`),
@@ -61,7 +72,9 @@ export async function GET() {
         "orders.orderType",
         "orders.customerLat",
         "orders.deliveryStatus",
+        "orders.voidedAt",
         "restaurants.loyaltyEnabled",
+        "restaurants.cashierVoidPin",
         "restaurants.customDomain",
         "plan_modules",
         "restaurant_invoices",
@@ -74,8 +87,11 @@ export async function GET() {
         "payroll_settings",
         "menu_item_costs",
         "storefront_settings",
+        "cash_movements",
+        "platform_settings",
       ];
       const missing = expected.filter((e) => !have.has(e));
+      if (!hasDailyPayType) missing.push("PayType.daily");
 
       return {
         connected: true,
@@ -88,11 +104,19 @@ export async function GET() {
     db = { connected: false, error: e instanceof Error ? e.message : "DB error" };
   }
 
+  // Subscription billing provider status (Xendit / PayMongo).
+  let billing: { provider: string | null; xenditConfigured: boolean } = { provider: null, xenditConfigured: false };
+  try {
+    billing = await getBillingStatus();
+  } catch {
+    /* platform_settings not migrated yet */
+  }
+
   const healthy =
     Object.values(env).every((v) => v !== false && v !== null) &&
     db.connected === true &&
     db.schemaCurrent === true &&
     (db.planCount as number) > 0;
 
-  return Response.json({ healthy, env, features, db }, { status: healthy ? 200 : 503 });
+  return Response.json({ healthy, env, features, db, billing }, { status: healthy ? 200 : 503 });
 }
