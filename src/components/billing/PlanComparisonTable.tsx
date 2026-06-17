@@ -1,4 +1,4 @@
-import { TIERS, POPULAR_TIER, FEATURE_GROUPS, type Cell } from "@/lib/billing/catalog";
+import { TIERS, POPULAR_TIER, FEATURE_GROUPS, type Cell, type FeatureRow, type Tier } from "@/lib/billing/catalog";
 
 function CellView({ cell }: { cell: Cell }) {
   if (cell === true) {
@@ -12,7 +12,7 @@ function CellView({ cell }: { cell: Cell }) {
   return <span className="text-sm font-medium text-plum-ink/80">{cell}</span>;
 }
 
-/** Full feature matrix across all three tiers. */
+/** Full feature matrix across all three tiers (columns follow TIERS order). */
 export function PlanComparisonTable() {
   return (
     <div className="overflow-x-auto rounded-tile border border-plum-ink/10 bg-white">
@@ -42,28 +42,25 @@ export function PlanComparisonTable() {
   );
 }
 
-function FeatureGroupRows({
-  group,
-  rows,
-}: {
-  group: string;
-  rows: { label: string; Starter: Cell; Business: Cell; Pro: Cell }[];
-}) {
+function FeatureGroupRows({ group, rows }: { group: string; rows: FeatureRow[] }) {
   return (
     <>
       <tr className="bg-cream/60">
-        <td colSpan={4} className="px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-plum-ink/45">
+        <td colSpan={TIERS.length + 1} className="px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-plum-ink/45">
           {group}
         </td>
       </tr>
       {rows.map((r) => (
         <tr key={r.label} className="border-t border-plum-ink/5">
           <td className="px-4 py-2.5 text-plum-ink/75">{r.label}</td>
-          <td className="px-4 py-2.5 text-center"><CellView cell={r.Starter} /></td>
-          <td className={`px-4 py-2.5 text-center ${POPULAR_TIER === "Business" ? "bg-brand-primary/[0.03]" : ""}`}>
-            <CellView cell={r.Business} />
-          </td>
-          <td className="px-4 py-2.5 text-center"><CellView cell={r.Pro} /></td>
+          {TIERS.map((t: Tier) => (
+            <td
+              key={t}
+              className={`px-4 py-2.5 text-center ${t === POPULAR_TIER ? "bg-brand-primary/[0.03]" : ""}`}
+            >
+              <CellView cell={r[t]} />
+            </td>
+          ))}
         </tr>
       ))}
     </>

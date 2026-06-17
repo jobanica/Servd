@@ -26,8 +26,9 @@ async function asSuper(fn) {
   });
 }
 
-// Plan tiers (centavos). Tiers ascend: Starter (essentials) → Business (every
-// feature) → Pro (everything + custom domain). Mirrors src/lib/billing/catalog.ts.
+// Plan tiers (centavos). Tiers ascend: Starter (essentials) → Pro (brand online
+// + marketing, adds custom domain) → Business (everything). Mirrors
+// src/lib/billing/catalog.ts.
 const PLANS = [
   {
     id: "00000000-0000-0000-0000-0000000000a1",
@@ -37,16 +38,16 @@ const PLANS = [
     modules: [],
   },
   {
-    id: "00000000-0000-0000-0000-0000000000a3",
-    name: "Business",
-    priceMonthly: 299900, // ₱2,999 — all features except custom domain
-    limits: { maxTables: 30, maxStaff: 20, smsIncluded: 200 },
-    modules: ["inventory", "hris"],
-  },
-  {
     id: "00000000-0000-0000-0000-0000000000a2",
     name: "Pro",
-    priceMonthly: 499900, // ₱4,999 — everything in Business + custom domain
+    priceMonthly: 299900, // ₱2,999 — adds custom domain + online ordering/marketing
+    limits: { maxTables: 30, maxStaff: 20, smsIncluded: 200 },
+    modules: ["custom_domain"],
+  },
+  {
+    id: "00000000-0000-0000-0000-0000000000a3",
+    name: "Business",
+    priceMonthly: 499900, // ₱4,999 — every feature (accounting, inventory, HR…)
     limits: { smsIncluded: 1000 }, // unlimited tables & staff
     modules: ["inventory", "hris", "custom_domain"],
   },

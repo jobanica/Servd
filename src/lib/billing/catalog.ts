@@ -3,12 +3,12 @@
  * which features it includes. Drives the public pricing page AND the in-app
  * billing comparison so they can never drift apart.
  *
- * Tiers ascend: Starter (essentials) → Business (every feature) → Pro
- * (everything in Business plus a custom domain). Pure data, safe to import in
- * both server and client components.
+ * Tiers ascend: Starter (essentials) → Pro (your brand online + marketing,
+ * adds a custom domain) → Business (the complete suite — every feature). Pure
+ * data, safe to import in both server and client components.
  */
 
-export const TIERS = ["Starter", "Business", "Pro"] as const;
+export const TIERS = ["Starter", "Pro", "Business"] as const;
 export type Tier = (typeof TIERS)[number];
 
 export interface TierInfo {
@@ -31,35 +31,36 @@ export const TIER_INFO: Record<Tier, TierInfo> = {
       "Feedback & Google reviews",
     ],
   },
-  Business: {
-    name: "Business",
+  Pro: {
+    name: "Pro",
     pricePesos: 2999,
-    tagline: "Every feature to grow — the full toolkit.",
+    tagline: "Your brand online — domain, ordering & marketing.",
     highlights: [
       "Up to 30 tables",
       "Everything in Starter, plus:",
+      "Your own custom domain",
       "Online ordering, pickup & delivery",
       "Online payments (GCash / card)",
       "Loyalty, promotions, customers & SMS",
-      "Accounting, inventory & HR / payroll",
     ],
   },
-  Pro: {
-    name: "Pro",
+  Business: {
+    name: "Business",
     pricePesos: 4999,
-    tagline: "Everything in Business, plus your own domain.",
+    tagline: "The complete suite — every feature included.",
     highlights: [
       "Unlimited tables & staff",
-      "Everything in Business, plus:",
-      "Your own custom domain",
+      "Everything in Pro, plus:",
+      "Accounting (sales, VAT, P&L)",
+      "Inventory + food COGS",
+      "HR, attendance & payroll",
       "1,000 SMS credits / month",
-      "Priority support",
     ],
   },
 };
 
 /** The tier we visually highlight as the best value. */
-export const POPULAR_TIER: Tier = "Business";
+export const POPULAR_TIER: Tier = "Pro";
 
 /** A feature cell: included (true), not included (false), or a value label. */
 export type Cell = boolean | string;
@@ -67,8 +68,8 @@ export type Cell = boolean | string;
 export interface FeatureRow {
   label: string;
   Starter: Cell;
-  Business: Cell;
   Pro: Cell;
+  Business: Cell;
 }
 
 export interface FeatureGroup {
@@ -80,47 +81,47 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
   {
     group: "Ordering & service",
     rows: [
-      { label: "QR dine-in ordering", Starter: true, Business: true, Pro: true },
-      { label: "Cashier POS", Starter: true, Business: true, Pro: true },
-      { label: "Real-time kitchen display", Starter: true, Business: true, Pro: true },
-      { label: "Online ordering website", Starter: false, Business: true, Pro: true },
-      { label: "Pickup & delivery orders", Starter: false, Business: true, Pro: true },
-      { label: "Tables included", Starter: "10", Business: "30", Pro: "Unlimited" },
-      { label: "Staff accounts", Starter: "5", Business: "20", Pro: "Unlimited" },
+      { label: "QR dine-in ordering", Starter: true, Pro: true, Business: true },
+      { label: "Cashier POS", Starter: true, Pro: true, Business: true },
+      { label: "Real-time kitchen display", Starter: true, Pro: true, Business: true },
+      { label: "Online ordering website", Starter: false, Pro: true, Business: true },
+      { label: "Pickup & delivery orders", Starter: false, Pro: true, Business: true },
+      { label: "Tables included", Starter: "10", Pro: "30", Business: "Unlimited" },
+      { label: "Staff accounts", Starter: "5", Pro: "20", Business: "Unlimited" },
     ],
   },
   {
     group: "Payments",
     rows: [
-      { label: "Cash & card at the counter", Starter: true, Business: true, Pro: true },
-      { label: "Online payment (GCash / card)", Starter: false, Business: true, Pro: true },
-      { label: "Auto-printed receipts with QR", Starter: true, Business: true, Pro: true },
+      { label: "Cash & card at the counter", Starter: true, Pro: true, Business: true },
+      { label: "Online payment (GCash / card)", Starter: false, Pro: true, Business: true },
+      { label: "Auto-printed receipts with QR", Starter: true, Pro: true, Business: true },
     ],
   },
   {
     group: "Marketing & growth",
     rows: [
-      { label: "Feedback & Google reviews", Starter: true, Business: true, Pro: true },
-      { label: "Loyalty & rewards", Starter: false, Business: true, Pro: true },
-      { label: "Promotions", Starter: false, Business: true, Pro: true },
-      { label: "Customer book + CSV export", Starter: false, Business: true, Pro: true },
-      { label: "SMS marketing credits", Starter: "—", Business: "200 / mo", Pro: "1,000 / mo" },
+      { label: "Feedback & Google reviews", Starter: true, Pro: true, Business: true },
+      { label: "Loyalty & rewards", Starter: false, Pro: true, Business: true },
+      { label: "Promotions", Starter: false, Pro: true, Business: true },
+      { label: "Customer book + CSV export", Starter: false, Pro: true, Business: true },
+      { label: "SMS marketing credits", Starter: "—", Pro: "200 / mo", Business: "1,000 / mo" },
     ],
   },
   {
     group: "Back office",
     rows: [
-      { label: "Analytics & reports", Starter: true, Business: true, Pro: true },
-      { label: "Accounting (sales, VAT, P&L)", Starter: false, Business: true, Pro: true },
-      { label: "Inventory + food COGS", Starter: false, Business: true, Pro: true },
-      { label: "HR, attendance & payroll", Starter: false, Business: true, Pro: true },
+      { label: "Analytics & reports", Starter: true, Pro: true, Business: true },
+      { label: "Accounting (sales, VAT, P&L)", Starter: false, Pro: false, Business: true },
+      { label: "Inventory + food COGS", Starter: false, Pro: false, Business: true },
+      { label: "HR, attendance & payroll", Starter: false, Pro: false, Business: true },
     ],
   },
   {
     group: "Branding",
     rows: [
-      { label: "Custom logo & colors", Starter: true, Business: true, Pro: true },
-      { label: "Custom domain", Starter: false, Business: false, Pro: true },
+      { label: "Custom logo & colors", Starter: true, Pro: true, Business: true },
+      { label: "Custom domain", Starter: false, Pro: true, Business: true },
     ],
   },
 ];
