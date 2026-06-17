@@ -11,6 +11,7 @@ export type SignupState = { ok?: boolean; error?: string } | null;
 
 const schema = z.object({
   restaurantName: z.string().trim().min(2, "Restaurant name is required").max(80),
+  phone: z.string().trim().min(7, "Enter a valid phone number").max(30),
   email: z.string().trim().email("Enter a valid email"),
   password: z.string().min(8, "Password must be at least 8 characters"),
 });
@@ -27,13 +28,14 @@ export async function signUpRestaurant(
 ): Promise<SignupState> {
   const parsed = schema.safeParse({
     restaurantName: formData.get("restaurantName"),
+    phone: formData.get("phone"),
     email: formData.get("email"),
     password: formData.get("password"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
-  const { restaurantName, email, password } = parsed.data;
+  const { restaurantName, phone, email, password } = parsed.data;
 
   try {
     const supabase = await createSupabaseServerClient();
@@ -63,6 +65,8 @@ export async function signUpRestaurant(
             displayName: restaurantName,
             slug,
             status: "active",
+            // Seed the contact phone — it also shows on printed receipts.
+            printerConfig: { receipt: { phone } },
             staff: { create: { authUserId, role: "admin", email } },
           },
           select: { id: true },

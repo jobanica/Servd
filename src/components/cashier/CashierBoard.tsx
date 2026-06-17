@@ -19,6 +19,7 @@ import { PrintTicketButton } from "./PrintTicketButton";
 import { NewOrderModal } from "./NewOrderModal";
 import { DiscountModal } from "./DiscountModal";
 import { LoyaltyRedeemModal } from "./LoyaltyRedeemModal";
+import { AddCustomerModal } from "./AddCustomerModal";
 
 export function CashierBoard({
   restaurantId,
@@ -34,6 +35,7 @@ export function CashierBoard({
   const [live, setLive] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [newOrderOpen, setNewOrderOpen] = useState(false);
+  const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   const [discountOrder, setDiscountOrder] = useState<CashierTable["orders"][number] | null>(null);
   const [loyaltyOrderId, setLoyaltyOrderId] = useState<string | null>(null);
   const [waiterCalls, setWaiterCalls] = useState<{ id: string; tableNumber: string }[]>([]);
@@ -242,6 +244,12 @@ export function CashierBoard({
               🍽️ {readyOrders.length} ready
             </button>
           )}
+          <button
+            onClick={() => setAddCustomerOpen(true)}
+            className="rounded-full border border-plum-ink/15 bg-white px-4 py-2 text-sm font-semibold text-plum-ink hover:bg-cream"
+          >
+            + Customer
+          </button>
           <button
             onClick={() => setNewOrderOpen(true)}
             className="rounded-full px-4 py-2 text-sm font-semibold btn-brand"
@@ -574,6 +582,8 @@ export function CashierBoard({
           onApplied={(t) => setTables(t)}
         />
       )}
+
+      {addCustomerOpen && <AddCustomerModal onClose={() => setAddCustomerOpen(false)} />}
     </div>
   );
 }

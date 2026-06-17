@@ -55,6 +55,19 @@ export default function SignupPage() {
           />
         </div>
         <div>
+          <label className="block text-sm font-medium" htmlFor="phone">
+            {t("phone")}
+          </label>
+          <input
+            id="phone"
+            name="phone"
+            type="tel"
+            required
+            autoComplete="tel"
+            className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2"
+          />
+        </div>
+        <div>
           <label className="block text-sm font-medium" htmlFor="email">
             {t("yourEmail")}
           </label>
