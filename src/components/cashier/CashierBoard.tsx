@@ -399,13 +399,17 @@ export function CashierBoard({
                         </button>
                       </>
                     )}
-                    <button
-                      onClick={() => close(o.id)}
-                      disabled={busy === o.id}
-                      className="rounded-lg px-3 py-1.5 text-xs font-semibold btn-brand disabled:opacity-60"
-                    >
-                      {o.paymentStatus === "paid" ? "Done" : "Close"}
-                    </button>
+                    {/* Only paid orders can be closed/dismissed — an unpaid open
+                        order stays on the board until the customer pays. */}
+                    {o.paymentStatus === "paid" && (
+                      <button
+                        onClick={() => close(o.id)}
+                        disabled={busy === o.id}
+                        className="rounded-lg px-3 py-1.5 text-xs font-semibold btn-brand disabled:opacity-60"
+                      >
+                        Done
+                      </button>
+                    )}
                   </div>
                 </li>
               ))}
