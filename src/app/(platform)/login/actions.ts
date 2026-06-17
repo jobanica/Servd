@@ -37,3 +37,17 @@ export async function signOut() {
   await supabase.auth.signOut();
   redirect("/login");
 }
+
+/** Sends a password-reset email. Always reports success (no account enumeration). */
+export async function requestPasswordReset(_prev: unknown, formData: FormData) {
+  const email = String(formData.get("email") ?? "").trim();
+  if (!email) return { error: "Enter your email address." };
+  const supabase = await createSupabaseServerClient();
+  const base = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  try {
+    await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${base}/reset-password` });
+  } catch {
+    /* ignore — still report success */
+  }
+  return { ok: true };
+}

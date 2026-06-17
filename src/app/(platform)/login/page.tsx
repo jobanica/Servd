@@ -47,6 +47,12 @@ export default function LoginPage() {
           />
         </div>
 
+        <div className="text-right">
+          <Link href="/forgot-password" className="text-sm font-semibold text-brand-primary">
+            Forgot password?
+          </Link>
+        </div>
+
         {state?.error && (
           <p className="text-sm text-guava">{state.error}</p>
         )}
