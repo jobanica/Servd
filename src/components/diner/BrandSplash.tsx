@@ -3,21 +3,12 @@
 import { useEffect, useState } from "react";
 
 /**
- * Branded welcome splash shown right after the QR scan, before the menu.
- * Auto-dismisses after a moment (or on tap) and fades out. Uses the
- * restaurant's brand colors (applied by the diner layout) + logo.
+ * "Powered by Servd" welcome splash shown right after the QR scan, before the
+ * menu. Shows the SaaS (Servd) logo + name — not the restaurant's brand — and
+ * auto-dismisses after a moment (or on tap). Uses the static Servd icon so it's
+ * independent of the restaurant's colors.
  */
-export function BrandSplash({
-  name,
-  logoUrl,
-  tagline,
-  onDone,
-}: {
-  name: string;
-  logoUrl: string | null;
-  tagline: string | null;
-  onDone: () => void;
-}) {
+export function BrandSplash({ onDone }: { onDone: () => void }) {
   const [leaving, setLeaving] = useState(false);
 
   function dismiss() {
@@ -35,27 +26,26 @@ export function BrandSplash({
   return (
     <div
       onClick={dismiss}
-      className={`fixed inset-0 z-[60] flex flex-col items-center justify-center bg-brand-gradient px-8 text-center text-white transition-opacity duration-500 ${
+      className={`fixed inset-0 z-[60] flex flex-col items-center justify-center bg-plum-ink px-8 text-center transition-opacity duration-500 ${
         leaving ? "opacity-0" : "opacity-100"
       }`}
     >
-      <div className={`flex flex-col items-center ${leaving ? "" : "animate-[fadeUp_0.6s_ease-out]"}`}>
-        {logoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={logoUrl}
-            alt={name}
-            className="h-24 w-24 rounded-3xl bg-white/15 object-cover shadow-xl"
-          />
-        ) : (
-          <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-white/20 font-heading text-4xl font-extrabold shadow-xl">
-            {name.charAt(0)}
-          </div>
-        )}
-        <h1 className="mt-5 font-heading text-3xl font-extrabold tracking-tight">{name}</h1>
-        {tagline && <p className="mt-2 max-w-xs text-sm text-white/85">{tagline}</p>}
+      <div className={leaving ? "" : "animate-[fadeUp_0.6s_ease-out]"}>
+        <p className="mb-5 text-xs font-semibold uppercase tracking-[0.3em] text-white/50">
+          Powered by
+        </p>
+        {/* Static Servd icon — brand-independent */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/brand/servd-icon.svg"
+          alt="Servd"
+          width={88}
+          height={88}
+          className="mx-auto rounded-[20px] shadow-xl"
+        />
+        <p className="mt-5 font-heading text-4xl font-extrabold tracking-tight text-white">servd</p>
       </div>
-      <p className="absolute bottom-10 text-xs text-white/70">Tap to continue</p>
+      <p className="absolute bottom-10 text-xs text-white/40">Tap to continue</p>
 
       <style>{`
         @keyframes fadeUp {

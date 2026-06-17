@@ -253,15 +253,8 @@ export function DinerMenu({
 
   return (
     <div className="relative mx-auto min-h-screen max-w-md bg-brand-surface pb-24">
-      {/* Branded welcome splash — shown first, before the menu */}
-      {!splashDone && (
-        <BrandSplash
-          name={brand.name}
-          logoUrl={brand.logoUrl}
-          tagline={brand.tagline}
-          onDone={() => setSplashDone(true)}
-        />
-      )}
+      {/* "Powered by Servd" welcome splash — shown first, before the menu */}
+      {!splashDone && <BrandSplash onDone={() => setSplashDone(true)} />}
 
       {/* App bar */}
       <header className="sticky top-0 z-20 border-b border-brand-ink/10 bg-brand-surface/95 backdrop-blur">
