@@ -14,6 +14,7 @@ import {
 import type { DinerCategory } from "@/lib/cart/types";
 import { computeDiscount, netTotal, type DiscountKind } from "@/lib/discount";
 import { awardPointsForOrder, getBalance, getLoyaltyConfig, redeemPoints, enrollAccount } from "@/server/loyalty/loyalty";
+import { notifyCustomer, restaurantDisplayName } from "@/server/sms/notify";
 
 export interface CashierOrder {
   id: string;
@@ -287,6 +288,20 @@ export async function acceptOrder(orderId: string): Promise<CashierState> {
   if (res.count > 0) {
     await notifyOrdersChanged(staff.restaurantId);
     await autoPrintIfEnabled(staff.restaurantId, orderId);
+
+    // Confirmation SMS for pickup/delivery customers (best-effort).
+    const m = (await orderMetaMap(staff.restaurantId, [orderId])).get(orderId);
+    if (m && m.orderType !== "dine_in" && m.customerPhone) {
+      const who = await restaurantDisplayName(staff.restaurantId);
+      const ref = orderId.slice(0, 8).toUpperCase();
+      const mode = m.orderType === "delivery" ? "for delivery" : "for pickup";
+      const hi = m.customerName ? `Hi ${m.customerName}, ` : "";
+      await notifyCustomer(
+        staff.restaurantId,
+        m.customerPhone,
+        `${hi}your order #${ref} at ${who} is confirmed ${mode}. We'll prepare it now. Salamat!`,
+      );
+    }
   }
   return { ok: true, incoming: await getIncomingOrders(), tables: await getCashierTables() };
 }

@@ -4,7 +4,7 @@ import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireStaff } from "@/server/tenancy/current-user";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
 import { awardPointsForOrder } from "@/server/loyalty/loyalty";
-import { getSmsProvider } from "@/server/sms";
+import { notifyCustomer, restaurantDisplayName } from "@/server/sms/notify";
 
 export interface DeliveryOrder {
   id: string;
@@ -117,20 +117,10 @@ export async function markOutForDelivery(orderId: string): Promise<Result> {
   }
 
   // Best-effort SMS to the customer.
-  try {
-    const provider = getSmsProvider();
-    const phone = order?.customerPhone;
-    if (provider && phone) {
-      const restaurant = await tenantDb(staff.restaurantId, (tx) =>
-        tx.restaurant.findFirstOrThrow({ select: { name: true, displayName: true, smsSenderName: true } }),
-      );
-      const sender = restaurant.smsSenderName || "Servd";
-      const who = restaurant.displayName || restaurant.name;
-      const name = order?.customerName ? `Hi ${order.customerName}, ` : "";
-      await provider.send(sender, phone, `${name}your order from ${who} is on the way! 🛵`);
-    }
-  } catch {
-    /* SMS is best-effort */
+  if (order?.customerPhone) {
+    const who = await restaurantDisplayName(staff.restaurantId);
+    const name = order.customerName ? `Hi ${order.customerName}, ` : "";
+    await notifyCustomer(staff.restaurantId, order.customerPhone, `${name}your order from ${who} is on the way! 🛵`);
   }
 
   await notifyOrdersChanged(staff.restaurantId);
@@ -168,6 +158,10 @@ export async function markDelivered(orderId: string): Promise<Result> {
   }
 
   await awardPointsForOrder(staff.restaurantId, orderId, amount, phone);
+  if (phone) {
+    const who = await restaurantDisplayName(staff.restaurantId);
+    await notifyCustomer(staff.restaurantId, phone, `Your order from ${who} has been delivered. Thank you, and enjoy! 🙏`);
+  }
   await notifyOrdersChanged(staff.restaurantId);
   return { ok: true, orders: await getDeliveryOrders() };
 }

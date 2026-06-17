@@ -19,6 +19,7 @@ export async function GET() {
   // Optional features (present-or-not, never required for `healthy`).
   const features = {
     aiInsights: !!process.env.ANTHROPIC_API_KEY,
+    sms: !!process.env.SEMAPHORE_API_KEY,
   };
 
   let db: Record<string, unknown> = { connected: false };
