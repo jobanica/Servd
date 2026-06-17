@@ -14,7 +14,7 @@ import { addMonths } from "@/lib/billing/period";
  */
 export async function payNow(): Promise<{ ok?: boolean; checkoutUrl?: string; error?: string }> {
   const { restaurantId } = await requireAdminAction();
-  const provider = getBillingProvider();
+  const provider = await getBillingProvider();
   if (!provider) return { error: "Billing isn't configured on the platform yet." };
 
   const info = await tenantDb(restaurantId, async (tx) => {

@@ -35,6 +35,7 @@ const NAV = [
   { label: "Subscriptions", href: "/super-admin/subscriptions", d: I.card },
   { label: "Plans", href: "/super-admin/plans", d: I.layers },
   { label: "Invoices", href: "/super-admin/invoices", d: I.receipt },
+  { label: "Payments", href: "/super-admin/payments", d: I.card },
 ];
 
 export function SuperAdminShell({ children }: { children: React.ReactNode }) {

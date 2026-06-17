@@ -6,6 +6,7 @@ import type { Prisma, PlanModuleType } from "@prisma/client";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { requireSuperAdmin } from "@/server/tenancy/current-user";
 import { runBillingCron, type CronSummary } from "@/server/billing/run-cron";
+import { saveXenditCreds } from "@/server/billing/platform-settings";
 import { addMonths } from "@/lib/billing/period";
 
 export type ActionState = { ok?: boolean; message?: string; error?: string } | null;
@@ -273,4 +274,27 @@ export async function runBillingNow(_prev: CronState, _formData: FormData): Prom
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Billing run failed." };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Payments (Xendit) — subscription billing provider
+// ---------------------------------------------------------------------------
+
+/** Save the platform's Xendit credentials (encrypted) for subscription billing. */
+export async function saveXenditSettings(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireSuperAdmin();
+  const secretKey = String(formData.get("secretKey") ?? "").trim();
+  const callbackToken = String(formData.get("callbackToken") ?? "").trim();
+  if (!secretKey || !/^xnd_/.test(secretKey)) {
+    return { error: "Enter your Xendit secret key (starts with xnd_)." };
+  }
+  if (!callbackToken) return { error: "Enter your Xendit webhook callback token." };
+  try {
+    await saveXenditCreds({ secretKey, callbackToken });
+  } catch (e) {
+    console.error("saveXenditSettings failed", e);
+    return { error: e instanceof Error ? e.message : "Couldn't save. Run the migration if you haven't yet." };
+  }
+  revalidatePath("/super-admin/payments");
+  return { ok: true, message: "Xendit connected. Subscriptions will activate automatically on payment." };
 }

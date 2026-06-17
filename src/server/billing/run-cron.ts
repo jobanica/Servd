@@ -20,7 +20,7 @@ export interface CronSummary {
  * subscription isn't "due" again until the next cycle.
  */
 export async function runBillingCron(now: Date = new Date()): Promise<CronSummary> {
-  const provider = getBillingProvider();
+  const provider = await getBillingProvider();
   const subs = await systemDb((tx) =>
     tx.subscription.findMany({
       where: { status: { in: ["trialing", "active", "past_due"] } },

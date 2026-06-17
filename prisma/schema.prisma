@@ -107,6 +107,17 @@ model PlatformAdmin {
   @@map("platform_admins")
 }
 
+/// Platform-wide settings owned by the super-admin (single row, id="platform").
+/// Holds the subscription billing provider + its encrypted credentials.
+model PlatformSetting {
+  id              String   @id @default("platform")
+  billingProvider String? // "xendit" | "paymongo" | null
+  xenditCredsEnc  String? // encrypted JSON { secretKey, callbackToken }
+  updatedAt       DateTime @updatedAt
+
+  @@map("platform_settings")
+}
+
 model Plan {
   id           String   @id @default(uuid())
   name         String
