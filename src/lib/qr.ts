@@ -33,10 +33,10 @@ export function restaurantOrderUrl(
   return dinerOrderUrl(r.slug, qrToken);
 }
 
-/** The restaurant's public website / online-ordering page: {APP_URL}/r/{slug}. */
+/** The restaurant's online-ordering page: {APP_URL}/r/{slug}/order. */
 export function restaurantSiteUrl(slug: string): string {
   const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  return `${base.replace(/\/$/, "")}/r/${slug}`;
+  return `${base.replace(/\/$/, "")}/r/${slug}/order`;
 }
 
 /**
