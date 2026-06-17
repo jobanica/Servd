@@ -51,6 +51,16 @@ export default async function ShiftSummaryPrintPage() {
       )}
       <div className={`${row} font-bold`}><span>Total expenses</span><span>{formatPeso(s.expensesTotal)}</span></div>
 
+      <div className="my-2 border-t border-dashed border-black" />
+      <p className="font-bold">CASH DRAWER</p>
+      <div className={row}><span>Cash collected</span><span>{formatPeso(s.cashCollected)}</span></div>
+      {s.cashOuts.map((c, i) => (
+        <div key={i} className={row}>
+          <span>Cash out{c.note ? ` · ${c.note}` : ""}</span><span>-{formatPeso(c.amount)}</span>
+        </div>
+      ))}
+      <div className={`${row} font-bold`}><span>Expected in drawer</span><span>{formatPeso(s.expectedCash)}</span></div>
+
       <div className="my-2 border-t border-black" />
       <div className={`${row} text-base font-extrabold`}>
         <span>NET</span><span>{formatPeso(s.net)}</span>

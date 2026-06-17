@@ -63,6 +63,20 @@ export function ShiftSummaryModal({ onClose }: { onClose: () => void }) {
               <div className={`${row} border-t border-plum-ink/10 font-bold`}><span>Total expenses</span><span>{formatPeso(s.expensesTotal)}</span></div>
             </div>
 
+            {(s.cashOutTotal > 0 || s.cashCollected > 0) && (
+              <div className="mt-3 rounded-lg border border-plum-ink/10 p-3">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-plum-ink/40">Cash drawer</p>
+                <div className={row}><span className="text-plum-ink/60">Cash collected</span><span>{formatPeso(s.cashCollected)}</span></div>
+                {s.cashOuts.map((c, i) => (
+                  <div key={i} className={row}>
+                    <span className="text-plum-ink/60">Cash out{c.note ? ` · ${c.note}` : ""}</span>
+                    <span className="text-guava">−{formatPeso(c.amount)}</span>
+                  </div>
+                ))}
+                <div className={`${row} border-t border-plum-ink/10 font-bold`}><span>Expected in drawer</span><span>{formatPeso(s.expectedCash)}</span></div>
+              </div>
+            )}
+
             <div className="mt-3 flex items-center justify-between rounded-lg bg-brand-primary/5 p-3">
               <span className="font-heading font-bold text-brand-primary">Net</span>
               <span className="font-heading text-lg font-extrabold text-brand-primary">{formatPeso(s.net)}</span>

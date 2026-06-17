@@ -23,6 +23,7 @@ import { AddCustomerModal } from "./AddCustomerModal";
 import { ClosedOrdersModal } from "./ClosedOrdersModal";
 import { ShiftSummaryModal } from "./ShiftSummaryModal";
 import { VoidPinModal } from "./VoidPinModal";
+import { CashOutModal } from "./CashOutModal";
 
 export function CashierBoard({
   restaurantId,
@@ -41,6 +42,7 @@ export function CashierBoard({
   const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   const [closedOpen, setClosedOpen] = useState(false);
   const [shiftOpen, setShiftOpen] = useState(false);
+  const [cashOutOpen, setCashOutOpen] = useState(false);
   const [voidOrderTarget, setVoidOrderTarget] = useState<{ id: string; label: string } | null>(null);
   const [discountOrder, setDiscountOrder] = useState<CashierTable["orders"][number] | null>(null);
   const [loyaltyOrderId, setLoyaltyOrderId] = useState<string | null>(null);
@@ -255,6 +257,12 @@ export function CashierBoard({
             className="rounded-full border border-plum-ink/15 bg-white px-4 py-2 text-sm font-semibold text-plum-ink hover:bg-cream"
           >
             Closed orders
+          </button>
+          <button
+            onClick={() => setCashOutOpen(true)}
+            className="rounded-full border border-plum-ink/15 bg-white px-4 py-2 text-sm font-semibold text-plum-ink hover:bg-cream"
+          >
+            Cash out
           </button>
           <button
             onClick={() => setShiftOpen(true)}
@@ -619,6 +627,8 @@ export function CashierBoard({
       )}
 
       {shiftOpen && <ShiftSummaryModal onClose={() => setShiftOpen(false)} />}
+
+      {cashOutOpen && <CashOutModal onClose={() => setCashOutOpen(false)} />}
 
       {voidOrderTarget && (
         <VoidPinModal

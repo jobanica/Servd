@@ -2,6 +2,7 @@
 
 import { requireStaff } from "@/server/tenancy/current-user";
 import { getSalesReport, getExpenses } from "@/server/accounting/queries";
+import { getCashOutsToday } from "@/server/orders/cash-out";
 
 const METHOD_LABEL: Record<string, string> = {
   cash: "Cash",
@@ -21,6 +22,10 @@ export interface ShiftSummary {
   byMethod: { label: string; amount: number; count: number }[];
   expensesTotal: number;
   expenses: { category: string; amount: number; note: string | null }[];
+  cashOutTotal: number;
+  cashOuts: { amount: number; note: string | null; at: string }[];
+  cashCollected: number; // cash payments today
+  expectedCash: number; // cash collected − cash-outs (what should be in the drawer)
   net: number; // gross − expenses
 }
 
@@ -42,12 +47,15 @@ export async function getShiftSummary(): Promise<ShiftSummary | null> {
   const to = new Date();
   to.setHours(23, 59, 59, 999);
 
-  const [sales, expenses] = await Promise.all([
+  const [sales, expenses, cashOuts] = await Promise.all([
     getSalesReport(staff.restaurantId, from, to),
     getExpenses(staff.restaurantId, from, to),
+    getCashOutsToday(staff.restaurantId),
   ]);
 
   const expensesTotal = expenses.reduce((s, e) => s + e.amount, 0);
+  const cashOutTotal = cashOuts.reduce((s, c) => s + c.amount, 0);
+  const cashCollected = sales.byMethod.find((m) => m.method === "cash")?.amount ?? 0;
 
   return {
     restaurantName: "",
@@ -64,6 +72,10 @@ export async function getShiftSummary(): Promise<ShiftSummary | null> {
     })),
     expensesTotal,
     expenses: expenses.map((e) => ({ category: e.category, amount: e.amount, note: e.note })),
+    cashOutTotal,
+    cashOuts: cashOuts.map((c) => ({ amount: c.amount, note: c.note, at: c.createdAt })),
+    cashCollected,
+    expectedCash: Math.max(0, cashCollected - cashOutTotal),
     net: sales.gross - expensesTotal,
   };
 }

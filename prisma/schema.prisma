@@ -293,6 +293,22 @@ model Expense {
   @@map("expenses")
 }
 
+/// A cash drawer movement — currently used for cash-outs (money removed from
+/// the drawer, e.g. the owner taking cash). Kept separate from expenses so it
+/// doesn't distort the P&L; it only affects expected cash in the drawer.
+model CashMovement {
+  id           String   @id @default(uuid())
+  restaurantId String
+  type         String   @default("cash_out") // cash_out (future: cash_in / float)
+  amount       Int // centavos
+  note         String?
+  staffEmail   String? // who recorded it
+  createdAt    DateTime @default(now())
+
+  @@index([restaurantId, createdAt])
+  @@map("cash_movements")
+}
+
 /// A customer's loyalty balance at a restaurant, keyed by phone number.
 model LoyaltyAccount {
   id           String   @id @default(uuid())
