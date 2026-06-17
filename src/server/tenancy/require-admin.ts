@@ -35,3 +35,12 @@ export async function requireAdminAction() {
   }
   return user;
 }
+
+/** Page guard: returns the platform super-admin, or redirects to /login. */
+export async function requireSuperAdminPage() {
+  const user = await getCurrentUser();
+  if (!user || user.kind !== "super") {
+    redirect("/login");
+  }
+  return user;
+}
