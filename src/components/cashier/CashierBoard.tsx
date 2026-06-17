@@ -22,6 +22,7 @@ import { LoyaltyRedeemModal } from "./LoyaltyRedeemModal";
 import { AddCustomerModal } from "./AddCustomerModal";
 import { ClosedOrdersModal } from "./ClosedOrdersModal";
 import { ShiftSummaryModal } from "./ShiftSummaryModal";
+import { VoidPinModal } from "./VoidPinModal";
 
 export function CashierBoard({
   restaurantId,
@@ -40,6 +41,7 @@ export function CashierBoard({
   const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   const [closedOpen, setClosedOpen] = useState(false);
   const [shiftOpen, setShiftOpen] = useState(false);
+  const [voidOrderTarget, setVoidOrderTarget] = useState<{ id: string; label: string } | null>(null);
   const [discountOrder, setDiscountOrder] = useState<CashierTable["orders"][number] | null>(null);
   const [loyaltyOrderId, setLoyaltyOrderId] = useState<string | null>(null);
   const [waiterCalls, setWaiterCalls] = useState<{ id: string; tableNumber: string }[]>([]);
@@ -397,6 +399,13 @@ export function CashierBoard({
                         >
                           Paid (card)
                         </button>
+                        <button
+                          onClick={() => setVoidOrderTarget({ id: o.id, label: t.label })}
+                          disabled={busy === o.id}
+                          className="rounded-lg border border-guava/40 px-3 py-1.5 text-xs font-semibold text-guava disabled:opacity-60"
+                        >
+                          Void
+                        </button>
                       </>
                     )}
                     {/* Only paid orders can be closed/dismissed — an unpaid open
@@ -610,6 +619,15 @@ export function CashierBoard({
       )}
 
       {shiftOpen && <ShiftSummaryModal onClose={() => setShiftOpen(false)} />}
+
+      {voidOrderTarget && (
+        <VoidPinModal
+          orderId={voidOrderTarget.id}
+          label={voidOrderTarget.label}
+          onClose={() => setVoidOrderTarget(null)}
+          onVoided={(t) => setTables(t)}
+        />
+      )}
     </div>
   );
 }

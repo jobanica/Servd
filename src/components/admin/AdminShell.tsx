@@ -77,6 +77,7 @@ const NAV: { group: string; items: Item[] }[] = [
     items: [
       { label: "Account", href: "/admin/account", d: I.users },
       { label: "Staff & access", href: "/admin/staff", d: I.users },
+      { label: "Cashier", href: "/admin/cashier", d: I.cash },
       { label: "Online website", href: "/admin/storefront", d: I.globe },
       { label: "Branding", href: "/admin/branding", d: I.brush },
       { label: "Online payment", href: "/admin/payments", d: I.card },

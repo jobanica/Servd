@@ -470,6 +470,55 @@ export async function reopenOrder(
   return { ok: true, tables: await getCashierTables(), closed: await getClosedOrders() };
 }
 
+/**
+ * Void an unpaid order. Requires the restaurant's cashier void PIN — so a
+ * cashier can't dismiss an order without authorization. Voided orders are
+ * cancelled (they leave the board and never count as sales, since sales come
+ * from confirmed payments).
+ */
+export async function voidOrder(
+  orderId: string,
+  pin: string,
+): Promise<{ ok: boolean; tables?: CashierTable[]; error?: string }> {
+  let staff;
+  try {
+    staff = await requireStaff(["cashier", "admin"]);
+  } catch {
+    return { ok: false, error: "Not allowed." };
+  }
+
+  const entered = (pin ?? "").trim();
+  if (!entered) return { ok: false, error: "Enter the void PIN." };
+
+  // Read the configured PIN (best-effort — column may lag on prod).
+  let configured: string | null = null;
+  try {
+    const r = await tenantDb(staff.restaurantId, (tx) =>
+      tx.restaurant.findFirst({ select: { cashierVoidPin: true } }),
+    );
+    configured = r?.cashierVoidPin ?? null;
+  } catch {
+    return { ok: false, error: "Void isn't set up yet. Ask an admin to set a void PIN." };
+  }
+  if (!configured) return { ok: false, error: "No void PIN set. Ask an admin to set one in Settings." };
+  if (entered !== configured) return { ok: false, error: "Incorrect PIN." };
+
+  try {
+    await tenantDb(staff.restaurantId, (tx) =>
+      // Only unpaid orders can be voided; cancelled status removes it from the board.
+      tx.order.updateMany({
+        where: { id: orderId, paymentStatus: { not: "paid" } },
+        data: { status: "cancelled", billRequested: false },
+      }),
+    );
+  } catch (e) {
+    console.error("voidOrder failed", e);
+    return { ok: false, error: e instanceof Error ? e.message : "Could not void the order." };
+  }
+  await notifyOrdersChanged(staff.restaurantId);
+  return { ok: true, tables: await getCashierTables() };
+}
+
 /** Confirm a ready order's food was served to the table. */
 export async function markServed(
   orderId: string,

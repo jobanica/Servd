@@ -169,6 +169,7 @@ model Restaurant {
   printMethod      PrintMethod @default(network)
   printerConfig    Json? // transport-specific details (ip, port, cloudprnt url…)
   autoPrint        Boolean     @default(false)
+  cashierVoidPin   String? // PIN a cashier must enter to void an unpaid order
 
   // --- Payments (connected-accounts model) ---
   // Each restaurant stores its OWN PayMongo credentials, encrypted at rest.
