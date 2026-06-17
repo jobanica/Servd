@@ -56,6 +56,30 @@ class EscPosBuilder {
     return this.raw(GS, 0x56, 0x00); // GS V 0 — full cut
   }
 
+  /**
+   * Native QR code via the GS ( k command family (model 2). Supported by the
+   * vast majority of modern thermal printers, and far crisper than a bitmap.
+   */
+  qr(data: string, moduleSize = 6): this {
+    const bytes: number[] = [];
+    for (const ch of data) {
+      const code = ch.charCodeAt(0);
+      bytes.push(code <= 0xff ? code : 0x3f);
+    }
+    // Function 165 — select model 2
+    this.raw(GS, 0x28, 0x6b, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00);
+    // Function 167 — module size
+    this.raw(GS, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x43, moduleSize);
+    // Function 169 — error correction level M
+    this.raw(GS, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x45, 0x31);
+    // Function 180 — store data in symbol storage area
+    const len = bytes.length + 3;
+    this.raw(GS, 0x28, 0x6b, len & 0xff, (len >> 8) & 0xff, 0x31, 0x50, 0x30, ...bytes);
+    // Function 181 — print the symbol
+    this.raw(GS, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30);
+    return this;
+  }
+
   build(): Uint8Array {
     return Uint8Array.from(this.bytes);
   }
@@ -83,6 +107,11 @@ export function encodeTicket(ticket: Ticket): Uint8Array {
   if (footer.length) {
     b.align("center").line();
     for (const line of footer) b.line(line);
+  }
+
+  // Website QR — scan to order online / view the menu.
+  if (ticket.qrUrl) {
+    b.align("center").line().line("Scan to order online").qr(ticket.qrUrl);
   }
 
   b.line().line().cut();

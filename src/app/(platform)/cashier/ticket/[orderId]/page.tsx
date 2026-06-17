@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/server/tenancy/current-user";
 import { getOrderTicket } from "@/server/printing/ticket-query";
 import { ticketLines } from "@/lib/printing/ticket";
+import { qrSvg } from "@/lib/qr";
 import { AutoPrint } from "@/components/cashier/AutoPrint";
 
 /**
@@ -22,12 +23,20 @@ export default async function TicketPage({
   const ticket = await getOrderTicket(user.restaurantId, orderId);
   if (!ticket) notFound();
 
+  const qr = ticket.qrUrl ? await qrSvg(ticket.qrUrl) : null;
+
   return (
     <div className="mx-auto max-w-[300px] bg-white p-4 font-mono text-sm text-black">
       <AutoPrint />
       <pre className="whitespace-pre-wrap leading-snug">
         {ticketLines(ticket).join("\n")}
       </pre>
+      {qr && (
+        <div className="mt-3 flex flex-col items-center">
+          <p className="mb-1 text-xs">Scan to order online</p>
+          <div className="w-[160px]" dangerouslySetInnerHTML={{ __html: qr }} />
+        </div>
+      )}
     </div>
   );
 }

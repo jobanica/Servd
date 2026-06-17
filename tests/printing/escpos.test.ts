@@ -8,9 +8,12 @@ const ticket = buildTicket({
   orderId: "abcdef12-3456-7890-aaaa-bbbbbbbbbbbb",
   createdAt: "2026-06-14T10:00:00.000Z",
   total: 25000,
+  paymentMethod: "cash",
+  paymentAmount: 25000,
+  qrUrl: "https://servd.app/r/mango-grill",
   items: [
-    { quantity: 2, name: "Burger", modifiers: ["Large", "Extra cheese"], note: "no onions" },
-    { quantity: 1, name: "Fries", modifiers: [] },
+    { quantity: 2, name: "Burger", modifiers: ["Large", "Extra cheese"], note: "no onions", lineTotal: 20000 },
+    { quantity: 1, name: "Fries", modifiers: [], lineTotal: 5000 },
   ],
 });
 

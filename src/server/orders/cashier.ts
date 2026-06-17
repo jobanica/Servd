@@ -325,7 +325,7 @@ export async function declineOrder(orderId: string): Promise<CashierState> {
 export async function markOrderPaid(
   orderId: string,
   method: "cash" | "card_terminal",
-): Promise<{ ok: boolean; tables?: CashierTable[]; error?: string }> {
+): Promise<{ ok: boolean; tables?: CashierTable[]; error?: string; printTicket?: boolean }> {
   let staff;
   try {
     staff = await requireStaff(["cashier", "admin"]);
@@ -363,8 +363,12 @@ export async function markOrderPaid(
   const phone = (await orderMetaMap(staff.restaurantId, [orderId])).get(orderId)?.customerPhone ?? null;
   await awardPointsForOrder(staff.restaurantId, orderId, netPaid, phone);
 
+  // Auto-print the receipt (server transports run unattended; client transports
+  // are handled by the cashier board opening the printable ticket page).
+  const { clientPrintNeeded } = await autoPrintIfEnabled(staff.restaurantId, orderId);
+
   await notifyOrdersChanged(staff.restaurantId);
-  return { ok: true, tables: await getCashierTables() };
+  return { ok: true, tables: await getCashierTables(), printTicket: clientPrintNeeded };
 }
 
 /** Close (settle) an order so it leaves the active boards. */

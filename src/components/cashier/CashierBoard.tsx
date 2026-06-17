@@ -155,6 +155,11 @@ export function CashierBoard({
       if (res.ok && res.tables) {
         setTables(res.tables);
         showToast("Payment recorded — order closed.");
+        // Browser-handled printer (OS dialog / AirPrint): open the printable
+        // receipt so it auto-fires the print dialog.
+        if (res.printTicket) {
+          window.open(`/cashier/ticket/${orderId}`, "_blank");
+        }
       } else if (!res.ok) {
         showToast(res.error ?? "Couldn't record the payment.");
         refresh();

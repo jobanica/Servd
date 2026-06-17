@@ -1,17 +1,29 @@
 /**
  * The order ticket / receipt — built ONCE as structured data, then rendered to
- * either ESC/POS bytes (thermal printers) or printable HTML (OS dialog). The
- * header (restaurant name + contact lines) and footer message are customizable
- * by the restaurant in Printer settings.
+ * either ESC/POS bytes (thermal printers) or printable HTML (OS dialog). Header
+ * (name + contact) and footer are customizable in Printer settings; the body is
+ * an itemized, VAT-inclusive receipt and the QR points to the restaurant's site.
  */
 
-import { formatPeso } from "@/lib/money";
+const VAT_RATE = 0.12;
+const WIDTH = 32; // characters per line (58mm thermal; 80mm just has slack)
+
+/** Right-align `right` against `left` within WIDTH characters. */
+function pad(left: string, right: string, width = WIDTH): string {
+  const space = width - left.length - right.length;
+  return space >= 1 ? left + " ".repeat(space) + right : `${left} ${right}`;
+}
+/** Plain decimal (no currency glyph — thermal printers can't render ₱). */
+function amt(centavos: number): string {
+  return (centavos / 100).toFixed(2);
+}
 
 export interface TicketLine {
   quantity: number;
   name: string;
   modifiers: string[];
   note?: string | null;
+  lineTotal: number; // centavos
 }
 
 export interface ReceiptBranding {
@@ -20,6 +32,13 @@ export interface ReceiptBranding {
   website?: string | null;
   footer?: string | null;
 }
+
+const METHOD_LABEL: Record<string, string> = {
+  cash: "Cash",
+  card_terminal: "Card",
+  online_gcash: "GCash",
+  online_card: "Card (online)",
+};
 
 export interface Ticket {
   restaurantName: string;
@@ -31,12 +50,15 @@ export interface Ticket {
   orderType: "dine_in" | "takeout" | "delivery";
   customerName: string | null;
   customerAddress: string | null;
-  orderRef: string; // short, human-readable
-  placedAt: string; // ISO
+  orderRef: string;
+  placedAt: string;
   items: TicketLine[];
-  total: number; // centavos (gross subtotal)
-  discountAmount: number; // centavos off
+  total: number; // gross items (centavos)
+  discountAmount: number;
   discountLabel: string | null;
+  paymentMethod: string | null;
+  paymentAmount: number | null;
+  qrUrl: string | null; // website link encoded as a QR
 }
 
 export interface TicketSource extends ReceiptBranding {
@@ -50,7 +72,10 @@ export interface TicketSource extends ReceiptBranding {
   total: number;
   discountAmount?: number;
   discountLabel?: string | null;
-  items: { quantity: number; name: string; modifiers: string[]; note?: string | null }[];
+  paymentMethod?: string | null;
+  paymentAmount?: number | null;
+  qrUrl?: string | null;
+  items: { quantity: number; name: string; modifiers: string[]; note?: string | null; lineTotal: number }[];
 }
 
 export function buildTicket(src: TicketSource): Ticket {
@@ -71,11 +96,22 @@ export function buildTicket(src: TicketSource): Ticket {
       name: i.name,
       modifiers: i.modifiers,
       note: i.note ?? null,
+      lineTotal: i.lineTotal,
     })),
     total: src.total,
     discountAmount: src.discountAmount ?? 0,
     discountLabel: src.discountLabel ?? null,
+    paymentMethod: src.paymentMethod ?? null,
+    paymentAmount: src.paymentAmount ?? null,
+    qrUrl: src.qrUrl ?? null,
   };
+}
+
+/** Net payable + VAT-of-net (centavos). */
+export function ticketTotals(t: Ticket) {
+  const net = Math.max(0, t.total - t.discountAmount);
+  const vat = Math.round(net - net / (1 + VAT_RATE));
+  return { net, vat };
 }
 
 /** The big heading line: table number, or PICKUP/DELIVERY + customer. */
@@ -94,25 +130,27 @@ export function ticketHeaderLines(t: Ticket): string[] {
   return lines;
 }
 
-/** Left-aligned body: order meta, items, totals. */
+/** Left-aligned body: meta, itemized lines with prices, totals, payment. */
 export function ticketBodyLines(t: Ticket): string[] {
   const lines: string[] = [];
-  lines.push(`Order #${t.orderRef}`);
+  lines.push(`Receipt #${t.orderRef}`);
   lines.push(new Date(t.placedAt).toLocaleString());
   lines.push("--------------------------------");
   for (const item of t.items) {
-    lines.push(`${item.quantity}x ${item.name}`);
+    lines.push(pad(`${item.quantity}x ${item.name}`, amt(item.lineTotal)));
     for (const mod of item.modifiers) lines.push(`   + ${mod}`);
     if (item.note) lines.push(`   ! ${item.note}`);
   }
   lines.push("--------------------------------");
+  const { net, vat } = ticketTotals(t);
   if (t.discountAmount > 0) {
-    lines.push(`SUBTOTAL  ${formatPeso(t.total)}`);
-    lines.push(`DISCOUNT  -${formatPeso(t.discountAmount)}`);
-    if (t.discountLabel) lines.push(`  (${t.discountLabel})`);
-    lines.push(`TOTAL DUE  ${formatPeso(Math.max(0, t.total - t.discountAmount))}`);
-  } else {
-    lines.push(`TOTAL  ${formatPeso(t.total)}`);
+    lines.push(pad("Subtotal", amt(t.total)));
+    lines.push(pad(t.discountLabel ?? "Discount", `-${amt(t.discountAmount)}`));
+  }
+  lines.push(pad("VAT (12% incl.)", amt(vat)));
+  lines.push(pad("TOTAL (PHP)", amt(net)));
+  if (t.paymentMethod) {
+    lines.push(pad(METHOD_LABEL[t.paymentMethod] ?? t.paymentMethod, amt(t.paymentAmount ?? net)));
   }
   return lines;
 }
@@ -120,19 +158,14 @@ export function ticketBodyLines(t: Ticket): string[] {
 /** Centered footer (custom message), split across lines. */
 export function ticketFooterLines(t: Ticket): string[] {
   if (!t.footer) return [];
-  return t.footer
-    .split("\n")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  return t.footer.split("\n").map((s) => s.trim()).filter(Boolean);
 }
 
 /** Full plain-text rendering (HTML fallback / preview). */
 export function ticketLines(ticket: Ticket): string[] {
   const footer = ticketFooterLines(ticket);
   const contact: string[] = [];
-  if (ticket.orderType === "delivery" && ticket.customerAddress) {
-    contact.push(ticket.customerAddress);
-  }
+  if (ticket.orderType === "delivery" && ticket.customerAddress) contact.push(ticket.customerAddress);
   return [
     ...ticketHeaderLines(ticket),
     ticketHeading(ticket),

@@ -4,6 +4,7 @@ import { tenantDb, systemDb } from "@/server/tenancy/scoped-db";
 import { requireStaff } from "@/server/tenancy/current-user";
 import { buildTicket, type Ticket } from "@/lib/printing/ticket";
 import { encodeTicketBase64 } from "@/lib/printing/escpos";
+import { restaurantSiteUrl } from "@/lib/qr";
 
 /**
  * PLUGGABLE PRINTING
@@ -46,6 +47,7 @@ async function loadTicket(restaurantId: string, orderId: string) {
       select: {
         name: true,
         displayName: true,
+        slug: true,
         printMethod: true,
         printerConfig: true,
         autoPrint: true,
@@ -64,11 +66,27 @@ async function loadTicket(restaurantId: string, orderId: string) {
             quantity: true,
             nameAtTime: true,
             note: true,
-            modifiers: { select: { nameAtTime: true } },
+            unitPrice: true,
+            modifiers: { select: { nameAtTime: true, priceDeltaAtTime: true } },
           },
         },
       },
     });
+
+    // Latest settled payment → tendered line on the receipt (best-effort).
+    let payment: { method: string; amount: number } | null = null;
+    if (order) {
+      try {
+        const pay = await tx.payment.findFirst({
+          where: { orderId, status: "paid" },
+          orderBy: { createdAt: "desc" },
+          select: { method: true, amount: true },
+        });
+        if (pay) payment = { method: pay.method, amount: pay.amount };
+      } catch {
+        /* no payment yet */
+      }
+    }
 
     // Newer columns (discount / order type) — read best-effort.
     let meta: {
@@ -103,13 +121,13 @@ async function loadTicket(restaurantId: string, orderId: string) {
         /* not migrated yet */
       }
     }
-    return { restaurant, order, meta };
+    return { restaurant, order, meta, payment };
   });
 }
 
 /** Core dispatch usable both from the cashier action and from auto-print. */
 async function dispatch(restaurantId: string, orderId: string): Promise<PrintDispatch> {
-  const { restaurant, order, meta } = await loadTicket(restaurantId, orderId);
+  const { restaurant, order, meta, payment } = await loadTicket(restaurantId, orderId);
   if (!order) return { ok: false, handledOnServer: false, message: "Order not found." };
 
   const config = (restaurant.printerConfig as PrinterConfig | null) ?? {};
@@ -130,12 +148,19 @@ async function dispatch(restaurantId: string, orderId: string): Promise<PrintDis
     total: order.total,
     discountAmount: meta.discountAmount,
     discountLabel: meta.discountLabel,
-    items: order.items.map((i) => ({
-      quantity: i.quantity,
-      name: i.nameAtTime,
-      modifiers: i.modifiers.map((m) => m.nameAtTime),
-      note: i.note,
-    })),
+    paymentMethod: payment?.method ?? null,
+    paymentAmount: payment?.amount ?? null,
+    qrUrl: restaurantSiteUrl(restaurant.slug),
+    items: order.items.map((i) => {
+      const unit = i.unitPrice + i.modifiers.reduce((s, m) => s + m.priceDeltaAtTime, 0);
+      return {
+        quantity: i.quantity,
+        name: i.nameAtTime,
+        modifiers: i.modifiers.map((m) => m.nameAtTime),
+        note: i.note,
+        lineTotal: unit * i.quantity,
+      };
+    }),
   });
   const base64 = encodeTicketBase64(ticket);
 
@@ -194,13 +219,21 @@ export async function printOrderTicket(orderId: string): Promise<PrintDispatch> 
   return dispatch(staff.restaurantId, orderId);
 }
 
-/** Auto-print on new order — only the server-handled transports run unattended. */
-export async function autoPrintIfEnabled(restaurantId: string, orderId: string): Promise<void> {
+/**
+ * Auto-print a ticket. The server-handled transports (network/cloud) print
+ * unattended here. For the browser transports (bluetooth/os_dialog) the server
+ * can't print on its own, so we return `clientPrintNeeded: true` and the cashier
+ * board opens the printable ticket page (which auto-fires the print dialog).
+ */
+export async function autoPrintIfEnabled(
+  restaurantId: string,
+  orderId: string,
+): Promise<{ clientPrintNeeded: boolean }> {
   const { restaurant } = await loadTicket(restaurantId, orderId);
-  if (!restaurant.autoPrint) return;
+  if (!restaurant.autoPrint) return { clientPrintNeeded: false };
   if (restaurant.printMethod === "network" || restaurant.printMethod === "cloud") {
     await dispatch(restaurantId, orderId);
+    return { clientPrintNeeded: false };
   }
-  // Client transports (bluetooth/os_dialog) can't print unattended — the cashier
-  // board prompts instead.
+  return { clientPrintNeeded: true };
 }

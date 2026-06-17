@@ -1,5 +1,6 @@
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { buildTicket, type Ticket } from "@/lib/printing/ticket";
+import { restaurantSiteUrl } from "@/lib/qr";
 
 /** Loads an order and shapes it into a Ticket (tenant-scoped). */
 export async function getOrderTicket(
@@ -8,7 +9,7 @@ export async function getOrderTicket(
 ): Promise<Ticket | null> {
   return tenantDb(restaurantId, async (tx) => {
     const restaurant = await tx.restaurant.findFirstOrThrow({
-      select: { name: true, displayName: true, printerConfig: true },
+      select: { name: true, displayName: true, slug: true, printerConfig: true },
     });
     const receipt =
       ((restaurant.printerConfig as { receipt?: Record<string, string | null> } | null)?.receipt) ??
@@ -27,12 +28,30 @@ export async function getOrderTicket(
             quantity: true,
             nameAtTime: true,
             note: true,
-            modifiers: { select: { nameAtTime: true } },
+            unitPrice: true,
+            modifiers: { select: { nameAtTime: true, priceDeltaAtTime: true } },
           },
         },
       },
     });
     if (!order) return null;
+
+    // Latest settled payment → shown as the tendered line on the receipt.
+    let paymentMethod: string | null = null;
+    let paymentAmount: number | null = null;
+    try {
+      const pay = await tx.payment.findFirst({
+        where: { orderId, status: "paid" },
+        orderBy: { createdAt: "desc" },
+        select: { method: true, amount: true },
+      });
+      if (pay) {
+        paymentMethod = pay.method;
+        paymentAmount = pay.amount;
+      }
+    } catch {
+      /* no payment yet */
+    }
 
     // Discount + order-type columns may not exist on a lagging DB — best-effort.
     let discountAmount = 0;
@@ -77,12 +96,19 @@ export async function getOrderTicket(
       total: order.total,
       discountAmount,
       discountLabel,
-      items: order.items.map((i) => ({
-        quantity: i.quantity,
-        name: i.nameAtTime,
-        modifiers: i.modifiers.map((m) => m.nameAtTime),
-        note: i.note,
-      })),
+      paymentMethod,
+      paymentAmount,
+      qrUrl: restaurantSiteUrl(restaurant.slug),
+      items: order.items.map((i) => {
+        const unit = i.unitPrice + i.modifiers.reduce((s, m) => s + m.priceDeltaAtTime, 0);
+        return {
+          quantity: i.quantity,
+          name: i.nameAtTime,
+          modifiers: i.modifiers.map((m) => m.nameAtTime),
+          note: i.note,
+          lineTotal: unit * i.quantity,
+        };
+      }),
     });
   });
 }

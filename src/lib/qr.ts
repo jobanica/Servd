@@ -33,6 +33,12 @@ export function restaurantOrderUrl(
   return dinerOrderUrl(r.slug, qrToken);
 }
 
+/** The restaurant's public website / online-ordering page: {APP_URL}/r/{slug}. */
+export function restaurantSiteUrl(slug: string): string {
+  const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  return `${base.replace(/\/$/, "")}/r/${slug}`;
+}
+
 /**
  * Renders a QR code as an inline SVG string. SVG (not PNG) so it stays crisp at
  * any print size. The result is injected via dangerouslySetInnerHTML in the
