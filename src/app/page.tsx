@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { AppIcon, Wordmark } from "@/components/Wordmark";
+import { PlanCards } from "@/components/billing/PlanCards";
+import { PlanComparisonTable } from "@/components/billing/PlanComparisonTable";
 
 /* ------------------------------------------------------------------ icons */
 function Icon({ path }: { path: string }) {
@@ -335,42 +337,16 @@ export default function Home() {
             no card to start.
           </p>
         </div>
-        <div className="mt-12 grid items-start gap-5 lg:grid-cols-3">
-          {[
-            ["Starter", "1,999", ["Up to 10 tables", "QR ordering & kitchen", "Online payment", "Feedback & reviews"], false],
-            ["Pro", "2,499", ["Up to 30 tables", "Everything in Starter", "SMS marketing credits", "Inventory module"], true],
-            ["Business", "4,999", ["Unlimited tables", "Everything in Pro", "HR & payroll prep", "Custom domain"], false],
-          ].map(([name, price, features, featured]) => (
-            <div
-              key={name as string}
-              className={`rounded-tile border bg-white p-7 ${featured ? "border-brand-primary shadow-xl ring-2 ring-brand-primary/20" : "border-plum-ink/10"}`}
-            >
-              {featured ? (
-                <span className="inline-block rounded-full bg-brand-gradient px-3 py-1 text-xs font-bold text-white">Most popular</span>
-              ) : (
-                <span className="inline-block text-xs font-bold uppercase tracking-wide text-plum-ink/40">{name}</span>
-              )}
-              {featured && <p className="mt-2 text-xs font-bold uppercase tracking-wide text-plum-ink/40">{name}</p>}
-              <p className="mt-3">
-                <span className="font-heading text-4xl font-extrabold">₱{price as string}</span>
-                <span className="text-plum-ink/50">/month</span>
-              </p>
-              <ul className="mt-5 space-y-2.5">
-                {(features as string[]).map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-sm text-plum-ink/75">
-                    <span className="mt-0.5 text-brand-primary"><Icon path={ICONS.check} /></span>
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <Link
-                href="/signup"
-                className={`mt-6 block rounded-full py-3 text-center font-semibold ${featured ? "btn-brand text-white" : "border border-plum-ink/15"}`}
-              >
-                Start free trial
-              </Link>
-            </div>
-          ))}
+        <div className="mt-12">
+          <PlanCards mode="signup" />
+        </div>
+
+        {/* Full feature comparison */}
+        <div className="mt-12">
+          <h3 className="mb-4 text-center font-heading text-2xl font-extrabold tracking-tight">
+            Compare every feature
+          </h3>
+          <PlanComparisonTable />
         </div>
       </section>
 

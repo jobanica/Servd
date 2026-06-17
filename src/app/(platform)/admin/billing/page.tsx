@@ -2,8 +2,10 @@ import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { getCurrentSubscription, listPlans } from "@/server/billing/subscription";
-import { selectPlan, cancelSubscription } from "@/server/billing/portal-actions";
+import { cancelSubscription } from "@/server/billing/portal-actions";
 import { PayNowButton } from "@/components/admin/PayNowButton";
+import { PlanCards } from "@/components/billing/PlanCards";
+import { PlanComparisonTable } from "@/components/billing/PlanComparisonTable";
 import { formatPeso } from "@/lib/money";
 
 function daysLeft(date: Date | null): number | null {
@@ -21,6 +23,10 @@ export default async function BillingPage() {
       tx.restaurantInvoice.findMany({ orderBy: { createdAt: "desc" }, take: 12 }),
     ),
   ]);
+
+  // Map each tier name to its real plan row so the cards can switch plans.
+  const planIdByName: Record<string, string> = {};
+  for (const p of plans) planIdByName[p.name] = p.id;
 
   const trialDays = sub?.status === "trialing" ? daysLeft(sub.trialEndsAt) : null;
   const needsPayment = sub?.status === "past_due" || (sub?.status === "trialing" && !sub.providerPaymentMethodId);
@@ -81,35 +87,19 @@ export default async function BillingPage() {
         )}
       </div>
 
-      {/* Plans */}
+      {/* Plans — choose / switch */}
       <div>
-        <h2 className="mb-2 font-heading text-lg font-bold">Plans</h2>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {plans.map((p) => {
-            const current = sub?.planId === p.id;
-            return (
-              <div key={p.id} className={`rounded-tile border bg-white p-4 ${current ? "border-brand-primary" : "border-plum-ink/10"}`}>
-                <p className="font-heading font-bold">{p.name}</p>
-                <p className="text-sm text-plum-ink/60">{formatPeso(p.priceMonthly)}/mo</p>
-                {p.modules.length > 0 && (
-                  <p className="mt-1 text-xs text-plum-ink/50">
-                    Includes: {p.modules.map((m) => m.module).join(", ")}
-                  </p>
-                )}
-                {current ? (
-                  <p className="mt-3 text-xs font-semibold text-brand-primary">Current plan</p>
-                ) : (
-                  <form action={selectPlan} className="mt-3">
-                    <input type="hidden" name="planId" value={p.id} />
-                    <button className="rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold">
-                      Switch to {p.name}
-                    </button>
-                  </form>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        <h2 className="mb-1 font-heading text-lg font-bold">Choose your plan</h2>
+        <p className="mb-4 text-sm text-plum-ink/55">
+          Switch any time — changes apply to your next renewal.
+        </p>
+        <PlanCards mode="switch" currentPlanName={sub?.plan.name ?? null} planIdByName={planIdByName} />
+      </div>
+
+      {/* Full comparison */}
+      <div>
+        <h2 className="mb-3 font-heading text-lg font-bold">Compare plans</h2>
+        <PlanComparisonTable />
       </div>
 
       {/* Invoices */}
