@@ -237,3 +237,21 @@ export async function autoPrintIfEnabled(
   }
   return { clientPrintNeeded: true };
 }
+
+/**
+ * Always print a receipt — used when the cashier explicitly settles an order
+ * ("Paid cash/card"), regardless of the auto-print-on-new-order toggle. Server
+ * transports print straight to the printer; browser transports tell the cashier
+ * board to open the printable ticket page (which fires the print dialog).
+ */
+export async function printReceipt(
+  restaurantId: string,
+  orderId: string,
+): Promise<{ clientPrintNeeded: boolean }> {
+  const { restaurant } = await loadTicket(restaurantId, orderId);
+  if (restaurant.printMethod === "network" || restaurant.printMethod === "cloud") {
+    await dispatch(restaurantId, orderId);
+    return { clientPrintNeeded: false };
+  }
+  return { clientPrintNeeded: true };
+}

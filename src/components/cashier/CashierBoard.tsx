@@ -20,6 +20,8 @@ import { NewOrderModal } from "./NewOrderModal";
 import { DiscountModal } from "./DiscountModal";
 import { LoyaltyRedeemModal } from "./LoyaltyRedeemModal";
 import { AddCustomerModal } from "./AddCustomerModal";
+import { ClosedOrdersModal } from "./ClosedOrdersModal";
+import { ShiftSummaryModal } from "./ShiftSummaryModal";
 
 export function CashierBoard({
   restaurantId,
@@ -36,6 +38,8 @@ export function CashierBoard({
   const [busy, setBusy] = useState<string | null>(null);
   const [newOrderOpen, setNewOrderOpen] = useState(false);
   const [addCustomerOpen, setAddCustomerOpen] = useState(false);
+  const [closedOpen, setClosedOpen] = useState(false);
+  const [shiftOpen, setShiftOpen] = useState(false);
   const [discountOrder, setDiscountOrder] = useState<CashierTable["orders"][number] | null>(null);
   const [loyaltyOrderId, setLoyaltyOrderId] = useState<string | null>(null);
   const [waiterCalls, setWaiterCalls] = useState<{ id: string; tableNumber: string }[]>([]);
@@ -244,6 +248,18 @@ export function CashierBoard({
               🍽️ {readyOrders.length} ready
             </button>
           )}
+          <button
+            onClick={() => setClosedOpen(true)}
+            className="rounded-full border border-plum-ink/15 bg-white px-4 py-2 text-sm font-semibold text-plum-ink hover:bg-cream"
+          >
+            Closed orders
+          </button>
+          <button
+            onClick={() => setShiftOpen(true)}
+            className="rounded-full border border-plum-ink/15 bg-white px-4 py-2 text-sm font-semibold text-plum-ink hover:bg-cream"
+          >
+            End-of-shift summary
+          </button>
           <button
             onClick={() => setAddCustomerOpen(true)}
             className="rounded-full border border-plum-ink/15 bg-white px-4 py-2 text-sm font-semibold text-plum-ink hover:bg-cream"
@@ -584,6 +600,12 @@ export function CashierBoard({
       )}
 
       {addCustomerOpen && <AddCustomerModal onClose={() => setAddCustomerOpen(false)} />}
+
+      {closedOpen && (
+        <ClosedOrdersModal onClose={() => setClosedOpen(false)} onReopened={(t) => setTables(t)} />
+      )}
+
+      {shiftOpen && <ShiftSummaryModal onClose={() => setShiftOpen(false)} />}
     </div>
   );
 }

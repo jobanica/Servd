@@ -3,7 +3,7 @@
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireStaff } from "@/server/tenancy/current-user";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
-import { autoPrintIfEnabled } from "@/server/printing/print";
+import { autoPrintIfEnabled, printReceipt } from "@/server/printing/print";
 import { getPublicMenu } from "@/server/menu/public-menu";
 import {
   buildValidatedOrder,
@@ -363,9 +363,10 @@ export async function markOrderPaid(
   const phone = (await orderMetaMap(staff.restaurantId, [orderId])).get(orderId)?.customerPhone ?? null;
   await awardPointsForOrder(staff.restaurantId, orderId, netPaid, phone);
 
-  // Auto-print the receipt (server transports run unattended; client transports
-  // are handled by the cashier board opening the printable ticket page).
-  const { clientPrintNeeded } = await autoPrintIfEnabled(staff.restaurantId, orderId);
+  // Always print the receipt on an explicit cash/card settle (independent of the
+  // auto-print-on-new-order toggle). Server transports print straight to the
+  // printer; client transports open the ticket page from the cashier board.
+  const { clientPrintNeeded } = await printReceipt(staff.restaurantId, orderId);
 
   await notifyOrdersChanged(staff.restaurantId);
   return { ok: true, tables: await getCashierTables(), printTicket: clientPrintNeeded };
@@ -394,6 +395,79 @@ export async function closeOrder(
   }
   await notifyOrdersChanged(staff.restaurantId);
   return { ok: true, tables: await getCashierTables() };
+}
+
+export interface ClosedOrder {
+  id: string;
+  label: string;
+  total: number;
+  paymentStatus: string;
+  closedAt: string;
+}
+
+/** Recently closed orders (today) so the cashier can re-open one if needed. */
+export async function getClosedOrders(): Promise<ClosedOrder[]> {
+  let staff;
+  try {
+    staff = await requireStaff(["cashier", "admin"]);
+  } catch {
+    return [];
+  }
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const rows = await tenantDb(staff.restaurantId, (tx) =>
+    tx.order.findMany({
+      where: { status: "closed", updatedAt: { gte: startOfDay } },
+      orderBy: { updatedAt: "desc" },
+      take: 50,
+      select: {
+        id: true,
+        total: true,
+        paymentStatus: true,
+        updatedAt: true,
+        orderType: true,
+        customerName: true,
+        table: { select: { tableNumber: true } },
+      },
+    }),
+  );
+  return rows.map((o) => ({
+    id: o.id,
+    label:
+      o.table?.tableNumber
+        ? `Table ${o.table.tableNumber}`
+        : o.customerName || (o.orderType === "delivery" ? "Delivery" : o.orderType === "takeout" ? "Pickup" : "Order"),
+    total: o.total,
+    paymentStatus: o.paymentStatus,
+    closedAt: o.updatedAt.toISOString(),
+  }));
+}
+
+/** Re-open a closed order so it returns to the active board. */
+export async function reopenOrder(
+  orderId: string,
+): Promise<{ ok: boolean; tables?: CashierTable[]; closed?: ClosedOrder[]; error?: string }> {
+  let staff;
+  try {
+    staff = await requireStaff(["cashier", "admin"]);
+  } catch {
+    return { ok: false, error: "Not allowed." };
+  }
+  try {
+    await tenantDb(staff.restaurantId, (tx) =>
+      // Back to "done" (ready/served) so it shows on the board again; payment
+      // status is left untouched so an already-paid order stays paid.
+      tx.order.updateMany({
+        where: { id: orderId, status: "closed" },
+        data: { status: "done" },
+      }),
+    );
+  } catch (e) {
+    console.error("reopenOrder failed", e);
+    return { ok: false, error: e instanceof Error ? e.message : "Could not re-open the order." };
+  }
+  await notifyOrdersChanged(staff.restaurantId);
+  return { ok: true, tables: await getCashierTables(), closed: await getClosedOrders() };
 }
 
 /** Confirm a ready order's food was served to the table. */
