@@ -65,6 +65,12 @@ export default function LoginPage() {
           {pending ? t("signingIn") : t("signIn")}
         </button>
       </form>
+
+      <div className="mt-6 text-center">
+        <Link href="/super-admin" className="text-xs font-medium text-plum-ink/40 hover:text-plum-ink">
+          Platform admin
+        </Link>
+      </div>
     </div>
   );
 }
