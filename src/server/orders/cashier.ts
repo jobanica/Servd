@@ -515,8 +515,63 @@ export async function voidOrder(
     console.error("voidOrder failed", e);
     return { ok: false, error: e instanceof Error ? e.message : "Could not void the order." };
   }
+  // Tag it as voided (best-effort) so it lists under "Voided today", separate
+  // from declined incoming orders. Works even if the column lags on prod.
+  try {
+    await tenantDb(staff.restaurantId, (tx) =>
+      tx.order.updateMany({ where: { id: orderId }, data: { voidedAt: new Date() } }),
+    );
+  } catch {
+    /* voidedAt column not migrated yet */
+  }
   await notifyOrdersChanged(staff.restaurantId);
   return { ok: true, tables: await getCashierTables() };
+}
+
+export interface VoidedOrder {
+  id: string;
+  label: string;
+  total: number;
+  voidedAt: string;
+}
+
+/** Orders voided today, for end-of-shift reconciliation. */
+export async function getVoidedOrders(): Promise<VoidedOrder[]> {
+  let staff;
+  try {
+    staff = await requireStaff(["cashier", "admin"]);
+  } catch {
+    return [];
+  }
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  try {
+    const rows = await tenantDb(staff.restaurantId, (tx) =>
+      tx.order.findMany({
+        where: { voidedAt: { gte: startOfDay } },
+        orderBy: { voidedAt: "desc" },
+        take: 50,
+        select: {
+          id: true,
+          total: true,
+          voidedAt: true,
+          orderType: true,
+          customerName: true,
+          table: { select: { tableNumber: true } },
+        },
+      }),
+    );
+    return rows.map((o) => ({
+      id: o.id,
+      label: o.table?.tableNumber
+        ? `Table ${o.table.tableNumber}`
+        : o.customerName || (o.orderType === "delivery" ? "Delivery" : o.orderType === "takeout" ? "Pickup" : "Order"),
+      total: o.total,
+      voidedAt: (o.voidedAt ?? new Date()).toISOString(),
+    }));
+  } catch {
+    return [];
+  }
 }
 
 /** Confirm a ready order's food was served to the table. */
