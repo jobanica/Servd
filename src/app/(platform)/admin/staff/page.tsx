@@ -2,6 +2,7 @@ import { requireAdminPage } from "@/server/tenancy/require-admin";
 import { getCurrentUser } from "@/server/tenancy/current-user";
 import { listStaff } from "@/server/staff/queries";
 import { AddStaffForm } from "@/components/admin/AddStaffForm";
+import { StaffCredentials } from "@/components/admin/StaffCredentials";
 import { updateStaffRole, deleteStaff } from "@/server/staff/actions";
 
 const ROLES = ["cashier", "kitchen", "manager", "admin"] as const;
@@ -66,12 +67,15 @@ export default async function StaffPage() {
                       </form>
                     )}
                   </td>
-                  <td>
+                  <td className="align-top">
                     {!isMe && (
-                      <form action={deleteStaff}>
-                        <input type="hidden" name="id" value={s.id} />
-                        <button className="text-xs text-muted hover:text-guava">remove</button>
-                      </form>
+                      <div className="space-y-2 py-2">
+                        <StaffCredentials id={s.id} email={s.email} />
+                        <form action={deleteStaff}>
+                          <input type="hidden" name="id" value={s.id} />
+                          <button className="text-xs text-muted hover:text-guava">remove</button>
+                        </form>
+                      </div>
                     )}
                   </td>
                 </tr>

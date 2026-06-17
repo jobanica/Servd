@@ -83,6 +83,43 @@ export async function updateStaffRole(formData: FormData): Promise<void> {
   revalidatePath("/admin/staff");
 }
 
+export type StaffCredState = { ok?: boolean; message?: string; error?: string } | null;
+
+/** Admin sets a new password for one of their staff. Tenant-scoped. */
+export async function resetStaffPassword(_prev: StaffCredState, formData: FormData): Promise<StaffCredState> {
+  const me = await requireAdminAction();
+  const id = String(formData.get("id"));
+  const password = String(formData.get("password") ?? "");
+  if (password.length < 8) return { error: "Password must be at least 8 characters." };
+  const staff = await tenantDb(me.restaurantId, (tx) =>
+    tx.staffUser.findFirst({ where: { id }, select: { authUserId: true } }),
+  );
+  if (!staff) return { error: "Staff member not found." };
+  const { error } = await createSupabaseAdminClient().auth.admin.updateUserById(staff.authUserId, { password });
+  if (error) return { error: error.message };
+  return { ok: true, message: "Password updated." };
+}
+
+/** Admin changes a staff member's login email. Tenant-scoped. */
+export async function updateStaffEmail(_prev: StaffCredState, formData: FormData): Promise<StaffCredState> {
+  const me = await requireAdminAction();
+  const id = String(formData.get("id"));
+  const email = String(formData.get("email") ?? "").trim();
+  if (!email) return { error: "Enter an email." };
+  const staff = await tenantDb(me.restaurantId, (tx) =>
+    tx.staffUser.findFirst({ where: { id }, select: { authUserId: true } }),
+  );
+  if (!staff) return { error: "Staff member not found." };
+  const { error } = await createSupabaseAdminClient().auth.admin.updateUserById(staff.authUserId, {
+    email,
+    email_confirm: true,
+  });
+  if (error) return { error: error.message };
+  await tenantDb(me.restaurantId, (tx) => tx.staffUser.update({ where: { id }, data: { email } }));
+  revalidatePath("/admin/staff");
+  return { ok: true, message: "Email updated." };
+}
+
 export async function deleteStaff(formData: FormData): Promise<void> {
   const me = await requireAdminAction();
   const id = String(formData.get("id"));
