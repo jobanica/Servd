@@ -464,8 +464,8 @@ export function ImportMenuButton({ imageGenEnabled = false }: { imageGenEnabled?
                       className="mt-0.5 h-4 w-4 accent-brand-primary"
                     />
                     <span>
-                      <span className="font-semibold">Generate AI photos</span> for each item
-                      (~$0.04 each, takes a moment). Generic placeholder shots — swap your own
+                      <span className="font-semibold">Generate AI photos</span> for each item (a
+                      few cents each, takes a moment). Generic placeholder shots — swap your own
                       anytime.
                     </span>
                   </label>

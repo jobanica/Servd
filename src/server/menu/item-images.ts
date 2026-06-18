@@ -39,19 +39,25 @@ export async function generateItemImage(itemId: string): Promise<GenImageResult>
 
   let b64: string | undefined;
   try {
+    // Model is configurable: "dall-e-3" (default, no org verification needed) or
+    // "gpt-image-1" (newer, cheaper at low quality, but the OpenAI org must be
+    // ID-verified). The two APIs differ slightly, so build the body per model.
+    const model = process.env.OPENAI_IMAGE_MODEL || "dall-e-3";
+    const body: Record<string, unknown> = { model, prompt, n: 1, size: "1024x1024" };
+    if (model === "gpt-image-1") {
+      // gpt-image-1 returns base64 by default and rejects response_format.
+      body.quality = process.env.OPENAI_IMAGE_QUALITY || "low";
+    } else {
+      body.response_format = "b64_json";
+    }
+
     const res = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
       },
-      body: JSON.stringify({
-        model: "dall-e-3",
-        prompt,
-        n: 1,
-        size: "1024x1024",
-        response_format: "b64_json",
-      }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
       const detail = (await res.text()).slice(0, 300);
