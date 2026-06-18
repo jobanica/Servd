@@ -1,0 +1,296 @@
+"use client";
+
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  analyzeMenuPhoto,
+  importParsedMenu,
+  type ParsedCategory,
+} from "@/server/menu/ai-import";
+
+/** Editable draft mirrors ParsedCategory but keeps prices as strings for inputs. */
+type DraftItem = { name: string; description: string; price: string };
+type DraftCategory = { name: string; items: DraftItem[] };
+
+function toDraft(categories: ParsedCategory[]): DraftCategory[] {
+  return categories.map((c) => ({
+    name: c.name,
+    items: c.items.map((i) => ({
+      name: i.name,
+      description: i.description ?? "",
+      price: i.price ? String(i.price) : "",
+    })),
+  }));
+}
+
+export function ImportMenuButton() {
+  const router = useRouter();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [open, setOpen] = useState(false);
+  const [step, setStep] = useState<"upload" | "analyzing" | "review" | "importing">("upload");
+  const [draft, setDraft] = useState<DraftCategory[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<{ categories: number; items: number } | null>(null);
+
+  function reset() {
+    setStep("upload");
+    setDraft([]);
+    setError(null);
+    setDone(null);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  function close() {
+    setOpen(false);
+    reset();
+  }
+
+  async function analyze() {
+    const files = fileRef.current?.files;
+    if (!files || files.length === 0) {
+      setError("Choose at least one menu photo.");
+      return;
+    }
+    setError(null);
+    setStep("analyzing");
+    const fd = new FormData();
+    for (const f of Array.from(files)) fd.append("images", f);
+
+    const res = await analyzeMenuPhoto(fd);
+    if (!res.ok) {
+      setError(res.error);
+      setStep("upload");
+      return;
+    }
+    setDraft(toDraft(res.categories));
+    setStep("review");
+  }
+
+  const itemCount = draft.reduce((n, c) => n + c.items.length, 0);
+
+  async function doImport() {
+    setError(null);
+    setStep("importing");
+    const payload = {
+      categories: draft
+        .map((c) => ({
+          name: c.name.trim(),
+          items: c.items
+            .filter((i) => i.name.trim())
+            .map((i) => ({
+              name: i.name.trim(),
+              description: i.description.trim(),
+              price: Number(i.price) || 0,
+            })),
+        }))
+        .filter((c) => c.name && c.items.length > 0),
+    };
+    if (payload.categories.length === 0) {
+      setError("Nothing to import — add at least one item.");
+      setStep("review");
+      return;
+    }
+    const res = await importParsedMenu(payload);
+    if (!res.ok) {
+      setError(res.error);
+      setStep("review");
+      return;
+    }
+    setDone({ categories: res.categories, items: res.items });
+    router.refresh();
+  }
+
+  // --- draft editing helpers ---
+  function updateCategory(ci: number, name: string) {
+    setDraft((d) => d.map((c, i) => (i === ci ? { ...c, name } : c)));
+  }
+  function removeCategory(ci: number) {
+    setDraft((d) => d.filter((_, i) => i !== ci));
+  }
+  function updateItem(ci: number, ii: number, patch: Partial<DraftItem>) {
+    setDraft((d) =>
+      d.map((c, i) =>
+        i === ci ? { ...c, items: c.items.map((it, j) => (j === ii ? { ...it, ...patch } : it)) } : c,
+      ),
+    );
+  }
+  function removeItem(ci: number, ii: number) {
+    setDraft((d) =>
+      d.map((c, i) => (i === ci ? { ...c, items: c.items.filter((_, j) => j !== ii) } : c)),
+    );
+  }
+
+  const input =
+    "rounded-lg border border-plum-ink/15 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none";
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="rounded-full px-4 py-2 text-sm font-semibold btn-brand"
+      >
+        ✨ Import from photo
+      </button>
+
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
+          <div className="mt-6 w-full max-w-2xl rounded-tile bg-white p-5 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h2 className="font-heading text-lg font-extrabold">Import menu from a photo</h2>
+              <button onClick={close} className="text-sm font-semibold text-plum-ink/50">
+                Close
+              </button>
+            </div>
+
+            {/* Success */}
+            {done ? (
+              <div className="py-8 text-center">
+                <p className="text-4xl">✅</p>
+                <p className="mt-3 font-semibold">
+                  Added {done.items} item{done.items === 1 ? "" : "s"}
+                  {done.categories > 0 &&
+                    ` across ${done.categories} new categor${done.categories === 1 ? "y" : "ies"}`}
+                  .
+                </p>
+                <p className="mt-1 text-sm text-plum-ink/55">
+                  Review them below in your menu — add photos, costs, and modifiers anytime.
+                </p>
+                <button
+                  onClick={close}
+                  className="mt-5 rounded-full px-5 py-2.5 text-sm font-semibold btn-brand"
+                >
+                  Done
+                </button>
+              </div>
+            ) : step === "review" ? (
+              /* Editable review */
+              <>
+                <p className="mt-1 text-sm text-plum-ink/55">
+                  Check the prices and names below — fix anything the scan got wrong, then import.
+                  Items already on your menu are skipped.
+                </p>
+
+                <div className="mt-4 max-h-[55vh] space-y-5 overflow-y-auto pr-1">
+                  {draft.map((cat, ci) => (
+                    <div key={ci} className="rounded-lg border border-plum-ink/10 p-3">
+                      <div className="flex items-center gap-2">
+                        <input
+                          value={cat.name}
+                          onChange={(e) => updateCategory(ci, e.target.value)}
+                          placeholder="Category name"
+                          className={`flex-1 font-heading font-bold ${input}`}
+                        />
+                        <button
+                          onClick={() => removeCategory(ci)}
+                          className="text-xs font-semibold text-muted hover:text-guava"
+                        >
+                          Remove
+                        </button>
+                      </div>
+
+                      <ul className="mt-3 space-y-2">
+                        {cat.items.map((item, ii) => (
+                          <li key={ii} className="flex flex-wrap items-start gap-2">
+                            <div className="flex min-w-[180px] flex-1 flex-col gap-1">
+                              <input
+                                value={item.name}
+                                onChange={(e) => updateItem(ci, ii, { name: e.target.value })}
+                                placeholder="Item name"
+                                className={input}
+                              />
+                              <input
+                                value={item.description}
+                                onChange={(e) =>
+                                  updateItem(ci, ii, { description: e.target.value })
+                                }
+                                placeholder="Description (optional)"
+                                className={`${input} text-plum-ink/70`}
+                              />
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className="text-sm text-plum-ink/50">₱</span>
+                              <input
+                                value={item.price}
+                                inputMode="decimal"
+                                onChange={(e) => updateItem(ci, ii, { price: e.target.value })}
+                                placeholder="0"
+                                className={`w-24 ${input}`}
+                              />
+                            </div>
+                            <button
+                              onClick={() => removeItem(ci, ii)}
+                              aria-label="Remove item"
+                              className="px-1 py-2 text-muted hover:text-guava"
+                            >
+                              ✕
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+
+                {error && <p className="mt-3 text-sm text-guava">{error}</p>}
+
+                <div className="mt-4 flex items-center justify-between gap-3">
+                  <button
+                    onClick={reset}
+                    className="rounded-full border border-plum-ink/15 px-4 py-2 text-sm font-semibold"
+                  >
+                    Start over
+                  </button>
+                  <button
+                    onClick={doImport}
+                    disabled={itemCount === 0}
+                    className="rounded-full px-5 py-2.5 text-sm font-semibold btn-brand disabled:opacity-60"
+                  >
+                    Import {itemCount} item{itemCount === 1 ? "" : "s"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              /* Upload */
+              <>
+                <p className="mt-1 text-sm text-plum-ink/55">
+                  Take a clear photo of your printed menu. Claude reads it and drafts your
+                  categories and items — you review before anything is saved.
+                </p>
+
+                <label className="mt-4 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-tile border-2 border-dashed border-plum-ink/20 px-4 py-10 text-center hover:border-brand-primary/50">
+                  <span className="text-3xl">📷</span>
+                  <span className="text-sm font-semibold">Choose menu photo(s)</span>
+                  <span className="text-xs text-plum-ink/45">JPG, PNG, or WebP · up to 6 photos</span>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    multiple
+                    className="hidden"
+                    onChange={() => setError(null)}
+                  />
+                </label>
+
+                {error && <p className="mt-3 text-sm text-guava">{error}</p>}
+
+                <div className="mt-4 flex justify-end">
+                  <button
+                    onClick={analyze}
+                    disabled={step === "analyzing"}
+                    className="rounded-full px-5 py-2.5 text-sm font-semibold btn-brand disabled:opacity-60"
+                  >
+                    {step === "analyzing" ? "Reading menu…" : "Analyze"}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {step === "importing" && (
+              <p className="mt-3 text-center text-sm text-plum-ink/55">Saving to your menu…</p>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
