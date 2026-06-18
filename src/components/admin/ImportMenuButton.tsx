@@ -7,8 +7,13 @@ import {
   analyzeMenuMedia,
   importParsedMenu,
   type ParsedCategory,
+  type CreatedItem,
 } from "@/server/menu/ai-import";
+import { generateItemImage } from "@/server/menu/item-images";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+
+// Generate a few photos at a time — fast enough, gentle on rate limits.
+const PHOTO_CONCURRENCY = 2;
 
 // Client-side guards (the server re-checks types). Photos are downscaled first,
 // so the real cap that matters is the PDF size.
@@ -59,25 +64,35 @@ function toDraft(categories: ParsedCategory[]): DraftCategory[] {
   }));
 }
 
-export function ImportMenuButton() {
+export function ImportMenuButton({ imageGenEnabled = false }: { imageGenEnabled?: boolean }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
+  const cancelPhotos = useRef(false);
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<"upload" | "analyzing" | "review" | "importing">("upload");
+  const [step, setStep] = useState<
+    "upload" | "analyzing" | "review" | "importing" | "photos"
+  >("upload");
   const [draft, setDraft] = useState<DraftCategory[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ categories: number; items: number } | null>(null);
+  const [done, setDone] = useState<{ categories: number; items: number; photos?: number } | null>(
+    null,
+  );
   const [autoDescribe, setAutoDescribe] = useState(true);
+  const [genPhotos, setGenPhotos] = useState(false);
+  const [photoProgress, setPhotoProgress] = useState({ done: 0, total: 0, failed: 0 });
 
   function reset() {
     setStep("upload");
     setDraft([]);
     setError(null);
     setDone(null);
+    setGenPhotos(false);
+    setPhotoProgress({ done: 0, total: 0, failed: 0 });
     if (fileRef.current) fileRef.current.value = "";
   }
 
   function close() {
+    cancelPhotos.current = true; // stop any in-flight photo generation
     setOpen(false);
     reset();
   }
@@ -177,12 +192,49 @@ export function ImportMenuButton() {
         setStep("review");
         return;
       }
-      setDone({ categories: res.categories, items: res.items });
-      router.refresh();
+      if (imageGenEnabled && genPhotos && res.created.length > 0) {
+        await runPhotoGeneration(res.created, res.categories);
+      } else {
+        setDone({ categories: res.categories, items: res.items });
+        router.refresh();
+      }
     } catch {
       setError("Couldn't save the menu — please try again.");
       setStep("review");
     }
+  }
+
+  // Generate AI photos for the freshly imported items, a couple at a time.
+  async function runPhotoGeneration(items: CreatedItem[], categories: number) {
+    setStep("photos");
+    cancelPhotos.current = false;
+    setPhotoProgress({ done: 0, total: items.length, failed: 0 });
+
+    let done = 0;
+    let failed = 0;
+    const queue = [...items];
+
+    async function worker() {
+      while (queue.length > 0 && !cancelPhotos.current) {
+        const item = queue.shift();
+        if (!item) break;
+        try {
+          const r = await generateItemImage(item.id);
+          if (!r.ok) failed++;
+        } catch {
+          failed++;
+        }
+        done++;
+        setPhotoProgress({ done, total: items.length, failed });
+      }
+    }
+
+    await Promise.all(
+      Array.from({ length: Math.min(PHOTO_CONCURRENCY, items.length) }, () => worker()),
+    );
+
+    router.refresh();
+    setDone({ categories, items: items.length, photos: done - failed });
   }
 
   // --- draft editing helpers ---
@@ -237,14 +289,46 @@ export function ImportMenuButton() {
                     ` across ${done.categories} new categor${done.categories === 1 ? "y" : "ies"}`}
                   .
                 </p>
+                {done.photos !== undefined && (
+                  <p className="mt-1 text-sm text-plum-ink/55">
+                    🎨 Generated {done.photos} photo{done.photos === 1 ? "" : "s"}.
+                  </p>
+                )}
                 <p className="mt-1 text-sm text-plum-ink/55">
-                  Review them below in your menu — add photos, costs, and modifiers anytime.
+                  Review them below in your menu — tweak photos, costs, and modifiers anytime.
                 </p>
                 <button
                   onClick={close}
                   className="mt-5 rounded-full px-5 py-2.5 text-sm font-semibold btn-brand"
                 >
                   Done
+                </button>
+              </div>
+            ) : step === "photos" ? (
+              /* Generating photos */
+              <div className="py-8 text-center">
+                <p className="text-4xl">🎨</p>
+                <p className="mt-3 font-semibold">
+                  Generating photos… {photoProgress.done}/{photoProgress.total}
+                </p>
+                <div className="mx-auto mt-3 h-2 w-64 overflow-hidden rounded-full bg-cream">
+                  <div
+                    className="h-full bg-brand-gradient transition-all"
+                    style={{
+                      width: `${photoProgress.total ? (photoProgress.done / photoProgress.total) * 100 : 0}%`,
+                    }}
+                  />
+                </div>
+                <p className="mt-2 text-xs text-plum-ink/45">
+                  Your items are already saved — you can stop and keep the photos generated so far.
+                </p>
+                <button
+                  onClick={() => {
+                    cancelPhotos.current = true;
+                  }}
+                  className="mt-4 rounded-full border border-plum-ink/15 px-4 py-2 text-sm font-semibold"
+                >
+                  Stop
                 </button>
               </div>
             ) : step === "review" ? (
@@ -370,6 +454,22 @@ export function ImportMenuButton() {
                     don&apos;t have one. You can still edit them before importing.
                   </span>
                 </label>
+
+                {imageGenEnabled && (
+                  <label className="mt-2 flex cursor-pointer items-start gap-2 text-sm text-plum-ink/70">
+                    <input
+                      type="checkbox"
+                      checked={genPhotos}
+                      onChange={(e) => setGenPhotos(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 accent-brand-primary"
+                    />
+                    <span>
+                      <span className="font-semibold">Generate AI photos</span> for each item
+                      (~$0.04 each, takes a moment). Generic placeholder shots — swap your own
+                      anytime.
+                    </span>
+                  </label>
+                )}
 
                 {error && <p className="mt-3 text-sm text-guava">{error}</p>}
 

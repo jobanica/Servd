@@ -19,6 +19,7 @@ export default async function MenuPage() {
   const { restaurantId } = await requireAdminPage();
   const categories = await getMenu(restaurantId);
   const aiImportEnabled = !!process.env.ANTHROPIC_API_KEY;
+  const imageGenEnabled = !!process.env.OPENAI_API_KEY;
 
   return (
     <div className="space-y-6">
@@ -30,7 +31,7 @@ export default async function MenuPage() {
           <h1 className="font-heading text-2xl font-bold">Menu</h1>
         </div>
         <div className="flex items-center gap-3">
-          {aiImportEnabled && <ImportMenuButton />}
+          {aiImportEnabled && <ImportMenuButton imageGenEnabled={imageGenEnabled} />}
           <Link
             href="/admin/modifiers"
             className="rounded-full border border-plum-ink/15 px-4 py-2 text-sm font-semibold"
