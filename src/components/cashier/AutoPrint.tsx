@@ -9,6 +9,18 @@ import { useEffect } from "react";
  */
 export function AutoPrint() {
   useEffect(() => {
+    // Close the tab once printing finishes (only works for windows we opened).
+    const close = () => {
+      setTimeout(() => {
+        try {
+          window.close();
+        } catch {
+          /* ignore */
+        }
+      }, 300);
+    };
+    window.addEventListener("afterprint", close);
+
     const fire = () => {
       try {
         window.focus();
@@ -19,7 +31,10 @@ export function AutoPrint() {
     };
     // Wait for layout (and the QR SVG) to be ready, then print.
     const t = setTimeout(fire, 500);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("afterprint", close);
+    };
   }, []);
   return null;
 }

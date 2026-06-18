@@ -11,16 +11,20 @@ import { AutoPrint } from "@/components/cashier/AutoPrint";
  */
 export default async function TicketPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ orderId: string }>;
+  searchParams: Promise<{ doc?: string }>;
 }) {
   const { orderId } = await params;
+  const { doc } = await searchParams;
   const user = await getCurrentUser();
   if (!user || user.kind !== "staff" || !["cashier", "admin"].includes(user.role)) {
     redirect("/login");
   }
 
-  const ticket = await getOrderTicket(user.restaurantId, orderId);
+  const kind = doc === "bill" ? "bill" : "receipt";
+  const ticket = await getOrderTicket(user.restaurantId, orderId, kind);
   if (!ticket) notFound();
 
   const qr = ticket.qrUrl ? await qrSvg(ticket.qrUrl) : null;

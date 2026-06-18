@@ -25,10 +25,8 @@ import { ShiftSummaryModal } from "./ShiftSummaryModal";
 import { VoidPinModal } from "./VoidPinModal";
 import { CashOutModal } from "./CashOutModal";
 import { BluetoothPrinterButton } from "./BluetoothPrinterButton";
-import { printReceiptInBackground } from "@/lib/print/receipt-print";
-import { getReceiptEscPos, printOrderTicket } from "@/server/printing/print";
-import { isPrinterConnected, printBytes, base64ToBytes } from "@/lib/printing/bt-printer";
-import { printViaBluetooth } from "@/lib/printing/bluetooth";
+import { printPaidTicket } from "@/server/printing/print";
+import { runPrintDispatch } from "@/lib/print/run-dispatch";
 
 export function CashierBoard({
   restaurantId,
@@ -163,34 +161,15 @@ export function CashierBoard({
     }
   }
 
-  // Print the receipt after a successful payment, mirroring the (working)
-  // "Print ticket" button so behaviour is identical.
-  async function printPaidReceipt(orderId: string, clientPrintNeeded?: boolean) {
-    // 1. A persistently-connected Bluetooth printer prints silently.
-    if (isPrinterConnected()) {
-      try {
-        const b64 = await getReceiptEscPos(orderId);
-        if (b64) {
-          await printBytes(base64ToBytes(b64));
-          return;
-        }
-      } catch {
-        showToast("Couldn't reach the Bluetooth printer — check it's on.");
-      }
-    }
-    // 2. Otherwise use the configured print method — same path as Print ticket.
+  // Print the paid RECEIPT — same dispatch runner as the "Print bill" button,
+  // so a connected Bluetooth printer prints automatically.
+  async function printPaidReceipt(orderId: string) {
     try {
-      const res = await printOrderTicket(orderId);
-      if (res.handledOnServer) return; // network/cloud printed server-side
-      if (res.clientAction === "bluetooth" && res.ticketBase64) {
-        await printViaBluetooth(base64ToBytes(res.ticketBase64));
-        return;
-      }
+      const res = await printPaidTicket(orderId);
+      await runPrintDispatch(res, orderId, "receipt");
     } catch {
-      /* fall through to OS print */
+      showToast("Couldn't print the receipt.");
     }
-    // 3. OS / kiosk fallback — hidden iframe (never a visible tab).
-    if (clientPrintNeeded) printReceiptInBackground(orderId);
   }
 
   async function pay(orderId: string, method: "cash" | "card_terminal") {
@@ -200,7 +179,7 @@ export function CashierBoard({
       if (res.ok && res.tables) {
         setTables(res.tables);
         showToast("Payment recorded — order closed.");
-        await printPaidReceipt(orderId, res.printTicket);
+        await printPaidReceipt(orderId);
       } else if (!res.ok) {
         showToast(res.error ?? "Couldn't record the payment.");
         refresh();

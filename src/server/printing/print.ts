@@ -2,7 +2,7 @@
 
 import { tenantDb, systemDb } from "@/server/tenancy/scoped-db";
 import { requireStaff } from "@/server/tenancy/current-user";
-import { buildTicket, type Ticket } from "@/lib/printing/ticket";
+import { buildTicket, type Ticket, type TicketKind } from "@/lib/printing/ticket";
 import { encodeTicketBase64 } from "@/lib/printing/escpos";
 import { restaurantSiteUrl } from "@/lib/qr";
 
@@ -126,12 +126,17 @@ async function loadTicket(restaurantId: string, orderId: string) {
 }
 
 /** Build the Ticket for an order (shared by dispatch + the ESC/POS action). */
-async function ticketFor(restaurantId: string, orderId: string): Promise<Ticket | null> {
+async function ticketFor(
+  restaurantId: string,
+  orderId: string,
+  kind: TicketKind = "receipt",
+): Promise<Ticket | null> {
   const { restaurant, order, meta, payment } = await loadTicket(restaurantId, orderId);
   if (!order) return null;
   const config = (restaurant.printerConfig as PrinterConfig | null) ?? {};
   const r = config.receipt ?? {};
   return buildTicket({
+    kind,
     restaurantName: restaurant.displayName || restaurant.name,
     address: r.address,
     phone: r.phone,
@@ -160,60 +165,18 @@ async function ticketFor(restaurantId: string, orderId: string): Promise<Ticket 
       };
     }),
   });
-}
-
-/**
- * The receipt as base64 ESC/POS — for the cashier's connected Bluetooth printer
- * to print automatically on payment. Returns null if the order isn't found.
- */
-export async function getReceiptEscPos(orderId: string): Promise<string | null> {
-  let staff;
-  try {
-    staff = await requireStaff(["cashier", "admin"]);
-  } catch {
-    return null;
-  }
-  const ticket = await ticketFor(staff.restaurantId, orderId);
-  return ticket ? encodeTicketBase64(ticket) : null;
 }
 
 /** Core dispatch usable both from the cashier action and from auto-print. */
-async function dispatch(restaurantId: string, orderId: string): Promise<PrintDispatch> {
-  const { restaurant, order, meta, payment } = await loadTicket(restaurantId, orderId);
-  if (!order) return { ok: false, handledOnServer: false, message: "Order not found." };
-
+async function dispatch(
+  restaurantId: string,
+  orderId: string,
+  kind: TicketKind = "receipt",
+): Promise<PrintDispatch> {
+  const { restaurant } = await loadTicket(restaurantId, orderId);
+  const ticket = await ticketFor(restaurantId, orderId, kind);
+  if (!ticket) return { ok: false, handledOnServer: false, message: "Order not found." };
   const config = (restaurant.printerConfig as PrinterConfig | null) ?? {};
-  const r = config.receipt ?? {};
-
-  const ticket = buildTicket({
-    restaurantName: restaurant.displayName || restaurant.name,
-    address: r.address,
-    phone: r.phone,
-    website: r.website,
-    footer: r.footer,
-    tableNumber: order.table?.tableNumber ?? "—",
-    orderType: meta.orderType,
-    customerName: meta.customerName,
-    customerAddress: meta.customerAddress,
-    orderId: order.id,
-    createdAt: order.createdAt.toISOString(),
-    total: order.total,
-    discountAmount: meta.discountAmount,
-    discountLabel: meta.discountLabel,
-    paymentMethod: payment?.method ?? null,
-    paymentAmount: payment?.amount ?? null,
-    qrUrl: restaurantSiteUrl(restaurant.slug),
-    items: order.items.map((i) => {
-      const unit = i.unitPrice + i.modifiers.reduce((s, m) => s + m.priceDeltaAtTime, 0);
-      return {
-        quantity: i.quantity,
-        name: i.nameAtTime,
-        modifiers: i.modifiers.map((m) => m.nameAtTime),
-        note: i.note,
-        lineTotal: unit * i.quantity,
-      };
-    }),
-  });
   const base64 = encodeTicketBase64(ticket);
 
   switch (restaurant.printMethod) {
@@ -256,11 +219,13 @@ async function dispatch(restaurantId: string, orderId: string): Promise<PrintDis
       return { ok: true, handledOnServer: false, clientAction: "bluetooth", ticketBase64: base64, message: "" };
     case "os_dialog":
     default:
-      return { ok: true, handledOnServer: false, clientAction: "os_dialog", ticket, message: "" };
+      // Include the bytes too, so a connected Web Bluetooth printer can print
+      // even when the configured method is the OS dialog.
+      return { ok: true, handledOnServer: false, clientAction: "os_dialog", ticket, ticketBase64: base64, message: "" };
   }
 }
 
-/** Cashier-triggered print. */
+/** Cashier-triggered print — a BILL (amount the customer must pay). */
 export async function printOrderTicket(orderId: string): Promise<PrintDispatch> {
   let staff;
   try {
@@ -268,7 +233,18 @@ export async function printOrderTicket(orderId: string): Promise<PrintDispatch> 
   } catch {
     return { ok: false, handledOnServer: false, message: "Not allowed." };
   }
-  return dispatch(staff.restaurantId, orderId);
+  return dispatch(staff.restaurantId, orderId, "bill");
+}
+
+/** Print the paid RECEIPT (after payment) — same transports as the bill. */
+export async function printPaidTicket(orderId: string): Promise<PrintDispatch> {
+  let staff;
+  try {
+    staff = await requireStaff(["cashier", "admin"]);
+  } catch {
+    return { ok: false, handledOnServer: false, message: "Not allowed." };
+  }
+  return dispatch(staff.restaurantId, orderId, "receipt");
 }
 
 /**
@@ -284,7 +260,7 @@ export async function autoPrintIfEnabled(
   const { restaurant } = await loadTicket(restaurantId, orderId);
   if (!restaurant.autoPrint) return { clientPrintNeeded: false };
   if (restaurant.printMethod === "network" || restaurant.printMethod === "cloud") {
-    await dispatch(restaurantId, orderId);
+    await dispatch(restaurantId, orderId, "bill"); // new order, not yet paid
     return { clientPrintNeeded: false };
   }
   return { clientPrintNeeded: true };
@@ -302,7 +278,7 @@ export async function printReceipt(
 ): Promise<{ clientPrintNeeded: boolean }> {
   const { restaurant } = await loadTicket(restaurantId, orderId);
   if (restaurant.printMethod === "network" || restaurant.printMethod === "cloud") {
-    await dispatch(restaurantId, orderId);
+    await dispatch(restaurantId, orderId, "receipt");
     return { clientPrintNeeded: false };
   }
   return { clientPrintNeeded: true };

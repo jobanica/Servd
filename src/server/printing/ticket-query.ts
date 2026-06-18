@@ -1,11 +1,12 @@
 import { tenantDb } from "@/server/tenancy/scoped-db";
-import { buildTicket, type Ticket } from "@/lib/printing/ticket";
+import { buildTicket, type Ticket, type TicketKind } from "@/lib/printing/ticket";
 import { restaurantSiteUrl } from "@/lib/qr";
 
 /** Loads an order and shapes it into a Ticket (tenant-scoped). */
 export async function getOrderTicket(
   restaurantId: string,
   orderId: string,
+  kind: TicketKind = "receipt",
 ): Promise<Ticket | null> {
   return tenantDb(restaurantId, async (tx) => {
     const restaurant = await tx.restaurant.findFirstOrThrow({
@@ -82,6 +83,7 @@ export async function getOrderTicket(
     }
 
     return buildTicket({
+      kind,
       restaurantName: restaurant.displayName || restaurant.name,
       address: receipt.address,
       phone: receipt.phone,

@@ -40,7 +40,11 @@ const METHOD_LABEL: Record<string, string> = {
   online_card: "Card (online)",
 };
 
+/** "bill" = pre-payment (amount due); "receipt" = post-payment (paid). */
+export type TicketKind = "bill" | "receipt";
+
 export interface Ticket {
+  kind: TicketKind;
   restaurantName: string;
   address: string | null;
   phone: string | null;
@@ -62,6 +66,7 @@ export interface Ticket {
 }
 
 export interface TicketSource extends ReceiptBranding {
+  kind?: TicketKind;
   restaurantName: string;
   tableNumber: string;
   orderType?: "dine_in" | "takeout" | "delivery";
@@ -80,6 +85,7 @@ export interface TicketSource extends ReceiptBranding {
 
 export function buildTicket(src: TicketSource): Ticket {
   return {
+    kind: src.kind ?? "receipt",
     restaurantName: src.restaurantName,
     address: src.address ?? null,
     phone: src.phone ?? null,
@@ -101,10 +107,16 @@ export function buildTicket(src: TicketSource): Ticket {
     total: src.total,
     discountAmount: src.discountAmount ?? 0,
     discountLabel: src.discountLabel ?? null,
-    paymentMethod: src.paymentMethod ?? null,
-    paymentAmount: src.paymentAmount ?? null,
+    // A bill is pre-payment — never show a payment line on it.
+    paymentMethod: src.kind === "bill" ? null : src.paymentMethod ?? null,
+    paymentAmount: src.kind === "bill" ? null : src.paymentAmount ?? null,
     qrUrl: src.qrUrl ?? null,
   };
+}
+
+/** The document label printed under the heading. */
+export function ticketDocLabel(t: Ticket): string {
+  return t.kind === "bill" ? "*** BILL ***" : "*** OFFICIAL RECEIPT ***";
 }
 
 /** Net payable + VAT-of-net (centavos). */
@@ -133,7 +145,7 @@ export function ticketHeaderLines(t: Ticket): string[] {
 /** Left-aligned body: meta, itemized lines with prices, totals, payment. */
 export function ticketBodyLines(t: Ticket): string[] {
   const lines: string[] = [];
-  lines.push(`Receipt #${t.orderRef}`);
+  lines.push(`${t.kind === "bill" ? "Bill" : "Receipt"} #${t.orderRef}`);
   lines.push(new Date(t.placedAt).toLocaleString());
   lines.push("--------------------------------");
   for (const item of t.items) {
@@ -148,9 +160,15 @@ export function ticketBodyLines(t: Ticket): string[] {
     lines.push(pad(t.discountLabel ?? "Discount", `-${amt(t.discountAmount)}`));
   }
   lines.push(pad("VAT (12% incl.)", amt(vat)));
-  lines.push(pad("TOTAL (PHP)", amt(net)));
-  if (t.paymentMethod) {
+  // Bill = amount the customer must PAY; receipt = total they paid.
+  lines.push(pad(t.kind === "bill" ? "AMOUNT DUE (PHP)" : "TOTAL (PHP)", amt(net)));
+
+  if (t.kind === "bill") {
+    lines.push("");
+    lines.push("Please pay at the counter.");
+  } else if (t.paymentMethod) {
     lines.push(pad(METHOD_LABEL[t.paymentMethod] ?? t.paymentMethod, amt(t.paymentAmount ?? net)));
+    lines.push("*** PAID ***");
   }
   return lines;
 }
@@ -169,6 +187,7 @@ export function ticketLines(ticket: Ticket): string[] {
   return [
     ...ticketHeaderLines(ticket),
     ticketHeading(ticket),
+    ticketDocLabel(ticket),
     ...contact,
     ...ticketBodyLines(ticket),
     ...(footer.length ? ["", ...footer] : []),
