@@ -12,6 +12,7 @@ import {
   orderItemsCreate,
   OrderValidationError,
 } from "@/server/orders/build-order";
+import { resolvePromo } from "@/server/promotions/redeem";
 
 /**
  * Creates an order from a diner's cart. Diners have no session — the order is
@@ -29,7 +30,7 @@ export async function placeOrder(
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid order" };
   }
-  const { slug, tableToken, lines, loyaltyPhone } = parsed.data;
+  const { slug, tableToken, lines, loyaltyPhone, couponCode } = parsed.data;
 
   // Resolve the restaurant + table (public lookups, scoped by slug/token).
   const ctx = await systemDb(async (tx) => {
@@ -55,6 +56,13 @@ export async function placeOrder(
     return { ok: false, error: "We couldn't place your order. Please try again." };
   }
 
+  // Apply a coupon code if given — recomputed server-side, never trusted.
+  let discount: { amount: number; label: string } | null = null;
+  if (couponCode?.trim()) {
+    const resolved = await resolvePromo(ctx.restaurantId, couponCode, built, 0);
+    if (resolved) discount = { amount: resolved.amount, label: resolved.label };
+  }
+
   // Persist atomically, tenant-scoped (RLS WITH CHECK enforces the boundary).
   const baseData = {
     restaurantId: ctx.restaurantId,
@@ -62,6 +70,7 @@ export async function placeOrder(
     status: "pending" as const, // awaiting cashier acceptance
     paymentStatus: "unpaid" as const,
     total: built.total,
+    ...(discount ? { discountAmount: discount.amount, discountLabel: discount.label } : {}),
     items: { create: orderItemsCreate(built.items) },
   };
   const phone = loyaltyPhone?.trim() || null;

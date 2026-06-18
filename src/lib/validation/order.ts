@@ -9,6 +9,7 @@ export const placeOrderSchema = z.object({
   slug: z.string().min(1),
   tableToken: z.string().min(1),
   loyaltyPhone: z.string().trim().max(30).optional(),
+  couponCode: z.string().trim().max(24).optional(),
   lines: z
     .array(
       z.object({

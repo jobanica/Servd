@@ -8,6 +8,7 @@ import { cartCount, cartTotal } from "@/lib/cart/pricing";
 import { useCart } from "@/lib/cart/useCart";
 import type { DinerCategory, DinerItem } from "@/lib/cart/types";
 import { placeOrder } from "@/server/orders/place-order";
+import { previewPromoCode } from "@/server/promotions/redeem";
 import type { PlaceOrderResult } from "@/lib/validation/order";
 import { ItemModal } from "./ItemModal";
 import { CartDrawer } from "./CartDrawer";
@@ -28,6 +29,11 @@ interface PromoItem {
   id: string;
   title: string;
   description: string | null;
+  code: string | null;
+  type: string;
+  value: number;
+  freeItemId: string | null;
+  minSpend: number;
 }
 
 /** Product card — image, "+" affordance, price pill, name. */
@@ -199,6 +205,7 @@ export function DinerMenu({
       slug,
       tableToken,
       loyaltyPhone: loyaltyPhone || undefined,
+      couponCode: appliedPromo ? couponCode.trim() : undefined,
       lines: cart.lines.map((l) => ({
         itemId: l.itemId,
         quantity: l.quantity,
@@ -206,6 +213,47 @@ export function DinerMenu({
         modifierIds: l.modifiers.map((m) => m.modifierId),
       })),
     });
+  }
+
+  // --- Coupon code (applied at checkout) ---
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedPromo, setAppliedPromo] = useState<{ label: string; amount: number } | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [couponBusy, setCouponBusy] = useState(false);
+
+  async function applyCoupon() {
+    const code = couponCode.trim();
+    if (!code) return;
+    setCouponBusy(true);
+    setCouponError(null);
+    try {
+      const res = await previewPromoCode({
+        slug,
+        code,
+        lines: cart.lines.map((l) => ({
+          itemId: l.itemId,
+          quantity: l.quantity,
+          modifierIds: l.modifiers.map((m) => m.modifierId),
+        })),
+      });
+      if (res.ok) {
+        setAppliedPromo({ label: res.label, amount: res.amount });
+      } else {
+        setAppliedPromo(null);
+        setCouponError(res.error);
+      }
+    } catch {
+      setAppliedPromo(null);
+      setCouponError("Couldn't check that code. Please try again.");
+    } finally {
+      setCouponBusy(false);
+    }
+  }
+
+  function clearCoupon() {
+    setCouponCode("");
+    setAppliedPromo(null);
+    setCouponError(null);
   }
 
   const [activeItem, setActiveItem] = useState<DinerItem | null>(null);
@@ -437,6 +485,7 @@ export function DinerMenu({
           onPlaceOrder={submitOrder}
           onPlaced={(orderId) => {
             cart.clear();
+            clearCoupon();
             startTracking(orderId);
             setUpsellDone(false); // reset for the next order
           }}
@@ -444,6 +493,17 @@ export function DinerMenu({
           showUpsellFirst={showUpsellFirst}
           onPickUpsell={(it) => setActiveItem(it)}
           onUpsellResolved={() => setUpsellDone(true)}
+          couponCode={couponCode}
+          onCouponCode={(c) => {
+            setCouponCode(c);
+            if (appliedPromo) setAppliedPromo(null);
+            if (couponError) setCouponError(null);
+          }}
+          appliedPromo={appliedPromo}
+          couponError={couponError}
+          couponBusy={couponBusy}
+          onApplyCoupon={applyCoupon}
+          onClearCoupon={clearCoupon}
         />
       )}
 
@@ -482,6 +542,15 @@ export function DinerMenu({
                     <p className="font-heading font-bold text-brand-ink">{p.title}</p>
                     {p.description && (
                       <p className="mt-1 text-sm text-brand-ink/65">{p.description}</p>
+                    )}
+                    {p.code && (
+                      <p className="mt-2 text-sm text-brand-ink/70">
+                        Use code{" "}
+                        <span className="rounded-md bg-white px-2 py-0.5 font-mono font-bold text-brand-primary">
+                          {p.code}
+                        </span>{" "}
+                        at checkout
+                      </p>
                     )}
                   </li>
                 ))}

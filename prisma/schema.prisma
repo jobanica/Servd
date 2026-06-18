@@ -901,18 +901,26 @@ model Order {
 /// Marketing promotions shown to diners in the app's "Promos" section. Managed
 /// by the restaurant from the admin dashboard.
 model Promotion {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   restaurantId String
   title        String
   description  String?
-  active       Boolean  @default(true)
-  sortOrder    Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  // Coupon redemption: customers enter `code` at checkout to get the offer.
+  code         String? // customizable coupon code (unique per restaurant, case-insensitive)
+  type         String    @default("info") // info | percent | amount | free_delivery | free_item | bogo
+  value        Int       @default(0) // percent (1-100) OR centavos off, depending on type
+  freeItemId   String? // menu item for free_item / bogo
+  minSpend     Int       @default(0) // centavos: minimum order subtotal to qualify
+  expiresAt    DateTime? // optional auto-expiry
+  active       Boolean   @default(true)
+  sortOrder    Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   @@index([restaurantId, active])
+  @@index([restaurantId, code])
   @@map("promotions")
 }
 
