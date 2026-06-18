@@ -5,7 +5,7 @@ import {
   connectPrinter,
   disconnectPrinter,
   isBluetoothSupported,
-  isPrinterConnected,
+  isPrinterPaired,
   onPrinterChange,
   printerName,
 } from "@/lib/printing/bt-printer";
@@ -21,7 +21,7 @@ export function BluetoothPrinterButton() {
   const supported = isBluetoothSupported();
 
   useEffect(() => {
-    setConnected(isPrinterConnected());
+    setConnected(isPrinterPaired());
     return onPrinterChange(setConnected);
   }, []);
 
