@@ -22,6 +22,13 @@ const ICONS = {
   chat: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z",
   box: "M21 8l-9-5-9 5 9 5 9-5zM3 8v8l9 5 9-5V8M12 13v8",
   check: "M20 6L9 17l-5-5",
+  receipt: "M5 3v18l2-1 2 1 2-1 2 1 2-1 2 1V3l-2 1-2-1-2 1-2-1-2 1zM9 8h6M9 12h6",
+  bag: "M6 2l-2 4v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6l-2-4zM4 6h16M16 10a4 4 0 0 1-8 0",
+  star: "M12 3l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.8 6.8 19l1-5.8L3.6 9.1l5.8-.8z",
+  tag: "M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8zM7 7h.01",
+  users: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M23 21v-2a4 4 0 0 0-3-3.9",
+  book: "M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5z",
+  spark: "M12 2l1.9 5.1L19 9l-5.1 1.9L12 16l-1.9-5.1L5 9l5.1-1.9zM18 14l.8 2.2L21 17l-2.2.8L18 20l-.8-2.2L15 17l2.2-.8z",
 };
 
 /* ------------------------------------------------------------------ nav */
@@ -425,6 +432,13 @@ export default async function Home() {
             [ICONS.chat, "Feedback & SMS", "Collect ratings, invite Google reviews, and run opt-in SMS promos to regulars."],
             [ICONS.box, "Inventory", "Recipes auto-deduct stock as orders cook, with low-stock alerts and COGS."],
             [ICONS.check, "HR & payroll prep", "Employees, schedules, QR time-clock, leave, and payroll-prep exports."],
+            [ICONS.receipt, "Cashier & POS", "Take payments, split bills, print receipts, plus cash-out and end-of-shift reports."],
+            [ICONS.bag, "Online ordering", "Your own takeout & delivery website with delivery zones and fees — beyond the table."],
+            [ICONS.star, "Loyalty & rewards", "Points and rewards that turn first-time diners into regulars who keep coming back."],
+            [ICONS.tag, "Promotions & coupons", "Create coupon codes — % off, free item, or buy-1-get-1 — redeemed right at checkout."],
+            [ICONS.users, "Customer database", "Every order builds a CRM you own — contacts, history, and segments for marketing."],
+            [ICONS.book, "Accounting", "Sales, COGS, and expense tracking with clean exports your bookkeeper will love."],
+            [ICONS.spark, "AI tools", "Snap a photo to import your menu, auto-write descriptions, and get smart insights."],
           ].map(([icon, title, body]) => (
             <div key={title} className="rounded-tile border border-plum-ink/10 bg-white p-6 transition hover:shadow-lg">
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-gradient text-white">
