@@ -6,10 +6,11 @@ const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 const nextConfig = {
   reactStrictMode: true,
   experimental: {
-    // Menu-import uploads (photos up to 5 MB each, PDFs up to 32 MB) flow
-    // through a Server Action, whose request body defaults to just 1 MB.
+    // Menu-item image uploads (up to 5 MB) flow through a Server Action, whose
+    // request body otherwise defaults to just 1 MB. (AI menu import uploads go
+    // straight to Supabase Storage, so they aren't bound by this.)
     serverActions: {
-      bodySizeLimit: "40mb",
+      bodySizeLimit: "8mb",
     },
   },
   images: {

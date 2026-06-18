@@ -3,10 +3,17 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  analyzeMenuPhoto,
+  createMenuImportUploads,
+  analyzeMenuMedia,
   importParsedMenu,
   type ParsedCategory,
 } from "@/server/menu/ai-import";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+
+// Client-side guards (the server re-checks types). Photos are downscaled first,
+// so the real cap that matters is the PDF size.
+const MAX_PDF_MB = 32;
+const MAX_FILES = 6;
 
 /** Editable draft mirrors ParsedCategory but keeps prices as strings for inputs. */
 type DraftItem = { name: string; description: string; price: string };
@@ -76,21 +83,55 @@ export function ImportMenuButton() {
   }
 
   async function analyze() {
-    const files = fileRef.current?.files;
-    if (!files || files.length === 0) {
+    const picked = fileRef.current?.files;
+    if (!picked || picked.length === 0) {
       setError("Choose at least one menu photo or PDF.");
       return;
     }
+    if (picked.length > MAX_FILES) {
+      setError(`Please choose at most ${MAX_FILES} files.`);
+      return;
+    }
+    for (const f of Array.from(picked)) {
+      if (f.type === "application/pdf" && f.size > MAX_PDF_MB * 1024 * 1024) {
+        setError(`Each PDF must be ${MAX_PDF_MB} MB or smaller.`);
+        return;
+      }
+    }
+
     setError(null);
     setStep("analyzing");
-    const fd = new FormData();
-    for (let i = 0; i < files.length; i++) {
-      fd.append("images", await downscaleImage(files[i]));
-    }
-    fd.append("generateDescriptions", autoDescribe ? "true" : "false");
 
     try {
-      const res = await analyzeMenuPhoto(fd);
+      // Downscale photos in the browser; leave PDFs as-is.
+      const files = await Promise.all(Array.from(picked).map((f) => downscaleImage(f)));
+
+      // 1. Ask the server for signed upload URLs.
+      const prep = await createMenuImportUploads(files.map((f) => f.type));
+      if (!prep.ok) {
+        setError(prep.error);
+        setStep("upload");
+        return;
+      }
+
+      // 2. Upload each file straight to Supabase Storage (bypasses the
+      //    serverless body limit, so big PDFs work).
+      const supabase = createSupabaseBrowserClient();
+      await Promise.all(
+        files.map(async (file, i) => {
+          const t = prep.targets[i];
+          const { error } = await supabase.storage
+            .from(prep.bucket)
+            .uploadToSignedUrl(t.path, t.token, file);
+          if (error) throw error;
+        }),
+      );
+
+      // 3. Analyze from storage.
+      const res = await analyzeMenuMedia({
+        paths: prep.targets.map((t) => t.path),
+        generateDescriptions: autoDescribe,
+      });
       if (!res.ok) {
         setError(res.error);
         setStep("upload");
@@ -99,7 +140,7 @@ export function ImportMenuButton() {
       setDraft(toDraft(res.categories));
       setStep("review");
     } catch {
-      setError("Upload failed — the file may be too large or the network dropped. Please try again.");
+      setError("Upload failed — please check your connection and try again.");
       setStep("upload");
     }
   }
