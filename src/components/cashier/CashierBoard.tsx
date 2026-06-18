@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { signOut } from "@/app/(platform)/login/actions";
 import {
   getCashierTables,
   getIncomingOrders,
@@ -32,10 +34,12 @@ export function CashierBoard({
   restaurantId,
   initialTables,
   initialIncoming = [],
+  isAdmin = false,
 }: {
   restaurantId: string;
   initialTables: CashierTable[];
   initialIncoming?: IncomingOrder[];
+  isAdmin?: boolean;
 }) {
   const [tables, setTables] = useState<CashierTable[]>(initialTables);
   const [incoming, setIncoming] = useState<IncomingOrder[]>(initialIncoming);
@@ -277,9 +281,29 @@ export function CashierBoard({
 
         <div className="my-1 border-t border-plum-ink/10" />
 
+        <Link href="/cashier/delivery" className={`${sidebarBtn} text-center`}>
+          🛵 Delivery orders
+        </Link>
+        <Link href="/clock/me" className="w-full rounded-full px-4 py-2.5 text-center text-sm font-semibold btn-brand">
+          Clock in/out
+        </Link>
+        {isAdmin && (
+          <Link href="/admin/printing" className={`${sidebarBtn} text-center`}>
+            Printer settings
+          </Link>
+        )}
+
+        <div className="my-1 border-t border-plum-ink/10" />
+
         <button onClick={() => setClosedOpen(true)} className={sidebarBtn}>Closed orders</button>
         <button onClick={() => setCashOutOpen(true)} className={sidebarBtn}>Cash out</button>
         <button onClick={() => setShiftOpen(true)} className={sidebarBtn}>End-of-shift summary</button>
+
+        <div className="my-1 border-t border-plum-ink/10" />
+
+        <form action={signOut}>
+          <button className={sidebarBtn}>Sign out</button>
+        </form>
       </aside>
 
       {/* Main board */}
