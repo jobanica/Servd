@@ -63,3 +63,12 @@ export const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
 // Menu item videos (short clips).
 export const ALLOWED_VIDEO_TYPES = ["video/mp4", "video/webm"] as const;
 export const MAX_VIDEO_BYTES = 50 * 1024 * 1024; // 50 MB
+
+// AI menu import accepts photos or a PDF of the printed menu.
+export const ALLOWED_MENU_DOC_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+] as const;
+export const MAX_PDF_BYTES = 32 * 1024 * 1024; // 32 MB (Claude PDF limit)

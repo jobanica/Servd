@@ -31,6 +31,7 @@ export function ImportMenuButton() {
   const [draft, setDraft] = useState<DraftCategory[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ categories: number; items: number } | null>(null);
+  const [autoDescribe, setAutoDescribe] = useState(true);
 
   function reset() {
     setStep("upload");
@@ -48,13 +49,14 @@ export function ImportMenuButton() {
   async function analyze() {
     const files = fileRef.current?.files;
     if (!files || files.length === 0) {
-      setError("Choose at least one menu photo.");
+      setError("Choose at least one menu photo or PDF.");
       return;
     }
     setError(null);
     setStep("analyzing");
     const fd = new FormData();
-    for (const f of Array.from(files)) fd.append("images", f);
+    for (let i = 0; i < files.length; i++) fd.append("images", files[i]);
+    fd.append("generateDescriptions", autoDescribe ? "true" : "false");
 
     const res = await analyzeMenuPhoto(fd);
     if (!res.ok) {
@@ -253,22 +255,37 @@ export function ImportMenuButton() {
               /* Upload */
               <>
                 <p className="mt-1 text-sm text-plum-ink/55">
-                  Take a clear photo of your printed menu. Claude reads it and drafts your
-                  categories and items — you review before anything is saved.
+                  Upload a clear photo or PDF of your printed menu. Claude reads it, sorts items
+                  into categories, and drafts everything — you review before anything is saved.
                 </p>
 
                 <label className="mt-4 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-tile border-2 border-dashed border-plum-ink/20 px-4 py-10 text-center hover:border-brand-primary/50">
                   <span className="text-3xl">📷</span>
-                  <span className="text-sm font-semibold">Choose menu photo(s)</span>
-                  <span className="text-xs text-plum-ink/45">JPG, PNG, or WebP · up to 6 photos</span>
+                  <span className="text-sm font-semibold">Choose menu photo(s) or PDF</span>
+                  <span className="text-xs text-plum-ink/45">
+                    JPG, PNG, WebP, or PDF · up to 6 files
+                  </span>
                   <input
                     ref={fileRef}
                     type="file"
-                    accept="image/jpeg,image/png,image/webp"
+                    accept="image/jpeg,image/png,image/webp,application/pdf"
                     multiple
                     className="hidden"
                     onChange={() => setError(null)}
                   />
+                </label>
+
+                <label className="mt-3 flex cursor-pointer items-start gap-2 text-sm text-plum-ink/70">
+                  <input
+                    type="checkbox"
+                    checked={autoDescribe}
+                    onChange={(e) => setAutoDescribe(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 accent-brand-primary"
+                  />
+                  <span>
+                    <span className="font-semibold">Auto-write descriptions</span> for items that
+                    don&apos;t have one. You can still edit them before importing.
+                  </span>
                 </label>
 
                 {error && <p className="mt-3 text-sm text-guava">{error}</p>}

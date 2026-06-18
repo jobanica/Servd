@@ -6,7 +6,11 @@ import { z } from "zod";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireAdminAction } from "@/server/tenancy/require-admin";
 import { pesosToCentavos } from "@/lib/money";
-import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "@/lib/validation/menu";
+import {
+  ALLOWED_MENU_DOC_TYPES,
+  MAX_IMAGE_BYTES,
+  MAX_PDF_BYTES,
+} from "@/lib/validation/menu";
 
 /**
  * AI menu import — snap a photo of a printed menu and let Claude turn it into
@@ -35,20 +39,31 @@ export type AnalyzeResult =
   | { ok: true; categories: ParsedCategory[] }
   | { ok: false; error: string };
 
-const MAX_IMAGES = 6;
+const MAX_FILES = 6;
 
-const ANALYZE_SYSTEM = `You are a menu-digitizing assistant for a restaurant ordering platform in the Philippines (prices are in Philippine pesos, ₱).
-You are given one or more photos of a printed or handwritten food menu.
+/** The description rule changes depending on the owner's toggle. */
+function describeRule(generate: boolean): string {
+  return generate
+    ? `- description: copy any printed description verbatim. For items WITHOUT a printed description, WRITE a short, appetizing one (max ~14 words) based on the item name — natural and accurate, never invent specific ingredients you can't infer from the name.`
+    : `- description: copy any printed description; otherwise use an empty string. Do NOT invent descriptions.`;
+}
+
+function buildSystemPrompt(generateDescriptions: boolean): string {
+  return `You are a menu-digitizing assistant for a restaurant ordering platform in the Philippines (prices are in Philippine pesos, ₱).
+You are given one or more photos or a PDF of a printed or handwritten food menu.
 Extract every menu item you can read into structured data.
 
 Rules:
-- Group items under their category/section headings exactly as printed (e.g. "Appetizers", "Mains", "Drinks"). If there are no clear sections, use a single category named "Menu".
+- Group items under their printed category/section headings exactly as written (e.g. "Appetizers", "Mains", "Drinks").
+- If a section is unlabeled, or items have no clear heading, INFER a sensible category for each item from what it is (e.g. "Appetizers", "Rice Meals", "Noodles", "Drinks", "Desserts"). Prefer a few well-named categories over one generic "Menu" bucket; only use "Menu" when an item is truly ambiguous.
 - price: the item's peso price as a plain number (e.g. 149 or 149.5). Strip the ₱/PHP sign and any commas. If an item lists multiple sizes/prices, pick the smallest and append the size to the name (e.g. "Iced Tea (Regular)"). If a price is unreadable, use 0.
-- description: copy any printed description; otherwise use an empty string. Do NOT invent descriptions.
+${describeRule(generateDescriptions)}
 - Preserve the exact item names. Fix only obvious OCR glitches.
 - Skip non-item text (addresses, phone numbers, "open daily", slogans).
+- Order categories the way a customer would expect to browse them (starters → mains → sides → drinks → desserts).
 - Return ONLY a JSON object, no prose, no code fence, of the form:
   {"categories":[{"name":"...","items":[{"name":"...","description":"...","price":0}]}]}`;
+}
 
 /** Validates the model's JSON before we trust it. */
 const parsedMenuSchema = z.object({
@@ -79,7 +94,7 @@ function mediaTypeFor(file: File): ImgMediaType {
       : "image/jpeg";
 }
 
-/** Step 1 — read the uploaded photo(s) into a structured menu draft. */
+/** Step 1 — read the uploaded photo(s) or PDF into a structured menu draft. */
 export async function analyzeMenuPhoto(formData: FormData): Promise<AnalyzeResult> {
   await requireAdminAction();
 
@@ -87,32 +102,43 @@ export async function analyzeMenuPhoto(formData: FormData): Promise<AnalyzeResul
     return { ok: false, error: "AI menu import isn't configured on this server." };
   }
 
+  const generateDescriptions = formData.get("generateDescriptions") === "true";
   const files = formData
     .getAll("images")
     .filter((f): f is File => f instanceof File && f.size > 0);
 
-  if (files.length === 0) return { ok: false, error: "Add at least one menu photo." };
-  if (files.length > MAX_IMAGES) {
-    return { ok: false, error: `Please upload at most ${MAX_IMAGES} photos at a time.` };
+  if (files.length === 0) return { ok: false, error: "Add at least one menu photo or PDF." };
+  if (files.length > MAX_FILES) {
+    return { ok: false, error: `Please upload at most ${MAX_FILES} files at a time.` };
   }
   for (const f of files) {
-    if (f.size > MAX_IMAGE_BYTES) {
-      return { ok: false, error: "Each photo must be 5 MB or smaller." };
+    if (!(ALLOWED_MENU_DOC_TYPES as readonly string[]).includes(f.type)) {
+      return { ok: false, error: "Files must be a JPG, PNG, WebP photo or a PDF." };
     }
-    if (!(ALLOWED_IMAGE_TYPES as readonly string[]).includes(f.type)) {
-      return { ok: false, error: "Photos must be JPG, PNG, or WebP." };
+    const isPdf = f.type === "application/pdf";
+    if (isPdf && f.size > MAX_PDF_BYTES) {
+      return { ok: false, error: "The PDF must be 32 MB or smaller." };
+    }
+    if (!isPdf && f.size > MAX_IMAGE_BYTES) {
+      return { ok: false, error: "Each photo must be 5 MB or smaller." };
     }
   }
 
-  const imageBlocks: Anthropic.ImageBlockParam[] = await Promise.all(
-    files.map(async (file) => ({
-      type: "image" as const,
-      source: {
-        type: "base64" as const,
-        media_type: mediaTypeFor(file),
-        data: Buffer.from(await file.arrayBuffer()).toString("base64"),
-      },
-    })),
+  // Photos become image blocks; a PDF becomes a document block.
+  const docBlocks: Anthropic.ContentBlockParam[] = await Promise.all(
+    files.map(async (file): Promise<Anthropic.ContentBlockParam> => {
+      const data = Buffer.from(await file.arrayBuffer()).toString("base64");
+      if (file.type === "application/pdf") {
+        return {
+          type: "document",
+          source: { type: "base64", media_type: "application/pdf", data },
+        };
+      }
+      return {
+        type: "image",
+        source: { type: "base64", media_type: mediaTypeFor(file), data },
+      };
+    }),
   );
 
   let text: string;
@@ -120,13 +146,13 @@ export async function analyzeMenuPhoto(formData: FormData): Promise<AnalyzeResul
     const client = new Anthropic();
     const message = await client.messages.create({
       model: "claude-opus-4-8",
-      max_tokens: 4096,
-      system: ANALYZE_SYSTEM,
+      max_tokens: 8192,
+      system: buildSystemPrompt(generateDescriptions),
       messages: [
         {
           role: "user",
           content: [
-            ...imageBlocks,
+            ...docBlocks,
             { type: "text", text: "Digitize this menu into the JSON schema described." },
           ],
         },
