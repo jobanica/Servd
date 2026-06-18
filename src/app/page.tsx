@@ -243,6 +243,156 @@ export default async function Home() {
         </div>
       </section>
 
+      {/* ANGLE 1 — STAFF SHORTAGE */}
+      <section className="mx-auto max-w-6xl px-6 py-20">
+        <div className="mx-auto max-w-3xl text-center">
+          <span className="inline-flex items-center gap-2 rounded-full border border-brand-primary/20 bg-brand-primary/10 px-3 py-1 text-xs font-semibold text-brand-primary">
+            Built for the staff shortage
+          </span>
+          <h2 className="mt-5 font-heading text-4xl font-extrabold tracking-tight sm:text-5xl">
+            Serve more customers without hiring another waiter.
+          </h2>
+          <p className="mt-5 text-lg text-plum-ink/70">
+            Customers scan a QR code, order on their phone, and orders go directly to the
+            cashier and kitchen.
+          </p>
+        </div>
+        <div className="mx-auto mt-10 grid max-w-3xl gap-4 sm:grid-cols-3">
+          {[
+            ["No waiting", "Diners order the moment they sit down."],
+            ["No missed tables", "Every order is captured — nothing slips through."],
+            ["No extra ordering staff", "Your team focuses on cooking and serving."],
+          ].map(([title, body]) => (
+            <div key={title} className="rounded-tile border border-plum-ink/10 bg-white p-5 text-center">
+              <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-brand-gradient text-white">
+                <Icon path={ICONS.check} />
+              </div>
+              <p className="mt-3 font-heading font-bold">{title}</p>
+              <p className="mt-1 text-sm text-plum-ink/60">{body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ANGLE 2 — LOST SALES (BEFORE / AFTER) */}
+      <section className="bg-white py-20">
+        <div className="mx-auto max-w-5xl px-6">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="font-heading text-4xl font-extrabold tracking-tight">
+              Your customers are ready to order. Why are they still waiting for a waiter?
+            </h2>
+            <p className="mt-4 text-plum-ink/70">
+              Every minute a customer waits, they get annoyed, order less, and leave sooner.
+            </p>
+          </div>
+          <div className="mt-12 grid gap-6 md:grid-cols-2">
+            {/* Before */}
+            <div className="rounded-tile border border-guava/30 bg-guava/5 p-7">
+              <p className="text-xs font-bold uppercase tracking-widest text-guava">Before</p>
+              <ul className="mt-4 space-y-3">
+                {["Customer waits", "Waiter is busy", "Order delayed"].map((s) => (
+                  <li key={s} className="flex items-center gap-3 text-plum-ink/70">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-guava/15 text-xs text-guava">✕</span>
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            {/* After */}
+            <div className="rounded-tile bg-brand-gradient p-7 text-white shadow-lg">
+              <p className="text-xs font-bold uppercase tracking-widest text-white/80">After</p>
+              <ul className="mt-4 space-y-3">
+                {["Scan", "Order", "Kitchen receives instantly"].map((s) => (
+                  <li key={s} className="flex items-center gap-3 font-semibold">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/25 text-xs">✓</span>
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ANGLE 3 + 4 — COST COMPARISON / HIDDEN COST */}
+      <section className="mx-auto max-w-6xl px-6 py-20">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="font-heading text-4xl font-extrabold tracking-tight">
+            The most expensive employee in your restaurant is your manual process.
+          </h2>
+          <p className="mt-4 text-plum-ink/70">
+            Owners rarely realize how much inefficiency quietly costs them every single day.
+          </p>
+        </div>
+
+        <div className="mx-auto mt-12 grid max-w-3xl items-stretch gap-6 md:grid-cols-2">
+          <div className="rounded-tile border border-plum-ink/10 bg-white p-7">
+            <p className="text-xs font-bold uppercase tracking-widest text-plum-ink/45">Manual ordering</p>
+            <p className="mt-3 font-heading text-4xl font-extrabold text-plum-ink/80">
+              ₱15,000<span className="text-2xl">–₱20,000</span>
+            </p>
+            <p className="mt-1 text-sm text-plum-ink/55">per month for dedicated ordering staff — plus the hidden costs below.</p>
+          </div>
+          <div className="rounded-tile bg-plum-ink p-7 text-cream">
+            <p className="text-xs font-bold uppercase tracking-widest text-mango">With Servd</p>
+            <p className="mt-3 font-heading text-4xl font-extrabold">₱2,499</p>
+            <p className="mt-1 text-sm text-cream/70">per month — technology handles the ordering, around the clock.</p>
+          </div>
+        </div>
+
+        <div className="mx-auto mt-8 max-w-3xl text-center">
+          <p className="text-sm font-semibold text-plum-ink/50">What manual processes quietly cost you:</p>
+          <div className="mt-4 flex flex-wrap justify-center gap-2.5">
+            {["Wrong orders", "Missed orders", "Slow service", "Inventory discrepancies", "Long queues"].map((x) => (
+              <span key={x} className="rounded-full border border-guava/30 bg-guava/5 px-3.5 py-1.5 text-sm font-semibold text-guava">
+                {x}
+              </span>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ANGLE 5 + 6 — BUSINESS ASSET / SYSTEMS NOT MEMORY */}
+      <section className="bg-plum-ink py-20 text-cream">
+        <div className="mx-auto max-w-5xl px-6">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="font-heading text-4xl font-extrabold tracking-tight">
+              Most restaurants only sell food. Smart restaurants build customer databases.
+            </h2>
+            <p className="mt-4 text-cream/65">
+              With Servd, every order grows an asset you actually own.
+            </p>
+          </div>
+          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              ["Customer data", "Know who orders, what, and how often."],
+              ["Loyalty members", "Turn one-time diners into regulars."],
+              ["SMS marketing", "Bring people back with a single text."],
+              ["Repeat customers", "A growing base that returns on its own."],
+            ].map(([title, body]) => (
+              <div key={title} className="rounded-tile border border-cream/10 bg-white/5 p-6">
+                <p className="font-heading text-lg font-bold">{title}</p>
+                <p className="mt-1.5 text-sm text-cream/65">{body}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mx-auto mt-14 max-w-3xl rounded-tile border border-cream/10 bg-white/5 p-8 text-center">
+            <h3 className="font-heading text-2xl font-extrabold tracking-tight sm:text-3xl">
+              Build a restaurant that can run on systems, not memory.
+            </h3>
+            <p className="mt-3 text-cream/70">
+              Most restaurants depend on one cashier, one manager, one trusted employee — and when
+              that person leaves, chaos begins. Servd turns how you operate into repeatable
+              processes that stay, no matter who is on shift.
+            </p>
+            <Link href="/signup" className="mt-7 inline-block rounded-full px-7 py-3.5 font-semibold btn-brand shadow-lg">
+              Start free — 30 days
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* FEATURES */}
       <section id="features" className="mx-auto max-w-6xl px-6 py-20">
         <div className="mx-auto max-w-2xl text-center">
