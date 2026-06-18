@@ -6,18 +6,22 @@ import { z } from "zod";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireAdminAction } from "@/server/tenancy/require-admin";
 import { pesosToCentavos } from "@/lib/money";
+import { ALLOWED_MENU_DOC_TYPES } from "@/lib/validation/menu";
 import {
-  ALLOWED_MENU_DOC_TYPES,
-  MAX_IMAGE_BYTES,
-  MAX_PDF_BYTES,
-} from "@/lib/validation/menu";
+  createImportUploadTargets,
+  signImportReadUrls,
+  removeImports,
+  MENU_IMPORT_BUCKET,
+  type UploadTarget,
+} from "@/server/storage/menu-imports";
 
 /**
  * AI menu import — snap a photo of a printed menu and let Claude turn it into
  * structured categories + items the owner can review and import in one tap.
  *
- * Two steps so the owner stays in control:
- *   1. analyzeMenuPhoto — vision model reads the photo(s) → structured draft.
+ * Steps so the owner stays in control:
+ *   0. createMenuImportUploads — signed URLs; the browser uploads to storage.
+ *   1. analyzeMenuMedia — vision model reads the file(s) → structured draft.
  *   2. importParsedMenu — writes the (possibly edited) draft to the menu.
  *
  * Best-effort + safe: if ANTHROPIC_API_KEY is unset or the model misbehaves we
@@ -85,74 +89,86 @@ const parsedMenuSchema = z.object({
     .default([]),
 });
 
-type ImgMediaType = "image/jpeg" | "image/png" | "image/webp";
-function mediaTypeFor(file: File): ImgMediaType {
-  return file.type === "image/png"
-    ? "image/png"
-    : file.type === "image/webp"
-      ? "image/webp"
-      : "image/jpeg";
+export type CreateUploadsResult =
+  | { ok: true; bucket: string; targets: UploadTarget[] }
+  | { ok: false; error: string };
+
+/**
+ * Step 0 — hand the browser short-lived signed upload URLs so it can send the
+ * files straight to Supabase Storage, bypassing the serverless body limit.
+ */
+export async function createMenuImportUploads(types: string[]): Promise<CreateUploadsResult> {
+  const { restaurantId } = await requireAdminAction();
+
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return { ok: false, error: "AI menu import isn't configured on this server." };
+  }
+  if (!Array.isArray(types) || types.length === 0) {
+    return { ok: false, error: "Add at least one menu photo or PDF." };
+  }
+  if (types.length > MAX_FILES) {
+    return { ok: false, error: `Please upload at most ${MAX_FILES} files at a time.` };
+  }
+  for (const t of types) {
+    if (!(ALLOWED_MENU_DOC_TYPES as readonly string[]).includes(t)) {
+      return { ok: false, error: "Files must be a JPG, PNG, WebP photo or a PDF." };
+    }
+  }
+
+  try {
+    const targets = await createImportUploadTargets(restaurantId, types);
+    return { ok: true, bucket: MENU_IMPORT_BUCKET, targets };
+  } catch {
+    return { ok: false, error: "Couldn't prepare the upload. Please try again." };
+  }
 }
 
-/** Step 1 — read the uploaded photo(s) or PDF into a structured menu draft. */
-export async function analyzeMenuPhoto(formData: FormData): Promise<AnalyzeResult> {
-  await requireAdminAction();
+/** Step 1 — read the uploaded photo(s)/PDF from storage into a menu draft. */
+export async function analyzeMenuMedia(input: {
+  paths: string[];
+  generateDescriptions: boolean;
+}): Promise<AnalyzeResult> {
+  const { restaurantId } = await requireAdminAction();
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return { ok: false, error: "AI menu import isn't configured on this server." };
   }
 
-  const generateDescriptions = formData.get("generateDescriptions") === "true";
-  const files = formData
-    .getAll("images")
-    .filter((f): f is File => f instanceof File && f.size > 0);
-
-  if (files.length === 0) return { ok: false, error: "Add at least one menu photo or PDF." };
-  if (files.length > MAX_FILES) {
+  const paths = Array.isArray(input?.paths)
+    ? input.paths.filter((p): p is string => typeof p === "string" && p.length > 0)
+    : [];
+  if (paths.length === 0) return { ok: false, error: "Add at least one menu photo or PDF." };
+  if (paths.length > MAX_FILES) {
     return { ok: false, error: `Please upload at most ${MAX_FILES} files at a time.` };
   }
-  for (const f of files) {
-    if (!(ALLOWED_MENU_DOC_TYPES as readonly string[]).includes(f.type)) {
-      return { ok: false, error: "Files must be a JPG, PNG, WebP photo or a PDF." };
-    }
-    const isPdf = f.type === "application/pdf";
-    if (isPdf && f.size > MAX_PDF_BYTES) {
-      return { ok: false, error: "The PDF must be 32 MB or smaller." };
-    }
-    if (!isPdf && f.size > MAX_IMAGE_BYTES) {
-      return { ok: false, error: "Each photo must be 5 MB or smaller." };
+  // Tenant isolation — only read this restaurant's own uploads.
+  for (const p of paths) {
+    if (!p.startsWith(`${restaurantId}/`)) {
+      return { ok: false, error: "That upload couldn't be verified. Please try again." };
     }
   }
-
-  // Photos become image blocks; a PDF becomes a document block.
-  const docBlocks: Anthropic.ContentBlockParam[] = await Promise.all(
-    files.map(async (file): Promise<Anthropic.ContentBlockParam> => {
-      const data = Buffer.from(await file.arrayBuffer()).toString("base64");
-      if (file.type === "application/pdf") {
-        return {
-          type: "document",
-          source: { type: "base64", media_type: "application/pdf", data },
-        };
-      }
-      return {
-        type: "image",
-        source: { type: "base64", media_type: mediaTypeFor(file), data },
-      };
-    }),
-  );
 
   let text: string;
   try {
+    // Signed read URLs Anthropic fetches directly — a PDF is a document block,
+    // photos are image blocks.
+    const urls = await signImportReadUrls(paths);
+    const blocks: Anthropic.ContentBlockParam[] = urls.map((url, i) =>
+      paths[i].toLowerCase().endsWith(".pdf")
+        ? { type: "document", source: { type: "url", url } }
+        : { type: "image", source: { type: "url", url } },
+    );
+
     const client = new Anthropic();
     const message = await client.messages.create({
       model: "claude-opus-4-8",
       max_tokens: 8192,
-      system: buildSystemPrompt(generateDescriptions),
+      system: buildSystemPrompt(input.generateDescriptions),
       messages: [
         {
           role: "user",
           content: [
-            ...docBlocks,
+            ...blocks,
             { type: "text", text: "Digitize this menu into the JSON schema described." },
           ],
         },
@@ -164,29 +180,36 @@ export async function analyzeMenuPhoto(formData: FormData): Promise<AnalyzeResul
       .join("")
       .trim();
   } catch {
-    return { ok: false, error: "Couldn't read the menu photo. Please try again." };
+    return { ok: false, error: "Couldn't read the menu. Please try again." };
+  } finally {
+    await removeImports(paths); // temp uploads aren't needed once analyzed
   }
 
-  // Tolerate the model wrapping the object in prose or a code fence.
+  return parseMenuText(text);
+}
+
+/** Tolerantly parse the model's JSON into a clean, validated draft. */
+function parseMenuText(text: string): AnalyzeResult {
+  // The model may wrap the object in prose or a code fence.
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   if (start === -1 || end === -1 || end <= start) {
-    return { ok: false, error: "Couldn't find any menu items in that photo." };
+    return { ok: false, error: "Couldn't find any menu items. Try a clearer photo." };
   }
 
   let raw: unknown;
   try {
     raw = JSON.parse(text.slice(start, end + 1));
   } catch {
-    return { ok: false, error: "Couldn't read the menu photo. Please try a clearer picture." };
+    return { ok: false, error: "Couldn't read the menu. Please try a clearer picture." };
   }
 
   const parsed = parsedMenuSchema.safeParse(raw);
   if (!parsed.success) {
-    return { ok: false, error: "Couldn't find any menu items in that photo." };
+    return { ok: false, error: "Couldn't find any menu items in that file." };
   }
 
-  // Drop empty categories and round prices to whole pesos for a clean draft.
+  // Drop empty categories and round prices for a clean draft.
   const categories = parsed.data.categories
     .map((c) => ({
       name: c.name,
@@ -199,7 +222,7 @@ export async function analyzeMenuPhoto(formData: FormData): Promise<AnalyzeResul
     .filter((c) => c.items.length > 0);
 
   if (categories.length === 0) {
-    return { ok: false, error: "Couldn't find any menu items in that photo." };
+    return { ok: false, error: "Couldn't find any menu items in that file." };
   }
   return { ok: true, categories };
 }
