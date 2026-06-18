@@ -11,6 +11,10 @@ import {
   toggleItemAvailability,
 } from "@/server/menu/actions";
 
+// AI menu import calls a vision model, which can take longer than the default
+// serverless timeout — give the Server Action room to finish.
+export const maxDuration = 60;
+
 export default async function MenuPage() {
   const { restaurantId } = await requireAdminPage();
   const categories = await getMenu(restaurantId);
