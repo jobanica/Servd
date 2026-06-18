@@ -46,7 +46,7 @@ export function BluetoothPrinterButton() {
       <button
         onClick={disconnectPrinter}
         title={printerName() ?? "Printer connected"}
-        className="rounded-full border border-mango/50 bg-mango/10 px-4 py-2 text-sm font-semibold text-mango"
+        className="w-full rounded-full border border-mango/50 bg-mango/10 px-4 py-2.5 text-sm font-semibold text-mango"
       >
         🖨️ Printer connected
       </button>
@@ -54,15 +54,15 @@ export function BluetoothPrinterButton() {
   }
 
   return (
-    <span className="inline-flex items-center gap-2">
+    <>
       <button
         onClick={connect}
         disabled={busy}
-        className="rounded-full border border-plum-ink/15 bg-white px-4 py-2 text-sm font-semibold text-plum-ink hover:bg-cream disabled:opacity-60"
+        className="w-full rounded-full border border-plum-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-plum-ink hover:bg-cream disabled:opacity-60"
       >
         {busy ? "Connecting…" : "🖨️ Connect printer"}
       </button>
       {err && <span className="text-xs text-guava">{err}</span>}
-    </span>
+    </>
   );
 }

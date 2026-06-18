@@ -259,69 +259,57 @@ export function CashierBoard({
   const showPopup = incoming.length > 0 && !popupDismissed;
   const showReady = readyOrders.length > 0 && !readyDismissed && !showPopup;
 
+  const sidebarBtn =
+    "w-full rounded-full border border-plum-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-plum-ink hover:bg-cream";
+
   return (
-    <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-xs text-plum-ink/50">
+    <div className="flex flex-col gap-5 sm:flex-row">
+      {/* Left action sidebar */}
+      <aside className="flex shrink-0 flex-col gap-2 sm:sticky sm:top-4 sm:w-52 sm:self-start">
+        <div className="mb-1 flex items-center gap-2 px-1 text-xs text-plum-ink/50">
           <span className={`inline-block h-2 w-2 rounded-full ${live ? "bg-mango" : "bg-muted"}`} />
-          {live ? "Live" : "Polling (realtime offline)"}
+          {live ? "Live" : "Polling (offline)"}
         </div>
-        <div className="flex items-center gap-2">
-          {incoming.length > 0 && (
-            <button
-              onClick={() => setPopupDismissed(false)}
-              className="rounded-full border border-guava bg-guava/10 px-4 py-2 text-sm font-semibold text-guava"
-            >
-              {incoming.length} incoming
-            </button>
-          )}
-          {readyOrders.length > 0 && (
-            <button
-              onClick={() => setReadyDismissed(false)}
-              className="rounded-full border border-mango bg-mango/10 px-4 py-2 text-sm font-semibold text-mango"
-            >
-              🍽️ {readyOrders.length} ready
-            </button>
-          )}
-          <button
-            onClick={() => setClosedOpen(true)}
-            className="rounded-full border border-plum-ink/15 bg-white px-4 py-2 text-sm font-semibold text-plum-ink hover:bg-cream"
-          >
-            Closed orders
-          </button>
-          <BluetoothPrinterButton />
-          <button
-            onClick={() => setCashOutOpen(true)}
-            className="rounded-full border border-plum-ink/15 bg-white px-4 py-2 text-sm font-semibold text-plum-ink hover:bg-cream"
-          >
-            Cash out
-          </button>
-          <button
-            onClick={() => setShiftOpen(true)}
-            className="rounded-full border border-plum-ink/15 bg-white px-4 py-2 text-sm font-semibold text-plum-ink hover:bg-cream"
-          >
-            End-of-shift summary
-          </button>
-          <button
-            onClick={() => setAddCustomerOpen(true)}
-            className="rounded-full border border-plum-ink/15 bg-white px-4 py-2 text-sm font-semibold text-plum-ink hover:bg-cream"
-          >
-            + Customer
-          </button>
-          <button
-            onClick={() => setNewOrderOpen(true)}
-            className="rounded-full px-4 py-2 text-sm font-semibold btn-brand"
-          >
-            + New order
-          </button>
-        </div>
-      </div>
 
-      {tables.length === 0 && incoming.length === 0 && (
-        <p className="text-sm text-plum-ink/40">No open tables right now.</p>
-      )}
+        <button onClick={() => setNewOrderOpen(true)} className="w-full rounded-full px-4 py-2.5 text-sm font-semibold btn-brand">
+          + New order
+        </button>
+        <button onClick={() => setAddCustomerOpen(true)} className={sidebarBtn}>
+          + Customer
+        </button>
+        <BluetoothPrinterButton />
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {incoming.length > 0 && (
+          <button
+            onClick={() => setPopupDismissed(false)}
+            className="w-full rounded-full border border-guava bg-guava/10 px-4 py-2.5 text-sm font-semibold text-guava"
+          >
+            {incoming.length} incoming
+          </button>
+        )}
+        {readyOrders.length > 0 && (
+          <button
+            onClick={() => setReadyDismissed(false)}
+            className="w-full rounded-full border border-mango bg-mango/10 px-4 py-2.5 text-sm font-semibold text-mango"
+          >
+            🍽️ {readyOrders.length} ready
+          </button>
+        )}
+
+        <div className="my-1 border-t border-plum-ink/10" />
+
+        <button onClick={() => setClosedOpen(true)} className={sidebarBtn}>Closed orders</button>
+        <button onClick={() => setCashOutOpen(true)} className={sidebarBtn}>Cash out</button>
+        <button onClick={() => setShiftOpen(true)} className={sidebarBtn}>End-of-shift summary</button>
+      </aside>
+
+      {/* Main board */}
+      <div className="min-w-0 flex-1">
+        {tables.length === 0 && incoming.length === 0 && (
+          <p className="text-sm text-plum-ink/40">No open tables right now.</p>
+        )}
+
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {tables.map((t) => (
           <section
             key={t.tableId}
@@ -465,6 +453,7 @@ export function CashierBoard({
             </ul>
           </section>
         ))}
+        </div>
       </div>
 
       {/* Incoming-order popup */}
