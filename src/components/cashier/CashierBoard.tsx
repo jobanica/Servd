@@ -390,7 +390,7 @@ export function CashierBoard({
                   </div>
 
                   <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <PrintTicketButton orderId={o.id} />
+                    <PrintTicketButton orderId={o.id} paid={o.paymentStatus === "paid"} />
                     {o.status === "done" && !o.served && (
                       <button
                         onClick={() => serve(o.id)}

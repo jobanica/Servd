@@ -1,14 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { printOrderTicket } from "@/server/printing/print";
+import { printOrderTicket, printPaidTicket } from "@/server/printing/print";
 import { runPrintDispatch } from "@/lib/print/run-dispatch";
 
 /**
- * Prints the BILL (amount due, pre-payment). Uses the shared dispatch runner so
- * it prints exactly the same way as the paid receipt.
+ * Prints the order's paper. Before payment it prints the BILL (amount due);
+ * once the order is paid it prints the official RECEIPT (with the PAID line),
+ * so the cashier can always re-print the right document. Uses the shared
+ * dispatch runner so both print the same way.
  */
-export function PrintTicketButton({ orderId }: { orderId: string }) {
+export function PrintTicketButton({ orderId, paid = false }: { orderId: string; paid?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -16,12 +18,12 @@ export function PrintTicketButton({ orderId }: { orderId: string }) {
     setBusy(true);
     setMsg(null);
     try {
-      const res = await printOrderTicket(orderId);
+      const res = paid ? await printPaidTicket(orderId) : await printOrderTicket(orderId);
       if (!res.ok && res.message) {
         setMsg(res.message);
         return;
       }
-      const m = await runPrintDispatch(res, orderId, "bill");
+      const m = await runPrintDispatch(res, orderId, paid ? "receipt" : "bill");
       if (m) setMsg(m);
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "Print failed.");
@@ -37,7 +39,7 @@ export function PrintTicketButton({ orderId }: { orderId: string }) {
         disabled={busy}
         className="rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
       >
-        {busy ? "Printing…" : "Print bill"}
+        {busy ? "Printing…" : paid ? "Print receipt" : "Print bill"}
       </button>
       {msg && <span className="text-xs text-plum-ink/50">{msg}</span>}
     </span>
