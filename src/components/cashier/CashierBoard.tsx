@@ -26,8 +26,9 @@ import { VoidPinModal } from "./VoidPinModal";
 import { CashOutModal } from "./CashOutModal";
 import { BluetoothPrinterButton } from "./BluetoothPrinterButton";
 import { printReceiptInBackground } from "@/lib/print/receipt-print";
-import { getReceiptEscPos } from "@/server/printing/print";
+import { getReceiptEscPos, printOrderTicket } from "@/server/printing/print";
 import { isPrinterConnected, printBytes, base64ToBytes } from "@/lib/printing/bt-printer";
+import { printViaBluetooth } from "@/lib/printing/bluetooth";
 
 export function CashierBoard({
   restaurantId,
@@ -162,10 +163,10 @@ export function CashierBoard({
     }
   }
 
-  // Print the receipt after a successful payment. A connected Bluetooth printer
-  // takes priority (truly automatic); otherwise fall back to the hidden-iframe
-  // OS/kiosk print.
+  // Print the receipt after a successful payment, mirroring the (working)
+  // "Print ticket" button so behaviour is identical.
   async function printPaidReceipt(orderId: string, clientPrintNeeded?: boolean) {
+    // 1. A persistently-connected Bluetooth printer prints silently.
     if (isPrinterConnected()) {
       try {
         const b64 = await getReceiptEscPos(orderId);
@@ -177,6 +178,18 @@ export function CashierBoard({
         showToast("Couldn't reach the Bluetooth printer — check it's on.");
       }
     }
+    // 2. Otherwise use the configured print method — same path as Print ticket.
+    try {
+      const res = await printOrderTicket(orderId);
+      if (res.handledOnServer) return; // network/cloud printed server-side
+      if (res.clientAction === "bluetooth" && res.ticketBase64) {
+        await printViaBluetooth(base64ToBytes(res.ticketBase64));
+        return;
+      }
+    } catch {
+      /* fall through to OS print */
+    }
+    // 3. OS / kiosk fallback — hidden iframe (never a visible tab).
     if (clientPrintNeeded) printReceiptInBackground(orderId);
   }
 
