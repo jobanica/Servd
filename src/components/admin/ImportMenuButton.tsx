@@ -12,6 +12,35 @@ import {
 type DraftItem = { name: string; description: string; price: string };
 type DraftCategory = { name: string; items: DraftItem[] };
 
+/**
+ * Shrink a photo in the browser before upload. Phone photos are often 3–8 MB,
+ * which exceeds the serverless request-body limit — a menu resized to ~1800px
+ * stays sharp enough for the model while dropping to a few hundred KB. PDFs and
+ * anything that can't be decoded are passed through untouched.
+ */
+async function downscaleImage(file: File, maxDim = 1800, quality = 0.82): Promise<File> {
+  if (!file.type.startsWith("image/")) return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+    const w = Math.round(bitmap.width * scale);
+    const h = Math.round(bitmap.height * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", quality),
+    );
+    if (!blob) return file;
+    return new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" });
+  } catch {
+    return file; // fall back to the original on any decode/canvas failure
+  }
+}
+
 function toDraft(categories: ParsedCategory[]): DraftCategory[] {
   return categories.map((c) => ({
     name: c.name,
@@ -55,17 +84,24 @@ export function ImportMenuButton() {
     setError(null);
     setStep("analyzing");
     const fd = new FormData();
-    for (let i = 0; i < files.length; i++) fd.append("images", files[i]);
+    for (let i = 0; i < files.length; i++) {
+      fd.append("images", await downscaleImage(files[i]));
+    }
     fd.append("generateDescriptions", autoDescribe ? "true" : "false");
 
-    const res = await analyzeMenuPhoto(fd);
-    if (!res.ok) {
-      setError(res.error);
+    try {
+      const res = await analyzeMenuPhoto(fd);
+      if (!res.ok) {
+        setError(res.error);
+        setStep("upload");
+        return;
+      }
+      setDraft(toDraft(res.categories));
+      setStep("review");
+    } catch {
+      setError("Upload failed — the file may be too large or the network dropped. Please try again.");
       setStep("upload");
-      return;
     }
-    setDraft(toDraft(res.categories));
-    setStep("review");
   }
 
   const itemCount = draft.reduce((n, c) => n + c.items.length, 0);
@@ -92,14 +128,19 @@ export function ImportMenuButton() {
       setStep("review");
       return;
     }
-    const res = await importParsedMenu(payload);
-    if (!res.ok) {
-      setError(res.error);
+    try {
+      const res = await importParsedMenu(payload);
+      if (!res.ok) {
+        setError(res.error);
+        setStep("review");
+        return;
+      }
+      setDone({ categories: res.categories, items: res.items });
+      router.refresh();
+    } catch {
+      setError("Couldn't save the menu — please try again.");
       setStep("review");
-      return;
     }
-    setDone({ categories: res.categories, items: res.items });
-    router.refresh();
   }
 
   // --- draft editing helpers ---
