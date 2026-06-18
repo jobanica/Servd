@@ -2,10 +2,23 @@
 
 import { useEffect } from "react";
 
-/** Fires the OS print dialog once on mount (for the HTML ticket fallback). */
+/**
+ * Fires the printer once the ticket has rendered. Works whether the ticket is
+ * shown in its own tab or loaded in a hidden iframe (the print targets whichever
+ * window this runs in). In Chrome kiosk-printing mode this prints silently.
+ */
 export function AutoPrint() {
   useEffect(() => {
-    const t = setTimeout(() => window.print(), 300);
+    const fire = () => {
+      try {
+        window.focus();
+      } catch {
+        /* ignore */
+      }
+      window.print();
+    };
+    // Wait for layout (and the QR SVG) to be ready, then print.
+    const t = setTimeout(fire, 500);
     return () => clearTimeout(t);
   }, []);
   return null;

@@ -24,6 +24,7 @@ import { ClosedOrdersModal } from "./ClosedOrdersModal";
 import { ShiftSummaryModal } from "./ShiftSummaryModal";
 import { VoidPinModal } from "./VoidPinModal";
 import { CashOutModal } from "./CashOutModal";
+import { printReceiptInBackground } from "@/lib/print/receipt-print";
 
 export function CashierBoard({
   restaurantId,
@@ -165,10 +166,11 @@ export function CashierBoard({
       if (res.ok && res.tables) {
         setTables(res.tables);
         showToast("Payment recorded — order closed.");
-        // Browser-handled printer (OS dialog / AirPrint): open the printable
-        // receipt so it auto-fires the print dialog.
+        // Browser-handled printer (OS dialog / AirPrint / kiosk): print the
+        // receipt in a hidden iframe so it goes straight to the printer instead
+        // of taking over the screen.
         if (res.printTicket) {
-          window.open(`/cashier/ticket/${orderId}`, "_blank");
+          printReceiptInBackground(orderId);
         }
       } else if (!res.ok) {
         showToast(res.error ?? "Couldn't record the payment.");
