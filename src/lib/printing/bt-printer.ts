@@ -20,7 +20,7 @@ let charUuid = DEFAULT_CHAR;
 
 const listeners = new Set<(connected: boolean) => void>();
 function notify() {
-  for (const l of listeners) l(isPrinterConnected());
+  for (const l of listeners) l(isPrinterPaired());
 }
 
 export function onPrinterChange(cb: (connected: boolean) => void): () => void {
@@ -30,6 +30,16 @@ export function onPrinterChange(cb: (connected: boolean) => void): () => void {
 
 export function isBluetoothSupported(): boolean {
   return typeof navigator !== "undefined" && "bluetooth" in navigator;
+}
+
+/**
+ * Whether a printer has been paired this session. BLE printers drop the GATT
+ * link when idle, so the live connection (isPrinterConnected) flickers between
+ * prints — but the device stays paired and printBytes reconnects on demand.
+ * Status and print routing key off pairing, not the momentary GATT state.
+ */
+export function isPrinterPaired(): boolean {
+  return !!device;
 }
 
 export function isPrinterConnected(): boolean {
@@ -81,6 +91,9 @@ export function disconnectPrinter(): void {
   } catch {
     /* ignore */
   }
+  // Fully unpair so the status reverts and the next print won't silently
+  // reconnect to a printer the user deliberately disconnected.
+  device = null;
   characteristic = null;
   notify();
 }

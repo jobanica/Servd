@@ -1,7 +1,7 @@
 "use client";
 
 import type { PrintDispatch } from "@/server/printing/print";
-import { isPrinterConnected, printBytes, base64ToBytes } from "@/lib/printing/bt-printer";
+import { isPrinterPaired, printBytes, base64ToBytes } from "@/lib/printing/bt-printer";
 import { printViaBluetooth } from "@/lib/printing/bluetooth";
 
 /** Open the printable ticket page (it auto-prints, then auto-closes). */
@@ -24,8 +24,10 @@ export async function runPrintDispatch(
 ): Promise<string | null> {
   if (res.handledOnServer) return res.message || null;
 
-  // A connected Web Bluetooth printer prints the exact bytes we got back.
-  if (isPrinterConnected() && res.ticketBase64) {
+  // A paired Web Bluetooth printer prints the exact bytes we got back.
+  // printBytes silently reconnects if the BLE link dropped while idle, so we
+  // never re-open the device chooser once a printer has been paired.
+  if (isPrinterPaired() && res.ticketBase64) {
     await printBytes(base64ToBytes(res.ticketBase64));
     return "Printed.";
   }
