@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
+import { requireFeaturePage } from "@/server/billing/feature-gate";
 import { getCustomers } from "@/server/customers/customers";
 import { formatPeso } from "@/lib/money";
 import { AddCustomerForm } from "@/components/customers/AddCustomerForm";
 
 export default async function CustomersPage() {
   const { restaurantId } = await requireAdminPage();
+  await requireFeaturePage(restaurantId, "customers");
   const customers = await getCustomers(restaurantId);
 
   return (

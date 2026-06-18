@@ -14,7 +14,25 @@ function daysLeft(date: Date | null): number | null {
   return Math.max(0, Math.ceil((date.getTime() - Date.now()) / 86400000));
 }
 
-export default async function BillingPage() {
+const UPGRADE_LABEL: Record<string, string> = {
+  accounting: "Accounting",
+  loyalty: "Loyalty & rewards",
+  promotions: "Promotions",
+  customers: "Customers",
+  sms: "SMS marketing",
+  onlineOrdering: "Online ordering",
+  onlinePayments: "Online payments",
+  inventory: "Inventory",
+  hr: "HR & payroll",
+  customDomain: "Custom domain",
+};
+
+export default async function BillingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ upgrade?: string }>;
+}) {
+  const { upgrade } = await searchParams;
   // allowSuspended so an owner can pay their way out of suspension here.
   const { restaurantId } = await requireAdminPage({ allowSuspended: true });
   const [sub, plans, invoices, pricing] = await Promise.all([
@@ -40,6 +58,14 @@ export default async function BillingPage() {
         <Link href="/admin" className="text-sm text-plum-ink/50">← Dashboard</Link>
         <h1 className="font-heading text-2xl font-bold">Billing</h1>
       </div>
+
+      {/* Upgrade prompt (redirected here from a gated feature) */}
+      {upgrade && UPGRADE_LABEL[upgrade] && (
+        <div className="rounded-tile border border-mango/40 bg-mango/10 p-4 text-sm">
+          <span className="font-semibold text-plum-ink">{UPGRADE_LABEL[upgrade]}</span> isn&apos;t
+          included in your current plan. Upgrade below to unlock it.
+        </div>
+      )}
 
       {/* Free-trial banner */}
       {trialDays !== null && (

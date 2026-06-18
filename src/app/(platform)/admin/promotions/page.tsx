@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
+import { requireFeaturePage } from "@/server/billing/feature-gate";
 import { getPromotions } from "@/server/promotions/queries";
 import { createPromotion, deletePromotion, togglePromotion } from "@/server/promotions/actions";
 
 export default async function PromotionsPage() {
   const { restaurantId } = await requireAdminPage();
+  await requireFeaturePage(restaurantId, "promotions");
   const promotions = await getPromotions(restaurantId);
 
   return (

@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
+import { requireFeaturePage } from "@/server/billing/feature-gate";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { getCampaigns, getConfirmedCount, setDoubleOptIn } from "@/server/sms/campaigns";
 import { SmsComposeForm } from "@/components/admin/SmsComposeForm";
 
 export default async function SmsPage() {
   const { restaurantId } = await requireAdminPage();
+  await requireFeaturePage(restaurantId, "sms");
 
   const restaurant = await tenantDb(restaurantId, (tx) =>
     tx.restaurant.findFirstOrThrow({

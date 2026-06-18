@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
+import { requireFeaturePage } from "@/server/billing/feature-gate";
 import { getStorefront } from "@/server/storefront/storefront";
 import { StorefrontForm } from "@/components/admin/StorefrontForm";
 
 export default async function StorefrontPage() {
   const { restaurantId } = await requireAdminPage();
+  await requireFeaturePage(restaurantId, "onlineOrdering");
   const sf = await getStorefront(restaurantId);
 
   return (

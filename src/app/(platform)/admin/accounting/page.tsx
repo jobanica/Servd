@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
+import { requireFeaturePage } from "@/server/billing/feature-gate";
 import { getSalesReport, getVatReport, getCogs, getExpenses } from "@/server/accounting/queries";
 import { formatPeso } from "@/lib/money";
 
@@ -26,6 +27,7 @@ export default async function AccountingPage({
   searchParams: Promise<{ period?: string }>;
 }) {
   const { restaurantId } = await requireAdminPage();
+  await requireFeaturePage(restaurantId, "accounting");
   const sp = await searchParams;
   const period = (sp.period === "last" ? "last" : sp.period === "today" ? "today" : "this") as Period;
   const { from, to } = range(period);

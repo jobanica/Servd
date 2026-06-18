@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
+import { requireFeaturePage } from "@/server/billing/feature-gate";
 import { getLoyaltyConfig, getLoyaltyMembers, getLoyaltyActivity } from "@/server/loyalty/loyalty";
 import { formatPeso } from "@/lib/money";
 import { LoyaltyForm } from "@/components/admin/LoyaltyForm";
 
 export default async function LoyaltyPage() {
   const { restaurantId } = await requireAdminPage();
+  await requireFeaturePage(restaurantId, "loyalty");
   const [cfg, members, activity] = await Promise.all([
     getLoyaltyConfig(restaurantId),
     getLoyaltyMembers(restaurantId),

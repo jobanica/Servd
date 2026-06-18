@@ -3,6 +3,7 @@ import { getPublicRestaurantBySlug } from "@/server/restaurants/get-public";
 import { getPublicMenu } from "@/server/menu/public-menu";
 import { getLoyaltyConfig } from "@/server/loyalty/loyalty";
 import { getPublicStorefront, isOpenNow } from "@/server/storefront/storefront";
+import { hasFeature } from "@/server/billing/feature-gate";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { WebOrder } from "@/components/site/WebOrder";
 
@@ -29,6 +30,8 @@ export default async function RestaurantSite({ params }: { params: Promise<{ slu
   const { slug } = await params;
   const restaurant = await getPublicRestaurantBySlug(slug);
   if (!restaurant) notFound();
+  // Online ordering is a Pro+ feature — Starter doesn't get a public order site.
+  if (!(await hasFeature(restaurant.id, "onlineOrdering"))) notFound();
 
   const [categories, loyalty, contact, sf] = await Promise.all([
     getPublicMenu(restaurant.id),

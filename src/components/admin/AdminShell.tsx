@@ -34,6 +34,20 @@ const I = {
   receipt: "M5 3v18l2-1 2 1 2-1 2 1 2-1 2 1V3l-2 1-2-1-2 1-2-1-2 1z M9 8h6M9 12h6",
 };
 
+// Nav items that require a plan feature — hidden when the plan lacks it.
+const ITEM_FEATURE: Record<string, string> = {
+  "/admin/accounting": "accounting",
+  "/admin/promotions": "promotions",
+  "/admin/loyalty": "loyalty",
+  "/admin/customers": "customers",
+  "/admin/sms": "sms",
+  "/admin/inventory": "inventory",
+  "/admin/hr": "hr",
+  "/admin/storefront": "onlineOrdering",
+  "/admin/payments": "onlinePayments",
+  "/admin/domains": "customDomain",
+};
+
 type Item = { label: string; href: string; d: string };
 const NAV: { group: string; items: Item[] }[] = [
   { group: "", items: [{ label: "Dashboard", href: "/admin", d: I.home }] },
@@ -90,9 +104,11 @@ const NAV: { group: string; items: Item[] }[] = [
 
 export function AdminShell({
   brand,
+  features,
   children,
 }: {
   brand: { name: string; slug: string; status: string };
+  features?: string[];
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -100,9 +116,19 @@ export function AdminShell({
   const isActive = (href: string) =>
     href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
 
+  // Hide nav items whose plan feature isn't included (when `features` is given).
+  const allowed = features ? new Set(features) : null;
+  const canShow = (href: string) => {
+    const f = ITEM_FEATURE[href];
+    return !f || !allowed || allowed.has(f);
+  };
+  const sections = NAV.map((s) => ({ ...s, items: s.items.filter((it) => canShow(it.href)) })).filter(
+    (s) => s.items.length > 0,
+  );
+
   const nav = (
     <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
-      {NAV.map((section, i) => (
+      {sections.map((section, i) => (
         <div key={i}>
           {section.group && (
             <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-plum-ink/35">

@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/server/tenancy/current-user";
 import { tenantDb } from "@/server/tenancy/scoped-db";
+import { getEntitledFeatures } from "@/server/billing/feature-gate";
 import { AdminShell } from "@/components/admin/AdminShell";
 
 /**
@@ -17,11 +18,14 @@ export default async function AdminLayout({
     return <>{children}</>;
   }
 
-  const restaurant = await tenantDb(user.restaurantId, (tx) =>
-    tx.restaurant.findFirstOrThrow({
-      select: { name: true, displayName: true, slug: true, status: true },
-    }),
-  );
+  const [restaurant, features] = await Promise.all([
+    tenantDb(user.restaurantId, (tx) =>
+      tx.restaurant.findFirstOrThrow({
+        select: { name: true, displayName: true, slug: true, status: true },
+      }),
+    ),
+    getEntitledFeatures(user.restaurantId),
+  ]);
 
   return (
     <AdminShell
@@ -30,6 +34,7 @@ export default async function AdminLayout({
         slug: restaurant.slug,
         status: restaurant.status,
       }}
+      features={[...features]}
     >
       {children}
     </AdminShell>
