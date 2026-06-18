@@ -253,7 +253,10 @@ const importSchema = z.object({
     .min(1, "Nothing to import"),
 });
 
-export type ImportResult = { ok: true; categories: number; items: number } | { ok: false; error: string };
+export type CreatedItem = { id: string; name: string };
+export type ImportResult =
+  | { ok: true; categories: number; items: number; created: CreatedItem[] }
+  | { ok: false; error: string };
 
 /** Step 2 — write the reviewed draft into the menu (idempotent-ish). */
 export async function importParsedMenu(input: unknown): Promise<ImportResult> {
@@ -265,7 +268,7 @@ export async function importParsedMenu(input: unknown): Promise<ImportResult> {
   }
 
   let createdCategories = 0;
-  let createdItems = 0;
+  const created: CreatedItem[] = [];
 
   try {
     await tenantDb(restaurantId, async (tx) => {
@@ -281,11 +284,11 @@ export async function importParsedMenu(input: unknown): Promise<ImportResult> {
         const key = cat.name.trim().toLowerCase();
         let categoryId = byName.get(key);
         if (!categoryId) {
-          const created = await tx.category.create({
+          const createdCat = await tx.category.create({
             data: { restaurantId, name: cat.name.trim(), sortOrder: sortOrder++ },
             select: { id: true },
           });
-          categoryId = created.id;
+          categoryId = createdCat.id;
           byName.set(key, categoryId);
           createdCategories++;
         }
@@ -304,17 +307,19 @@ export async function importParsedMenu(input: unknown): Promise<ImportResult> {
           const nameKey = item.name.trim().toLowerCase();
           if (present.has(nameKey)) continue;
           present.add(nameKey);
-          await tx.menuItem.create({
+          const name = item.name.trim();
+          const row = await tx.menuItem.create({
             data: {
               restaurantId,
               categoryId,
-              name: item.name.trim(),
+              name,
               description: item.description?.trim() || null,
               price: pesosToCentavos(item.price),
               isAvailable: true,
             },
+            select: { id: true },
           });
-          createdItems++;
+          created.push({ id: row.id, name });
         }
       }
     });
@@ -323,5 +328,5 @@ export async function importParsedMenu(input: unknown): Promise<ImportResult> {
   }
 
   revalidatePath("/admin/menu");
-  return { ok: true, categories: createdCategories, items: createdItems };
+  return { ok: true, categories: createdCategories, items: created.length, created };
 }
