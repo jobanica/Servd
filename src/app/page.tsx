@@ -193,16 +193,28 @@ export default async function Home() {
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 py-16 lg:grid-cols-2 lg:py-24">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full border border-brand-primary/20 bg-brand-primary/10 px-3 py-1 text-xs font-semibold text-brand-primary">
-              ✨ 30 days free — every feature unlocked
+              ✨ Free setup · 30 days free
             </span>
             <h1 className="mt-5 font-heading text-5xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
-              The QR ordering system that{" "}
-              <span className="bg-brand-gradient bg-clip-text text-transparent">grows your sales</span>.
+              We&apos;ll digitize your{" "}
+              <span className="bg-brand-gradient bg-clip-text text-transparent">restaurant for free</span>.
             </h1>
-            <p className="mt-5 max-w-md text-lg text-plum-ink/70">
-              Diners scan, browse your branded menu, order, and pay — GCash or card.
-              Orders hit the kitchen in real time. You keep every peso.
-            </p>
+            <ul className="mt-6 max-w-md space-y-2.5">
+              {[
+                "We'll create your ordering website.",
+                "We'll generate your QR codes.",
+                "We'll set up your menu.",
+                "We'll train your staff.",
+                "We'll let you use everything free for 30 days.",
+              ].map((line) => (
+                <li key={line} className="flex items-center gap-3 text-plum-ink/75">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-gradient text-xs text-white">
+                    ✓
+                  </span>
+                  {line}
+                </li>
+              ))}
+            </ul>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/signup" className="rounded-full px-7 py-3.5 font-semibold btn-brand shadow-lg">
                 Start free — 30 days
@@ -211,9 +223,13 @@ export default async function Home() {
                 See how it works
               </a>
             </div>
-            <p className="mt-4 text-sm text-plum-ink/50">
-              All features free for 30 days · No card required · Set up in minutes
-            </p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {["No setup fees", "No contracts", "No risk"].map((x) => (
+                <span key={x} className="rounded-full border border-plum-ink/10 bg-white px-3 py-1 text-xs font-semibold text-plum-ink/60">
+                  {x}
+                </span>
+              ))}
+            </div>
           </div>
           <PhoneMockup />
         </div>
