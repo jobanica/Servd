@@ -118,8 +118,11 @@ export async function createMenuImportUploads(types: string[]): Promise<CreateUp
   try {
     const targets = await createImportUploadTargets(restaurantId, types);
     return { ok: true, bucket: MENU_IMPORT_BUCKET, targets };
-  } catch {
-    return { ok: false, error: "Couldn't prepare the upload. Please try again." };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? `Couldn't prepare the upload: ${e.message}` : "Couldn't prepare the upload.",
+    };
   }
 }
 
@@ -179,8 +182,11 @@ export async function analyzeMenuMedia(input: {
       .map((b) => b.text)
       .join("")
       .trim();
-  } catch {
-    return { ok: false, error: "Couldn't read the menu. Please try again." };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? `Couldn't read the menu: ${e.message}` : "Couldn't read the menu.",
+    };
   } finally {
     await removeImports(paths); // temp uploads aren't needed once analyzed
   }
