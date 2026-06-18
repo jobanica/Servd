@@ -116,19 +116,16 @@ export function AdminShell({
   const isActive = (href: string) =>
     href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
 
-  // Hide nav items whose plan feature isn't included (when `features` is given).
+  // Show ALL items; "locked" ones (not in the plan) route to the upgrade page.
   const allowed = features ? new Set(features) : null;
-  const canShow = (href: string) => {
+  const isLocked = (href: string) => {
     const f = ITEM_FEATURE[href];
-    return !f || !allowed || allowed.has(f);
+    return !!f && !!allowed && !allowed.has(f);
   };
-  const sections = NAV.map((s) => ({ ...s, items: s.items.filter((it) => canShow(it.href)) })).filter(
-    (s) => s.items.length > 0,
-  );
 
   const nav = (
     <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
-      {sections.map((section, i) => (
+      {NAV.map((section, i) => (
         <div key={i}>
           {section.group && (
             <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-plum-ink/35">
@@ -137,20 +134,37 @@ export function AdminShell({
           )}
           <div className="space-y-0.5">
             {section.items.map((item) => {
-              const active = isActive(item.href);
+              const locked = isLocked(item.href);
+              const href = locked
+                ? `/admin/billing?upgrade=${ITEM_FEATURE[item.href]}`
+                : item.href;
+              const active = !locked && isActive(item.href);
               return (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  href={href}
                   onClick={() => setOpen(false)}
+                  title={locked ? "Upgrade to unlock" : undefined}
                   className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
                     active
                       ? "bg-brand-gradient text-white shadow-sm"
-                      : "text-plum-ink/70 hover:bg-plum-ink/5 hover:text-plum-ink"
+                      : locked
+                        ? "text-plum-ink/40 hover:bg-plum-ink/5"
+                        : "text-plum-ink/70 hover:bg-plum-ink/5 hover:text-plum-ink"
                   }`}
                 >
                   <Icon d={item.d} />
-                  {item.label}
+                  <span className="flex-1">{item.label}</span>
+                  {locked && (
+                    <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-mango">
+                      {/* lock icon */}
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} className="h-3 w-3">
+                        <rect x="5" y="11" width="14" height="9" rx="2" />
+                        <path d="M8 11V8a4 4 0 1 1 8 0v3" />
+                      </svg>
+                      Upgrade
+                    </span>
+                  )}
                 </Link>
               );
             })}
