@@ -281,12 +281,6 @@ export function CashierBoard({
 
         <div className="my-1 border-t border-plum-ink/10" />
 
-        <button onClick={() => setClosedOpen(true)} className={sidebarBtn}>Closed orders</button>
-        <button onClick={() => setCashOutOpen(true)} className={sidebarBtn}>Cash out</button>
-        <button onClick={() => setShiftOpen(true)} className={sidebarBtn}>End-of-shift summary</button>
-
-        <div className="my-1 border-t border-plum-ink/10" />
-
         <Link href="/cashier/delivery" className={`${sidebarBtn} text-center`}>
           🛵 Delivery orders
         </Link>
@@ -298,6 +292,12 @@ export function CashierBoard({
             Printer settings
           </Link>
         )}
+
+        <div className="my-1 border-t border-plum-ink/10" />
+
+        <button onClick={() => setClosedOpen(true)} className={sidebarBtn}>Closed orders</button>
+        <button onClick={() => setCashOutOpen(true)} className={sidebarBtn}>Cash out</button>
+        <button onClick={() => setShiftOpen(true)} className={sidebarBtn}>End-of-shift summary</button>
 
         <div className="my-1 border-t border-plum-ink/10" />
 
