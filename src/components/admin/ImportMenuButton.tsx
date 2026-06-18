@@ -139,8 +139,9 @@ export function ImportMenuButton() {
       }
       setDraft(toDraft(res.categories));
       setStep("review");
-    } catch {
-      setError("Upload failed — please check your connection and try again.");
+    } catch (e) {
+      const detail = e instanceof Error && e.message ? `: ${e.message}` : "";
+      setError(`Upload failed${detail}. Please try again.`);
       setStep("upload");
     }
   }
