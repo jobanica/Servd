@@ -46,6 +46,7 @@ export function CashierBoard({
   const [live, setLive] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [newOrderOpen, setNewOrderOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   const [closedOpen, setClosedOpen] = useState(false);
   const [shiftOpen, setShiftOpen] = useState(false);
@@ -245,66 +246,123 @@ export function CashierBoard({
   const sidebarBtn =
     "w-full rounded-full border border-plum-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-plum-ink hover:bg-cream";
 
-  return (
-    <div className="flex flex-col gap-5 sm:flex-row">
-      {/* Left action sidebar */}
-      <aside className="flex shrink-0 flex-col gap-2 sm:sticky sm:top-4 sm:w-52 sm:self-start">
-        <div className="mb-1 flex items-center gap-2 px-1 text-xs text-plum-ink/50">
-          <span className={`inline-block h-2 w-2 rounded-full ${live ? "bg-mango" : "bg-muted"}`} />
-          {live ? "Live" : "Polling (offline)"}
-        </div>
+  // The action buttons — shared by the desktop sidebar and the mobile drawer.
+  const sidebarInner = (
+    <>
+      <div className="mb-1 flex items-center gap-2 px-1 text-xs text-plum-ink/50">
+        <span className={`inline-block h-2 w-2 rounded-full ${live ? "bg-mango" : "bg-muted"}`} />
+        {live ? "Live" : "Polling (offline)"}
+      </div>
 
-        <button onClick={() => setNewOrderOpen(true)} className="w-full rounded-full px-4 py-2.5 text-sm font-semibold btn-brand">
+      <button onClick={() => setNewOrderOpen(true)} className="w-full rounded-full px-4 py-2.5 text-sm font-semibold btn-brand">
+        + New order
+      </button>
+      <button onClick={() => setAddCustomerOpen(true)} className={sidebarBtn}>
+        + Customer
+      </button>
+      <BluetoothPrinterButton />
+
+      {incoming.length > 0 && (
+        <button
+          onClick={() => setPopupDismissed(false)}
+          className="w-full rounded-full border border-guava bg-guava/10 px-4 py-2.5 text-sm font-semibold text-guava"
+        >
+          {incoming.length} incoming
+        </button>
+      )}
+      {readyOrders.length > 0 && (
+        <button
+          onClick={() => setReadyDismissed(false)}
+          className="w-full rounded-full border border-mango bg-mango/10 px-4 py-2.5 text-sm font-semibold text-mango"
+        >
+          🍽️ {readyOrders.length} ready
+        </button>
+      )}
+
+      <div className="my-1 border-t border-plum-ink/10" />
+
+      <Link href="/cashier/delivery" className={`${sidebarBtn} text-center`}>
+        🛵 Delivery orders
+      </Link>
+      <Link href="/clock/me" className="w-full rounded-full px-4 py-2.5 text-center text-sm font-semibold btn-brand">
+        Clock in/out
+      </Link>
+      {isAdmin && (
+        <Link href="/admin/printing" className={`${sidebarBtn} text-center`}>
+          Printer settings
+        </Link>
+      )}
+
+      <div className="my-1 border-t border-plum-ink/10" />
+
+      <button onClick={() => setClosedOpen(true)} className={sidebarBtn}>Closed orders</button>
+      <button onClick={() => setCashOutOpen(true)} className={sidebarBtn}>Cash out</button>
+      <button onClick={() => setShiftOpen(true)} className={sidebarBtn}>End-of-shift summary</button>
+
+      <div className="my-1 border-t border-plum-ink/10" />
+
+      <form action={signOut}>
+        <button className={sidebarBtn}>Sign out</button>
+      </form>
+    </>
+  );
+
+  return (
+    <div>
+      {/* Mobile top bar: menu toggle + always-visible New order. */}
+      <div className="mb-4 flex items-center gap-2 sm:hidden">
+        <button
+          onClick={() => setMenuOpen(true)}
+          aria-label="Open menu"
+          className="rounded-full border border-plum-ink/15 bg-white p-2.5 text-plum-ink"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+            strokeLinecap="round" className="h-5 w-5">
+            <path d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <span className="flex items-center gap-1.5 text-xs text-plum-ink/50">
+          <span className={`inline-block h-2 w-2 rounded-full ${live ? "bg-mango" : "bg-muted"}`} />
+          {live ? "Live" : "Offline"}
+        </span>
+        <button
+          onClick={() => setNewOrderOpen(true)}
+          className="ml-auto rounded-full px-4 py-2.5 text-sm font-semibold btn-brand"
+        >
           + New order
         </button>
-        <button onClick={() => setAddCustomerOpen(true)} className={sidebarBtn}>
-          + Customer
-        </button>
-        <BluetoothPrinterButton />
+      </div>
 
-        {incoming.length > 0 && (
-          <button
-            onClick={() => setPopupDismissed(false)}
-            className="w-full rounded-full border border-guava bg-guava/10 px-4 py-2.5 text-sm font-semibold text-guava"
-          >
-            {incoming.length} incoming
-          </button>
+      <div className="flex flex-col gap-5 sm:flex-row">
+        {/* Desktop sidebar */}
+        <aside className="hidden shrink-0 flex-col gap-2 sm:sticky sm:top-4 sm:flex sm:w-52 sm:self-start">
+          {sidebarInner}
+        </aside>
+
+        {/* Mobile drawer */}
+        {menuOpen && (
+          <div className="fixed inset-0 z-50 sm:hidden">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setMenuOpen(false)} />
+            <aside
+              onClick={() => setMenuOpen(false)}
+              className="absolute left-0 top-0 flex h-full w-72 max-w-[80%] flex-col gap-2 overflow-y-auto bg-cream p-4 shadow-xl"
+            >
+              <div className="mb-1 flex justify-end">
+                <button
+                  onClick={() => setMenuOpen(false)}
+                  aria-label="Close menu"
+                  className="rounded-full p-1.5 text-plum-ink/60 hover:bg-plum-ink/5"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+                    strokeLinecap="round" className="h-5 w-5">
+                    <path d="M6 6l12 12M18 6L6 18" />
+                  </svg>
+                </button>
+              </div>
+              {sidebarInner}
+            </aside>
+          </div>
         )}
-        {readyOrders.length > 0 && (
-          <button
-            onClick={() => setReadyDismissed(false)}
-            className="w-full rounded-full border border-mango bg-mango/10 px-4 py-2.5 text-sm font-semibold text-mango"
-          >
-            🍽️ {readyOrders.length} ready
-          </button>
-        )}
-
-        <div className="my-1 border-t border-plum-ink/10" />
-
-        <Link href="/cashier/delivery" className={`${sidebarBtn} text-center`}>
-          🛵 Delivery orders
-        </Link>
-        <Link href="/clock/me" className="w-full rounded-full px-4 py-2.5 text-center text-sm font-semibold btn-brand">
-          Clock in/out
-        </Link>
-        {isAdmin && (
-          <Link href="/admin/printing" className={`${sidebarBtn} text-center`}>
-            Printer settings
-          </Link>
-        )}
-
-        <div className="my-1 border-t border-plum-ink/10" />
-
-        <button onClick={() => setClosedOpen(true)} className={sidebarBtn}>Closed orders</button>
-        <button onClick={() => setCashOutOpen(true)} className={sidebarBtn}>Cash out</button>
-        <button onClick={() => setShiftOpen(true)} className={sidebarBtn}>End-of-shift summary</button>
-
-        <div className="my-1 border-t border-plum-ink/10" />
-
-        <form action={signOut}>
-          <button className={sidebarBtn}>Sign out</button>
-        </form>
-      </aside>
 
       {/* Main board */}
       <div className="min-w-0 flex-1">
@@ -457,6 +515,7 @@ export function CashierBoard({
           </section>
         ))}
         </div>
+      </div>
       </div>
 
       {/* Incoming-order popup */}
