@@ -125,6 +125,58 @@ async function loadTicket(restaurantId: string, orderId: string) {
   });
 }
 
+/** Build the Ticket for an order (shared by dispatch + the ESC/POS action). */
+async function ticketFor(restaurantId: string, orderId: string): Promise<Ticket | null> {
+  const { restaurant, order, meta, payment } = await loadTicket(restaurantId, orderId);
+  if (!order) return null;
+  const config = (restaurant.printerConfig as PrinterConfig | null) ?? {};
+  const r = config.receipt ?? {};
+  return buildTicket({
+    restaurantName: restaurant.displayName || restaurant.name,
+    address: r.address,
+    phone: r.phone,
+    website: r.website,
+    footer: r.footer,
+    tableNumber: order.table?.tableNumber ?? "—",
+    orderType: meta.orderType,
+    customerName: meta.customerName,
+    customerAddress: meta.customerAddress,
+    orderId: order.id,
+    createdAt: order.createdAt.toISOString(),
+    total: order.total,
+    discountAmount: meta.discountAmount,
+    discountLabel: meta.discountLabel,
+    paymentMethod: payment?.method ?? null,
+    paymentAmount: payment?.amount ?? null,
+    qrUrl: restaurantSiteUrl(restaurant.slug),
+    items: order.items.map((i) => {
+      const unit = i.unitPrice + i.modifiers.reduce((s, m) => s + m.priceDeltaAtTime, 0);
+      return {
+        quantity: i.quantity,
+        name: i.nameAtTime,
+        modifiers: i.modifiers.map((m) => m.nameAtTime),
+        note: i.note,
+        lineTotal: unit * i.quantity,
+      };
+    }),
+  });
+}
+
+/**
+ * The receipt as base64 ESC/POS — for the cashier's connected Bluetooth printer
+ * to print automatically on payment. Returns null if the order isn't found.
+ */
+export async function getReceiptEscPos(orderId: string): Promise<string | null> {
+  let staff;
+  try {
+    staff = await requireStaff(["cashier", "admin"]);
+  } catch {
+    return null;
+  }
+  const ticket = await ticketFor(staff.restaurantId, orderId);
+  return ticket ? encodeTicketBase64(ticket) : null;
+}
+
 /** Core dispatch usable both from the cashier action and from auto-print. */
 async function dispatch(restaurantId: string, orderId: string): Promise<PrintDispatch> {
   const { restaurant, order, meta, payment } = await loadTicket(restaurantId, orderId);
