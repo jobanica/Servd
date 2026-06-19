@@ -119,6 +119,23 @@ model PlatformSetting {
   @@map("platform_settings")
 }
 
+/// Feedback / recommendations from restaurant owners ABOUT Servd itself,
+/// surfaced to the super-admin. Platform-level (no tenant RLS); written + read
+/// through systemDb.
+model PlatformFeedback {
+  id           String   @id @default(uuid())
+  restaurantId String?
+  restaurantName String?
+  authorEmail  String?
+  rating       Int? // optional 1–5
+  message      String
+  resolved     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("platform_feedback")
+}
+
 model Plan {
   id           String   @id @default(uuid())
   name         String

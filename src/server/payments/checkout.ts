@@ -55,11 +55,8 @@ export async function createTableCheckout(input: {
 
   const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const orderPath = `${base}/order/${parsed.data.slug}/${parsed.data.tableToken}`;
-  // After paying, send the diner to the on-device feedback screen when enabled;
-  // otherwise back to the menu (follow-up SMS handles feedback in that mode).
-  const onDevice =
-    ctx.restaurant.feedbackMode === "on_device" || ctx.restaurant.feedbackMode === "both";
-  const successUrl = onDevice ? `${orderPath}/feedback?paid=1` : `${orderPath}?paid=1`;
+  // After paying online, thank the diner and ask for feedback.
+  const successUrl = `${orderPath}/feedback?paid=1`;
 
   let checkout;
   try {

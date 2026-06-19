@@ -53,3 +53,12 @@ export async function notifyWaiterCall(
 ): Promise<void> {
   await broadcast(restaurantId, "waiter", { tableNumber, at: Date.now() });
 }
+
+/** Alert staff that a table requested the bill (cash = a waiter must collect). */
+export async function notifyBillRequest(
+  restaurantId: string,
+  tableNumber: string,
+  method: "cash" | "online",
+): Promise<void> {
+  await broadcast(restaurantId, "bill", { tableNumber, method, at: Date.now() });
+}

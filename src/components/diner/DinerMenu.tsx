@@ -12,8 +12,7 @@ import { previewPromoCode } from "@/server/promotions/redeem";
 import type { PlaceOrderResult } from "@/lib/validation/order";
 import { ItemModal } from "./ItemModal";
 import { CartDrawer } from "./CartDrawer";
-import { RequestBillButton } from "./RequestBillButton";
-import { PayOnlineButton } from "./PayOnlineButton";
+import { BillSheet } from "./BillSheet";
 import { CallWaiterButton } from "./CallWaiterButton";
 import { RewardsPanel } from "./RewardsPanel";
 import { OrderStatusTracker } from "./OrderStatusTracker";
@@ -259,6 +258,7 @@ export function DinerMenu({
   const [activeItem, setActiveItem] = useState<DinerItem | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [billOpen, setBillOpen] = useState(false);
   const [promosOpen, setPromosOpen] = useState(false);
   const [rewardsOpen, setRewardsOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -410,15 +410,15 @@ export function DinerMenu({
         )}
       </main>
 
-      {/* Floating "Request bill" — appears once the food is ready */}
+      {/* Floating "Get the bill" — appears once the food is ready */}
       {trackedOrderId && orderStatus === "done" && (
         <div className="fixed inset-x-0 bottom-24 z-30 mx-auto flex max-w-md flex-col items-center gap-2 px-4">
-          <RequestBillButton
-            slug={slug}
-            tableToken={tableToken}
-            prominent
-            onRequested={loyaltyEnabled ? () => setRewardsOpen(true) : undefined}
-          />
+          <button
+            onClick={() => setBillOpen(true)}
+            className="rounded-full px-6 py-3 text-sm font-semibold text-white shadow-lg btn-brand"
+          >
+            🧾 {t("requestBill")}
+          </button>
           {loyaltyEnabled && (
             <button
               onClick={() => setRewardsOpen(true)}
@@ -576,6 +576,16 @@ export function DinerMenu({
         </div>
       )}
 
+      {/* Bill sheet — itemized bill + cash / online payment choice */}
+      {billOpen && (
+        <BillSheet
+          slug={slug}
+          tableToken={tableToken}
+          payOnline={payOnline}
+          onClose={() => setBillOpen(false)}
+        />
+      )}
+
       {/* More sheet — pay online, request bill, feedback */}
       {sheetOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setSheetOpen(false)}>
@@ -595,8 +605,15 @@ export function DinerMenu({
                 />
               )}
               <CallWaiterButton slug={slug} tableToken={tableToken} />
-              {payOnline && <PayOnlineButton slug={slug} tableToken={tableToken} />}
-              <RequestBillButton slug={slug} tableToken={tableToken} />
+              <button
+                onClick={() => {
+                  setSheetOpen(false);
+                  setBillOpen(true);
+                }}
+                className="rounded-full py-3 text-center text-sm font-semibold text-white btn-brand"
+              >
+                🧾 {t("requestBill")}
+              </button>
               <a
                 href={`/order/${slug}/${tableToken}/feedback`}
                 className="rounded-full border border-brand-ink/15 py-3 text-center text-sm font-semibold text-brand-ink"
