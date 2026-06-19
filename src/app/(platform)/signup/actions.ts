@@ -1,11 +1,13 @@
 "use server";
 
 import { z } from "zod";
+import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { uniqueSlug } from "@/lib/slug";
 import { startTrial } from "@/server/billing/subscription";
+import { recordReferralAtSignup } from "@/server/referrals/attribution";
 
 export type SignupState = { ok?: boolean; error?: string } | null;
 
@@ -36,6 +38,14 @@ export async function signUpRestaurant(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
   const { restaurantName, phone, email, password } = parsed.data;
+
+  // Referral attribution (last-touch), captured into a cookie by middleware.
+  let refCode: string | null = null;
+  try {
+    refCode = (await cookies()).get("servd_ref")?.value ?? null;
+  } catch {
+    /* cookies unavailable — no attribution */
+  }
 
   try {
     const supabase = await createSupabaseServerClient();
@@ -73,6 +83,12 @@ export async function signUpRestaurant(
         });
         // Start the 30-day free trial.
         await startTrial(tx, restaurant.id);
+        // Record referral attribution (self-referral blocked + audited inside).
+        await recordReferralAtSignup(tx, {
+          newRestaurantId: restaurant.id,
+          newOwnerEmail: email,
+          codeValue: refCode,
+        });
       });
     } catch (e) {
       console.error("[signup] provisioning failed:", e);
