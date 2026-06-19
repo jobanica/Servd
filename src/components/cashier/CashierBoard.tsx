@@ -55,6 +55,8 @@ export function CashierBoard({
   const [discountOrder, setDiscountOrder] = useState<CashierTable["orders"][number] | null>(null);
   const [loyaltyOrderId, setLoyaltyOrderId] = useState<string | null>(null);
   const [waiterCalls, setWaiterCalls] = useState<{ id: string; tableNumber: string }[]>([]);
+  const [billCalls, setBillCalls] = useState<{ id: string; tableNumber: string; method: string }[]>([]);
+  const [onlinePaid, setOnlinePaid] = useState<{ id: string; label: string }[]>([]);
   const [popupDismissed, setPopupDismissed] = useState(false);
   const [readyDismissed, setReadyDismissed] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -90,7 +92,10 @@ export function CashierBoard({
           if (o.paidOnline && !seenOnlinePaid.current.has(o.id)) {
             seenOnlinePaid.current.add(o.id);
             chime();
-            showToast(`💳 Online payment received — Table ${tbl.tableNumber}. Verify it in your gateway.`);
+            setOnlinePaid((prev) => [
+              ...prev.filter((x) => x.id !== o.id),
+              { id: o.id, label: tbl.tableNumber },
+            ]);
           }
           if (o.status === "done" && !o.served && !seenReady.current.has(o.id)) {
             seenReady.current.add(o.id);
@@ -130,6 +135,17 @@ export function CashierBoard({
         setWaiterCalls((prev) => [
           ...prev,
           { id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, tableNumber },
+        ]);
+      })
+      .on("broadcast", { event: "bill" }, (msg) => {
+        const p = (msg as { payload?: { tableNumber?: string; method?: string } }).payload ?? {};
+        const tableNumber = String(p.tableNumber ?? "—");
+        const method = p.method === "online" ? "online" : "cash";
+        chime();
+        refresh();
+        setBillCalls((prev) => [
+          ...prev,
+          { id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, tableNumber, method },
         ]);
       })
       .subscribe((status) => setLive(status === "SUBSCRIBED"));
@@ -663,6 +679,83 @@ export function CashierBoard({
                   <button
                     onClick={() => setWaiterCalls((prev) => prev.filter((x) => x.id !== c.id))}
                     className="rounded-full bg-mango px-4 py-1.5 text-sm font-semibold text-white"
+                  >
+                    Got it
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {/* Online-payment popup — paid via GCash/card; offer to print the receipt */}
+      {onlinePaid.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
+          <div className="mt-6 w-full max-w-md rounded-tile bg-white p-5 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h2 className="font-heading text-lg font-extrabold">💳 Paid online</h2>
+              <button onClick={() => setOnlinePaid([])} className="text-sm font-semibold text-plum-ink/50">
+                Clear all
+              </button>
+            </div>
+            <ul className="mt-4 space-y-2">
+              {onlinePaid.map((o) => (
+                <li key={o.id} className="flex items-center justify-between rounded-lg border border-mango/40 bg-mango/5 p-3">
+                  <span>
+                    <span className="font-heading font-bold">Table {o.label}</span>
+                    <span className="block text-xs text-plum-ink/60">Paid via GCash / card</span>
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => printPaidReceipt(o.id)}
+                      className="rounded-full bg-plum-ink px-3 py-1.5 text-sm font-semibold text-white"
+                    >
+                      🖨 Print receipt
+                    </button>
+                    <button
+                      onClick={() => setOnlinePaid((prev) => prev.filter((x) => x.id !== o.id))}
+                      className="rounded-full border border-plum-ink/15 px-3 py-1.5 text-sm font-semibold"
+                    >
+                      Got it
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {/* Bill-request popup (cash = a waiter must collect payment) */}
+      {billCalls.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
+          <div className="mt-6 w-full max-w-md rounded-tile bg-white p-5 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h2 className="font-heading text-lg font-extrabold">🧾 Bill requested</h2>
+              <button onClick={() => setBillCalls([])} className="text-sm font-semibold text-plum-ink/50">
+                Clear all
+              </button>
+            </div>
+            <ul className="mt-4 space-y-2">
+              {billCalls.map((c) => (
+                <li
+                  key={c.id}
+                  className={`flex items-center justify-between rounded-lg border p-3 ${
+                    c.method === "cash" ? "border-guava/40 bg-guava/5" : "border-brand-primary/30 bg-brand-primary/5"
+                  }`}
+                >
+                  <span>
+                    <span className="font-heading font-bold">Table {c.tableNumber}</span>
+                    <span className="block text-xs text-plum-ink/60">
+                      {c.method === "cash"
+                        ? "💵 Cash — collect payment at the table"
+                        : "💳 Paying online…"}
+                    </span>
+                  </span>
+                  <button
+                    onClick={() => setBillCalls((prev) => prev.filter((x) => x.id !== c.id))}
+                    className="rounded-full bg-plum-ink px-4 py-1.5 text-sm font-semibold text-white"
                   >
                     Got it
                   </button>
