@@ -36,11 +36,14 @@ export default async function SuperAdminReferralsPage() {
             track1CreditMonths: settings.track1CreditMonths,
             cookieDays: settings.cookieDays,
             clawbackDays: settings.clawbackDays,
+            track2CommissionPct: settings.track2CommissionPct,
+            track2ResellerPct: settings.track2ResellerPct,
+            track2DurationMonths: settings.track2DurationMonths,
+            payoutModel: settings.payoutModel,
+            bountyAmountPesos: settings.bountyAmount / 100,
+            minPayoutPesos: settings.minPayout / 100,
           }}
         />
-        <p className="mt-3 text-xs text-plum-ink/40">
-          Track-2 (partner) settings and payouts arrive in the next phase.
-        </p>
       </section>
 
       <section className="rounded-tile border border-plum-ink/10 bg-white p-5">

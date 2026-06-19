@@ -437,6 +437,7 @@ model Referral {
   referralCodeId       String
   referrerRestaurantId String? // denormalized owner restaurant (Track 1) — RLS key
   referredRestaurantId String    @unique // last-touch: one attribution per restaurant
+  partnerId            String? // set for partner-track referrals (Track 2)
   status               String    @default("signed_up") // signed_up | trialing | paying | churned
   firstPaidAt          DateTime?
   paidMonths           Int       @default(0)
@@ -444,7 +445,62 @@ model Referral {
 
   @@index([referralCodeId])
   @@index([referrerRestaurantId])
+  @@index([partnerId])
   @@map("referrals")
+}
+
+// ----------------------------------------------------------------------------
+// Affiliate program (Track 2: platform partners — recurring commission)
+// ----------------------------------------------------------------------------
+
+/// A platform-level affiliate / reseller. Has its own login (Supabase auth).
+model Partner {
+  id              String   @id @default(uuid())
+  authUserId      String?  @unique // Supabase auth user for the partner portal
+  name            String
+  email           String   @unique
+  status          String   @default("pending") // pending | approved | suspended
+  tier            String   @default("affiliate") // affiliate | reseller
+  payoutMethod    String? // "gcash" | "bank"
+  payoutDetailsEnc String? // encrypted JSON (account name/number)
+  taxInfoEnc      String? // encrypted JSON (TIN, etc.) — supports PH reporting
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("partners")
+}
+
+/// A commission earned by a partner off a referred restaurant's PAID invoice.
+model Commission {
+  id         String   @id @default(uuid())
+  partnerId  String
+  referralId String
+  invoiceId  String
+  amount     Int // centavos
+  status     String   @default("payable") // payable | paid | clawed_back
+  period     String // "YYYY-MM" of the paid invoice
+  payoutId   String?
+  createdAt  DateTime @default(now())
+
+  // One commission per paid invoice per referral (idempotency / no double-pay).
+  @@unique([referralId, invoiceId])
+  @@index([partnerId, status])
+  @@map("commissions")
+}
+
+/// A payout batch to a partner (record-keeping only; never auto-disburses).
+model Payout {
+  id        String    @id @default(uuid())
+  partnerId String
+  period    String // "YYYY-MM"
+  amount    Int // centavos
+  method    String? // snapshot of payout method
+  status    String    @default("requested") // requested | approved | paid
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([partnerId, status])
+  @@map("payouts")
 }
 
 /// Subscription account credit (Track 1 reward). Applied against a future

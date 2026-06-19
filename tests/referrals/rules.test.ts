@@ -7,6 +7,9 @@ import {
   track1CreditAmount,
   shouldAccrueFirstReward,
   creditCoversCycle,
+  commissionForInvoice,
+  periodKey,
+  type CommissionInput,
 } from "@/lib/referrals/rules";
 
 describe("referral rules — code helpers", () => {
@@ -101,5 +104,44 @@ describe("referral rules — clawback window", () => {
 
   it("is never inside the window when never paid", () => {
     expect(isWithinClawbackWindow(null, new Date(), 60)).toBe(false);
+  });
+});
+
+describe("referral rules — Track 2 commissions", () => {
+  const base: CommissionInput = {
+    payoutModel: "recurring",
+    tier: "affiliate",
+    paidMonthCount: 1,
+    invoiceAmount: 199900,
+    affiliatePct: 25,
+    resellerPct: 35,
+    durationMonths: 12,
+    bountyAmount: 50000,
+    bountyAlreadyGranted: false,
+  };
+
+  it("recurring: affiliate earns 25% each month within the window", () => {
+    expect(commissionForInvoice(base)).toBe(49975); // 25% of 199900
+    expect(commissionForInvoice({ ...base, paidMonthCount: 12 })).toBe(49975);
+  });
+
+  it("recurring: reseller earns 35%", () => {
+    expect(commissionForInvoice({ ...base, tier: "reseller" })).toBe(69965);
+  });
+
+  it("recurring: nothing after the duration window", () => {
+    expect(commissionForInvoice({ ...base, paidMonthCount: 13 })).toBeNull();
+  });
+
+  it("bounty: paid once after the 2nd paid month, never again", () => {
+    const b = { ...base, payoutModel: "bounty" as const };
+    expect(commissionForInvoice({ ...b, paidMonthCount: 1 })).toBeNull(); // too early
+    expect(commissionForInvoice({ ...b, paidMonthCount: 2 })).toBe(50000);
+    expect(commissionForInvoice({ ...b, paidMonthCount: 2, bountyAlreadyGranted: true })).toBeNull();
+  });
+
+  it("buckets dates into YYYY-MM periods", () => {
+    expect(periodKey(new Date("2026-06-19T10:00:00Z"))).toBe("2026-06");
+    expect(periodKey(new Date("2026-12-01T00:00:00Z"))).toBe("2026-12");
   });
 });

@@ -16,25 +16,30 @@ export async function recordReferralAtSignup(
 
   const codeRow = await tx.referralCode.findUnique({
     where: { code },
-    select: { id: true, ownerType: true, restaurantId: true, active: true },
+    select: { id: true, ownerType: true, restaurantId: true, partnerId: true, active: true },
   });
   if (!codeRow) return; // unknown code → ignore silently
-  // Track 1 only handles restaurant-owned codes; partner codes are Track 2.
-  if (codeRow.ownerType !== "restaurant") return;
 
-  // Referrer admin emails for the self-referral check.
-  const referrerStaff = codeRow.restaurantId
-    ? await tx.staffUser.findMany({
-        where: { restaurantId: codeRow.restaurantId, role: "admin" },
-        select: { email: true },
-      })
-    : [];
-  const referrerEmails = referrerStaff
-    .map((s) => s.email)
-    .filter((e): e is string => !!e);
+  // Referrer identity emails for the self-referral check.
+  let referrerEmails: string[] = [];
+  if (codeRow.ownerType === "restaurant" && codeRow.restaurantId) {
+    const staff = await tx.staffUser.findMany({
+      where: { restaurantId: codeRow.restaurantId, role: "admin" },
+      select: { email: true },
+    });
+    referrerEmails = staff.map((s) => s.email).filter((e): e is string => !!e);
+  } else if (codeRow.ownerType === "partner" && codeRow.partnerId) {
+    const partner = await tx.partner.findUnique({
+      where: { id: codeRow.partnerId },
+      select: { email: true },
+    });
+    if (partner?.email) referrerEmails = [partner.email];
+  } else {
+    return; // malformed code
+  }
 
   const verdict = validateAttribution({
-    codeOwnerRestaurantId: codeRow.restaurantId,
+    codeOwnerRestaurantId: codeRow.restaurantId, // null for partner codes
     codeActive: codeRow.active,
     newRestaurantId: args.newRestaurantId,
     newOwnerEmail: args.newOwnerEmail,
@@ -55,14 +60,15 @@ export async function recordReferralAtSignup(
     const referral = await tx.referral.create({
       data: {
         referralCodeId: codeRow.id,
-        referrerRestaurantId: codeRow.restaurantId,
+        referrerRestaurantId: codeRow.ownerType === "restaurant" ? codeRow.restaurantId : null,
+        partnerId: codeRow.ownerType === "partner" ? codeRow.partnerId : null,
         referredRestaurantId: args.newRestaurantId,
         status: "signed_up",
       },
       select: { id: true },
     });
     await tx.referralEvent.create({
-      data: { referralId: referral.id, type: "attribution", detailJson: { code } },
+      data: { referralId: referral.id, type: "attribution", detailJson: { code, ownerType: codeRow.ownerType } },
     });
   } catch {
     // unique(referredRestaurantId) — already attributed; keep the existing one.

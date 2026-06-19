@@ -547,7 +547,7 @@ export default async function Home() {
           </div>
           {[
             ["Product", [["Features", "#features"], ["Pricing", "#pricing"], ["Staff login", "/login"]]],
-            ["Company", [["About", "#"], ["Contact", "#"], ["Blog", "#"]]],
+            ["Company", [["Become a partner", "/partner/apply"], ["Contact", "#"], ["Blog", "#"]]],
             ["Legal", [["Privacy", "#"], ["Terms", "#"], ["SMS consent", "#"]]],
           ].map(([title, rows]) => (
             <div key={title as string}>

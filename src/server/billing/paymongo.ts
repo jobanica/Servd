@@ -143,8 +143,11 @@ export class PayMongoBillingProvider implements BillingProvider {
     if (!providerRef) return null;
 
     const paymentMethodId = event.data?.attributes?.data?.attributes?.payment_method?.id;
-    const status: BillingWebhookEvent["status"] =
-      type.includes("paid") || type.includes("succeeded") ? "paid" : "failed";
+    const status: BillingWebhookEvent["status"] = type.includes("refund")
+      ? "refunded"
+      : type.includes("paid") || type.includes("succeeded")
+        ? "paid"
+        : "failed";
 
     return { providerRef, status, paymentMethodId, raw: event };
   }
