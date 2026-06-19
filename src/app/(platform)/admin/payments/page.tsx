@@ -10,12 +10,18 @@ export default async function PaymentsSettingsPage() {
 
   const restaurant = await tenantDb(restaurantId, (tx) =>
     tx.restaurant.findFirstOrThrow({
-      select: { id: true, paymentOnlineEnabled: true, paymentCredentialsEnc: true },
+      select: {
+        id: true,
+        paymentOnlineEnabled: true,
+        paymentCredentialsEnc: true,
+        paymentGateway: true,
+      },
     }),
   );
 
   const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const webhookUrl = `${base}/api/webhooks/paymongo/${restaurant.id}`;
+  const webhookBase = `${base}/api/webhooks`;
+  const gateway = restaurant.paymentGateway === "xendit" ? "xendit" : "paymongo";
 
   return (
     <div className="space-y-6">
@@ -25,7 +31,7 @@ export default async function PaymentsSettingsPage() {
         </Link>
         <h1 className="font-heading text-2xl font-bold">Online payment</h1>
         <p className="text-sm text-plum-ink/50">
-          Connected-accounts model: your own PayMongo account receives the money.
+          Connected-accounts model: your own PayMongo or Xendit account receives the money.
         </p>
       </div>
 
@@ -33,8 +39,10 @@ export default async function PaymentsSettingsPage() {
         initial={{
           enabled: restaurant.paymentOnlineEnabled,
           configured: !!restaurant.paymentCredentialsEnc,
+          gateway,
         }}
-        webhookUrl={webhookUrl}
+        webhookBase={webhookBase}
+        restaurantId={restaurant.id}
       />
     </div>
   );

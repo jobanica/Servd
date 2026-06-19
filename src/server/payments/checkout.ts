@@ -25,7 +25,7 @@ export async function createTableCheckout(input: {
   const ctx = await systemDb(async (tx) => {
     const restaurant = await tx.restaurant.findFirst({
       where: { slug: parsed.data.slug, status: "active" },
-      select: { id: true, name: true, displayName: true, feedbackMode: true },
+      select: { id: true, name: true, displayName: true, feedbackMode: true, paymentGateway: true },
     });
     if (!restaurant) return null;
     const table = await tx.table.findFirst({
@@ -81,7 +81,7 @@ export async function createTableCheckout(input: {
         orderId: o.id,
         amount: o.total,
         method: "online_gcash", // refined to actual method on webhook if available
-        gateway: "paymongo",
+        gateway: ctx.restaurant.paymentGateway ?? "paymongo",
         gatewayRef: checkout!.gatewayRef,
         status: "pending",
       })),
