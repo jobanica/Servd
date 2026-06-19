@@ -5,8 +5,11 @@ import { z } from "zod";
 import type { Prisma, PlanModuleType } from "@prisma/client";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { requireSuperAdmin } from "@/server/tenancy/current-user";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { runBillingCron, type CronSummary } from "@/server/billing/run-cron";
 import { saveXenditCreds } from "@/server/billing/platform-settings";
+import { startTrial } from "@/server/billing/subscription";
+import { uniqueSlug } from "@/lib/slug";
 import { addMonths } from "@/lib/billing/period";
 
 export type ActionState = { ok?: boolean; message?: string; error?: string } | null;
@@ -297,4 +300,79 @@ export async function saveXenditSettings(_prev: ActionState, formData: FormData)
   }
   revalidatePath("/super-admin/payments");
   return { ok: true, message: "Xendit connected. Subscriptions will activate automatically on payment." };
+}
+
+// ---------------------------------------------------------------------------
+// Accounts — provision restaurant logins with the email pre-confirmed
+// ---------------------------------------------------------------------------
+
+const accountSchema = z.object({
+  restaurantName: z.string().trim().min(2, "Restaurant name is required").max(80),
+  email: z.string().trim().email("Enter a valid email"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  phone: z.string().trim().max(30).optional().or(z.literal("")),
+});
+
+/**
+ * Super-admin: create a restaurant + owner login with the email PRE-CONFIRMED
+ * (via the Supabase admin API), so the owner can sign in immediately — no
+ * confirmation email needed. Provisions the tenant + admin staff + free trial,
+ * exactly like self-serve signup.
+ */
+export async function createRestaurantAccount(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireSuperAdmin();
+  const parsed = accountSchema.safeParse({
+    restaurantName: formData.get("restaurantName"),
+    email: formData.get("email"),
+    password: formData.get("password"),
+    phone: formData.get("phone") ?? "",
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  const { restaurantName, email, password, phone } = parsed.data;
+
+  // 1. Create the auth user, email pre-confirmed (no confirmation link).
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  });
+  if (error || !data.user) {
+    return { error: /registered|exists/i.test(error?.message ?? "") ? "That email already has an account." : error?.message ?? "Couldn't create the login." };
+  }
+  const authUserId = data.user.id;
+
+  // 2. Provision the tenant + owner + trial.
+  try {
+    await systemDb(async (tx) => {
+      const slug = await uniqueSlug(restaurantName, async (s) => {
+        const hit = await tx.restaurant.findUnique({ where: { slug: s }, select: { id: true } });
+        return !!hit;
+      });
+      const restaurant = await tx.restaurant.create({
+        data: {
+          name: restaurantName,
+          displayName: restaurantName,
+          slug,
+          status: "active",
+          ...(phone ? { printerConfig: { receipt: { phone } } as unknown as Prisma.InputJsonValue } : {}),
+          staff: { create: { authUserId, role: "admin", email } },
+        },
+        select: { id: true },
+      });
+      await startTrial(tx, restaurant.id);
+    });
+  } catch (e) {
+    // Roll back the orphaned auth user so the email can be reused.
+    try {
+      await admin.auth.admin.deleteUser(authUserId);
+    } catch {
+      /* ignore */
+    }
+    const msg = e instanceof Error ? e.message : "Couldn't create the account.";
+    return { error: /unique/i.test(msg) ? "That email already has an account." : msg };
+  }
+
+  refresh();
+  return { ok: true, message: `Account created for ${restaurantName} — they can log in right away.` };
 }
