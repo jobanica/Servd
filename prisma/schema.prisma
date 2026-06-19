@@ -413,6 +413,89 @@ model RestaurantInvoice {
 }
 
 // ----------------------------------------------------------------------------
+// Affiliate & referral program (Track 1: restaurant-to-restaurant credit)
+// ----------------------------------------------------------------------------
+
+/// A unique referral code. Owned by a restaurant (Track 1) or a partner (Track 2).
+model ReferralCode {
+  id           String   @id @default(uuid())
+  code         String   @unique
+  ownerType    String // "restaurant" | "partner"
+  restaurantId String? // set for restaurant-owned codes (RLS key)
+  partnerId    String? // set for partner-owned codes (Track 2)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  @@index([restaurantId])
+  @@map("referral_codes")
+}
+
+/// One referred restaurant, attributed to a code. Accrual is driven off paid
+/// invoices, never signups.
+model Referral {
+  id                   String    @id @default(uuid())
+  referralCodeId       String
+  referrerRestaurantId String? // denormalized owner restaurant (Track 1) — RLS key
+  referredRestaurantId String    @unique // last-touch: one attribution per restaurant
+  status               String    @default("signed_up") // signed_up | trialing | paying | churned
+  firstPaidAt          DateTime?
+  paidMonths           Int       @default(0)
+  createdAt            DateTime  @default(now())
+
+  @@index([referralCodeId])
+  @@index([referrerRestaurantId])
+  @@map("referrals")
+}
+
+/// Subscription account credit (Track 1 reward). Applied against a future
+/// Servd invoice — never paid out as cash.
+model AccountCredit {
+  id               String    @id @default(uuid())
+  restaurantId     String
+  amount           Int // centavos
+  reason           String
+  sourceReferralId String?
+  status           String    @default("pending") // pending | applied | reversed
+  appliedInvoiceId String?
+  appliedAt        DateTime?
+  createdAt        DateTime  @default(now())
+
+  // At most one referral-sourced credit per restaurant per referral (idempotency).
+  @@unique([restaurantId, sourceReferralId])
+  @@index([restaurantId, status])
+  @@map("account_credits")
+}
+
+/// Program-wide settings (singleton row id="program"). Configurable, not hardcoded.
+model ProgramSetting {
+  id                   String   @id @default("program")
+  track1CreditMonths   Int      @default(1)
+  track2CommissionPct  Int      @default(25)
+  track2ResellerPct    Int      @default(35)
+  track2DurationMonths Int      @default(12)
+  bountyAmount         Int      @default(0) // centavos (bounty payout model)
+  payoutModel          String   @default("recurring") // recurring | bounty
+  cookieDays           Int      @default(30)
+  clawbackDays         Int      @default(60)
+  minPayout            Int      @default(50000) // centavos = ₱500
+  updatedAt            DateTime @updatedAt
+
+  @@map("program_settings")
+}
+
+/// Append-only audit / fraud trail for the referral program.
+model ReferralEvent {
+  id         String   @id @default(uuid())
+  referralId String?
+  type       String // attribution | self_referral_blocked | first_paid | clawback | credit_applied
+  detailJson Json?
+  createdAt  DateTime @default(now())
+
+  @@index([referralId])
+  @@map("referral_events")
+}
+
+// ----------------------------------------------------------------------------
 // Tables & menu
 // ----------------------------------------------------------------------------
 
