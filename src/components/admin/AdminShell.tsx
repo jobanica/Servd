@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AppIcon, Wordmark } from "@/components/Wordmark";
 import { signOut } from "@/app/(platform)/login/actions";
+import { PlatformFeedbackButton } from "./PlatformFeedbackButton";
 
 function Icon({ d }: { d: string }) {
   return (
@@ -182,7 +183,8 @@ export function AdminShell({
         <Wordmark size="1.15rem" />
       </Link>
       {nav}
-      <div className="border-t border-plum-ink/10 p-3">
+      <div className="space-y-1 border-t border-plum-ink/10 p-3">
+        <PlatformFeedbackButton />
         <form action={signOut}>
           <button className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-plum-ink/60 hover:bg-plum-ink/5">
             Sign out
