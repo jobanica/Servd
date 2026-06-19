@@ -94,3 +94,47 @@ export function shouldAccrueFirstReward(referral: {
 export function creditCoversCycle(creditAmount: number, cycleAmount: number): boolean {
   return creditAmount >= cycleAmount && cycleAmount > 0;
 }
+
+// ----------------------------------------------------------------- Track 2
+
+export type PartnerTier = "affiliate" | "reseller";
+export type PayoutModel = "recurring" | "bounty";
+
+export interface CommissionInput {
+  payoutModel: PayoutModel;
+  tier: PartnerTier;
+  /** Count of PAID months so far for the referred restaurant (incl. this one). */
+  paidMonthCount: number;
+  invoiceAmount: number; // centavos, the paid invoice
+  affiliatePct: number; // e.g. 25
+  resellerPct: number; // e.g. 35
+  durationMonths: number; // recurring window
+  bountyAmount: number; // centavos (bounty model)
+  /** Whether a bounty was already granted for this referral (idempotency). */
+  bountyAlreadyGranted: boolean;
+}
+
+/**
+ * The commission (centavos) a partner earns from a paid invoice, or null if
+ * none applies. Recurring: a % of each paid month within the duration window.
+ * Bounty: a one-time amount once the referral reaches its 2nd paid month.
+ */
+export function commissionForInvoice(i: CommissionInput): number | null {
+  if (i.payoutModel === "bounty") {
+    if (i.bountyAlreadyGranted) return null;
+    if (i.paidMonthCount < 2) return null;
+    return i.bountyAmount > 0 ? i.bountyAmount : null;
+  }
+  // recurring
+  if (i.paidMonthCount < 1 || i.paidMonthCount > i.durationMonths) return null;
+  const pct = i.tier === "reseller" ? i.resellerPct : i.affiliatePct;
+  const amount = Math.round((Math.max(0, i.invoiceAmount) * Math.max(0, pct)) / 100);
+  return amount > 0 ? amount : null;
+}
+
+/** The "YYYY-MM" period bucket for a date (used for commissions/payouts). */
+export function periodKey(d: Date): string {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+}

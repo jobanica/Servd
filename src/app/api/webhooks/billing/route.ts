@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { getBillingProvider } from "@/server/billing";
 import { activateByProviderRef } from "@/server/billing/activate";
+import { systemDb } from "@/server/tenancy/scoped-db";
+import { clawbackByInvoiceProviderRef } from "@/server/referrals/accrual";
 
 /**
  * PayMongo platform billing webhook. Marks an invoice paid + activates the
@@ -16,6 +18,13 @@ export async function POST(req: NextRequest) {
   const signature = req.headers.get("paymongo-signature") ?? "";
   const event = provider.verifyAndParseWebhook(rawBody, signature);
   if (!event) return new Response("Invalid signature", { status: 400 });
+
+  // Refund → reverse referral rewards tied to that invoice (within window).
+  if (event.status === "refunded") {
+    await systemDb((tx) => clawbackByInvoiceProviderRef(tx, event.providerRef, "refund"));
+    return new Response("ok", { status: 200 });
+  }
+
   if (event.status !== "paid") return new Response("ok", { status: 200 });
 
   await activateByProviderRef(event.providerRef, {

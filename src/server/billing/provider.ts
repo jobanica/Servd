@@ -20,7 +20,7 @@ export interface ChargeResult {
 
 export interface BillingWebhookEvent {
   providerRef: string; // the checkout/intent id this event concerns
-  status: "paid" | "failed";
+  status: "paid" | "failed" | "refunded";
   paymentMethodId?: string; // captured so future months charge off-session
   customerId?: string;
   raw?: unknown;

@@ -4,6 +4,10 @@ import {
   track1CreditAmount,
   isWithinClawbackWindow,
   creditCoversCycle,
+  commissionForInvoice,
+  periodKey,
+  type PartnerTier,
+  type PayoutModel,
 } from "@/lib/referrals/rules";
 
 /** Read the program settings within the caller's transaction (no nested tx). */
@@ -12,6 +16,11 @@ async function readSettings(tx: Prisma.TransactionClient) {
   return {
     track1CreditMonths: row?.track1CreditMonths ?? 1,
     clawbackDays: row?.clawbackDays ?? 60,
+    track2CommissionPct: row?.track2CommissionPct ?? 25,
+    track2ResellerPct: row?.track2ResellerPct ?? 35,
+    track2DurationMonths: row?.track2DurationMonths ?? 12,
+    bountyAmount: row?.bountyAmount ?? 0,
+    payoutModel: (row?.payoutModel as PayoutModel) ?? "recurring",
   };
 }
 
@@ -36,44 +45,82 @@ export async function onInvoicePaid(
 
   const referral = await tx.referral.findUnique({
     where: { referredRestaurantId: invoice.restaurantId },
-    select: { id: true, status: true, firstPaidAt: true, referrerRestaurantId: true },
+    select: { id: true, status: true, firstPaidAt: true, referrerRestaurantId: true, partnerId: true },
   });
   if (!referral) return;
-  if (referral.firstPaidAt) return; // already accrued — idempotent on retries
   if (referral.status === "churned") return;
-  if (!referral.referrerRestaurantId) return; // partner-owned code → Track 2
 
   const settings = await readSettings(tx);
-  const amount = track1CreditAmount(invoice.amount, settings.track1CreditMonths);
+  const wasFirstPaid = referral.firstPaidAt == null;
+
+  // Paid months so far (incl. this invoice, already marked paid). Counting
+  // instead of incrementing keeps it idempotent across webhook retries.
+  const paidMonthCount = await tx.restaurantInvoice.count({
+    where: { restaurantId: invoice.restaurantId, status: "paid", amount: { gt: 0 } },
+  });
 
   await tx.referral.update({
     where: { id: referral.id },
-    data: { firstPaidAt: new Date(), status: "paying", paidMonths: { increment: 1 } },
+    data: { firstPaidAt: referral.firstPaidAt ?? new Date(), status: "paying", paidMonths: paidMonthCount },
   });
 
-  if (amount > 0) {
-    await tx.accountCredit.createMany({
-      data: [
-        {
-          restaurantId: referral.referrerRestaurantId,
-          amount,
-          reason: "Referral reward — you referred a restaurant",
-          sourceReferralId: referral.id,
-        },
-        {
-          restaurantId: invoice.restaurantId,
-          amount,
-          reason: "Referral reward — you were referred",
-          sourceReferralId: referral.id,
-        },
-      ],
-      skipDuplicates: true, // safe on webhook retries
+  // --- Track 1: restaurant-to-restaurant credit (first paid month only) ---
+  if (referral.referrerRestaurantId && wasFirstPaid) {
+    const amount = track1CreditAmount(invoice.amount, settings.track1CreditMonths);
+    if (amount > 0) {
+      await tx.accountCredit.createMany({
+        data: [
+          { restaurantId: referral.referrerRestaurantId, amount, reason: "Referral reward — you referred a restaurant", sourceReferralId: referral.id },
+          { restaurantId: invoice.restaurantId, amount, reason: "Referral reward — you were referred", sourceReferralId: referral.id },
+        ],
+        skipDuplicates: true,
+      });
+    }
+    await tx.referralEvent.create({
+      data: { referralId: referral.id, type: "first_paid", detailJson: { invoiceId: invoice.id, amount } },
     });
   }
 
-  await tx.referralEvent.create({
-    data: { referralId: referral.id, type: "first_paid", detailJson: { invoiceId: invoice.id, amount } },
-  });
+  // --- Track 2: partner commission (recurring or bounty) ---
+  if (referral.partnerId) {
+    const partner = await tx.partner.findUnique({
+      where: { id: referral.partnerId },
+      select: { tier: true, status: true },
+    });
+    if (partner && partner.status === "approved") {
+      const bountyAlreadyGranted = (await tx.commission.count({ where: { referralId: referral.id } })) > 0;
+      const amount = commissionForInvoice({
+        payoutModel: settings.payoutModel,
+        tier: (partner.tier as PartnerTier) ?? "affiliate",
+        paidMonthCount,
+        invoiceAmount: invoice.amount,
+        affiliatePct: settings.track2CommissionPct,
+        resellerPct: settings.track2ResellerPct,
+        durationMonths: settings.track2DurationMonths,
+        bountyAmount: settings.bountyAmount,
+        bountyAlreadyGranted,
+      });
+      if (amount && amount > 0) {
+        try {
+          await tx.commission.create({
+            data: {
+              partnerId: referral.partnerId,
+              referralId: referral.id,
+              invoiceId: invoice.id,
+              amount,
+              period: periodKey(new Date()),
+              status: "payable",
+            },
+          });
+          await tx.referralEvent.create({
+            data: { referralId: referral.id, type: "commission_accrued", detailJson: { invoiceId: invoice.id, amount, month: paidMonthCount } },
+          });
+        } catch {
+          // unique(referralId, invoiceId) — webhook retry; already accrued.
+        }
+      }
+    }
+  }
 }
 
 /** Reverse the rewards tied to a referral (clawback). Pending credits are
@@ -93,13 +140,43 @@ export async function reverseRewardsForReferral(
     where: { sourceReferralId: referralId, status: "applied" },
   });
 
+  // Track 2: reverse not-yet-paid commissions (paid ones are flagged only).
+  const clawedCommissions = await tx.commission.updateMany({
+    where: { referralId, status: "payable" },
+    data: { status: "clawed_back" },
+  });
+  const alreadyPaidCommissions = await tx.commission.count({
+    where: { referralId, status: "paid" },
+  });
+
   await tx.referralEvent.create({
     data: {
       referralId,
       type: "clawback",
-      detailJson: { reason, reversedPending: reversed.count, alreadyApplied },
+      detailJson: {
+        reason,
+        reversedPending: reversed.count,
+        alreadyApplied,
+        clawedCommissions: clawedCommissions.count,
+        alreadyPaidCommissions,
+      },
     },
   });
+}
+
+/** Clawback by a refunded invoice's gateway ref (refund webhook). */
+export async function clawbackByInvoiceProviderRef(
+  tx: Prisma.TransactionClient,
+  providerRef: string,
+  reason: string,
+  now: Date = new Date(),
+): Promise<boolean> {
+  const invoice = await tx.restaurantInvoice.findFirst({
+    where: { providerRef },
+    select: { restaurantId: true },
+  });
+  if (!invoice) return false;
+  return clawbackForReferredRestaurant(tx, invoice.restaurantId, reason, now);
 }
 
 /** Clawback when a referred restaurant churns within the clawback window. */
