@@ -65,56 +65,6 @@ function Nav() {
 }
 
 /* ------------------------------------------------------------- phone mockup */
-function PhoneMockup() {
-  const items = [
-    ["Smoky BBQ Burger", "₱290"],
-    ["Truffle Fries", "₱180"],
-    ["Mango Cheesecake", "₱160"],
-  ];
-  return (
-    <div className="relative mx-auto w-[260px]">
-      {/* floating "new order" chip */}
-      <div className="absolute -left-10 top-24 hidden rounded-2xl border border-plum-ink/10 bg-white p-3 shadow-xl sm:block">
-        <p className="text-[10px] font-semibold text-mango">● NEW ORDER · Table 7</p>
-        <p className="mt-1 text-xs font-bold text-plum-ink">2× Smoky BBQ Burger</p>
-      </div>
-      {/* floating "paid" chip */}
-      <div className="absolute -right-8 bottom-20 hidden rounded-2xl border border-plum-ink/10 bg-white p-3 shadow-xl sm:block">
-        <p className="text-xs font-bold text-plum-ink">Paid via GCash ✓</p>
-        <p className="text-[10px] text-plum-ink/50">₱630.00</p>
-      </div>
-      {/* device */}
-      <div className="rounded-[2.5rem] border-[10px] border-plum-ink bg-white p-3 shadow-2xl">
-        <div className="overflow-hidden rounded-[1.6rem] bg-cream">
-          <div className="bg-brand-gradient px-4 pb-6 pt-5 text-white">
-            <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/25 font-bold">M</div>
-              <div>
-                <p className="text-sm font-bold leading-tight">Mango Grill</p>
-                <p className="text-[10px] opacity-80">Table 7</p>
-              </div>
-            </div>
-          </div>
-          <div className="-mt-3 space-y-2 rounded-t-2xl bg-cream p-3">
-            {items.map(([name, price]) => (
-              <div key={name} className="flex items-center justify-between rounded-xl bg-white p-2.5 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-lg" style={{ background: "var(--brand-gradient)", opacity: 0.18 }} />
-                  <span className="text-xs font-medium text-plum-ink">{name}</span>
-                </div>
-                <span className="text-xs font-bold text-plum-ink">{price}</span>
-              </div>
-            ))}
-            <div className="mt-2 rounded-full py-2 text-center text-xs font-bold text-white btn-brand">
-              View order · ₱630
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /* --------------------------------------------------------- browser mockups */
 function BrowserFrame({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -238,7 +188,12 @@ export default async function Home() {
               ))}
             </div>
           </div>
-          <PhoneMockup />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/app-showcase.webp"
+            alt="The Servd app — QR ordering, real-time kitchen, loyalty, inventory, and analytics"
+            className="mx-auto w-full max-w-md"
+          />
         </div>
       </section>
 
