@@ -73,8 +73,13 @@ export async function createTableCheckout(input: {
       successUrl,
       methods: ["gcash", "card"],
     });
-  } catch {
-    return { ok: false, error: "Couldn't start checkout. Please try again." };
+  } catch (e) {
+    console.error("createTableCheckout: gateway error", e);
+    const detail = e instanceof Error ? e.message : "";
+    return {
+      ok: false,
+      error: detail ? `Couldn't start checkout: ${detail}` : "Couldn't start checkout. Please try again.",
+    };
   }
 
   // Record a pending payment per order, all keyed to this checkout session.
