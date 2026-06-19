@@ -14,6 +14,7 @@ interface StoredCredentials {
 }
 
 const schema = z.object({
+  gateway: z.enum(["paymongo", "xendit"]).default("paymongo"),
   // Blank => keep whatever's already stored (so admins don't re-enter secrets).
   secretKey: z.string().trim().optional().or(z.literal("")),
   webhookSecret: z.string().trim().optional().or(z.literal("")),
@@ -26,6 +27,7 @@ export async function updatePaymentSettings(
 ): Promise<FormState> {
   const { restaurantId } = await requireAdminAction();
   const parsed = schema.safeParse({
+    gateway: formData.get("gateway") ?? "paymongo",
     secretKey: formData.get("secretKey") ?? "",
     webhookSecret: formData.get("webhookSecret") ?? "",
     enabled: formData.get("enabled") === "on",
@@ -55,7 +57,7 @@ export async function updatePaymentSettings(
       await tx.restaurant.update({
         where: { id: restaurantId },
         data: {
-          paymentGateway: "paymongo",
+          paymentGateway: parsed.data.gateway,
           paymentCredentialsEnc: hasCreds ? encryptJson(merged) : null,
           paymentOnlineEnabled: parsed.data.enabled && hasCreds,
         },

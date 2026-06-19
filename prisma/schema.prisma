@@ -63,6 +63,7 @@ enum PaymentMethod {
 
 enum Gateway {
   paymongo
+  xendit
   manual // cash / in-person recorded by cashier
 }
 
