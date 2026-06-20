@@ -11,8 +11,9 @@ export function dinerOrderUrl(slug: string, qrToken: string): string {
 }
 
 /**
- * The diner URL to encode in a table's QR, preferring the restaurant's branded
- * host when available: verified custom domain → subdomain → platform URL.
+ * The diner URL to encode in a table's QR. Prefers the restaurant's own
+ * verified custom domain; otherwise uses the platform apex path
+ * ({APP_URL}/order/{slug}/{token}), which works without wildcard-subdomain DNS.
  */
 export function restaurantOrderUrl(
   r: {
@@ -23,13 +24,11 @@ export function restaurantOrderUrl(
   },
   qrToken: string,
 ): string {
-  const root = process.env.NEXT_PUBLIC_ROOT_DOMAIN;
   if (r.customDomain && r.customDomainVerified) {
     return `https://${r.customDomain}/t/${qrToken}`;
   }
-  if (r.subdomain && root) {
-    return `https://${r.subdomain}.${root}/t/${qrToken}`;
-  }
+  // Servd subdomains are disabled (no wildcard *.servdph.com DNS) — fall back to
+  // the apex path so QR codes resolve on the main domain.
   return dinerOrderUrl(r.slug, qrToken);
 }
 
