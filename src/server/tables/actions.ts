@@ -60,7 +60,12 @@ export async function createTable(
 export async function deleteTable(formData: FormData): Promise<void> {
   const { restaurantId } = await requireAdminAction();
   const id = String(formData.get("id"));
-  await tenantDb(restaurantId, (tx) => tx.table.delete({ where: { id } }));
+  await tenantDb(restaurantId, async (tx) => {
+    // Detach any orders so a foreign key can't block the delete; order history
+    // is preserved (just no longer linked to the removed table).
+    await tx.order.updateMany({ where: { tableId: id }, data: { tableId: null } });
+    await tx.table.delete({ where: { id } });
+  });
   revalidatePath("/admin/tables");
 }
 
