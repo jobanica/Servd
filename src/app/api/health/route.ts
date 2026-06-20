@@ -1,12 +1,13 @@
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { getBillingStatus } from "@/server/billing/platform-settings";
+import { parseHost } from "@/lib/host";
 
 /**
  * Diagnostics: confirms env vars are present, the DB is reachable, the schema is
  * up to date, and plans are seeded. Returns only booleans/counts (no secrets).
  * Hit /api/health right after a deploy to verify everything's wired.
  */
-export async function GET() {
+export async function GET(req: Request) {
   const env = {
     NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -15,6 +16,17 @@ export async function GET() {
     DIRECT_URL: !!process.env.DIRECT_URL,
     CREDENTIALS_ENCRYPTION_KEY: !!process.env.CREDENTIALS_ENCRYPTION_KEY,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL ?? null,
+  };
+
+  // Multi-tenant routing: how THIS request's host is classified. For your
+  // platform domain you want hostKind="platform". If it shows "custom", then
+  // NEXT_PUBLIC_ROOT_DOMAIN is wrong/unset and the domain is misrouted as a tenant.
+  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? null;
+  const requestHost = (req.headers.get("host") ?? "").split(":")[0].toLowerCase() || null;
+  const routing = {
+    NEXT_PUBLIC_ROOT_DOMAIN: rootDomain,
+    requestHost,
+    hostKind: requestHost ? parseHost(requestHost, rootDomain ?? undefined).kind : null,
   };
 
   // Optional features (present-or-not, never required for `healthy`).
@@ -118,5 +130,5 @@ export async function GET() {
     db.schemaCurrent === true &&
     (db.planCount as number) > 0;
 
-  return Response.json({ healthy, env, features, db, billing }, { status: healthy ? 200 : 503 });
+  return Response.json({ healthy, env, routing, features, db, billing }, { status: healthy ? 200 : 503 });
 }
