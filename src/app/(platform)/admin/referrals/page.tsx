@@ -18,6 +18,24 @@ export default async function ReferralsPage() {
   const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const link = `${base.replace(/\/$/, "")}/signup?ref=${data.code}`;
 
+  if (!data.ready) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <Link href="/admin" className="text-sm text-plum-ink/50">
+            ← Dashboard
+          </Link>
+          <h1 className="font-heading text-2xl font-bold">Refer &amp; earn</h1>
+        </div>
+        <div className="rounded-tile border border-plum-ink/10 bg-white p-6 text-center">
+          <p className="text-3xl">🛠️</p>
+          <p className="mt-2 font-semibold">The referral program is being set up.</p>
+          <p className="mt-1 text-sm text-plum-ink/55">Please check back shortly.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
