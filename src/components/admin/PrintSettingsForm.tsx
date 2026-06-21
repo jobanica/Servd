@@ -38,6 +38,7 @@ export function PrintSettingsForm({
     null,
   );
   const [method, setMethod] = useState<Method>(initial.printMethod);
+  const [autoPrint, setAutoPrint] = useState(initial.autoPrint);
   const [address, setAddress] = useState(initial.receiptAddress);
   const [phone, setPhone] = useState(initial.receiptPhone);
   const [website, setWebsite] = useState(initial.receiptWebsite);
@@ -119,10 +120,48 @@ export function PrintSettingsForm({
         </div>
       )}
 
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="autoPrint" defaultChecked={initial.autoPrint} />
-        Auto-print each new order (server-driven methods only)
-      </label>
+      {/* Kitchen workflow — show new orders on a screen, or print a docket. */}
+      <div className="border-t border-plum-ink/10 pt-5">
+        <label className="block text-sm font-semibold">Kitchen workflow</label>
+        <p className="mt-1 text-sm text-plum-ink/55">
+          How should the kitchen receive each new order?
+        </p>
+        {/* The server reads autoPrint from this hidden field. */}
+        <input type="hidden" name="autoPrint" value={autoPrint ? "on" : "off"} />
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => setAutoPrint(false)}
+            className={`rounded-lg border p-3 text-left ${
+              !autoPrint ? "border-brand-primary ring-2 ring-brand-primary/20" : "border-plum-ink/15"
+            }`}
+          >
+            <span className="block text-sm font-semibold">🖥️ Kitchen Display Screen</span>
+            <span className="mt-1 block text-xs text-plum-ink/55">
+              New orders appear live on the Kitchen screen (/kitchen). Staff tap to advance them.
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setAutoPrint(true)}
+            className={`rounded-lg border p-3 text-left ${
+              autoPrint ? "border-brand-primary ring-2 ring-brand-primary/20" : "border-plum-ink/15"
+            }`}
+          >
+            <span className="block text-sm font-semibold">🧾 Print kitchen tickets</span>
+            <span className="mt-1 block text-xs text-plum-ink/55">
+              A docket prints automatically for every new order. (The Kitchen screen still works too.)
+            </span>
+          </button>
+        </div>
+        {autoPrint && (method === "bluetooth" || method === "os_dialog") && (
+          <p className="mt-2 rounded-lg bg-cream px-3 py-2 text-xs text-plum-ink/70">
+            Heads up: with {method === "bluetooth" ? "Bluetooth" : "OS print"}, tickets can&apos;t print
+            unattended — the order opens on the cashier device for printing. For hands-off kitchen
+            printing, use a Network/USB or Cloud printer.
+          </p>
+        )}
+      </div>
 
       {/* Receipt design */}
       <div className="border-t border-plum-ink/10 pt-5">
