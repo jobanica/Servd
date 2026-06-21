@@ -59,8 +59,17 @@ export function PlanCards({
             </div>
 
             <p className="mt-3">
-              <span className="font-heading text-4xl font-extrabold">₱{price.toLocaleString()}</span>
-              <span className="text-plum-ink/50">/month</span>
+              {price <= 0 ? (
+                <>
+                  <span className="font-heading text-4xl font-extrabold">Free</span>
+                  <span className="text-plum-ink/50"> forever</span>
+                </>
+              ) : (
+                <>
+                  <span className="font-heading text-4xl font-extrabold">₱{price.toLocaleString()}</span>
+                  <span className="text-plum-ink/50">/month</span>
+                </>
+              )}
             </p>
             <p className="mt-1 text-sm text-plum-ink/60">{info.tagline}</p>
 

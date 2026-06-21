@@ -61,6 +61,23 @@ export async function runBillingCron(now: Date = new Date()): Promise<CronSummar
       continue;
     }
 
+    // Free plans (₱0) never bill — keep them active and roll the period forward
+    // so they're never suspended or invoiced for non-payment.
+    if (amount <= 0) {
+      const overdue = !sub.currentPeriodEnd || sub.currentPeriodEnd <= now;
+      if (sub.status !== "active" || overdue) {
+        const base = sub.currentPeriodEnd && sub.currentPeriodEnd > now ? sub.currentPeriodEnd : now;
+        await systemDb(async (tx) => {
+          await tx.subscription.update({
+            where: { id: sub.id },
+            data: { status: "active", currentPeriodEnd: addMonths(base, 1), failedCharges: 0 },
+          });
+          await tx.restaurant.update({ where: { id: sub.restaurantId }, data: { status: "active" } });
+        });
+      }
+      continue;
+    }
+
     if (decision.action === "suspend") {
       await systemDb(async (tx) => {
         await tx.subscription.update({ where: { id: sub.id }, data: { status: "past_due" } });

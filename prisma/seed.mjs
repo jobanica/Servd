@@ -26,28 +26,28 @@ async function asSuper(fn) {
   });
 }
 
-// Plan tiers (centavos). Tiers ascend: Starter (essentials) → Pro (brand online
-// + marketing, adds custom domain) → Business (everything). Mirrors
-// src/lib/billing/catalog.ts.
+// Plan tiers (centavos). Tiers ascend: Free (essentials, no monthly fee) →
+// Growth (brand online + marketing + AI menu import, adds custom domain) →
+// Business (everything). Mirrors src/lib/billing/catalog.ts.
 const PLANS = [
   {
     id: "00000000-0000-0000-0000-0000000000a1",
-    name: "Starter",
-    priceMonthly: 99900, // ₱999
-    limits: { maxTables: 10, maxStaff: 5, smsIncluded: 0 },
+    name: "Free",
+    priceMonthly: 0, // free forever
+    limits: { maxTables: 5, maxStaff: 3, smsIncluded: 0 },
     modules: [],
   },
   {
     id: "00000000-0000-0000-0000-0000000000a2",
-    name: "Pro",
-    priceMonthly: 299900, // ₱2,999 — adds custom domain + online ordering/marketing
-    limits: { maxTables: 30, maxStaff: 20, smsIncluded: 200 },
+    name: "Growth",
+    priceMonthly: 89900, // ₱899 — adds custom domain + online ordering/marketing + AI menu import
+    limits: { maxTables: 20, maxStaff: 15, smsIncluded: 200 },
     modules: ["custom_domain"],
   },
   {
     id: "00000000-0000-0000-0000-0000000000a3",
     name: "Business",
-    priceMonthly: 349900, // ₱3,499 — every feature (accounting, inventory, HR…)
+    priceMonthly: 179900, // ₱1,799 — every feature (accounting, inventory, HR…)
     limits: { smsIncluded: 1000 }, // unlimited tables & staff
     modules: ["inventory", "hris", "custom_domain"],
   },
@@ -115,7 +115,7 @@ await asSuper(async (tx) => {
       },
     });
 
-    // 30-day trial subscription on the default (Starter) plan.
+    // 30-day trial subscription on the default (Free) plan.
     const existingSub = await tx.subscription.findFirst({
       where: { restaurantId: restaurant.id },
     });

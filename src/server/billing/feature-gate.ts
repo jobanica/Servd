@@ -17,6 +17,7 @@ export type Feature =
   | "promotions"
   | "customers"
   | "sms"
+  | "aiMenuImport"
   | "accounting"
   | "inventory"
   | "hr"
@@ -24,13 +25,14 @@ export type Feature =
 
 /** Which tiers include each feature (must match src/lib/billing/catalog.ts). */
 const FEATURE_TIERS: Record<Feature, Tier[]> = {
-  onlineOrdering: ["Pro", "Business"],
-  onlinePayments: ["Pro", "Business"],
-  loyalty: ["Pro", "Business"],
-  promotions: ["Pro", "Business"],
-  customers: ["Pro", "Business"],
-  sms: ["Pro", "Business"],
-  customDomain: ["Pro", "Business"],
+  onlineOrdering: ["Growth", "Business"],
+  onlinePayments: ["Growth", "Business"],
+  loyalty: ["Growth", "Business"],
+  promotions: ["Growth", "Business"],
+  customers: ["Growth", "Business"],
+  sms: ["Growth", "Business"],
+  aiMenuImport: ["Growth", "Business"],
+  customDomain: ["Growth", "Business"],
   accounting: ["Business"],
   inventory: ["Business"],
   hr: ["Business"],

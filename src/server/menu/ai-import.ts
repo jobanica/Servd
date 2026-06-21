@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireAdminAction } from "@/server/tenancy/require-admin";
+import { hasFeature } from "@/server/billing/feature-gate";
 import { pesosToCentavos } from "@/lib/money";
 import { ALLOWED_MENU_DOC_TYPES } from "@/lib/validation/menu";
 import {
@@ -103,6 +104,9 @@ export async function createMenuImportUploads(types: string[]): Promise<CreateUp
   if (!process.env.ANTHROPIC_API_KEY) {
     return { ok: false, error: "AI menu import isn't configured on this server." };
   }
+  if (!(await hasFeature(restaurantId, "aiMenuImport"))) {
+    return { ok: false, error: "AI menu import is available on the Growth and Business plans. Upgrade to use it." };
+  }
   if (!Array.isArray(types) || types.length === 0) {
     return { ok: false, error: "Add at least one menu photo or PDF." };
   }
@@ -135,6 +139,9 @@ export async function analyzeMenuMedia(input: {
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return { ok: false, error: "AI menu import isn't configured on this server." };
+  }
+  if (!(await hasFeature(restaurantId, "aiMenuImport"))) {
+    return { ok: false, error: "AI menu import is available on the Growth and Business plans. Upgrade to use it." };
   }
 
   const paths = Array.isArray(input?.paths)
