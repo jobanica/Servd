@@ -4,7 +4,8 @@ import { z } from "zod";
 import { systemDb, tenantDb } from "@/server/tenancy/scoped-db";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
 import { findPromoByCode } from "@/server/promotions/redeem";
-import { computePromo } from "@/lib/promotions/compute";
+import { getActivePromotions } from "@/server/promotions/queries";
+import { computePromo, offerSummary } from "@/lib/promotions/compute";
 
 /**
  * Diner-applied coupon at the bill stage (dine-in, after eating). No session —
@@ -57,6 +58,37 @@ function outstandingOrders(restaurantId: string, tableId: string) {
       },
     }),
   );
+}
+
+export interface RedeemableCode {
+  code: string;
+  title: string;
+  summary: string; // e.g. "20% off"
+  minSpend: number; // centavos, 0 = none
+}
+
+/** The restaurant's active, redeemable coupon codes — for the bill's "tap to
+ * apply" list. Only promos that actually carry a code and a redeemable offer
+ * type (not display-only "info"). Resolved by public slug; no session. */
+export async function listRedeemableCodes(input: {
+  slug: string;
+}): Promise<RedeemableCode[]> {
+  const slug = (input?.slug ?? "").trim();
+  if (!slug) return [];
+  const restaurant = await systemDb((tx) =>
+    tx.restaurant.findFirst({ where: { slug, status: "active" }, select: { id: true } }),
+  );
+  if (!restaurant) return [];
+
+  const promos = await getActivePromotions(restaurant.id);
+  return promos
+    .filter((p) => p.code && p.type !== "info")
+    .map((p) => ({
+      code: p.code!.toUpperCase(),
+      title: p.title,
+      summary: offerSummary({ type: p.type, value: p.value, freeItemId: p.freeItemId, minSpend: p.minSpend }),
+      minSpend: p.minSpend,
+    }));
 }
 
 export type ApplyPromoResult =
