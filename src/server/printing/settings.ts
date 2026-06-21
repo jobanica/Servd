@@ -12,6 +12,7 @@ export type FormState = { ok?: boolean; error?: string } | null;
 const schema = z.object({
   printMethod: z.enum(["network", "cloud", "bluetooth", "os_dialog"]),
   autoPrint: z.coerce.boolean().default(false),
+  kitchenDisplay: z.coerce.boolean().default(true),
   bridgeUrl: z.string().url().optional().or(z.literal("")),
   receiptAddress: z.string().max(120).optional(),
   receiptPhone: z.string().max(60).optional(),
@@ -27,6 +28,7 @@ export async function updatePrintSettings(
   const parsed = schema.safeParse({
     printMethod: formData.get("printMethod"),
     autoPrint: formData.get("autoPrint") === "on",
+    kitchenDisplay: formData.get("kitchenDisplay") === "on",
     bridgeUrl: formData.get("bridgeUrl") ?? "",
     receiptAddress: formData.get("receiptAddress") ?? "",
     receiptPhone: formData.get("receiptPhone") ?? "",
@@ -70,6 +72,16 @@ export async function updatePrintSettings(
       },
     });
   });
+
+  // Kitchen display/print toggle — best-effort so a lagging column can't block
+  // the rest of the printer settings from saving.
+  try {
+    await tenantDb(restaurantId, (tx) =>
+      tx.restaurant.updateMany({ where: { id: restaurantId }, data: { kitchenDisplay: parsed.data.kitchenDisplay } }),
+    );
+  } catch {
+    /* kitchenDisplay column not migrated yet */
+  }
 
   revalidatePath("/admin/printing");
   return { ok: true };

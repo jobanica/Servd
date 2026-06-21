@@ -23,7 +23,7 @@ export default async function TicketPage({
     redirect("/login");
   }
 
-  const kind = doc === "bill" ? "bill" : "receipt";
+  const kind = doc === "bill" ? "bill" : doc === "kitchen" ? "kitchen" : "receipt";
   const ticket = await getOrderTicket(user.restaurantId, orderId, kind);
   if (!ticket) notFound();
 

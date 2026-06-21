@@ -3,7 +3,7 @@
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireStaff } from "@/server/tenancy/current-user";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
-import { autoPrintIfEnabled, printReceipt } from "@/server/printing/print";
+import { autoPrintIfEnabled, printReceipt, printKitchenIfNeeded } from "@/server/printing/print";
 import { getPublicMenu } from "@/server/menu/public-menu";
 import {
   buildValidatedOrder,
@@ -269,6 +269,9 @@ export interface CashierState {
   incoming?: IncomingOrder[];
   tables?: CashierTable[];
   error?: string;
+  // Set when a kitchen ticket must be printed by the browser (no kitchen display).
+  printKitchen?: boolean;
+  printOrderId?: string;
 }
 
 /** Accept an incoming QR order → moves it into the kitchen + prints the ticket. */
@@ -285,9 +288,12 @@ export async function acceptOrder(orderId: string): Promise<CashierState> {
     tx.order.updateMany({ where: { id: orderId, status: "pending" }, data: { status: "new" } }),
   );
 
+  let printKitchen = false;
   if (res.count > 0) {
     await notifyOrdersChanged(staff.restaurantId);
     await autoPrintIfEnabled(staff.restaurantId, orderId);
+    // No kitchen display → print a kitchen ticket on accept.
+    printKitchen = (await printKitchenIfNeeded(staff.restaurantId, orderId)).clientPrintNeeded;
 
     // Confirmation SMS for pickup/delivery customers (best-effort).
     const m = (await orderMetaMap(staff.restaurantId, [orderId])).get(orderId);
@@ -303,7 +309,13 @@ export async function acceptOrder(orderId: string): Promise<CashierState> {
       );
     }
   }
-  return { ok: true, incoming: await getIncomingOrders(), tables: await getCashierTables() };
+  return {
+    ok: true,
+    incoming: await getIncomingOrders(),
+    tables: await getCashierTables(),
+    printKitchen,
+    printOrderId: printKitchen ? orderId : undefined,
+  };
 }
 
 /** Decline an incoming QR order → cancels it. */
@@ -720,7 +732,7 @@ export async function createCashierOrder(input: {
   customerPhone?: string;
   customerAddress?: string;
   lines: OrderLineInput[];
-}): Promise<{ ok: boolean; tables?: CashierTable[]; error?: string }> {
+}): Promise<{ ok: boolean; tables?: CashierTable[]; error?: string; printKitchen?: boolean; printOrderId?: string }> {
   let staff;
   try {
     staff = await requireStaff(["cashier", "admin"]);
@@ -792,6 +804,8 @@ export async function createCashierOrder(input: {
 
   await notifyOrdersChanged(staff.restaurantId);
   await autoPrintIfEnabled(staff.restaurantId, orderId);
+  // No kitchen display → print a kitchen ticket for the new order.
+  const kitchen = await printKitchenIfNeeded(staff.restaurantId, orderId);
 
   // Auto-enroll pickup/delivery customers into loyalty (name + phone given).
   if (orderType !== "dine_in" && input.customerPhone?.trim()) {
@@ -802,5 +816,10 @@ export async function createCashierOrder(input: {
       /* best-effort */
     }
   }
-  return { ok: true, tables: await getCashierTables() };
+  return {
+    ok: true,
+    tables: await getCashierTables(),
+    printKitchen: kitchen.clientPrintNeeded,
+    printOrderId: kitchen.clientPrintNeeded ? orderId : undefined,
+  };
 }

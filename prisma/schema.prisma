@@ -199,6 +199,9 @@ model Restaurant {
   printerConfig    Json? // transport-specific details (ip, port, cloudprnt url…)
   autoPrint        Boolean     @default(false)
   cashierVoidPin   String? // PIN a cashier must enter to void an unpaid order
+  // Kitchen routing: true => on-screen kitchen display; false => print a kitchen
+  // ticket for the kitchen when an order is accepted/created (no screen).
+  kitchenDisplay   Boolean     @default(true)
 
   // --- Payments (connected-accounts model) ---
   // Each restaurant stores its OWN PayMongo credentials, encrypted at rest.

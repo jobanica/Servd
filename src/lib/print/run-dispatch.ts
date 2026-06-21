@@ -5,7 +5,7 @@ import { isPrinterPaired, printBytes, base64ToBytes } from "@/lib/printing/bt-pr
 import { printViaBluetooth } from "@/lib/printing/bluetooth";
 
 /** Open the printable ticket page (it auto-prints, then auto-closes). */
-export function openTicketForPrint(orderId: string, doc: "bill" | "receipt") {
+export function openTicketForPrint(orderId: string, doc: "bill" | "receipt" | "kitchen") {
   window.open(`/cashier/ticket/${orderId}?doc=${doc}`, "_blank", "noopener");
 }
 
@@ -20,7 +20,7 @@ export function openTicketForPrint(orderId: string, doc: "bill" | "receipt") {
 export async function runPrintDispatch(
   res: PrintDispatch,
   orderId: string,
-  doc: "bill" | "receipt",
+  doc: "bill" | "receipt" | "kitchen",
 ): Promise<string | null> {
   if (res.handledOnServer) return res.message || null;
 

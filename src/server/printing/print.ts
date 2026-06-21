@@ -247,6 +247,47 @@ export async function printPaidTicket(orderId: string): Promise<PrintDispatch> {
   return dispatch(staff.restaurantId, orderId, "receipt");
 }
 
+/** Print a KITCHEN ticket (items only) — used when there's no kitchen display. */
+export async function printKitchenTicket(orderId: string): Promise<PrintDispatch> {
+  let staff;
+  try {
+    staff = await requireStaff(["cashier", "admin"]);
+  } catch {
+    return { ok: false, handledOnServer: false, message: "Not allowed." };
+  }
+  return dispatch(staff.restaurantId, orderId, "kitchen");
+}
+
+/** Whether this restaurant prints kitchen tickets instead of using a display. */
+async function kitchenPrintMode(restaurantId: string): Promise<boolean> {
+  try {
+    const r = await tenantDb(restaurantId, (tx) =>
+      tx.restaurant.findFirst({ select: { kitchenDisplay: true } }),
+    );
+    return r?.kitchenDisplay === false; // false = print mode
+  } catch {
+    return false; // column not migrated yet → keep the display behaviour
+  }
+}
+
+/**
+ * When an order enters the kitchen and the restaurant has NO display, print a
+ * kitchen ticket. Server transports (network/cloud) print unattended; browser
+ * transports return clientPrintNeeded so the cashier board prints it.
+ */
+export async function printKitchenIfNeeded(
+  restaurantId: string,
+  orderId: string,
+): Promise<{ clientPrintNeeded: boolean }> {
+  if (!(await kitchenPrintMode(restaurantId))) return { clientPrintNeeded: false };
+  const { restaurant } = await loadTicket(restaurantId, orderId);
+  if (restaurant.printMethod === "network" || restaurant.printMethod === "cloud") {
+    await dispatch(restaurantId, orderId, "kitchen");
+    return { clientPrintNeeded: false };
+  }
+  return { clientPrintNeeded: true };
+}
+
 /**
  * Auto-print a ticket. The server-handled transports (network/cloud) print
  * unattended here. For the browser transports (bluetooth/os_dialog) the server

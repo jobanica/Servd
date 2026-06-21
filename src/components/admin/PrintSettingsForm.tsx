@@ -24,6 +24,7 @@ export function PrintSettingsForm({
   initial: {
     printMethod: Method;
     autoPrint: boolean;
+    kitchenDisplay: boolean;
     bridgeUrl: string;
     receiptAddress: string;
     receiptPhone: string;
@@ -61,6 +62,26 @@ export function PrintSettingsForm({
           <option value="os_dialog">OS print dialog / AirPrint</option>
         </select>
         <p className="mt-2 text-sm text-plum-ink/60">{METHOD_HELP[method]}</p>
+      </div>
+
+      {/* Kitchen routing: on-screen display vs printed tickets */}
+      <div className="rounded-lg border border-plum-ink/10 bg-cream/40 p-3">
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            name="kitchenDisplay"
+            defaultChecked={initial.kitchenDisplay}
+            className="mt-0.5"
+          />
+          <span>
+            <span className="font-semibold">Use a kitchen display screen</span>
+            <span className="mt-0.5 block text-plum-ink/55">
+              On — accepted orders show on the Kitchen screen. Off — no screen: a
+              <strong> kitchen ticket prints automatically</strong> when an order is accepted or
+              created, so you can hand it to the kitchen.
+            </span>
+          </span>
+        </label>
       </div>
 
       {method === "bluetooth" && (

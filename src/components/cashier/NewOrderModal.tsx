@@ -15,6 +15,8 @@ import {
   createCashierOrder,
   type CashierTable,
 } from "@/server/orders/cashier";
+import { printKitchenTicket } from "@/server/printing/print";
+import { runPrintDispatch } from "@/lib/print/run-dispatch";
 
 function lineId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -214,6 +216,15 @@ export function NewOrderModal({
     setSubmitting(false);
     if (res.ok && res.tables) {
       onCreated(res.tables);
+      // No kitchen display → print the kitchen ticket from the browser.
+      if (res.printKitchen && res.printOrderId) {
+        try {
+          const k = await printKitchenTicket(res.printOrderId);
+          await runPrintDispatch(k, res.printOrderId, "kitchen");
+        } catch {
+          /* non-blocking */
+        }
+      }
       onClose();
     } else {
       setSubmitError(res.error ?? "Could not create the order.");

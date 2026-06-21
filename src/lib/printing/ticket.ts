@@ -40,8 +40,11 @@ const METHOD_LABEL: Record<string, string> = {
   online_card: "Card (online)",
 };
 
-/** "bill" = pre-payment (amount due); "receipt" = post-payment (paid). */
-export type TicketKind = "bill" | "receipt";
+/**
+ * "bill" = pre-payment (amount due); "receipt" = post-payment (paid);
+ * "kitchen" = prep ticket for the kitchen (items only, no prices).
+ */
+export type TicketKind = "bill" | "receipt" | "kitchen";
 
 export interface Ticket {
   kind: TicketKind;
@@ -107,16 +110,19 @@ export function buildTicket(src: TicketSource): Ticket {
     total: src.total,
     discountAmount: src.discountAmount ?? 0,
     discountLabel: src.discountLabel ?? null,
-    // A bill is pre-payment — never show a payment line on it.
-    paymentMethod: src.kind === "bill" ? null : src.paymentMethod ?? null,
-    paymentAmount: src.kind === "bill" ? null : src.paymentAmount ?? null,
-    qrUrl: src.qrUrl ?? null,
+    // Only a paid receipt shows a payment line (bills/kitchen tickets never do).
+    paymentMethod: src.kind === "receipt" ? src.paymentMethod ?? null : null,
+    paymentAmount: src.kind === "receipt" ? src.paymentAmount ?? null : null,
+    // The kitchen ticket carries no QR (it's for the cooks, not the diner).
+    qrUrl: src.kind === "kitchen" ? null : src.qrUrl ?? null,
   };
 }
 
 /** The document label printed under the heading. */
 export function ticketDocLabel(t: Ticket): string {
-  return t.kind === "bill" ? "*** BILL ***" : "*** OFFICIAL RECEIPT ***";
+  if (t.kind === "bill") return "*** BILL ***";
+  if (t.kind === "kitchen") return "*** KITCHEN ***";
+  return "*** OFFICIAL RECEIPT ***";
 }
 
 /** Net payable + VAT-of-net (centavos). */
@@ -145,7 +151,23 @@ export function ticketHeaderLines(t: Ticket): string[] {
 /** Left-aligned body: meta, itemized lines with prices, totals, payment. */
 export function ticketBodyLines(t: Ticket): string[] {
   const lines: string[] = [];
-  lines.push(`${t.kind === "bill" ? "Bill" : "Receipt"} #${t.orderRef}`);
+
+  // Kitchen ticket = prep list only: quantities, items, modifiers and notes.
+  // No prices, totals, VAT or payment — the cooks just need what to make.
+  if (t.kind === "kitchen") {
+    lines.push(`Order #${t.orderRef}`);
+    lines.push(new Date(t.placedAt).toLocaleString());
+    lines.push("--------------------------------");
+    for (const item of t.items) {
+      lines.push(`${item.quantity}x ${item.name}`);
+      for (const mod of item.modifiers) lines.push(`   + ${mod}`);
+      if (item.note) lines.push(`   ! ${item.note}`);
+    }
+    return lines;
+  }
+
+  const docLabel = t.kind === "bill" ? "Bill" : "Receipt";
+  lines.push(`${docLabel} #${t.orderRef}`);
   lines.push(new Date(t.placedAt).toLocaleString());
   lines.push("--------------------------------");
   for (const item of t.items) {

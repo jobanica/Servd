@@ -27,7 +27,7 @@ import { ShiftSummaryModal } from "./ShiftSummaryModal";
 import { VoidPinModal } from "./VoidPinModal";
 import { CashOutModal } from "./CashOutModal";
 import { BluetoothPrinterButton } from "./BluetoothPrinterButton";
-import { printPaidTicket } from "@/server/printing/print";
+import { printPaidTicket, printKitchenTicket } from "@/server/printing/print";
 import { runPrintDispatch } from "@/lib/print/run-dispatch";
 
 export function CashierBoard({
@@ -156,6 +156,17 @@ export function CashierBoard({
     };
   }, [restaurantId, refresh, initialTables]);
 
+  // Print a kitchen ticket on the browser when there's no kitchen display
+  // (server transports already printed; this handles bluetooth / OS print).
+  async function printKitchen(orderId: string) {
+    try {
+      const res = await printKitchenTicket(orderId);
+      await runPrintDispatch(res, orderId, "kitchen");
+    } catch {
+      showToast("Couldn't print the kitchen ticket.");
+    }
+  }
+
   async function accept(orderId: string) {
     setBusy(orderId);
     const res = await acceptOrder(orderId);
@@ -166,6 +177,7 @@ export function CashierBoard({
         setIncoming(res.incoming);
       }
       if (res.tables) setTables(res.tables);
+      if (res.printKitchen && res.printOrderId) await printKitchen(res.printOrderId);
     }
   }
 

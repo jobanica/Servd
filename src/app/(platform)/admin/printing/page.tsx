@@ -12,6 +12,17 @@ export default async function PrintingSettingsPage() {
     }),
   );
 
+  // kitchenDisplay is read separately so a lagging column can't break the page.
+  let kitchenDisplay = true;
+  try {
+    const k = await tenantDb(restaurantId, (tx) =>
+      tx.restaurant.findFirst({ select: { kitchenDisplay: true } }),
+    );
+    kitchenDisplay = k?.kitchenDisplay ?? true;
+  } catch {
+    /* not migrated yet */
+  }
+
   const cfg = (restaurant.printerConfig as
     | {
         bridgeUrl?: string;
@@ -42,6 +53,7 @@ export default async function PrintingSettingsPage() {
         initial={{
           printMethod: restaurant.printMethod,
           autoPrint: restaurant.autoPrint,
+          kitchenDisplay,
           bridgeUrl: cfg.bridgeUrl ?? "",
           receiptAddress: receipt.address ?? "",
           receiptPhone: receipt.phone ?? "",
