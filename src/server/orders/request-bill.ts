@@ -29,7 +29,10 @@ async function resolveTable(slug: string, tableToken: string) {
 
 export interface TableBill {
   items: { name: string; quantity: number; lineTotal: number }[];
-  total: number; // centavos
+  subtotal: number; // centavos, gross (before any discount)
+  discount: number; // centavos taken off
+  discountLabel: string | null; // e.g. "Promo SAVE20 · 20% off"
+  total: number; // centavos, net payable (subtotal − discount)
   orderCount: number;
 }
 
@@ -52,6 +55,8 @@ export async function getTableBill(input: {
       },
       select: {
         total: true,
+        discountAmount: true,
+        discountLabel: true,
         items: {
           select: {
             quantity: true,
@@ -65,16 +70,21 @@ export async function getTableBill(input: {
   );
 
   const items: TableBill["items"] = [];
-  let total = 0;
+  let subtotal = 0;
+  let discount = 0;
+  let discountLabel: string | null = null;
   for (const o of orders) {
-    total += o.total;
+    subtotal += o.total;
+    discount += o.discountAmount ?? 0;
+    if (o.discountLabel) discountLabel = o.discountLabel;
     for (const i of o.items) {
       const unit = i.unitPrice + i.modifiers.reduce((s, m) => s + m.priceDeltaAtTime, 0);
       items.push({ name: i.nameAtTime, quantity: i.quantity, lineTotal: unit * i.quantity });
     }
   }
 
-  return { ok: true, bill: { items, total, orderCount: orders.length } };
+  const total = Math.max(0, subtotal - discount);
+  return { ok: true, bill: { items, subtotal, discount, discountLabel, total, orderCount: orders.length } };
 }
 
 /**
