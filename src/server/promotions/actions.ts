@@ -109,7 +109,14 @@ export async function createPromotion(
     if (e instanceof Error && e.message === "DUPLICATE_CODE") {
       return { error: "That coupon code is already used by another promotion." };
     }
-    return { error: "Couldn't save the promotion. Make sure the database migration has been run." };
+    // Surface the real DB error so a misconfiguration (missing column, RLS, etc.)
+    // is diagnosable instead of hidden behind a generic message.
+    const detail = e instanceof Error ? e.message.split("\n").slice(-1)[0].trim() : "";
+    return {
+      error: detail
+        ? `Couldn't save the promotion: ${detail}`
+        : "Couldn't save the promotion. Make sure the database migration has been run.",
+    };
   }
 
   revalidatePath("/admin/promotions");
