@@ -47,7 +47,7 @@ export default async function BillingPage({
   // Map each tier name to its real plan row so the cards can switch plans.
   const planIdByName: Record<string, string> = {};
   for (const p of plans) planIdByName[p.name] = p.id;
-  const priceByTier = { Starter: pricing.Starter.pricePesos, Pro: pricing.Pro.pricePesos, Business: pricing.Business.pricePesos };
+  const priceByTier = { Free: pricing.Free.pricePesos, Growth: pricing.Growth.pricePesos, Business: pricing.Business.pricePesos };
 
   const trialDays = sub?.status === "trialing" ? daysLeft(sub.trialEndsAt) : null;
   const needsPayment = sub?.status === "past_due" || (sub?.status === "trialing" && !sub.providerPaymentMethodId);

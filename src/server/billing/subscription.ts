@@ -6,7 +6,7 @@ import { addMonths } from "@/lib/billing/period";
 export const TRIAL_DAYS = 30;
 
 /**
- * Picks the default signup plan: the cheapest active plan (e.g. Starter).
+ * Picks the default signup plan: the cheapest active plan (e.g. Free).
  * Returns null if no plans are seeded yet (trial still works, just unlimited).
  */
 export async function getDefaultPlan(tx: Prisma.TransactionClient) {

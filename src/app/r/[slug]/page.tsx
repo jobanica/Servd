@@ -30,7 +30,7 @@ export default async function RestaurantSite({ params }: { params: Promise<{ slu
   const { slug } = await params;
   const restaurant = await getPublicRestaurantBySlug(slug);
   if (!restaurant) notFound();
-  // Online ordering is a Pro+ feature — Starter doesn't get a public order site.
+  // Online ordering is a Growth+ feature — Free doesn't get a public order site.
   if (!(await hasFeature(restaurant.id, "onlineOrdering"))) notFound();
 
   const [categories, loyalty, contact, sf] = await Promise.all([

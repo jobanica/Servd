@@ -138,7 +138,7 @@ function AnalyticsMock() {
 /* ------------------------------------------------------------------ page */
 export default async function Home() {
   const pricing = await getPublicPricing();
-  const priceByTier = { Starter: pricing.Starter.pricePesos, Pro: pricing.Pro.pricePesos, Business: pricing.Business.pricePesos };
+  const priceByTier = { Free: pricing.Free.pricePesos, Growth: pricing.Growth.pricePesos, Business: pricing.Business.pricePesos };
 
   return (
     <main className="bg-cream text-plum-ink">
@@ -313,7 +313,7 @@ export default async function Home() {
           </div>
           <div className="rounded-tile bg-plum-ink p-7 text-cream">
             <p className="text-xs font-bold uppercase tracking-widest text-mango">With Servd</p>
-            <p className="mt-3 font-heading text-4xl font-extrabold">₱2,499</p>
+            <p className="mt-3 font-heading text-4xl font-extrabold">From ₱0</p>
             <p className="mt-1 text-sm text-cream/70">per month — technology handles the ordering, around the clock.</p>
           </div>
         </div>

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireAdminAction } from "@/server/tenancy/require-admin";
+import { hasFeature } from "@/server/billing/feature-gate";
 import { uploadMenuImageBytes } from "@/server/storage/menu-images";
 
 /**
@@ -21,6 +22,9 @@ export async function generateItemImage(itemId: string): Promise<GenImageResult>
 
   if (!process.env.OPENAI_API_KEY) {
     return { ok: false, error: "Image generation isn't configured on this server." };
+  }
+  if (!(await hasFeature(restaurantId, "aiMenuImport"))) {
+    return { ok: false, error: "AI image generation is available on the Growth and Business plans. Upgrade to use it." };
   }
 
   const item = await tenantDb(restaurantId, (tx) =>

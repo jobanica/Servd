@@ -5,6 +5,7 @@ import { formatPeso } from "@/lib/money";
 import { AddCategoryForm } from "@/components/admin/AddCategoryForm";
 import { AddItemForm } from "@/components/admin/AddItemForm";
 import { ImportMenuButton } from "@/components/admin/ImportMenuButton";
+import { hasFeature } from "@/server/billing/feature-gate";
 import {
   deleteCategory,
   deleteItem,
@@ -18,7 +19,10 @@ export const maxDuration = 60;
 export default async function MenuPage() {
   const { restaurantId } = await requireAdminPage();
   const categories = await getMenu(restaurantId);
-  const aiImportEnabled = !!process.env.ANTHROPIC_API_KEY;
+  // AI menu import is a paid feature (Growth & Business). Gate on both the API
+  // key being configured AND the restaurant's plan including it.
+  const aiImportEnabled =
+    !!process.env.ANTHROPIC_API_KEY && (await hasFeature(restaurantId, "aiMenuImport"));
   const imageGenEnabled = !!process.env.OPENAI_API_KEY;
 
   return (
