@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getTableBill, requestBill, type TableBill } from "@/server/orders/request-bill";
+import { applyBillPromo, clearBillPromo } from "@/server/promotions/apply-bill";
 import { createTableCheckout } from "@/server/payments/checkout";
 
 function peso(centavos: number) {
@@ -28,12 +29,42 @@ export function BillSheet({
   const [phase, setPhase] = useState<"choose" | "cash" | "redirecting">("choose");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const [promoBusy, setPromoBusy] = useState(false);
+  const [promoError, setPromoError] = useState<string | null>(null);
 
-  useEffect(() => {
-    getTableBill({ slug, tableToken })
+  const loadBill = useCallback(() => {
+    return getTableBill({ slug, tableToken })
       .then((r) => setBill(r.ok && r.bill ? r.bill : null))
       .catch(() => setBill(null));
   }, [slug, tableToken]);
+
+  useEffect(() => {
+    loadBill();
+  }, [loadBill]);
+
+  async function applyCode() {
+    const c = code.trim();
+    if (!c) return;
+    setPromoBusy(true);
+    setPromoError(null);
+    const res = await applyBillPromo({ slug, tableToken, code: c });
+    if (res.ok) {
+      setCode("");
+      await loadBill();
+    } else {
+      setPromoError(res.error);
+    }
+    setPromoBusy(false);
+  }
+
+  async function removeCode() {
+    setPromoBusy(true);
+    setPromoError(null);
+    await clearBillPromo({ slug, tableToken });
+    await loadBill();
+    setPromoBusy(false);
+  }
 
   async function payCash() {
     setBusy(true);
@@ -101,9 +132,61 @@ export function BillSheet({
                     </li>
                   ))}
                 </ul>
-                <div className="mt-3 flex justify-between border-t border-plum-ink/10 pt-3 font-heading text-lg font-bold">
-                  <span>Total</span>
-                  <span>{peso(bill.total)}</span>
+                {/* Promo code */}
+                {bill.discount > 0 ? (
+                  <div className="mt-3 flex items-center justify-between rounded-xl bg-mango/10 px-3 py-2 text-sm">
+                    <span className="font-medium text-brand-ink">
+                      🎟️ {bill.discountLabel ?? "Promo applied"}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="font-semibold text-mango">−{peso(bill.discount)}</span>
+                      <button
+                        onClick={removeCode}
+                        disabled={promoBusy}
+                        className="text-xs text-brand-ink/45 underline disabled:opacity-50"
+                      >
+                        Remove
+                      </button>
+                    </span>
+                  </div>
+                ) : (
+                  <div className="mt-3">
+                    <div className="flex gap-2">
+                      <input
+                        value={code}
+                        onChange={(e) => setCode(e.target.value.toUpperCase())}
+                        placeholder="Promo code"
+                        className="min-w-0 flex-1 rounded-xl border border-plum-ink/15 px-3 py-2 text-sm uppercase tracking-wide outline-none focus:border-brand-primary"
+                      />
+                      <button
+                        onClick={applyCode}
+                        disabled={promoBusy || !code.trim()}
+                        className="shrink-0 rounded-xl border border-brand-ink/15 px-4 py-2 text-sm font-semibold text-brand-ink disabled:opacity-50"
+                      >
+                        {promoBusy ? "…" : "Apply"}
+                      </button>
+                    </div>
+                    {promoError && <p className="mt-1 text-xs text-guava">{promoError}</p>}
+                  </div>
+                )}
+
+                <div className="mt-3 space-y-1 border-t border-plum-ink/10 pt-3">
+                  {bill.discount > 0 && (
+                    <>
+                      <div className="flex justify-between text-sm text-brand-ink/60">
+                        <span>Subtotal</span>
+                        <span>{peso(bill.subtotal)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-mango">
+                        <span>Discount</span>
+                        <span>−{peso(bill.discount)}</span>
+                      </div>
+                    </>
+                  )}
+                  <div className="flex justify-between font-heading text-lg font-bold">
+                    <span>Total</span>
+                    <span>{peso(bill.total)}</span>
+                  </div>
                 </div>
 
                 <p className="mt-5 text-center text-sm font-semibold text-brand-ink/70">How would you like to pay?</p>

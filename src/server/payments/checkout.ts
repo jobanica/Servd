@@ -48,10 +48,14 @@ export async function createTableCheckout(input: {
         status: { in: ["new", "preparing", "done"] },
         paymentStatus: { in: ["unpaid", "failed"] },
       },
-      select: { id: true, total: true },
+      select: { id: true, total: true, discountAmount: true },
     }),
   );
   if (orders.length === 0) return { ok: false, error: "Nothing to pay right now." };
+
+  // Charge the net amount (gross − any discount applied at the bill, e.g. a
+  // diner-redeemed promo code). Never trust a client-supplied total.
+  const net = (o: { total: number; discountAmount: number }) => Math.max(0, o.total - (o.discountAmount ?? 0));
 
   const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const orderPath = `${base}/order/${parsed.data.slug}/${parsed.data.tableToken}`;
@@ -63,7 +67,7 @@ export async function createTableCheckout(input: {
     checkout = await gateway.createCheckout({
       lineItems: orders.map((o, i) => ({
         name: `${ctx.restaurant.displayName || ctx.restaurant.name} · Table ${ctx.table.tableNumber} · Order ${i + 1}`,
-        amount: o.total,
+        amount: net(o),
         quantity: 1,
       })),
       referenceNumber: parsed.data.tableToken.slice(0, 12),
@@ -84,7 +88,7 @@ export async function createTableCheckout(input: {
     tx.payment.createMany({
       data: orders.map((o) => ({
         orderId: o.id,
-        amount: o.total,
+        amount: net(o),
         method: "online_gcash", // refined to actual method on webhook if available
         gateway: ctx.restaurant.paymentGateway ?? "paymongo",
         gatewayRef: checkout!.gatewayRef,
