@@ -13,7 +13,25 @@ import { startTrial } from "@/server/billing/subscription";
 import { uniqueSlug } from "@/lib/slug";
 import { addMonths } from "@/lib/billing/period";
 
-export type ActionState = { ok?: boolean; message?: string; error?: string; claimUrl?: string } | null;
+export type ActionState =
+  | { ok?: boolean; message?: string; error?: string; credentials?: { username: string; password: string } }
+  | null;
+
+/** Synthetic email domain for username-only logins (no mail is ever sent). */
+const LOGIN_EMAIL_DOMAIN = process.env.INTERNAL_LOGIN_DOMAIN || "staff.servdph.com";
+
+function syntheticEmail(username: string): string {
+  return `${username}@${LOGIN_EMAIL_DOMAIN}`;
+}
+
+/** Short, readable temp password for handoff (no ambiguous characters). */
+function tempPassword(): string {
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  const bytes = randomBytes(10);
+  let out = "";
+  for (let i = 0; i < 10; i++) out += chars[bytes[i] % chars.length];
+  return out;
+}
 
 const ALL_MODULES: PlanModuleType[] = ["hris", "inventory", "custom_domain"];
 
@@ -380,30 +398,51 @@ export async function createRestaurantAccount(_prev: ActionState, formData: Form
 
 const businessSchema = z.object({
   restaurantName: z.string().trim().min(2, "Business name is required").max(80),
+  username: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .min(3, "Username must be at least 3 characters")
+    .max(30)
+    .regex(/^[a-z0-9._-]+$/, "Username can use letters, numbers, dot, dash, underscore"),
   businessAddress: z.string().trim().max(300).optional().or(z.literal("")),
   latitude: z.coerce.number().min(-90).max(90).optional().or(z.literal("")),
   longitude: z.coerce.number().min(-180).max(180).optional().or(z.literal("")),
 });
 
 /**
- * Super-admin: create a business with ONLY its name (+ address/map). No login is
- * created yet — instead we return a one-time **claim link** the owner opens to
- * set their own email + password. The address + map pin are recorded so the
- * super-admin can find/visit the business anytime.
+ * Super-admin: create a business by NAME + USERNAME (no email). We generate a
+ * temporary password and provision a username-based login; the owner signs in
+ * with the username + temp password and sets their real email/password from the
+ * dashboard. Address + map pin are recorded so the super-admin can visit anytime.
  */
 export async function createBusinessAccount(_prev: ActionState, formData: FormData): Promise<ActionState> {
   await requireSuperAdmin();
   const parsed = businessSchema.safeParse({
     restaurantName: formData.get("restaurantName"),
+    username: formData.get("username"),
     businessAddress: formData.get("businessAddress") ?? "",
     latitude: formData.get("latitude") ?? "",
     longitude: formData.get("longitude") ?? "",
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
-  const { restaurantName, businessAddress } = parsed.data;
+  const { restaurantName, username, businessAddress } = parsed.data;
   const latitude = typeof parsed.data.latitude === "number" ? parsed.data.latitude : null;
   const longitude = typeof parsed.data.longitude === "number" ? parsed.data.longitude : null;
-  const claimToken = randomBytes(24).toString("hex");
+
+  // Username must be unique (it's how they log in).
+  const taken = await systemDb((tx) => tx.staffUser.findFirst({ where: { username }, select: { id: true } }));
+  if (taken) return { error: "That username is already taken." };
+
+  // Create the login under a synthetic email (no mail is ever sent).
+  const password = tempPassword();
+  const email = syntheticEmail(username);
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true });
+  if (error || !data.user) {
+    return { error: /registered|exists/i.test(error?.message ?? "") ? "That username is already taken." : error?.message ?? "Couldn't create the login." };
+  }
+  const authUserId = data.user.id;
 
   try {
     await systemDb(async (tx) => {
@@ -420,23 +459,27 @@ export async function createBusinessAccount(_prev: ActionState, formData: FormDa
           businessAddress: businessAddress || null,
           latitude,
           longitude,
-          claimToken,
+          staff: { create: { authUserId, role: "admin", email, username } },
         },
         select: { id: true },
       });
       await startTrial(tx, restaurant.id);
     });
   } catch (e) {
+    try {
+      await admin.auth.admin.deleteUser(authUserId);
+    } catch {
+      /* ignore */
+    }
     const msg = e instanceof Error ? e.message : "Couldn't create the business.";
-    return { error: /unique/i.test(msg) ? "A business with that name already exists." : msg };
+    return { error: /unique/i.test(msg) ? "That username or business already exists." : msg };
   }
 
   refresh();
   revalidatePath("/super-admin/accounts");
-  const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   return {
     ok: true,
-    message: `${restaurantName} created. Send the owner this setup link to add their email & password:`,
-    claimUrl: `${base.replace(/\/$/, "")}/claim/${claimToken}`,
+    message: `${restaurantName} created. Give the owner these login details — they can change their email & password from the dashboard:`,
+    credentials: { username, password },
   };
 }

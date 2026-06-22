@@ -2,22 +2,41 @@
 
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { systemDb } from "@/server/tenancy/scoped-db";
 import { getCurrentUser } from "@/server/tenancy/current-user";
 
+/** Resolve a login identifier to the auth email. Accepts an email OR a username. */
+async function resolveEmail(identifier: string): Promise<string | null> {
+  const id = identifier.trim();
+  if (!id) return null;
+  if (id.includes("@")) return id; // already an email
+  try {
+    const staff = await systemDb((tx) =>
+      tx.staffUser.findFirst({ where: { username: id.toLowerCase() }, select: { email: true } }),
+    );
+    return staff?.email ?? null;
+  } catch {
+    return null; // username column not migrated yet
+  }
+}
+
 /**
- * Staff/admin/super-admin sign-in. Supabase verifies the password (stored
- * hashed in auth.users) and sets the session cookie. We then route the user to
- * the right home screen based on their Servd role.
+ * Staff/admin/super-admin sign-in. The identifier can be an email OR a username
+ * (the super-admin can create accounts by username). Supabase verifies the
+ * password and sets the session cookie; we route by role.
  */
 export async function signIn(_prev: unknown, formData: FormData) {
-  const email = String(formData.get("email") ?? "");
+  const identifier = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
+
+  const email = await resolveEmail(identifier);
+  if (!email) return { error: "Invalid email/username or password." };
 
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    return { error: "Invalid email or password." };
+    return { error: "Invalid email/username or password." };
   }
 
   const user = await getCurrentUser();

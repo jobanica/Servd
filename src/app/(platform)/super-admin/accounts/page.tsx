@@ -1,6 +1,5 @@
 import { listBusinesses } from "@/server/billing/super-admin";
 import { CreateAccountForm } from "@/components/super-admin/CreateAccountForm";
-import { CopyLinkButton } from "@/components/super-admin/CopyLinkButton";
 
 function mapUrl(lat: number | null, lng: number | null, address: string | null): string | null {
   if (lat != null && lng != null) return `https://www.google.com/maps?q=${lat},${lng}`;
@@ -10,15 +9,14 @@ function mapUrl(lat: number | null, lng: number | null, address: string | null):
 
 export default async function SuperAdminAccountsPage() {
   const businesses = await listBusinesses();
-  const base = process.env.NEXT_PUBLIC_APP_URL ?? "";
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-bold">Create business</h1>
         <p className="text-sm text-plum-ink/50">
-          Create a business with just its name + location. The owner adds their own email &amp;
-          password via the setup link — no credentials needed here.
+          Create a business with just its name, a username, and the location — no email needed. The
+          owner sets their email from their own dashboard.
         </p>
       </div>
 
@@ -32,7 +30,7 @@ export default async function SuperAdminAccountsPage() {
               <tr className="border-b border-plum-ink/10">
                 <th className="px-4 py-2">Business</th>
                 <th className="px-4 py-2">Location</th>
-                <th className="px-4 py-2">Owner / setup</th>
+                <th className="px-4 py-2">Owner login</th>
                 <th className="px-4 py-2">Created</th>
               </tr>
             </thead>
@@ -58,14 +56,8 @@ export default async function SuperAdminAccountsPage() {
                           </a>
                         )}
                       </td>
-                      <td className="px-4 py-2">
-                        {b.claimedAt ? (
-                          <span className="rounded-full bg-mango/15 px-2 py-0.5 text-xs font-semibold text-mango">Claimed ✓</span>
-                        ) : b.claimToken ? (
-                          <CopyLinkButton url={`${base.replace(/\/$/, "")}/claim/${b.claimToken}`} />
-                        ) : (
-                          <span className="text-xs text-plum-ink/40">—</span>
-                        )}
+                      <td className="px-4 py-2 font-mono text-xs text-plum-ink/70">
+                        {b.ownerLogin ?? <span className="text-plum-ink/30">—</span>}
                       </td>
                       <td className="px-4 py-2 text-plum-ink/50">{new Date(b.createdAt).toLocaleDateString()}</td>
                     </tr>
