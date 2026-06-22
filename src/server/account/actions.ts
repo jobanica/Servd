@@ -2,23 +2,45 @@
 
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/server/tenancy/current-user";
 import { requireAdminAction } from "@/server/tenancy/require-admin";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 
 export type AccountState = { ok?: boolean; message?: string; error?: string } | null;
 
-/** Change the login email (Supabase sends a confirmation to the new address). */
+/**
+ * Change the login email. Applied instantly (pre-confirmed via the admin client,
+ * matching how accounts are provisioned) and kept in sync with the StaffUser
+ * record so the dashboard shows the right address. No confirmation round-trip.
+ */
 export async function updateEmail(_prev: AccountState, formData: FormData): Promise<AccountState> {
   const user = await getCurrentUser();
-  if (!user) return { error: "Please sign in again." };
-  const email = String(formData.get("email") ?? "").trim();
-  if (!email) return { error: "Enter the new email." };
+  if (!user || user.kind !== "staff") return { error: "Please sign in again." };
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: "Enter a valid email." };
+  if (email === user.email.toLowerCase()) return { ok: true, message: "That's already your email." };
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.updateUser({ email });
-  if (error) return { error: error.message };
-  return { ok: true, message: "Check your new inbox to confirm the change." };
+  const admin = createSupabaseAdminClient();
+  const { error } = await admin.auth.admin.updateUserById(user.authUserId, { email, email_confirm: true });
+  if (error) {
+    return {
+      error: /registered|exists|already/i.test(error.message)
+        ? "That email is already in use by another account."
+        : error.message,
+    };
+  }
+
+  // Keep our own record in sync (the app shows email from StaffUser).
+  try {
+    await tenantDb(user.restaurantId, (tx) =>
+      tx.staffUser.update({ where: { id: user.staffUserId }, data: { email } }),
+    );
+  } catch {
+    /* auth email already changed; record sync is best-effort */
+  }
+  revalidatePath("/admin/account");
+  return { ok: true, message: "Login email updated." };
 }
 
 /** Change the login password. */
