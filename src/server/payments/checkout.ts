@@ -7,6 +7,8 @@ import { getRestaurantGateway } from "./credentials";
 const schema = z.object({
   slug: z.string().min(1),
   tableToken: z.string().min(1),
+  // Optional gratuity (centavos) the diner chose to add at checkout.
+  tipCentavos: z.coerce.number().int().min(0).max(10_000_000).optional(),
 });
 
 /**
@@ -18,6 +20,7 @@ const schema = z.object({
 export async function createTableCheckout(input: {
   slug: string;
   tableToken: string;
+  tipCentavos?: number;
 }): Promise<{ ok: boolean; checkoutUrl?: string; error?: string }> {
   const parsed = schema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Invalid request." };
@@ -58,6 +61,24 @@ export async function createTableCheckout(input: {
   const net = (o: { total: number; discountAmount: number; creditApplied?: number }) =>
     Math.max(0, o.total - (o.discountAmount ?? 0) - (o.creditApplied ?? 0));
 
+  // Optional tip, clamped server-side to a sane cap (≤ the bill, min ₱500 floor
+  // for tiny bills). Distributed across the orders proportionally to their net.
+  const tableNet = orders.reduce((s, o) => s + net(o), 0);
+  const tipCap = Math.max(tableNet, 50_000); // allow up to 100% of the bill (or ₱500)
+  const tip = Math.min(Math.max(0, Math.round(parsed.data.tipCentavos ?? 0)), tipCap);
+  const tipByOrder = new Map<string, number>();
+  let allocated = 0;
+  orders.forEach((o, idx) => {
+    const share =
+      idx === orders.length - 1
+        ? tip - allocated
+        : tableNet > 0
+          ? Math.round((tip * net(o)) / tableNet)
+          : 0;
+    tipByOrder.set(o.id, Math.max(0, share));
+    allocated += Math.max(0, share);
+  });
+
   const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const orderPath = `${base}/order/${parsed.data.slug}/${parsed.data.tableToken}`;
   // After paying online, thank the diner and ask for feedback.
@@ -66,11 +87,14 @@ export async function createTableCheckout(input: {
   let checkout;
   try {
     checkout = await gateway.createCheckout({
-      lineItems: orders.map((o, i) => ({
-        name: `${ctx.restaurant.displayName || ctx.restaurant.name} · Table ${ctx.table.tableNumber} · Order ${i + 1}`,
-        amount: net(o),
-        quantity: 1,
-      })),
+      lineItems: [
+        ...orders.map((o, i) => ({
+          name: `${ctx.restaurant.displayName || ctx.restaurant.name} · Table ${ctx.table.tableNumber} · Order ${i + 1}`,
+          amount: net(o),
+          quantity: 1,
+        })),
+        ...(tip > 0 ? [{ name: "Tip / gratuity", amount: tip, quantity: 1 }] : []),
+      ],
       referenceNumber: parsed.data.tableToken.slice(0, 12),
       successUrl,
       methods: ["gcash", "card"],
@@ -84,25 +108,26 @@ export async function createTableCheckout(input: {
     };
   }
 
-  // Record a pending payment per order, all keyed to this checkout session.
-  await tenantDb(ctx.restaurant.id, (tx) =>
-    tx.payment.createMany({
+  // Record a pending payment per order (incl. its tip share), all keyed to this
+  // checkout session, and store the tip on the order for reporting.
+  await tenantDb(ctx.restaurant.id, async (tx) => {
+    await tx.payment.createMany({
       data: orders.map((o) => ({
         orderId: o.id,
-        amount: net(o),
+        amount: net(o) + (tipByOrder.get(o.id) ?? 0),
         method: "online_gcash", // refined to actual method on webhook if available
         gateway: ctx.restaurant.paymentGateway ?? "paymongo",
         gatewayRef: checkout!.gatewayRef,
         status: "pending",
       })),
-    }),
-  );
-  await tenantDb(ctx.restaurant.id, (tx) =>
-    tx.order.updateMany({
-      where: { id: { in: orders.map((o) => o.id) } },
-      data: { paymentStatus: "pending" },
-    }),
-  );
+    });
+    for (const o of orders) {
+      await tx.order.update({
+        where: { id: o.id },
+        data: { paymentStatus: "pending", tipAmount: tipByOrder.get(o.id) ?? 0 },
+      });
+    }
+  });
 
   return { ok: true, checkoutUrl: checkout.checkoutUrl };
 }

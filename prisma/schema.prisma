@@ -253,6 +253,7 @@ model Restaurant {
   auditLogs       AuditLog[]
   happyHours      HappyHour[]
   giftCards       GiftCard[]
+  reservations    Reservation[]
   smsCreditLedger SmsCreditLedger[]
   invoices        RestaurantInvoice[]
   suppliers       Supplier[]
@@ -1081,6 +1082,7 @@ model Order {
   discountLabel String? // e.g. "Senior Citizen (20%)"
   creditApplied Int           @default(0) // centavos paid by a redeemed gift card / store credit
   giftCardId    String? // the gift card credit was redeemed from
+  tipAmount     Int           @default(0) // centavos gratuity added at online checkout
   inventoryDeductedAt DateTime? // set once stock is deducted (idempotency)
   servedAt      DateTime? // set when the cashier confirms the food was served
   voidedAt      DateTime? // set when a cashier voids the (unpaid) order
@@ -1098,6 +1100,28 @@ model Order {
   @@index([restaurantId, orderNumber]) // daily counter-number lookup
   @@index([tableId])
   @@map("orders")
+}
+
+/// Reservations & waitlist. A booking with a time is a reservation; a `null`
+/// reservedAt with status "waitlisted" is a walk-in waiting for a table.
+model Reservation {
+  id            String    @id @default(uuid())
+  restaurantId  String
+  customerName  String
+  customerPhone String?
+  partySize     Int       @default(2)
+  reservedAt    DateTime? // the booked slot; null = waitlist (no set time)
+  durationMin   Int       @default(90)
+  status        String    @default("booked") // booked | seated | cancelled | no_show | waitlisted
+  tableId       String? // soft link to a table (no FK — table may be removed)
+  note          String?
+  createdAt     DateTime  @default(now())
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, reservedAt])
+  @@index([restaurantId, status])
+  @@map("reservations")
 }
 
 /// Prepaid gift cards / store credit. Balance is server-authoritative — every

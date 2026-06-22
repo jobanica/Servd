@@ -20,6 +20,7 @@ export type Feature =
   | "aiMenuImport"
   | "floorPlan"
   | "giftCards"
+  | "reservations"
   | "accounting"
   | "inventory"
   | "hr"
@@ -36,6 +37,7 @@ const FEATURE_TIERS: Record<Feature, Tier[]> = {
   aiMenuImport: ["Growth", "Business"],
   floorPlan: ["Growth", "Business"],
   giftCards: ["Growth", "Business"],
+  reservations: ["Growth", "Business"],
   customDomain: ["Growth", "Business"],
   accounting: ["Business"],
   inventory: ["Business"],
