@@ -23,6 +23,7 @@ export type Feature =
   | "reservations"
   | "dataExport"
   | "auditLog"
+  | "offline"
   | "accounting"
   | "inventory"
   | "hr"
@@ -42,6 +43,7 @@ const FEATURE_TIERS: Record<Feature, Tier[]> = {
   reservations: ["Growth", "Business"],
   dataExport: ["Growth", "Business"],
   auditLog: ["Business"],
+  offline: ["Business"],
   customDomain: ["Growth", "Business"],
   accounting: ["Business"],
   inventory: ["Business"],

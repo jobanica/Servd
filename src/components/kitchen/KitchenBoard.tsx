@@ -1,9 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getKitchenOrders, advanceOrderStatus } from "@/server/orders/kitchen";
 import type { KitchenOrder } from "@/lib/orders/types";
+import { useOnline } from "@/lib/offline/useOnline";
+import { kvGet, kvSet, outboxAdd, outboxAll, outboxRemove, type OutboxOp } from "@/lib/offline/idb";
+import { ConnectivityPill } from "@/components/offline/ConnectivityPill";
 
 function minutesAgo(iso: string): string {
   const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
@@ -56,25 +59,72 @@ function OrderCard({
   );
 }
 
+const CACHE_KEY = "kitchen:orders";
+
 export function KitchenBoard({
   restaurantId,
   initialOrders,
+  offlineEnabled = false,
 }: {
   restaurantId: string;
   initialOrders: KitchenOrder[];
+  offlineEnabled?: boolean;
 }) {
   const [orders, setOrders] = useState<KitchenOrder[]>(initialOrders);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [live, setLive] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(0);
+  const online = useOnline();
+  const syncing = useRef(false);
 
   const refresh = useCallback(async () => {
     try {
-      setOrders(await getKitchenOrders());
+      const fresh = await getKitchenOrders();
+      setOrders(fresh);
+      if (offlineEnabled) kvSet(CACHE_KEY, fresh); // keep the offline read-cache warm
     } catch {
       /* ignore transient errors; next tick retries */
     }
-  }, []);
+  }, [offlineEnabled]);
+
+  // Replay any queued status changes once we're back online (idempotent server-side).
+  const drainOutbox = useCallback(async () => {
+    if (!offlineEnabled || syncing.current) return;
+    syncing.current = true;
+    try {
+      const ops = await outboxAll();
+      for (const op of ops) {
+        try {
+          await advanceOrderStatus(op.orderId, op.toStatus);
+          await outboxRemove(op.opId);
+        } catch {
+          break; // still offline / transient — try again next tick
+        }
+      }
+      setPending((await outboxAll()).length);
+    } finally {
+      syncing.current = false;
+    }
+    await refresh();
+  }, [offlineEnabled, refresh]);
+
+  // On mount: hydrate from the cache if we loaded offline, and show the queue size.
+  useEffect(() => {
+    if (!offlineEnabled) return;
+    (async () => {
+      setPending((await outboxAll()).length);
+      if (!navigator.onLine) {
+        const cached = await kvGet<KitchenOrder[]>(CACHE_KEY);
+        if (cached) setOrders(cached);
+      }
+    })();
+  }, [offlineEnabled]);
+
+  // When connectivity returns, drain the queue.
+  useEffect(() => {
+    if (offlineEnabled && online) drainOutbox();
+  }, [offlineEnabled, online, drainOutbox]);
 
   // Realtime ping + polling fallback.
   useEffect(() => {
@@ -93,19 +143,52 @@ export function KitchenBoard({
     };
   }, [restaurantId, refresh]);
 
+  // Optimistically move an order locally (and refresh the offline cache).
+  function applyLocal(id: string, to: "preparing" | "done") {
+    setOrders((prev) => {
+      const next = prev.map((o) => (o.id === id ? { ...o, status: to } : o));
+      if (offlineEnabled) kvSet(CACHE_KEY, next);
+      return next;
+    });
+  }
+
+  async function queueOffline(id: string, to: "preparing" | "done") {
+    const op: OutboxOp = {
+      opId: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${id}-${Date.now()}`,
+      type: "advance",
+      orderId: id,
+      toStatus: to,
+      createdAt: Date.now(),
+    };
+    await outboxAdd(op);
+    applyLocal(id, to);
+    setPending((await outboxAll()).length);
+  }
+
   async function handleAdvance(id: string, to: "preparing" | "done") {
+    // Offline: queue the change and update the board optimistically.
+    if (offlineEnabled && !online) {
+      await queueOffline(id, to);
+      return;
+    }
     setBusyId(id);
     setError(null);
     try {
       const res = await advanceOrderStatus(id, to);
       if (res.ok && res.orders) {
         setOrders(res.orders);
+        if (offlineEnabled) kvSet(CACHE_KEY, res.orders);
       } else if (!res.ok) {
         setError(res.error ?? "Couldn't update the order.");
         refresh(); // resync in case another tablet already moved it
       }
     } catch {
-      setError("Something went wrong. Please try again.");
+      // Network died mid-request — fall back to the offline queue if enabled.
+      if (offlineEnabled) {
+        await queueOffline(id, to);
+      } else {
+        setError("Something went wrong. Please try again.");
+      }
     } finally {
       setBusyId(null); // never leave the button stuck
     }
@@ -116,13 +199,12 @@ export function KitchenBoard({
 
   return (
     <div>
-      <div className="mb-4 flex items-center gap-2 text-xs text-plum-ink/50">
-        <span
-          className={`inline-block h-2 w-2 rounded-full ${
-            live ? "bg-mango" : "bg-muted"
-          }`}
-        />
-        {live ? "Live" : "Polling (realtime offline)"}
+      <div className="mb-4 flex items-center gap-3 text-xs text-plum-ink/50">
+        <span className="flex items-center gap-2">
+          <span className={`inline-block h-2 w-2 rounded-full ${live ? "bg-mango" : "bg-muted"}`} />
+          {live ? "Live" : "Polling (realtime offline)"}
+        </span>
+        {offlineEnabled && <ConnectivityPill online={online} pending={pending} />}
       </div>
 
       {error && (

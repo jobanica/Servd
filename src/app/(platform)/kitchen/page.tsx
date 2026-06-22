@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/server/tenancy/current-user";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { getKitchenOrders } from "@/server/orders/kitchen";
+import { hasFeature } from "@/server/billing/feature-gate";
 import { KitchenBoard } from "@/components/kitchen/KitchenBoard";
+import { ServiceWorkerRegister } from "@/components/offline/ServiceWorkerRegister";
 import { StaffDataError } from "@/components/StaffDataError";
 import { signOut } from "../login/actions";
 
@@ -13,12 +15,14 @@ export default async function KitchenHome() {
   }
 
   let initialOrders;
+  let offlineEnabled = false;
   try {
     const r = await tenantDb(user.restaurantId, (tx) =>
       tx.restaurant.findFirstOrThrow({ select: { status: true } }),
     );
     if (r.status === "suspended") return redirect("/suspended");
     initialOrders = await getKitchenOrders();
+    offlineEnabled = await hasFeature(user.restaurantId, "offline");
   } catch (e) {
     // Let Next's redirect signal pass through.
     if (e && typeof e === "object" && "digest" in e && String((e as { digest?: string }).digest).startsWith("NEXT_REDIRECT")) {
@@ -51,7 +55,8 @@ export default async function KitchenHome() {
         New orders appear here automatically. Advance each order as you cook.
       </p>
 
-      <KitchenBoard restaurantId={user.restaurantId} initialOrders={initialOrders} />
+      <KitchenBoard restaurantId={user.restaurantId} initialOrders={initialOrders} offlineEnabled={offlineEnabled} />
+      {offlineEnabled && <ServiceWorkerRegister />}
     </div>
   );
 }
