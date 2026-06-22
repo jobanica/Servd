@@ -10,12 +10,11 @@ export interface BusinessRow {
   businessAddress: string | null;
   latitude: number | null;
   longitude: number | null;
-  claimToken: string | null;
-  claimedAt: Date | null;
+  ownerLogin: string | null; // username (preferred) or email of the admin
   createdAt: Date;
 }
 
-/** All businesses for the super-admin, newest first (with location + claim state). */
+/** All businesses for the super-admin, newest first (location + owner login). */
 export async function listBusinesses(limit = 100): Promise<BusinessRow[]> {
   try {
     const rows = await systemDb((tx) =>
@@ -31,24 +30,30 @@ export async function listBusinesses(limit = 100): Promise<BusinessRow[]> {
           businessAddress: true,
           latitude: true,
           longitude: true,
-          claimToken: true,
-          claimedAt: true,
           createdAt: true,
+          staff: {
+            where: { role: "admin" },
+            orderBy: { createdAt: "asc" },
+            take: 1,
+            select: { username: true, email: true },
+          },
         },
       }),
     );
-    return rows.map((r) => ({
-      id: r.id,
-      name: r.displayName || r.name,
-      slug: r.slug,
-      status: r.status,
-      businessAddress: r.businessAddress,
-      latitude: r.latitude,
-      longitude: r.longitude,
-      claimToken: r.claimToken,
-      claimedAt: r.claimedAt,
-      createdAt: r.createdAt,
-    }));
+    return rows.map((r) => {
+      const owner = r.staff[0];
+      return {
+        id: r.id,
+        name: r.displayName || r.name,
+        slug: r.slug,
+        status: r.status,
+        businessAddress: r.businessAddress,
+        latitude: r.latitude,
+        longitude: r.longitude,
+        ownerLogin: owner ? owner.username || owner.email : null,
+        createdAt: r.createdAt,
+      };
+    });
   } catch {
     return []; // columns not migrated yet
   }

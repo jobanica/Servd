@@ -400,6 +400,7 @@ model StaffUser {
   authUserId   String    @unique
   role         StaffRole
   email        String
+  username     String?   @unique // optional login handle (super-admin can create by username)
   displayName  String?
   createdAt    DateTime  @default(now())
 

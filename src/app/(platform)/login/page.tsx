@@ -27,9 +27,10 @@ export default function LoginPage() {
           <input
             id="email"
             name="email"
-            type="email"
+            type="text"
             required
-            autoComplete="email"
+            autoComplete="username"
+            placeholder="Email or username"
             className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2"
           />
         </div>

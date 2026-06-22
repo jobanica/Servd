@@ -28,6 +28,10 @@ export function CreateAccountForm() {
           <input name="restaurantName" required className={field} />
         </div>
         <div>
+          <label className={label}>Username (their login)</label>
+          <input name="username" required autoComplete="off" placeholder="e.g. torks" className={field} />
+        </div>
+        <div className="sm:col-span-2">
           <label className={label}>Business address</label>
           <input name="businessAddress" placeholder="Street, city" className={field} />
         </div>
@@ -52,33 +56,36 @@ export function CreateAccountForm() {
         {state?.error && <p className="text-sm text-guava">{state.error}</p>}
       </div>
 
-      {state?.ok && state.claimUrl && (
+      {state?.ok && state.credentials && (
         <div className="rounded-tile border border-mango/30 bg-mango/5 p-3">
           <p className="text-sm text-plum-ink">{state.message}</p>
-          <div className="mt-2 flex items-center gap-2">
-            <code className="flex-1 truncate rounded-lg bg-white px-3 py-2 text-xs">{state.claimUrl}</code>
-            <button
-              type="button"
-              onClick={() => {
-                navigator.clipboard?.writeText(state.claimUrl!).then(() => {
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 1500);
-                });
-              }}
-              className="rounded-lg border border-plum-ink/15 px-3 py-2 text-xs font-semibold"
-            >
-              {copied ? "Copied ✓" : "Copy"}
-            </button>
+          <div className="mt-2 grid gap-1 font-mono text-sm">
+            <div>Username: <strong>{state.credentials.username}</strong></div>
+            <div>Temp password: <strong>{state.credentials.password}</strong></div>
           </div>
+          <button
+            type="button"
+            onClick={() => {
+              const text = `Username: ${state.credentials!.username}\nPassword: ${state.credentials!.password}`;
+              navigator.clipboard?.writeText(text).then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              });
+            }}
+            className="mt-2 rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold"
+          >
+            {copied ? "Copied ✓" : "Copy login details"}
+          </button>
           <p className="mt-1 text-xs text-plum-ink/45">
-            Send this to the owner — they open it to add their email &amp; password.
+            The owner signs in with this username + temp password, then sets their own email &amp;
+            password from the dashboard.
           </p>
         </div>
       )}
 
       <p className="text-xs text-plum-ink/45">
-        Create with just the business name + location. The owner sets their own email &amp; password
-        via the setup link — no email/password needed here.
+        No email needed — create with a business name, a username, and the location. The owner adds
+        their email from their dashboard later.
       </p>
     </form>
   );
