@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AppIcon, Wordmark } from "@/components/Wordmark";
+import { Wordmark } from "@/components/Wordmark";
+import { brandStyle, type BrandInput } from "@/lib/theme/brand";
 import { signOut } from "@/app/(platform)/login/actions";
 import { PlatformFeedbackButton } from "./PlatformFeedbackButton";
 
@@ -118,10 +119,14 @@ const NAV: { group: string; items: Item[] }[] = [
 
 export function AdminShell({
   brand,
+  theme,
+  fullWhiteLabel = false,
   features,
   children,
 }: {
-  brand: { name: string; slug: string; status: string };
+  brand: { name: string; slug: string; status: string; logoUrl?: string | null };
+  theme?: BrandInput;
+  fullWhiteLabel?: boolean;
   features?: string[];
   children: React.ReactNode;
 }) {
@@ -190,9 +195,17 @@ export function AdminShell({
 
   const sidebar = (
     <div className="flex h-full flex-col">
-      <Link href="/admin" className="flex items-center gap-2 px-5 py-4">
-        <AppIcon size={28} />
-        <Wordmark size="1.15rem" />
+      {/* The restaurant's own brand — their logo (or a monogram) + name. */}
+      <Link href="/admin" className="flex items-center gap-2.5 px-5 py-4">
+        {brand.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={brand.logoUrl} alt={brand.name} className="h-8 w-8 shrink-0 rounded-lg object-cover" />
+        ) : (
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-gradient text-sm font-bold text-white">
+            {brand.name.charAt(0).toUpperCase()}
+          </span>
+        )}
+        <span className="truncate font-heading text-base font-bold text-plum-ink">{brand.name}</span>
       </Link>
       {nav}
       <div className="space-y-1 border-t border-plum-ink/10 p-3">
@@ -202,12 +215,19 @@ export function AdminShell({
             Sign out
           </button>
         </form>
+        {!fullWhiteLabel && (
+          <p className="flex items-center gap-1 px-3 pt-1 text-[11px] text-plum-ink/35">
+            Powered by <Wordmark size="0.72rem" />
+          </p>
+        )}
       </div>
     </div>
   );
 
   return (
-    <div className="flex min-h-screen bg-cream">
+    // Tint the dashboard accents (buttons, active nav, gradient) with the
+    // restaurant's brand color via the --brand-* CSS variables.
+    <div className="flex min-h-screen bg-cream" style={brandStyle(theme ?? {})}>
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 border-r border-plum-ink/10 bg-white md:flex print:hidden">
         {sidebar}
