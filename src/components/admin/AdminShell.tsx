@@ -39,6 +39,7 @@ const I = {
 const ITEM_FEATURE: Record<string, string> = {
   "/admin/accounting": "accounting",
   "/admin/promotions": "promotions",
+  "/admin/happy-hours": "promotions",
   "/admin/loyalty": "loyalty",
   "/admin/customers": "customers",
   "/admin/sms": "sms",
@@ -77,6 +78,7 @@ const NAV: { group: string; items: Item[] }[] = [
       { label: "Accounting", href: "/admin/accounting", d: I.receipt },
       { label: "Feedback", href: "/admin/feedback", d: I.star },
       { label: "Promotions", href: "/admin/promotions", d: I.star },
+      { label: "Happy hour", href: "/admin/happy-hours", d: I.star },
       { label: "Loyalty & rewards", href: "/admin/loyalty", d: I.star },
       { label: "Refer & earn", href: "/admin/referrals", d: I.star },
       { label: "Customers", href: "/admin/customers", d: I.users },

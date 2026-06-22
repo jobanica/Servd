@@ -70,8 +70,18 @@ function ProductCard({
           </span>
         )}
 
-        {/* price pill */}
-        <span className="absolute bottom-2 right-2 rounded-full bg-brand-primary px-2.5 py-1 text-xs font-extrabold text-white shadow">
+        {/* happy-hour ribbon */}
+        {item.originalPrice && item.originalPrice > item.price && (
+          <span className="absolute left-2 top-2 rounded-full bg-mango px-2 py-0.5 text-[10px] font-bold text-white shadow">
+            ⏰ Happy hour
+          </span>
+        )}
+
+        {/* price pill (struck-through original when on happy hour) */}
+        <span className="absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-brand-primary px-2.5 py-1 text-xs font-extrabold text-white shadow">
+          {item.originalPrice && item.originalPrice > item.price && (
+            <span className="font-medium text-white/70 line-through">{formatPeso(item.originalPrice)}</span>
+          )}
           {formatPeso(item.price)}
         </span>
 

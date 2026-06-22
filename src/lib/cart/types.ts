@@ -29,6 +29,7 @@ export interface DinerItem {
   videoPosterUrl: string | null;
   isAvailable: boolean;
   dietaryTags: string[]; // diet/allergen tag keys (see src/lib/menu/dietary.ts)
+  originalPrice?: number | null; // pre-discount price when a happy hour is active
   groups: DinerModifierGroup[];
 }
 

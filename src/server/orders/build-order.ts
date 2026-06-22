@@ -2,6 +2,8 @@ import "server-only";
 
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { unitPrice, validateSelection } from "@/lib/cart/pricing";
+import { effectivePrice } from "@/lib/pricing/happy-hour";
+import { getActiveHappyHoursTenant } from "@/server/pricing/happy-hour";
 import type { DinerItem, Selection } from "@/lib/cart/types";
 
 /**
@@ -59,6 +61,10 @@ export async function buildValidatedOrder(
   );
   const itemMap = new Map(dbItems.map((i) => [i.id, i]));
 
+  // Active happy-hour rules → the authoritative base price per item (the client
+  // is never trusted for the discounted price).
+  const happyHours = await getActiveHappyHoursTenant(restaurantId);
+
   let total = 0;
   const items: BuiltOrderItem[] = [];
 
@@ -67,11 +73,17 @@ export async function buildValidatedOrder(
     if (!dbItem) throw new OrderValidationError("An item is no longer on the menu.");
     if (!dbItem.isAvailable) throw new OrderValidationError(`"${dbItem.name}" is sold out.`);
 
+    const effBase = effectivePrice(
+      dbItem.price,
+      { id: dbItem.id, categoryId: dbItem.categoryId },
+      happyHours,
+    ).price;
+
     const dinerItem: DinerItem = {
       id: dbItem.id,
       name: dbItem.name,
       description: dbItem.description,
-      price: dbItem.price,
+      price: effBase,
       imageUrl: dbItem.imageUrl,
       videoUrl: dbItem.videoUrl,
       videoPosterUrl: dbItem.videoPosterUrl,
@@ -112,7 +124,7 @@ export async function buildValidatedOrder(
       menuItemId: dbItem.id,
       nameAtTime: dbItem.name,
       quantity: line.quantity,
-      unitPrice: dbItem.price, // base snapshot; deltas live on modifiers
+      unitPrice: effBase, // happy-hour-adjusted base snapshot; deltas live on modifiers
       note: line.note ?? null,
       modifiers: chosen,
     });
