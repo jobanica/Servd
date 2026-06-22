@@ -51,3 +51,45 @@ export async function writeAudit(
 export async function audit(restaurantId: string, entry: AuditEntry): Promise<void> {
   await tenantDb(restaurantId, (tx) => writeAudit(tx, restaurantId, entry));
 }
+
+export interface AuditRow {
+  id: string;
+  actorEmail: string | null;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  reason: string | null;
+  before: unknown;
+  after: unknown;
+  createdAt: string;
+}
+
+/** Read recent audit entries for the audit-log viewer. Tenant-scoped. */
+export async function getAuditLogs(
+  restaurantId: string,
+  opts?: { limit?: number; action?: string },
+): Promise<AuditRow[]> {
+  try {
+    const rows = await tenantDb(restaurantId, (tx) =>
+      tx.auditLog.findMany({
+        where: opts?.action ? { action: { startsWith: opts.action } } : undefined,
+        orderBy: { createdAt: "desc" },
+        take: Math.min(opts?.limit ?? 200, 1000),
+        select: {
+          id: true,
+          actorEmail: true,
+          action: true,
+          entityType: true,
+          entityId: true,
+          reason: true,
+          before: true,
+          after: true,
+          createdAt: true,
+        },
+      }),
+    );
+    return rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() }));
+  } catch {
+    return []; // not migrated yet
+  }
+}

@@ -39,6 +39,7 @@ export default async function HrPage() {
           {[
             ["Attendance", "/admin/hr/attendance"],
             ["Late report", "/admin/hr/late"],
+            ["Staff performance", "/admin/hr/performance"],
             ["Schedule", "/admin/hr/schedule"],
             ["Timesheets", "/admin/hr/timesheets"],
             ["Leave", "/admin/hr/leave"],
