@@ -228,6 +228,7 @@ model Restaurant {
 
   // Inventory: auto-flip a menu item to out-of-stock when an ingredient hits 0.
   autoOutOfStock Boolean @default(false)
+  lowStockAlertPhone String? // phone to SMS when an ingredient drops to its reorder level
 
   // --- Loyalty & rewards (points per peso) ---
   loyaltyEnabled       Boolean @default(false)
@@ -785,6 +786,7 @@ model InventoryItem {
   stockQty     Float    @default(0)
   costPerUnit  Int      @default(0) // centavos (weighted-average)
   reorderLevel Float    @default(0)
+  lowStockAlertedAt DateTime? // set when a low-stock alert was sent; cleared on restock
   supplierId   String?
   createdAt    DateTime @default(now())
 

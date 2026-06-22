@@ -1,5 +1,6 @@
 import "server-only";
 import { tenantDb } from "@/server/tenancy/scoped-db";
+import { notifyCustomer } from "@/server/sms/notify";
 
 /**
  * Deducts recipe ingredients for a completed order. Idempotent via
@@ -9,6 +10,9 @@ import { tenantDb } from "@/server/tenancy/scoped-db";
  * unavailable. Best-effort: never throws into the order flow.
  */
 export async function deductForOrder(restaurantId: string, orderId: string): Promise<void> {
+  // Items that just crossed below their reorder level → alert after commit.
+  let newlyLow: string[] = [];
+  let alertPhone: string | null = null;
   try {
     await tenantDb(restaurantId, async (tx) => {
       const order = await tx.order.findFirst({
@@ -18,8 +22,9 @@ export async function deductForOrder(restaurantId: string, orderId: string): Pro
       if (!order || order.inventoryDeductedAt) return;
 
       const restaurant = await tx.restaurant.findFirstOrThrow({
-        select: { autoOutOfStock: true },
+        select: { autoOutOfStock: true, lowStockAlertPhone: true },
       });
+      alertPhone = restaurant.lowStockAlertPhone ?? null;
 
       const menuItemIds = [...new Set(order.items.map((i) => i.menuItemId))];
       const recipes = await tx.recipeComponent.findMany({
@@ -42,7 +47,13 @@ export async function deductForOrder(restaurantId: string, orderId: string): Pro
         const inv = await tx.inventoryItem.findUnique({ where: { id: invId } });
         if (!inv) continue;
         const newStock = inv.stockQty - qty;
-        await tx.inventoryItem.update({ where: { id: invId }, data: { stockQty: newStock } });
+        // First time this item drops to/below its reorder level → flag for alert.
+        const crossing = inv.reorderLevel > 0 && newStock <= inv.reorderLevel && !inv.lowStockAlertedAt;
+        await tx.inventoryItem.update({
+          where: { id: invId },
+          data: { stockQty: newStock, ...(crossing ? { lowStockAlertedAt: new Date() } : {}) },
+        });
+        if (crossing) newlyLow.push(inv.name);
         await tx.stockMovement.create({
           data: {
             restaurantId,
@@ -73,6 +84,13 @@ export async function deductForOrder(restaurantId: string, orderId: string): Pro
 
       await tx.order.update({ where: { id: orderId }, data: { inventoryDeductedAt: new Date() } });
     });
+
+    // Low-stock SMS alert (best-effort, after commit), once per crossing.
+    if (newlyLow.length > 0 && alertPhone) {
+      const list = newlyLow.slice(0, 6).join(", ");
+      const more = newlyLow.length > 6 ? ` +${newlyLow.length - 6} more` : "";
+      await notifyCustomer(restaurantId, alertPhone, `Low stock: ${list}${more}. Time to reorder.`);
+    }
   } catch {
     // Inventory must never block the kitchen flow.
   }
