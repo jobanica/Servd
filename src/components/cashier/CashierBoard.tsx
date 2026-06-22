@@ -26,6 +26,8 @@ import { ClosedOrdersModal } from "./ClosedOrdersModal";
 import { ShiftSummaryModal } from "./ShiftSummaryModal";
 import { VoidPinModal } from "./VoidPinModal";
 import { EditOrderModal } from "./EditOrderModal";
+import { GiftCardModal } from "./GiftCardModal";
+import { removeGiftCard } from "@/server/gift-cards/gift-cards";
 import { CashOutModal } from "./CashOutModal";
 import { BluetoothPrinterButton } from "./BluetoothPrinterButton";
 import { printPaidTicket } from "@/server/printing/print";
@@ -54,6 +56,7 @@ export function CashierBoard({
   const [cashOutOpen, setCashOutOpen] = useState(false);
   const [voidOrderTarget, setVoidOrderTarget] = useState<{ id: string; label: string } | null>(null);
   const [editOrderTarget, setEditOrderTarget] = useState<{ id: string; label: string } | null>(null);
+  const [giftCardTarget, setGiftCardTarget] = useState<{ id: string; label: string } | null>(null);
   const [discountOrder, setDiscountOrder] = useState<CashierTable["orders"][number] | null>(null);
   const [loyaltyOrderId, setLoyaltyOrderId] = useState<string | null>(null);
   const [waiterCalls, setWaiterCalls] = useState<{ id: string; tableNumber: string }[]>([]);
@@ -427,7 +430,7 @@ export function CashierBoard({
                       {o.itemCount} item{o.itemCount > 1 ? "s" : ""} ·{" "}
                       <span className="text-plum-ink/50">{o.status}</span>
                     </span>
-                    {o.discountAmount > 0 ? (
+                    {o.discountAmount > 0 || o.creditApplied > 0 ? (
                       <span className="text-right">
                         <span className="block text-xs text-plum-ink/40 line-through">{formatPeso(o.total)}</span>
                         <span className="font-semibold">{formatPeso(o.net)}</span>
@@ -439,6 +442,20 @@ export function CashierBoard({
                   {o.discountAmount > 0 && (
                     <p className="mt-0.5 text-xs font-semibold text-guava">
                       {o.discountLabel ?? "Discount"} · −{formatPeso(o.discountAmount)}
+                    </p>
+                  )}
+                  {o.creditApplied > 0 && (
+                    <p className="mt-0.5 flex items-center gap-2 text-xs font-semibold text-brand-primary">
+                      🎁 Gift card · −{formatPeso(o.creditApplied)}
+                      <button
+                        onClick={async () => {
+                          const res = await removeGiftCard(o.id);
+                          if (res.ok) setTables(res.tables);
+                        }}
+                        className="font-medium text-plum-ink/45 underline"
+                      >
+                        remove
+                      </button>
                     </p>
                   )}
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
@@ -513,6 +530,15 @@ export function CashierBoard({
                         >
                           Edit
                         </button>
+                        {o.creditApplied === 0 && (
+                          <button
+                            onClick={() => setGiftCardTarget({ id: o.id, label: t.label })}
+                            disabled={busy === o.id}
+                            className="rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
+                          >
+                            🎁 Gift card
+                          </button>
+                        )}
                         <button
                           onClick={() => setVoidOrderTarget({ id: o.id, label: t.label })}
                           disabled={busy === o.id}
@@ -830,6 +856,15 @@ export function CashierBoard({
           label={editOrderTarget.label}
           onClose={() => setEditOrderTarget(null)}
           onChanged={(t) => setTables(t)}
+        />
+      )}
+
+      {giftCardTarget && (
+        <GiftCardModal
+          orderId={giftCardTarget.id}
+          label={giftCardTarget.label}
+          onClose={() => setGiftCardTarget(null)}
+          onApplied={(t) => setTables(t)}
         />
       )}
     </div>
