@@ -48,14 +48,15 @@ export async function createTableCheckout(input: {
         status: { in: ["new", "preparing", "done"] },
         paymentStatus: { in: ["unpaid", "failed"] },
       },
-      select: { id: true, total: true, discountAmount: true },
+      select: { id: true, total: true, discountAmount: true, creditApplied: true },
     }),
   );
   if (orders.length === 0) return { ok: false, error: "Nothing to pay right now." };
 
-  // Charge the net amount (gross − any discount applied at the bill, e.g. a
-  // diner-redeemed promo code). Never trust a client-supplied total.
-  const net = (o: { total: number; discountAmount: number }) => Math.max(0, o.total - (o.discountAmount ?? 0));
+  // Charge the net amount (gross − any discount AND any redeemed gift-card credit
+  // applied at the bill). Never trust a client-supplied total.
+  const net = (o: { total: number; discountAmount: number; creditApplied?: number }) =>
+    Math.max(0, o.total - (o.discountAmount ?? 0) - (o.creditApplied ?? 0));
 
   const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const orderPath = `${base}/order/${parsed.data.slug}/${parsed.data.tableToken}`;

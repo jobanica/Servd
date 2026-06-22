@@ -38,7 +38,7 @@ export function computeDiscount(
   }
 }
 
-/** Net payable after discount (never below zero). */
-export function netTotal(total: number, discountAmount: number): number {
-  return Math.max(0, total - discountAmount);
+/** Net payable after discount + any redeemed store credit (never below zero). */
+export function netTotal(total: number, discountAmount: number, creditApplied = 0): number {
+  return Math.max(0, total - discountAmount - creditApplied);
 }

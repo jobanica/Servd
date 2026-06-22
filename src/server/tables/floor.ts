@@ -53,7 +53,7 @@ export async function getFloorPlan(restaurantId: string): Promise<FloorTable[]> 
   const orders = await tenantDb(restaurantId, (tx) =>
     tx.order.findMany({
       where: { status: { in: [...OPEN] }, paymentStatus: { in: ["unpaid", "failed"] }, tableId: { not: null } },
-      select: { tableId: true, total: true, discountAmount: true },
+      select: { tableId: true, total: true, discountAmount: true, creditApplied: true },
     }),
   );
   const byTable = new Map<string, { count: number; outstanding: number }>();
@@ -61,7 +61,7 @@ export async function getFloorPlan(restaurantId: string): Promise<FloorTable[]> 
     if (!o.tableId) continue;
     const cur = byTable.get(o.tableId) ?? { count: 0, outstanding: 0 };
     cur.count += 1;
-    cur.outstanding += Math.max(0, o.total - (o.discountAmount ?? 0));
+    cur.outstanding += Math.max(0, o.total - (o.discountAmount ?? 0) - (o.creditApplied ?? 0));
     byTable.set(o.tableId, cur);
   }
 

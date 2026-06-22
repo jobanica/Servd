@@ -26,7 +26,8 @@ export interface CashierOrder {
   total: number;
   discountAmount: number;
   discountLabel: string | null;
-  net: number; // total - discount
+  creditApplied: number; // centavos paid by a redeemed gift card
+  net: number; // total - discount - credit
   billRequested: boolean;
   paidOnline: boolean; // a confirmed gateway (PayMongo) payment exists
   served: boolean; // cashier confirmed the food was served
@@ -51,6 +52,19 @@ async function discountMap(
       }),
     );
     return new Map(rows.map((o) => [o.id, { amount: o.discountAmount, label: o.discountLabel }]));
+  } catch {
+    return new Map();
+  }
+}
+
+/** Best-effort per-order redeemed gift-card credit (column may lag on prod). */
+async function creditMap(restaurantId: string, ids: string[]): Promise<Map<string, number>> {
+  if (ids.length === 0) return new Map();
+  try {
+    const rows = await tenantDb(restaurantId, (tx) =>
+      tx.order.findMany({ where: { id: { in: ids } }, select: { id: true, creditApplied: true } }),
+    );
+    return new Map(rows.map((o) => [o.id, o.creditApplied ?? 0]));
   } catch {
     return new Map();
   }
@@ -157,6 +171,7 @@ export async function getCashierTables(): Promise<CashierTable[]> {
   }
 
   const discounts = await discountMap(staff.restaurantId, orders.map((o) => o.id));
+  const credits = await creditMap(staff.restaurantId, orders.map((o) => o.id));
   const meta = await orderMetaMap(staff.restaurantId, orders.map((o) => o.id));
 
   const byTable = new Map<string, CashierTable>();
@@ -195,7 +210,8 @@ export async function getCashierTables(): Promise<CashierTable[]> {
     const t = byTable.get(key)!;
     const disc = discounts.get(o.id);
     const discountAmount = disc?.amount ?? 0;
-    const net = netTotal(o.total, discountAmount);
+    const creditApplied = credits.get(o.id) ?? 0;
+    const net = netTotal(o.total, discountAmount, creditApplied);
     t.orders.push({
       id: o.id,
       status: o.status,
@@ -203,6 +219,7 @@ export async function getCashierTables(): Promise<CashierTable[]> {
       total: o.total,
       discountAmount,
       discountLabel: disc?.label ?? null,
+      creditApplied,
       net,
       billRequested: o.billRequested,
       paidOnline: o.payments.some((p) => p.gateway === "paymongo"),
@@ -357,15 +374,16 @@ export async function markOrderPaid(
     return { ok: false, error: "Not allowed." };
   }
 
-  // Charge the discounted (net) amount if a discount was applied.
+  // Charge the discounted (net) amount, less any gift-card credit already applied.
   const disc = (await discountMap(staff.restaurantId, [orderId])).get(orderId);
+  const credit = (await creditMap(staff.restaurantId, [orderId])).get(orderId) ?? 0;
   let netPaid = 0;
 
   try {
     await tenantDb(staff.restaurantId, async (tx) => {
       const order = await tx.order.findFirst({ where: { id: orderId }, select: { total: true } });
       if (!order) throw new Error("Order not found");
-      const amount = netTotal(order.total, disc?.amount ?? 0);
+      const amount = netTotal(order.total, disc?.amount ?? 0, credit);
       netPaid = amount;
       // updateMany (not update) so it doesn't read the whole row back — keeps
       // working even if the prod schema lags (e.g. missing newer columns).
@@ -524,13 +542,23 @@ export async function voidOrder(
     await tenantDb(staff.restaurantId, async (tx) => {
       const before = await tx.order.findFirst({
         where: { id: orderId, paymentStatus: { not: "paid" } },
-        select: { id: true, status: true, total: true, tableId: true },
+        select: { id: true, status: true, total: true, tableId: true, creditApplied: true, giftCardId: true },
       });
       if (!before) throw new Error("Only an unpaid order can be voided.");
+      // Restore any redeemed gift-card balance (the void unwinds the redemption).
+      if (before.giftCardId && before.creditApplied > 0) {
+        await tx.giftCard.update({
+          where: { id: before.giftCardId },
+          data: { balance: { increment: before.creditApplied } },
+        });
+        await tx.giftCardTxn.create({
+          data: { restaurantId: staff.restaurantId, giftCardId: before.giftCardId, amount: before.creditApplied, kind: "restore", orderId },
+        });
+      }
       // Cancelled status removes it from the board; tag voidedAt for reconciliation.
       await tx.order.updateMany({
         where: { id: orderId, paymentStatus: { not: "paid" } },
-        data: { status: "cancelled", billRequested: false, voidedAt: new Date() },
+        data: { status: "cancelled", billRequested: false, voidedAt: new Date(), creditApplied: 0, giftCardId: null },
       });
       await writeAudit(tx, staff.restaurantId, {
         actorStaffId: staff.staffUserId,

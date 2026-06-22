@@ -252,6 +252,7 @@ model Restaurant {
   smsCampaigns    SmsCampaign[]
   auditLogs       AuditLog[]
   happyHours      HappyHour[]
+  giftCards       GiftCard[]
   smsCreditLedger SmsCreditLedger[]
   invoices        RestaurantInvoice[]
   suppliers       Supplier[]
@@ -1078,6 +1079,8 @@ model Order {
   total         Int           @default(0) // centavos (gross subtotal)
   discountAmount Int          @default(0) // centavos taken off (senior/PWD/custom)
   discountLabel String? // e.g. "Senior Citizen (20%)"
+  creditApplied Int           @default(0) // centavos paid by a redeemed gift card / store credit
+  giftCardId    String? // the gift card credit was redeemed from
   inventoryDeductedAt DateTime? // set once stock is deducted (idempotency)
   servedAt      DateTime? // set when the cashier confirms the food was served
   voidedAt      DateTime? // set when a cashier voids the (unpaid) order
@@ -1095,6 +1098,45 @@ model Order {
   @@index([restaurantId, orderNumber]) // daily counter-number lookup
   @@index([tableId])
   @@map("orders")
+}
+
+/// Prepaid gift cards / store credit. Balance is server-authoritative — every
+/// load/redeem is a GiftCardTxn and the running balance is recomputed from them
+/// (the stored `balance` is a cache).
+model GiftCard {
+  id             String   @id @default(uuid())
+  restaurantId   String
+  code           String // redemption code (unique per restaurant, case-insensitive)
+  initialBalance Int // centavos issued
+  balance        Int // centavos remaining
+  customerPhone  String? // optional owner
+  customerName   String?
+  active         Boolean  @default(true)
+  expiresAt      DateTime?
+  createdAt      DateTime @default(now())
+
+  restaurant   Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  transactions GiftCardTxn[]
+
+  @@unique([restaurantId, code])
+  @@index([restaurantId])
+  @@map("gift_cards")
+}
+
+/// Ledger of gift-card movements (issue / redeem / restore) for audit + balance.
+model GiftCardTxn {
+  id           String   @id @default(uuid())
+  restaurantId String
+  giftCardId   String
+  amount       Int // centavos: positive = load/restore, negative = redeem
+  kind         String // "issue" | "redeem" | "restore"
+  orderId      String?
+  createdAt    DateTime @default(now())
+
+  giftCard GiftCard @relation(fields: [giftCardId], references: [id], onDelete: Cascade)
+
+  @@index([giftCardId])
+  @@map("gift_card_txns")
 }
 
 /// Happy hour / scheduled pricing — time-windowed automatic discounts applied

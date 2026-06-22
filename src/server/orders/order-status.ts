@@ -39,7 +39,7 @@ export async function getOrderStatus(
     // best-effort so the tracker never breaks before the migration.
     const order = await tx.order.findFirst({
       where: { id: orderId, restaurantId: restaurant.id, tableId: table.id },
-      select: { status: true, paymentStatus: true, total: true },
+      select: { status: true, paymentStatus: true, total: true, creditApplied: true },
     });
     if (!order) return null;
 
@@ -70,7 +70,7 @@ export async function getOrderStatus(
       total: order.total,
       discountAmount,
       discountLabel,
-      net: Math.max(0, order.total - discountAmount),
+      net: Math.max(0, order.total - discountAmount - (order.creditApplied ?? 0)),
       orderNumber,
     };
   });
