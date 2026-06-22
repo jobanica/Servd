@@ -12,6 +12,7 @@ import {
   recordCount,
   deleteSupplier,
   setAutoOutOfStock,
+  setLowStockAlertPhone,
 } from "@/server/inventory/actions";
 
 export default async function InventoryPage() {
@@ -35,7 +36,9 @@ export default async function InventoryPage() {
     listInventory(restaurantId),
     listSuppliers(restaurantId),
     getInventoryReport(restaurantId, from, new Date()),
-    tenantDb(restaurantId, (tx) => tx.restaurant.findFirstOrThrow({ select: { autoOutOfStock: true } })),
+    tenantDb(restaurantId, (tx) =>
+      tx.restaurant.findFirstOrThrow({ select: { autoOutOfStock: true, lowStockAlertPhone: true } }),
+    ),
   ]);
   const cogs = report.reduce((s, r) => s + r.cogs, 0);
   const lowCount = items.filter((i) => i.low).length;
@@ -47,9 +50,14 @@ export default async function InventoryPage() {
           <Link href="/admin" className="text-sm text-plum-ink/50">← Dashboard</Link>
           <h1 className="font-heading text-2xl font-bold">Inventory</h1>
         </div>
-        <Link href="/admin/inventory/po" className="rounded-full border border-plum-ink/15 px-4 py-2 text-sm font-semibold">
-          Purchase orders →
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/admin/inventory/reorder" className="rounded-full px-4 py-2 text-sm font-semibold btn-brand">
+            🛒 Reorder suggestions →
+          </Link>
+          <Link href="/admin/inventory/po" className="rounded-full border border-plum-ink/15 px-4 py-2 text-sm font-semibold">
+            Purchase orders →
+          </Link>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
@@ -73,6 +81,23 @@ export default async function InventoryPage() {
           Auto-mark menu items out of stock when an ingredient hits zero
         </label>
         <button className="mt-2 rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold">Save</button>
+      </form>
+
+      <form action={setLowStockAlertPhone} className="rounded-tile border border-plum-ink/10 bg-white p-4">
+        <label className="block text-sm font-medium">Low-stock SMS alert phone</label>
+        <p className="mb-2 text-xs text-plum-ink/50">
+          Get a text the moment an ingredient drops to its reorder level (needs SMS configured).
+          Leave blank to turn off.
+        </p>
+        <div className="flex gap-2">
+          <input
+            name="lowStockAlertPhone"
+            defaultValue={restaurant.lowStockAlertPhone ?? ""}
+            placeholder="09XX XXX XXXX"
+            className="w-56 rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+          />
+          <button className="rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold">Save</button>
+        </div>
       </form>
 
       <AddInventoryItemForm suppliers={suppliers} />

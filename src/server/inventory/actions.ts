@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireAdminAction } from "@/server/tenancy/require-admin";
 import { hasModule } from "@/server/billing/entitlements";
+import { getReorderSuggestions } from "@/server/inventory/queries";
 import { pesosToCentavos } from "@/lib/money";
 
 export type FormState = { ok?: boolean; error?: string } | null;
@@ -110,7 +112,11 @@ async function applyMovement(
 ) {
   await tenantDb(restaurantId, async (tx) => {
     const inv = await tx.inventoryItem.findFirstOrThrow({ where: { id: itemId } });
-    await tx.inventoryItem.update({ where: { id: itemId }, data: { stockQty: newStock } });
+    await tx.inventoryItem.update({
+      where: { id: itemId },
+      // Restocked above the reorder level → re-arm the low-stock alert.
+      data: { stockQty: newStock, ...(newStock > inv.reorderLevel ? { lowStockAlertedAt: null } : {}) },
+    });
     await tx.stockMovement.create({
       data: { restaurantId, inventoryItemId: itemId, changeQty, reason, unitCost: inv.costPerUnit, note },
     });
@@ -215,7 +221,7 @@ export async function receivePurchaseOrder(formData: FormData): Promise<void> {
           : inv.costPerUnit;
       await tx.inventoryItem.update({
         where: { id: inv.id },
-        data: { stockQty: newStock, costPerUnit: newCost },
+        data: { stockQty: newStock, costPerUnit: newCost, ...(newStock > inv.reorderLevel ? { lowStockAlertedAt: null } : {}) },
       });
       await tx.stockMovement.create({
         data: {
@@ -270,4 +276,57 @@ export async function setAutoOutOfStock(formData: FormData): Promise<void> {
     }),
   );
   revalidatePath("/admin/inventory");
+}
+
+/** Phone that receives a low-stock SMS when an ingredient hits its reorder level. */
+export async function setLowStockAlertPhone(formData: FormData): Promise<void> {
+  const { restaurantId } = await requireAdminAction();
+  await ensureModule(restaurantId);
+  const phone = String(formData.get("lowStockAlertPhone") ?? "").trim();
+  await tenantDb(restaurantId, (tx) =>
+    tx.restaurant.update({ where: { id: restaurantId }, data: { lowStockAlertPhone: phone || null } }),
+  );
+  revalidatePath("/admin/inventory");
+}
+
+/**
+ * Auto-PO: create a draft purchase order from the reorder suggestions for one
+ * supplier (or unassigned items). Quantities come from usage velocity, computed
+ * server-side. Returns the new PO id so the caller can open it.
+ */
+export async function createDraftPoFromSuggestions(supplierId: string | null): Promise<string | null> {
+  const { restaurantId } = await requireAdminAction();
+  await ensureModule(restaurantId);
+  const suggestions = await getReorderSuggestions(restaurantId);
+  const forSupplier = suggestions.filter((s) => (s.supplierId ?? null) === (supplierId || null) && s.suggestedQty > 0);
+  if (forSupplier.length === 0) return null;
+
+  const poId = await tenantDb(restaurantId, async (tx) => {
+    const po = await tx.purchaseOrder.create({
+      data: { restaurantId, supplierId: supplierId || null, status: "draft" },
+      select: { id: true },
+    });
+    for (const s of forSupplier) {
+      await tx.purchaseOrderItem.create({
+        data: {
+          restaurantId,
+          purchaseOrderId: po.id,
+          inventoryItemId: s.id,
+          quantity: s.suggestedQty,
+          unitCost: s.costPerUnit,
+        },
+      });
+    }
+    return po.id;
+  });
+  revalidatePath("/admin/inventory/po");
+  return poId;
+}
+
+/** Form-action wrapper: build the draft PO then open it. */
+export async function createPoFromSuggestions(formData: FormData): Promise<void> {
+  const supplierId = String(formData.get("supplierId") ?? "") || null;
+  const poId = await createDraftPoFromSuggestions(supplierId);
+  if (poId) redirect(`/admin/inventory/po/${poId}`);
+  revalidatePath("/admin/inventory/reorder");
 }
