@@ -251,6 +251,7 @@ model Restaurant {
   customers       CustomerContact[]
   smsCampaigns    SmsCampaign[]
   auditLogs       AuditLog[]
+  happyHours      HappyHour[]
   smsCreditLedger SmsCreditLedger[]
   invoices        RestaurantInvoice[]
   suppliers       Supplier[]
@@ -665,6 +666,7 @@ model MenuItem {
   videoUrl     String? // uploaded file URL or a YouTube/Vimeo/direct link
   videoPosterUrl String? // optional poster; UI falls back to imageUrl
   isAvailable  Boolean  @default(true) // false => out of stock
+  dietaryTags  String[] @default([]) // diet/allergen tag keys (see src/lib/menu/dietary.ts)
   sortOrder    Int      @default(0)
   createdAt    DateTime @default(now())
 
@@ -1093,6 +1095,29 @@ model Order {
   @@index([restaurantId, orderNumber]) // daily counter-number lookup
   @@index([tableId])
   @@map("orders")
+}
+
+/// Happy hour / scheduled pricing — time-windowed automatic discounts applied
+/// to selected items or categories. Server-authoritative: the discount is
+/// recomputed at order time (and shown on the menu), never trusted from the client.
+model HappyHour {
+  id           String   @id @default(uuid())
+  restaurantId String
+  name         String
+  discountType String   @default("percent") // "percent" | "amount"
+  value        Int      @default(0) // percent (1-100) or centavos off the item's base price
+  scope        String   @default("all") // "all" | "category" | "item"
+  targetIds    String[] @default([]) // category ids or item ids when scoped
+  days         Int[]    @default([]) // 0=Sun..6=Sat; empty = every day
+  startMinute  Int      @default(0) // minutes from midnight (Asia/Manila)
+  endMinute    Int      @default(0)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, active])
+  @@map("happy_hours")
 }
 
 /// Marketing promotions shown to diners in the app's "Promos" section. Managed

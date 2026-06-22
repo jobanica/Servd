@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { formatPeso } from "@/lib/money";
+import { DIETARY_TAGS, tagInfo } from "@/lib/menu/dietary";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { cartCount, cartTotal } from "@/lib/cart/pricing";
 import { useCart } from "@/lib/cart/useCart";
@@ -69,8 +70,18 @@ function ProductCard({
           </span>
         )}
 
-        {/* price pill */}
-        <span className="absolute bottom-2 right-2 rounded-full bg-brand-primary px-2.5 py-1 text-xs font-extrabold text-white shadow">
+        {/* happy-hour ribbon */}
+        {item.originalPrice && item.originalPrice > item.price && (
+          <span className="absolute left-2 top-2 rounded-full bg-mango px-2 py-0.5 text-[10px] font-bold text-white shadow">
+            ⏰ Happy hour
+          </span>
+        )}
+
+        {/* price pill (struck-through original when on happy hour) */}
+        <span className="absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-brand-primary px-2.5 py-1 text-xs font-extrabold text-white shadow">
+          {item.originalPrice && item.originalPrice > item.price && (
+            <span className="font-medium text-white/70 line-through">{formatPeso(item.originalPrice)}</span>
+          )}
           {formatPeso(item.price)}
         </span>
 
@@ -86,8 +97,34 @@ function ProductCard({
         {item.description && (
           <p className="mt-0.5 line-clamp-1 text-xs text-brand-ink/50">{item.description}</p>
         )}
+        <DietBadges tags={item.dietaryTags} />
       </div>
     </button>
+  );
+}
+
+/** Diet/allergen badges — emoji chips with the tag label as a tooltip. */
+function DietBadges({ tags, size = "sm" }: { tags: string[]; size?: "sm" | "md" }) {
+  if (!tags?.length) return null;
+  const resolved = tags.map(tagInfo).filter((t): t is NonNullable<typeof t> => !!t);
+  if (resolved.length === 0) return null;
+  return (
+    <div className={`mt-1 flex flex-wrap gap-1 ${size === "md" ? "text-sm" : "text-[11px]"}`}>
+      {resolved.map((t) => (
+        <span
+          key={t.key}
+          title={t.label}
+          className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 ${
+            t.kind === "allergen"
+              ? "bg-guava/10 text-guava"
+              : "bg-brand-primary/10 text-brand-primary"
+          }`}
+        >
+          <span>{t.emoji}</span>
+          {size === "md" && <span className="font-medium">{t.label}</span>}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -265,6 +302,7 @@ export function DinerMenu({
   const [rewardsOpen, setRewardsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [activeCat, setActiveCat] = useState("all");
+  const [dietFilter, setDietFilter] = useState<Set<string>>(new Set());
   // Whether the drinks upsell has been resolved for the current cart session.
   const [upsellDone, setUpsellDone] = useState(false);
   // Branded welcome splash shown right after the QR scan, before the menu.
@@ -291,11 +329,20 @@ export function DinerMenu({
   // Flatten for searching / filtering.
   const flat = nonEmpty.flatMap((c) => c.items.map((it) => ({ it, catId: c.id, catName: c.name })));
   const q = search.trim().toLowerCase();
-  const shown = q
+
+  // Diet-preference filters: only offer tags that actually appear on the menu.
+  const menuDietKeys = new Set(flat.flatMap(({ it }) => it.dietaryTags ?? []));
+  const dietChips = DIETARY_TAGS.filter((t) => t.kind === "diet" && menuDietKeys.has(t.key));
+  const activeDiets = [...dietFilter];
+
+  let shown = q
     ? flat.filter(({ it }) => it.name.toLowerCase().includes(q))
     : activeCat === "all"
       ? flat
       : flat.filter(({ catId }) => catId === activeCat);
+  if (activeDiets.length > 0) {
+    shown = shown.filter(({ it }) => activeDiets.every((k) => (it.dietaryTags ?? []).includes(k)));
+  }
 
   function scrollTop() {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -373,6 +420,33 @@ export function DinerMenu({
                 {c.name}
               </button>
             ))}
+          </div>
+        )}
+
+        {/* Dietary preference filters */}
+        {dietChips.length > 0 && !q && (
+          <div className="flex gap-2 overflow-x-auto px-4 pb-3">
+            {dietChips.map((tag) => {
+              const on = dietFilter.has(tag.key);
+              return (
+                <button
+                  key={tag.key}
+                  onClick={() =>
+                    setDietFilter((prev) => {
+                      const next = new Set(prev);
+                      next.has(tag.key) ? next.delete(tag.key) : next.add(tag.key);
+                      return next;
+                    })
+                  }
+                  className={`flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold ${
+                    on ? "bg-brand-primary text-white" : "bg-white text-brand-ink/70 ring-1 ring-brand-ink/10"
+                  }`}
+                >
+                  <span>{tag.emoji}</span>
+                  {tag.label}
+                </button>
+              );
+            })}
           </div>
         )}
       </header>

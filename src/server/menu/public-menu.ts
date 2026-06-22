@@ -1,5 +1,7 @@
 import { systemDb } from "@/server/tenancy/scoped-db";
 import type { DinerCategory } from "@/lib/cart/types";
+import { effectivePrice } from "@/lib/pricing/happy-hour";
+import { getActiveHappyHours } from "@/server/pricing/happy-hour";
 
 /**
  * Loads a restaurant's full menu for the diner page, by restaurantId. Returns
@@ -35,19 +37,26 @@ export async function getPublicMenu(
     }),
   );
 
+  // Active happy-hour rules → discounted display price (struck-through original).
+  const happyHours = await getActiveHappyHours(restaurantId);
+
   // Overlay the requested locale's translations, falling back to base text.
   return categories.map((c) => ({
     id: c.id,
     name: c.translations[0]?.name ?? c.name,
-    items: c.menuItems.map((item) => ({
+    items: c.menuItems.map((item) => {
+      const eff = effectivePrice(item.price, { id: item.id, categoryId: item.categoryId }, happyHours);
+      return {
       id: item.id,
       name: item.translations[0]?.name ?? item.name,
       description: item.translations[0]?.description ?? item.description,
-      price: item.price,
+      price: eff.price,
+      originalPrice: eff.discount > 0 ? eff.originalPrice : null,
       imageUrl: item.imageUrl,
       videoUrl: item.videoUrl,
       videoPosterUrl: item.videoPosterUrl,
       isAvailable: item.isAvailable,
+      dietaryTags: item.dietaryTags ?? [],
       groups: item.modifierGroups.map((link) => ({
         id: link.group.id,
         name: link.group.name,
@@ -60,6 +69,7 @@ export async function getPublicMenu(
           priceDelta: m.priceDelta,
         })),
       })),
-    })),
+      };
+    }),
   }));
 }
