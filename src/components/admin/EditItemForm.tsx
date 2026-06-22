@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { updateItem, type FormState } from "@/server/menu/actions";
+import { DIETARY_TAGS } from "@/lib/menu/dietary";
 import { SubmitButton } from "./SubmitButton";
 
 type Category = { id: string; name: string };
@@ -15,6 +16,7 @@ type Item = {
   isAvailable: boolean;
   imageUrl: string | null;
   videoUrl: string | null;
+  dietaryTags?: string[];
 };
 
 export function EditItemForm({
@@ -100,6 +102,31 @@ export function EditItemForm({
           className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2"
         />
       </label>
+
+      <fieldset className="block text-sm">
+        <span className="font-medium">Dietary &amp; allergen tags</span>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {DIETARY_TAGS.map((tag) => (
+            <label
+              key={tag.key}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-plum-ink/15 px-3 py-1.5 text-xs has-[:checked]:border-brand-primary has-[:checked]:bg-brand-primary/10 has-[:checked]:text-brand-primary"
+            >
+              <input
+                type="checkbox"
+                name="dietaryTags"
+                value={tag.key}
+                defaultChecked={item.dietaryTags?.includes(tag.key)}
+                className="sr-only"
+              />
+              <span>{tag.emoji}</span>
+              {tag.label}
+            </label>
+          ))}
+        </div>
+        <span className="mt-1 block text-xs text-plum-ink/40">
+          Shown to diners as badges; diners can filter the menu by the green preference tags.
+        </span>
+      </fieldset>
 
       <div className="flex items-center gap-4">
         {item.imageUrl && (

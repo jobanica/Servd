@@ -7,6 +7,7 @@ import { requireAdminAction } from "@/server/tenancy/require-admin";
 import { uploadMenuImage } from "@/server/storage/menu-images";
 import { uploadMenuVideo } from "@/server/storage/menu-videos";
 import { pesosToCentavos } from "@/lib/money";
+import { sanitizeTags } from "@/lib/menu/dietary";
 import {
   categorySchema,
   menuItemSchema,
@@ -134,6 +135,7 @@ export async function createItem(
         description: parsed.data.description || null,
         price: pesosToCentavos(parsed.data.pricePesos),
         isAvailable: parsed.data.isAvailable,
+        dietaryTags: sanitizeTags(formData.getAll("dietaryTags").map(String)),
         imageUrl,
       },
       select: { id: true },
@@ -177,6 +179,7 @@ export async function updateItem(
         description: parsed.data.description || null,
         price: pesosToCentavos(parsed.data.pricePesos),
         isAvailable: parsed.data.isAvailable,
+        dietaryTags: sanitizeTags(formData.getAll("dietaryTags").map(String)),
         // Only overwrite the image when a new one was uploaded.
         ...(imageUrl ? { imageUrl } : {}),
         ...videoUpdate,

@@ -9,6 +9,7 @@ import {
   selectionToLineModifiers,
 } from "@/lib/cart/pricing";
 import type { CartLine, DinerItem, Selection } from "@/lib/cart/types";
+import { tagInfo } from "@/lib/menu/dietary";
 import { VideoPlayer } from "./VideoPlayer";
 
 /** Generates a unique line id without pulling in a uuid dependency. */
@@ -83,6 +84,24 @@ export function ItemModal({
         </div>
         {item.description && (
           <p className="mt-1 text-sm text-brand-ink/60">{item.description}</p>
+        )}
+
+        {item.dietaryTags?.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {item.dietaryTags.map(tagInfo).map((tg) =>
+              tg ? (
+                <span
+                  key={tg.key}
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                    tg.kind === "allergen" ? "bg-guava/10 text-guava" : "bg-brand-primary/10 text-brand-primary"
+                  }`}
+                >
+                  <span>{tg.emoji}</span>
+                  {tg.label}
+                </span>
+              ) : null,
+            )}
+          </div>
         )}
 
         {item.videoUrl && (

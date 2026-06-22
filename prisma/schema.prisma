@@ -662,6 +662,7 @@ model MenuItem {
   videoUrl     String? // uploaded file URL or a YouTube/Vimeo/direct link
   videoPosterUrl String? // optional poster; UI falls back to imageUrl
   isAvailable  Boolean  @default(true) // false => out of stock
+  dietaryTags  String[] @default([]) // diet/allergen tag keys (see src/lib/menu/dietary.ts)
   sortOrder    Int      @default(0)
   createdAt    DateTime @default(now())
 

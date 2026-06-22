@@ -28,6 +28,7 @@ export interface DinerItem {
   videoUrl: string | null;
   videoPosterUrl: string | null;
   isAvailable: boolean;
+  dietaryTags: string[]; // diet/allergen tag keys (see src/lib/menu/dietary.ts)
   groups: DinerModifierGroup[];
 }
 

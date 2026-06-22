@@ -48,6 +48,7 @@ export async function getPublicMenu(
       videoUrl: item.videoUrl,
       videoPosterUrl: item.videoPosterUrl,
       isAvailable: item.isAvailable,
+      dietaryTags: item.dietaryTags ?? [],
       groups: item.modifierGroups.map((link) => ({
         id: link.group.id,
         name: link.group.name,

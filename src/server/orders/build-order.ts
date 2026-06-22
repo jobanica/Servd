@@ -76,6 +76,7 @@ export async function buildValidatedOrder(
       videoUrl: dbItem.videoUrl,
       videoPosterUrl: dbItem.videoPosterUrl,
       isAvailable: dbItem.isAvailable,
+      dietaryTags: dbItem.dietaryTags ?? [],
       groups: dbItem.modifierGroups.map((l) => ({
         id: l.group.id,
         name: l.group.name,
