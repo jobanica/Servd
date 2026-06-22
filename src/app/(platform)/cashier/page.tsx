@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/server/tenancy/current-user";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { getCashierTables, getIncomingOrders, type IncomingOrder } from "@/server/orders/cashier";
+import { hasFeature } from "@/server/billing/feature-gate";
 import { CashierBoard } from "@/components/cashier/CashierBoard";
+import { ServiceWorkerRegister } from "@/components/offline/ServiceWorkerRegister";
 import { StaffDataError } from "@/components/StaffDataError";
 
 export default async function CashierHome() {
@@ -13,14 +15,16 @@ export default async function CashierHome() {
 
   let initialTables;
   let initialIncoming: IncomingOrder[] = [];
+  let offlineEnabled = false;
   try {
     const r = await tenantDb(user.restaurantId, (tx) =>
       tx.restaurant.findFirstOrThrow({ select: { status: true } }),
     );
     if (r.status === "suspended") return redirect("/suspended");
-    [initialTables, initialIncoming] = await Promise.all([
+    [initialTables, initialIncoming, offlineEnabled] = await Promise.all([
       getCashierTables(),
       getIncomingOrders(),
+      hasFeature(user.restaurantId, "offline"),
     ]);
   } catch (e) {
     if (e && typeof e === "object" && "digest" in e && String((e as { digest?: string }).digest).startsWith("NEXT_REDIRECT")) {
@@ -46,7 +50,9 @@ export default async function CashierHome() {
         initialTables={initialTables}
         initialIncoming={initialIncoming}
         isAdmin={user.role === "admin"}
+        offlineEnabled={offlineEnabled}
       />
+      {offlineEnabled && <ServiceWorkerRegister />}
     </div>
   );
 }

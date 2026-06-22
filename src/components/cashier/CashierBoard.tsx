@@ -30,6 +30,8 @@ import { EditOrderModal } from "./EditOrderModal";
 import { GiftCardModal } from "./GiftCardModal";
 import { SplitPaymentModal } from "./SplitPaymentModal";
 import { removeGiftCard } from "@/server/gift-cards/gift-cards";
+import { useOnline } from "@/lib/offline/useOnline";
+import { ConnectivityPill } from "@/components/offline/ConnectivityPill";
 import { CashOutModal } from "./CashOutModal";
 import { BluetoothPrinterButton } from "./BluetoothPrinterButton";
 import { printPaidTicket } from "@/server/printing/print";
@@ -40,15 +42,18 @@ export function CashierBoard({
   initialTables,
   initialIncoming = [],
   isAdmin = false,
+  offlineEnabled = false,
 }: {
   restaurantId: string;
   initialTables: CashierTable[];
   initialIncoming?: IncomingOrder[];
   isAdmin?: boolean;
+  offlineEnabled?: boolean;
 }) {
   const [tables, setTables] = useState<CashierTable[]>(initialTables);
   const [incoming, setIncoming] = useState<IncomingOrder[]>(initialIncoming);
   const [live, setLive] = useState(false);
+  const online = useOnline();
   const [busy, setBusy] = useState<string | null>(null);
   const [newOrderOpen, setNewOrderOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -274,9 +279,12 @@ export function CashierBoard({
   // The action buttons — shared by the desktop sidebar and the mobile drawer.
   const sidebarInner = (
     <>
-      <div className="mb-1 flex items-center gap-2 px-1 text-xs text-plum-ink/50">
-        <span className={`inline-block h-2 w-2 rounded-full ${live ? "bg-mango" : "bg-muted"}`} />
-        {live ? "Live" : "Polling (offline)"}
+      <div className="mb-1 flex flex-wrap items-center gap-2 px-1 text-xs text-plum-ink/50">
+        <span className="flex items-center gap-2">
+          <span className={`inline-block h-2 w-2 rounded-full ${live ? "bg-mango" : "bg-muted"}`} />
+          {live ? "Live" : "Polling (offline)"}
+        </span>
+        {offlineEnabled && <ConnectivityPill online={online} pending={0} />}
       </div>
 
       <button onClick={() => setNewOrderOpen(true)} className="w-full rounded-full px-4 py-2.5 text-sm font-semibold btn-brand">
@@ -347,10 +355,14 @@ export function CashierBoard({
             <path d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <span className="flex items-center gap-1.5 text-xs text-plum-ink/50">
-          <span className={`inline-block h-2 w-2 rounded-full ${live ? "bg-mango" : "bg-muted"}`} />
-          {live ? "Live" : "Offline"}
-        </span>
+        {offlineEnabled ? (
+          <ConnectivityPill online={online} pending={0} />
+        ) : (
+          <span className="flex items-center gap-1.5 text-xs text-plum-ink/50">
+            <span className={`inline-block h-2 w-2 rounded-full ${live ? "bg-mango" : "bg-muted"}`} />
+            {live ? "Live" : "Offline"}
+          </span>
+        )}
         <button
           onClick={() => setNewOrderOpen(true)}
           className="ml-auto rounded-full px-4 py-2.5 text-sm font-semibold btn-brand"
