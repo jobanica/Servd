@@ -14,6 +14,7 @@ export interface OrderStatusResult {
   discountAmount: number; // centavos off
   discountLabel: string | null;
   net: number; // total - discount
+  orderNumber: number | null; // counter/stall ticket number, if any
 }
 
 export async function getOrderStatus(
@@ -55,6 +56,14 @@ export async function getOrderStatus(
       /* columns not migrated yet */
     }
 
+    let orderNumber: number | null = null;
+    try {
+      const n = await tx.order.findFirst({ where: { id: orderId }, select: { orderNumber: true } });
+      orderNumber = n?.orderNumber ?? null;
+    } catch {
+      /* column not migrated yet */
+    }
+
     return {
       status: order.status,
       paymentStatus: order.paymentStatus,
@@ -62,6 +71,7 @@ export async function getOrderStatus(
       discountAmount,
       discountLabel,
       net: Math.max(0, order.total - discountAmount),
+      orderNumber,
     };
   });
 }

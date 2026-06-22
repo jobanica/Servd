@@ -13,6 +13,7 @@ import {
 } from "@/server/orders/build-order";
 import type { DinerCategory } from "@/lib/cart/types";
 import { computeDiscount, netTotal, type DiscountKind } from "@/lib/discount";
+import { formatOrderNumber } from "@/lib/orders/order-number";
 import { awardPointsForOrder, getBalance, getLoyaltyConfig, redeemPoints, enrollAccount } from "@/server/loyalty/loyalty";
 import { notifyCustomer, restaurantDisplayName } from "@/server/sms/notify";
 
@@ -71,14 +72,14 @@ async function orderMetaMap(
   restaurantId: string,
   ids: string[],
 ): Promise<
-  Map<string, { orderType: string; customerName: string | null; customerPhone: string | null; customerAddress: string | null; mapUrl: string | null }>
+  Map<string, { orderType: string; customerName: string | null; customerPhone: string | null; customerAddress: string | null; mapUrl: string | null; orderNumber: number | null }>
 > {
   if (ids.length === 0) return new Map();
   try {
     const rows = await tenantDb(restaurantId, (tx) =>
       tx.order.findMany({
         where: { id: { in: ids } },
-        select: { id: true, orderType: true, customerName: true, customerPhone: true, customerAddress: true, customerLat: true, customerLng: true },
+        select: { id: true, orderType: true, customerName: true, customerPhone: true, customerAddress: true, customerLat: true, customerLng: true, orderNumber: true },
       }),
     );
     return new Map(
@@ -90,6 +91,7 @@ async function orderMetaMap(
           customerPhone: o.customerPhone,
           customerAddress: o.customerAddress,
           mapUrl: o.customerLat != null && o.customerLng != null ? `https://maps.google.com/?q=${o.customerLat},${o.customerLng}` : null,
+          orderNumber: o.orderNumber,
         },
       ]),
     );
@@ -159,15 +161,20 @@ export async function getCashierTables(): Promise<CashierTable[]> {
   for (const o of orders) {
     const m = meta.get(o.id);
     const kind = (m?.orderType ?? "dine_in") as CashierTable["kind"];
-    // Dine-in groups by table; pickup/delivery is one card per order.
-    const isDineIn = kind === "dine_in" || !!o.table;
+    // A counter/stall order has an order number — one card per order, never
+    // grouped under the shared counter "table".
+    const isCounter = m?.orderNumber != null;
+    // Dine-in groups by table; pickup/delivery/counter is one card per order.
+    const isDineIn = !isCounter && (kind === "dine_in" || !!o.table);
     const key = isDineIn ? `table:${o.table?.id ?? o.id}` : `order:${o.id}`;
     const customerName = m?.customerName ?? null;
     const label = isDineIn
       ? `Table ${o.table?.tableNumber ?? "—"}`
-      : kind === "delivery"
-        ? `🛵 Delivery — ${customerName ?? "Customer"}`
-        : `🥡 Pickup — ${customerName ?? "Customer"}`;
+      : isCounter
+        ? `🧾 Order ${formatOrderNumber(m!.orderNumber!)}`
+        : kind === "delivery"
+          ? `🛵 Delivery — ${customerName ?? "Customer"}`
+          : `🥡 Pickup — ${customerName ?? "Customer"}`;
 
     if (!byTable.has(key)) {
       byTable.set(key, {
@@ -237,15 +244,18 @@ export async function getIncomingOrders(): Promise<IncomingOrder[]> {
   return orders.map((o) => {
     const m = meta.get(o.id);
     const kind = (m?.orderType ?? "dine_in") as string;
-    const isDineIn = kind === "dine_in" || !!o.table;
+    const isCounter = m?.orderNumber != null;
+    const isDineIn = !isCounter && (kind === "dine_in" || !!o.table);
     const label = isDineIn
       ? `Table ${o.table?.tableNumber ?? "—"}`
-      : kind === "delivery"
-        ? `🛵 Delivery — ${m?.customerName ?? "Customer"}`
-        : `🥡 Pickup — ${m?.customerName ?? "Customer"}`;
+      : isCounter
+        ? `🧾 Order ${formatOrderNumber(m!.orderNumber!)}`
+        : kind === "delivery"
+          ? `🛵 Delivery — ${m?.customerName ?? "Customer"}`
+          : `🥡 Pickup — ${m?.customerName ?? "Customer"}`;
     return {
       id: o.id,
-      tableNumber: o.table?.tableNumber ?? "—",
+      tableNumber: isCounter ? formatOrderNumber(m!.orderNumber!) : o.table?.tableNumber ?? "—",
       label,
       channel: isDineIn ? "dine_in" : kind,
       customerPhone: m?.customerPhone ?? null,
