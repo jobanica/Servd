@@ -23,6 +23,7 @@ export const metadata: Metadata = {
   title: "Servd — QR ordering for restaurants",
   description:
     "Scan, order, pay. A QR-based ordering platform for restaurants.",
+  manifest: "/manifest.webmanifest",
 };
 
 export default async function RootLayout({

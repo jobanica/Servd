@@ -1,0 +1,18 @@
+{
+  "name": "Servd",
+  "short_name": "Servd",
+  "description": "Servd cashier & kitchen",
+  "start_url": "/cashier",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#FFF6EC",
+  "theme_color": "#FF7A1A",
+  "icons": [
+    {
+      "src": "/brand/servd-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
