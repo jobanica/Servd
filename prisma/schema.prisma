@@ -190,6 +190,17 @@ model Restaurant {
   coverImageUrl     String?
   tagline           String?
 
+  // --- Business location (set by super-admin at creation; shown on the
+  // super-admin map so they can visit the business) ---
+  businessAddress String?
+  latitude        Float?
+  longitude       Float?
+
+  // --- Claim flow: created by super-admin with no login; the owner opens the
+  // claim link to set their email + password. Token cleared once claimed. ---
+  claimToken String?   @unique
+  claimedAt  DateTime?
+
   // --- Reputation ---
   googleReviewUrl String?
   feedbackMode    FeedbackMode @default(follow_up)

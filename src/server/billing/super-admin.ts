@@ -2,6 +2,58 @@ import "server-only";
 
 import { systemDb } from "@/server/tenancy/scoped-db";
 
+export interface BusinessRow {
+  id: string;
+  name: string;
+  slug: string;
+  status: string;
+  businessAddress: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  claimToken: string | null;
+  claimedAt: Date | null;
+  createdAt: Date;
+}
+
+/** All businesses for the super-admin, newest first (with location + claim state). */
+export async function listBusinesses(limit = 100): Promise<BusinessRow[]> {
+  try {
+    const rows = await systemDb((tx) =>
+      tx.restaurant.findMany({
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        select: {
+          id: true,
+          name: true,
+          displayName: true,
+          slug: true,
+          status: true,
+          businessAddress: true,
+          latitude: true,
+          longitude: true,
+          claimToken: true,
+          claimedAt: true,
+          createdAt: true,
+        },
+      }),
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.displayName || r.name,
+      slug: r.slug,
+      status: r.status,
+      businessAddress: r.businessAddress,
+      latitude: r.latitude,
+      longitude: r.longitude,
+      claimToken: r.claimToken,
+      claimedAt: r.claimedAt,
+      createdAt: r.createdAt,
+    }));
+  } catch {
+    return []; // columns not migrated yet
+  }
+}
+
 /**
  * Cross-tenant subscription data for the platform back office. Everything runs
  * through systemDb (bypasses tenant RLS) because the super-admin owns the whole

@@ -1,5 +1,6 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { Prisma, PlanModuleType } from "@prisma/client";
@@ -12,7 +13,7 @@ import { startTrial } from "@/server/billing/subscription";
 import { uniqueSlug } from "@/lib/slug";
 import { addMonths } from "@/lib/billing/period";
 
-export type ActionState = { ok?: boolean; message?: string; error?: string } | null;
+export type ActionState = { ok?: boolean; message?: string; error?: string; claimUrl?: string } | null;
 
 const ALL_MODULES: PlanModuleType[] = ["hris", "inventory", "custom_domain"];
 
@@ -375,4 +376,67 @@ export async function createRestaurantAccount(_prev: ActionState, formData: Form
 
   refresh();
   return { ok: true, message: `Account created for ${restaurantName} — they can log in right away.` };
+}
+
+const businessSchema = z.object({
+  restaurantName: z.string().trim().min(2, "Business name is required").max(80),
+  businessAddress: z.string().trim().max(300).optional().or(z.literal("")),
+  latitude: z.coerce.number().min(-90).max(90).optional().or(z.literal("")),
+  longitude: z.coerce.number().min(-180).max(180).optional().or(z.literal("")),
+});
+
+/**
+ * Super-admin: create a business with ONLY its name (+ address/map). No login is
+ * created yet — instead we return a one-time **claim link** the owner opens to
+ * set their own email + password. The address + map pin are recorded so the
+ * super-admin can find/visit the business anytime.
+ */
+export async function createBusinessAccount(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireSuperAdmin();
+  const parsed = businessSchema.safeParse({
+    restaurantName: formData.get("restaurantName"),
+    businessAddress: formData.get("businessAddress") ?? "",
+    latitude: formData.get("latitude") ?? "",
+    longitude: formData.get("longitude") ?? "",
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  const { restaurantName, businessAddress } = parsed.data;
+  const latitude = typeof parsed.data.latitude === "number" ? parsed.data.latitude : null;
+  const longitude = typeof parsed.data.longitude === "number" ? parsed.data.longitude : null;
+  const claimToken = randomBytes(24).toString("hex");
+
+  try {
+    await systemDb(async (tx) => {
+      const slug = await uniqueSlug(restaurantName, async (s) => {
+        const hit = await tx.restaurant.findUnique({ where: { slug: s }, select: { id: true } });
+        return !!hit;
+      });
+      const restaurant = await tx.restaurant.create({
+        data: {
+          name: restaurantName,
+          displayName: restaurantName,
+          slug,
+          status: "active",
+          businessAddress: businessAddress || null,
+          latitude,
+          longitude,
+          claimToken,
+        },
+        select: { id: true },
+      });
+      await startTrial(tx, restaurant.id);
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Couldn't create the business.";
+    return { error: /unique/i.test(msg) ? "A business with that name already exists." : msg };
+  }
+
+  refresh();
+  revalidatePath("/super-admin/accounts");
+  const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  return {
+    ok: true,
+    message: `${restaurantName} created. Send the owner this setup link to add their email & password:`,
+    claimUrl: `${base.replace(/\/$/, "")}/claim/${claimToken}`,
+  };
 }
