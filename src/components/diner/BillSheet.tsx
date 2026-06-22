@@ -32,6 +32,10 @@ export function BillSheet({
   const [code, setCode] = useState("");
   const [promoBusy, setPromoBusy] = useState(false);
   const [promoError, setPromoError] = useState<string | null>(null);
+  const [splitOpen, setSplitOpen] = useState(false);
+  const [splitMode, setSplitMode] = useState<"evenly" | "item">("evenly");
+  const [people, setPeople] = useState(2);
+  const [picked, setPicked] = useState<Set<number>>(new Set());
   const [codes, setCodes] = useState<RedeemableCode[]>([]);
 
   const loadBill = useCallback(() => {
@@ -207,6 +211,92 @@ export function BillSheet({
                     <span>{peso(bill.total)}</span>
                   </div>
                 </div>
+
+                {/* Split the bill — a helper for groups paying together */}
+                <button
+                  onClick={() => setSplitOpen((v) => !v)}
+                  className="mt-3 w-full rounded-full border border-brand-ink/15 py-2.5 text-sm font-semibold text-brand-ink"
+                >
+                  👥 Split the bill {splitOpen ? "▲" : "▼"}
+                </button>
+                {splitOpen && (
+                  <div className="mt-2 rounded-xl border border-brand-ink/10 p-3">
+                    <div className="mb-3 flex gap-2">
+                      {(["evenly", "item"] as const).map((m) => (
+                        <button
+                          key={m}
+                          onClick={() => setSplitMode(m)}
+                          className={`flex-1 rounded-full py-1.5 text-xs font-semibold ${
+                            splitMode === m ? "bg-brand-primary text-white" : "bg-white text-brand-ink/70 ring-1 ring-brand-ink/10"
+                          }`}
+                        >
+                          {m === "evenly" ? "Evenly" : "By item"}
+                        </button>
+                      ))}
+                    </div>
+
+                    {splitMode === "evenly" ? (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setPeople((n) => Math.max(2, n - 1))}
+                            className="h-8 w-8 rounded-full border border-brand-ink/15 text-lg leading-none"
+                          >
+                            −
+                          </button>
+                          <span className="w-16 text-center text-sm">{people} people</span>
+                          <button
+                            onClick={() => setPeople((n) => Math.min(50, n + 1))}
+                            className="h-8 w-8 rounded-full border border-brand-ink/15 text-lg leading-none"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-brand-ink/50">Each pays</p>
+                          <p className="font-heading text-lg font-bold text-brand-primary">
+                            {peso(Math.ceil(bill.total / people))}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <ul className="max-h-40 divide-y divide-plum-ink/5 overflow-y-auto">
+                          {bill.items.map((it, i) => (
+                            <li key={i}>
+                              <label className="flex items-center gap-2 py-1.5 text-sm">
+                                <input
+                                  type="checkbox"
+                                  checked={picked.has(i)}
+                                  onChange={() =>
+                                    setPicked((prev) => {
+                                      const next = new Set(prev);
+                                      next.has(i) ? next.delete(i) : next.add(i);
+                                      return next;
+                                    })
+                                  }
+                                />
+                                <span className="flex-1 text-brand-ink">
+                                  {it.quantity}× {it.name}
+                                </span>
+                                <span className="text-brand-ink/60">{peso(it.lineTotal)}</span>
+                              </label>
+                            </li>
+                          ))}
+                        </ul>
+                        <div className="mt-2 flex justify-between border-t border-plum-ink/10 pt-2 text-sm font-semibold">
+                          <span>Your items</span>
+                          <span className="text-brand-primary">
+                            {peso(bill.items.reduce((s, it, i) => (picked.has(i) ? s + it.lineTotal : s), 0))}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                    <p className="mt-2 text-center text-[11px] text-brand-ink/45">
+                      Show this to your server — pay your share at the counter (cash or card).
+                    </p>
+                  </div>
+                )}
 
                 <p className="mt-5 text-center text-sm font-semibold text-brand-ink/70">How would you like to pay?</p>
                 <div className="mt-3 space-y-2">
