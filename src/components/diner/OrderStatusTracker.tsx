@@ -6,6 +6,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getOrderStatus } from "@/server/orders/order-status";
 import { chime } from "@/lib/sound";
 import { formatPeso } from "@/lib/money";
+import { formatOrderNumber } from "@/lib/orders/order-number";
 import { FeedbackForm } from "./FeedbackForm";
 
 type Stage = {
@@ -73,6 +74,7 @@ export function OrderStatusTracker({
   slug,
   tableToken,
   orderId,
+  isCounter = false,
   googleReviewUrl = null,
   onDismiss,
   onStatus,
@@ -81,6 +83,7 @@ export function OrderStatusTracker({
   slug: string;
   tableToken: string;
   orderId: string;
+  isCounter?: boolean;
   googleReviewUrl?: string | null;
   onDismiss: () => void;
   onStatus?: (status: string) => void;
@@ -88,6 +91,7 @@ export function OrderStatusTracker({
   const t = useTranslations("feedback");
   const [status, setStatus] = useState<string>("pending");
   const [paymentStatus, setPaymentStatus] = useState<string>("unpaid");
+  const [orderNumber, setOrderNumber] = useState<number | null>(null);
   const [bill, setBill] = useState<{ total: number; discountAmount: number; discountLabel: string | null; net: number }>({
     total: 0,
     discountAmount: 0,
@@ -106,6 +110,7 @@ export function OrderStatusTracker({
     if (!res) return;
     setStatus(res.status);
     setPaymentStatus(res.paymentStatus);
+    setOrderNumber(res.orderNumber);
     setBill({
       total: res.total,
       discountAmount: res.discountAmount,
@@ -178,9 +183,21 @@ export function OrderStatusTracker({
       <div className={`mt-3 rounded-tile border p-4 ${TONE_CLASSES[stage.tone]}`}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="font-heading text-base font-bold text-brand-ink">{stage.label}</p>
+            {orderNumber != null && (
+              <p className="font-heading text-2xl font-extrabold leading-none text-brand-primary">
+                Order {formatOrderNumber(orderNumber)}
+              </p>
+            )}
+            <p className={`font-heading text-base font-bold text-brand-ink ${orderNumber != null ? "mt-1" : ""}`}>
+              {stage.label}
+            </p>
             {stage.detail && <p className="mt-0.5 text-sm text-brand-ink/70">{stage.detail}</p>}
-            <p className="mt-1 text-xs text-brand-ink/40">Order #{orderId.slice(0, 8)}</p>
+            {(isCounter || orderNumber != null) && !terminal && paymentStatus !== "paid" && (
+              <p className="mt-1 text-xs font-semibold text-brand-ink/70">
+                💳 Pay at the counter — show this number.
+              </p>
+            )}
+            <p className="mt-1 text-xs text-brand-ink/40">Ref #{orderId.slice(0, 8)}</p>
           </div>
           {terminal && (
             <button onClick={onDismiss} className="text-sm font-semibold text-brand-ink/50">

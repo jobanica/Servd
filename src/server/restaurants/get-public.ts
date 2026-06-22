@@ -30,10 +30,22 @@ export async function getPublicRestaurantBySlug(slug: string) {
 
 /** Validates a table token belongs to the restaurant. Returns the table or null. */
 export async function getTableByToken(restaurantId: string, qrToken: string) {
-  return systemDb((tx) =>
+  const table = await systemDb((tx) =>
     tx.table.findFirst({
       where: { restaurantId, qrToken },
       select: { id: true, tableNumber: true },
     }),
   );
+  if (!table) return null;
+  // isCounter may not exist yet on a lagging DB — read it best-effort.
+  let isCounter = false;
+  try {
+    const c = await systemDb((tx) =>
+      tx.table.findFirst({ where: { id: table.id }, select: { isCounter: true } }),
+    );
+    isCounter = c?.isCounter ?? false;
+  } catch {
+    /* column not migrated yet */
+  }
+  return { ...table, isCounter };
 }

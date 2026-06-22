@@ -48,6 +48,7 @@ export default async function DinerOrderPage({
       slug={slug}
       tableToken={tableToken}
       tableNumber={table.tableNumber}
+      isCounter={table.isCounter}
       brand={{
         name: restaurant.displayName || restaurant.name,
         logoUrl: restaurant.logoUrl,

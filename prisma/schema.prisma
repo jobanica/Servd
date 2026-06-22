@@ -577,6 +577,7 @@ model Table {
   restaurantId String
   tableNumber  String // string so "T1", "Patio-3" etc. are allowed
   qrToken      String   @unique // non-guessable token embedded in the QR
+  isCounter    Boolean  @default(false) // a single stall/takeout QR — issues order numbers, not a seat
   createdAt    DateTime @default(now())
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
@@ -1025,6 +1026,7 @@ model Order {
   restaurantId  String
   tableId       String?
   orderType     OrderType     @default(dine_in)
+  orderNumber   Int? // daily ticket number for counter/stall orders (resets daily)
   customerName  String? // for pickup / delivery
   customerPhone String?
   customerAddress String? // for delivery
@@ -1051,6 +1053,7 @@ model Order {
 
   @@index([restaurantId, status])
   @@index([restaurantId, createdAt]) // date-range analytics
+  @@index([restaurantId, orderNumber]) // daily counter-number lookup
   @@index([tableId])
   @@map("orders")
 }

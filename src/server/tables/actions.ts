@@ -57,6 +57,23 @@ export async function createTable(
   return { ok: true };
 }
 
+/**
+ * Creates the restaurant's single counter/takeout QR — a Table flagged
+ * isCounter. Stall/cart customers scan it, order, and get a daily order number
+ * (no table). No-op if one already exists.
+ */
+export async function createCounterTable(): Promise<void> {
+  const { restaurantId } = await requireAdminAction();
+  await tenantDb(restaurantId, async (tx) => {
+    const existing = await tx.table.findFirst({ where: { isCounter: true }, select: { id: true } });
+    if (existing) return;
+    await tx.table.create({
+      data: { restaurantId, tableNumber: "Counter", qrToken: newQrToken(), isCounter: true },
+    });
+  });
+  revalidatePath("/admin/tables");
+}
+
 export async function deleteTable(formData: FormData): Promise<void> {
   const { restaurantId } = await requireAdminAction();
   const id = String(formData.get("id"));

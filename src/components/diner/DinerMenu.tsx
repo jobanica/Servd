@@ -120,6 +120,7 @@ export function DinerMenu({
   slug,
   tableToken,
   tableNumber,
+  isCounter = false,
   brand,
   categories,
   payOnline,
@@ -132,6 +133,7 @@ export function DinerMenu({
   slug: string;
   tableToken: string;
   tableNumber: string;
+  isCounter?: boolean;
   brand: RestaurantBrand;
   categories: DinerCategory[];
   payOnline: boolean;
@@ -318,7 +320,7 @@ export function DinerMenu({
           <div className="min-w-0 flex-1">
             <h1 className="truncate font-heading text-base font-bold text-brand-ink">{brand.name}</h1>
             <p className="truncate text-xs text-brand-ink/55">
-              {t("table")} {tableNumber}
+              {isCounter ? "🧾 Order at the counter" : `${t("table")} ${tableNumber}`}
             </p>
           </div>
           <LanguageSwitcher />
@@ -388,6 +390,7 @@ export function DinerMenu({
             slug={slug}
             tableToken={tableToken}
             orderId={trackedOrderId}
+            isCounter={isCounter}
             googleReviewUrl={googleReviewUrl}
             onDismiss={stopTracking}
             onStatus={setOrderStatus}
@@ -410,8 +413,9 @@ export function DinerMenu({
         )}
       </main>
 
-      {/* Floating "Get the bill" — appears once the food is ready */}
-      {trackedOrderId && orderStatus === "done" && (
+      {/* Floating "Get the bill" — appears once the food is ready (dine-in only;
+          counter/stall customers pay at the counter, so there's no table bill) */}
+      {!isCounter && trackedOrderId && orderStatus === "done" && (
         <div className="fixed inset-x-0 bottom-24 z-30 mx-auto flex max-w-md flex-col items-center gap-2 px-4">
           <button
             onClick={() => setBillOpen(true)}
@@ -604,16 +608,18 @@ export function DinerMenu({
                   onPhone={saveLoyaltyPhone}
                 />
               )}
-              <CallWaiterButton slug={slug} tableToken={tableToken} />
-              <button
-                onClick={() => {
-                  setSheetOpen(false);
-                  setBillOpen(true);
-                }}
-                className="rounded-full py-3 text-center text-sm font-semibold text-white btn-brand"
-              >
-                🧾 {t("requestBill")}
-              </button>
+              {!isCounter && <CallWaiterButton slug={slug} tableToken={tableToken} />}
+              {!isCounter && (
+                <button
+                  onClick={() => {
+                    setSheetOpen(false);
+                    setBillOpen(true);
+                  }}
+                  className="rounded-full py-3 text-center text-sm font-semibold text-white btn-brand"
+                >
+                  🧾 {t("requestBill")}
+                </button>
+              )}
               <a
                 href={`/order/${slug}/${tableToken}/feedback`}
                 className="rounded-full border border-brand-ink/15 py-3 text-center text-sm font-semibold text-brand-ink"

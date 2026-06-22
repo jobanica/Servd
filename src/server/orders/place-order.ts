@@ -13,6 +13,7 @@ import {
   OrderValidationError,
 } from "@/server/orders/build-order";
 import { resolvePromo } from "@/server/promotions/redeem";
+import { startOfManilaDay } from "@/lib/orders/order-number";
 
 /**
  * Creates an order from a diner's cart. Diners have no session — the order is
@@ -44,7 +45,15 @@ export async function placeOrder(
       select: { id: true },
     });
     if (!table) return null;
-    return { restaurantId: restaurant.id, tableId: table.id };
+    // isCounter may not exist yet on a lagging DB — read it best-effort.
+    let isCounter = false;
+    try {
+      const c = await tx.table.findFirst({ where: { id: table.id }, select: { isCounter: true } });
+      isCounter = c?.isCounter ?? false;
+    } catch {
+      /* column not migrated yet */
+    }
+    return { restaurantId: restaurant.id, tableId: table.id, isCounter };
   });
   if (!ctx) return { ok: false, error: "This table or restaurant is unavailable." };
 
@@ -64,38 +73,50 @@ export async function placeOrder(
   }
 
   // Persist atomically, tenant-scoped (RLS WITH CHECK enforces the boundary).
+  // Counter/stall orders are takeout and carry a daily-reset order number.
   const baseData = {
     restaurantId: ctx.restaurantId,
     tableId: ctx.tableId,
     status: "pending" as const, // awaiting cashier acceptance
     paymentStatus: "unpaid" as const,
     total: built.total,
+    ...(ctx.isCounter ? { orderType: "takeout" as const } : {}),
     ...(discount ? { discountAmount: discount.amount, discountLabel: discount.label } : {}),
     items: { create: orderItemsCreate(built.items) },
   };
   const phone = loyaltyPhone?.trim() || null;
 
-  let order;
+  let order!: { id: string; orderNumber?: number | null };
   try {
-    order = await tenantDb(ctx.restaurantId, (tx) =>
-      tx.order.create({
-        data: phone ? { ...baseData, customerPhone: phone } : baseData,
-        select: { id: true },
-      }),
-    );
-  } catch (e) {
-    // customerPhone column may not exist yet on a lagging DB — retry without it.
-    if (phone) {
-      try {
-        order = await tenantDb(ctx.restaurantId, (tx) =>
-          tx.order.create({ data: baseData, select: { id: true } }),
-        );
-      } catch (e2) {
-        console.error("placeOrder: failed to create order", e2);
-        return { ok: false, error: "We couldn't place your order. Please try again." };
+    order = await tenantDb(ctx.restaurantId, async (tx) => {
+      // Next daily ticket number for a counter order (server-computed).
+      let orderNumber: number | null = null;
+      if (ctx.isCounter) {
+        const last = await tx.order.findFirst({
+          where: { orderNumber: { not: null }, createdAt: { gte: startOfManilaDay() } },
+          orderBy: { orderNumber: "desc" },
+          select: { orderNumber: true },
+        });
+        orderNumber = (last?.orderNumber ?? 0) + 1;
       }
-    } else {
-      console.error("placeOrder: failed to create order", e);
+      return tx.order.create({
+        data: {
+          ...baseData,
+          ...(phone ? { customerPhone: phone } : {}),
+          ...(orderNumber != null ? { orderNumber } : {}),
+        },
+        select: { id: true, orderNumber: true },
+      });
+    });
+  } catch (e) {
+    // customerPhone / orderNumber columns may not exist yet on a lagging DB —
+    // retry with just the base order so placement never hard-fails.
+    try {
+      order = await tenantDb(ctx.restaurantId, (tx) =>
+        tx.order.create({ data: baseData, select: { id: true } }),
+      );
+    } catch (e2) {
+      console.error("placeOrder: failed to create order", e2, e);
       return { ok: false, error: "We couldn't place your order. Please try again." };
     }
   }
@@ -103,5 +124,5 @@ export async function placeOrder(
   // Alert the live cashier screen (the kitchen ticket prints on acceptance).
   await notifyOrdersChanged(ctx.restaurantId);
 
-  return { ok: true, orderId: order.id };
+  return { ok: true, orderId: order.id, orderNumber: order.orderNumber ?? null };
 }

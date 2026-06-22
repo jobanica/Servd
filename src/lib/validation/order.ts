@@ -26,5 +26,5 @@ export const placeOrderSchema = z.object({
 
 export type PlaceOrderInput = z.infer<typeof placeOrderSchema>;
 export type PlaceOrderResult =
-  | { ok: true; orderId: string }
+  | { ok: true; orderId: string; orderNumber?: number | null }
   | { ok: false; error: string };

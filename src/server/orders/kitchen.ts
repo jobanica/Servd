@@ -4,6 +4,7 @@ import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireStaff } from "@/server/tenancy/current-user";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
 import { deductForOrder } from "@/server/inventory/deduct";
+import { formatOrderNumber } from "@/lib/orders/order-number";
 import type { KitchenOrder } from "@/lib/orders/types";
 
 const ACTIVE = ["new", "preparing"] as const;
@@ -69,16 +70,21 @@ export async function getKitchenOrders(): Promise<KitchenOrder[]> {
     }),
   );
 
-  // Best-effort pickup/delivery labels (columns may lag on prod).
+  // Best-effort pickup/delivery/counter labels (columns may lag on prod).
   const labels = new Map<string, string>();
   try {
     const meta = await tenantDb(staff.restaurantId, (tx) =>
       tx.order.findMany({
         where: { id: { in: orders.map((o) => o.id) }, orderType: { not: "dine_in" } },
-        select: { id: true, orderType: true, customerName: true },
+        select: { id: true, orderType: true, customerName: true, orderNumber: true },
       }),
     );
     for (const m of meta) {
+      // A counter/stall order shows its big daily ticket number to the kitchen.
+      if (m.orderNumber != null) {
+        labels.set(m.id, `🧾 ${formatOrderNumber(m.orderNumber)}`);
+        continue;
+      }
       labels.set(
         m.id,
         `${m.orderType === "delivery" ? "🛵 Delivery" : "🥡 Pickup"} — ${m.customerName ?? "Customer"}`,
