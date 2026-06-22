@@ -12,6 +12,7 @@ import {
 } from "@/lib/cart/pricing";
 import type { CartLine, DinerCategory, DinerItem, Selection } from "@/lib/cart/types";
 import { placeWebOrder } from "@/server/orders/web-order";
+import { captureCartLead } from "@/server/marketing/cart-recovery";
 import { LocationPicker } from "./LocationPicker";
 
 function lineId(): string {
@@ -273,7 +274,19 @@ export function WebOrder(props: WebOrderProps) {
               ))}
             </div>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="Phone number" className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
+            <input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              onBlur={() => {
+                // Capture an abandoned-cart lead once a usable phone is entered.
+                if (phone.replace(/[^\d+]/g, "").length >= 7 && lines.length > 0) {
+                  captureCartLead({ slug, name, phone, itemCount: lines.length, total: subtotal }).catch(() => {});
+                }
+              }}
+              inputMode="tel"
+              placeholder="Phone number"
+              className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+            />
             {orderType === "delivery" && (
               <>
                 {zones.length > 0 && (

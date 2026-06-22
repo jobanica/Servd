@@ -10,6 +10,7 @@ import {
 import { notifyOrdersChanged } from "@/server/realtime/notify";
 import { getPublicStorefront, isOpenNow } from "@/server/storefront/storefront";
 import { getLoyaltyConfig, enrollAccount } from "@/server/loyalty/loyalty";
+import { markCartConverted } from "@/server/marketing/cart-recovery";
 import { formatPeso } from "@/lib/money";
 
 const schema = z.object({
@@ -118,6 +119,9 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
   }
 
   await notifyOrdersChanged(restaurant.id);
+
+  // The cart converted — close any open abandoned-cart lead for this phone.
+  await markCartConverted(restaurant.id, d.customerPhone);
 
   // Auto-enroll the customer into loyalty (they gave name + phone). Best-effort.
   try {
