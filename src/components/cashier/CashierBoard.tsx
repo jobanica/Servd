@@ -27,6 +27,7 @@ import { ShiftSummaryModal } from "./ShiftSummaryModal";
 import { VoidPinModal } from "./VoidPinModal";
 import { EditOrderModal } from "./EditOrderModal";
 import { GiftCardModal } from "./GiftCardModal";
+import { SplitPaymentModal } from "./SplitPaymentModal";
 import { removeGiftCard } from "@/server/gift-cards/gift-cards";
 import { CashOutModal } from "./CashOutModal";
 import { BluetoothPrinterButton } from "./BluetoothPrinterButton";
@@ -57,6 +58,7 @@ export function CashierBoard({
   const [voidOrderTarget, setVoidOrderTarget] = useState<{ id: string; label: string } | null>(null);
   const [editOrderTarget, setEditOrderTarget] = useState<{ id: string; label: string } | null>(null);
   const [giftCardTarget, setGiftCardTarget] = useState<{ id: string; label: string } | null>(null);
+  const [splitTarget, setSplitTarget] = useState<{ id: string; label: string; remaining: number } | null>(null);
   const [discountOrder, setDiscountOrder] = useState<CashierTable["orders"][number] | null>(null);
   const [loyaltyOrderId, setLoyaltyOrderId] = useState<string | null>(null);
   const [waiterCalls, setWaiterCalls] = useState<{ id: string; tableNumber: string }[]>([]);
@@ -456,6 +458,11 @@ export function CashierBoard({
                       {o.discountLabel ?? "Discount"} · −{formatPeso(o.discountAmount)}
                     </p>
                   )}
+                  {o.paid > 0 && o.paid < o.net && (
+                    <p className="mt-0.5 text-xs font-semibold text-mango">
+                      Part-paid {formatPeso(o.paid)} · {formatPeso(o.net - o.paid)} left
+                    </p>
+                  )}
                   {o.creditApplied > 0 && (
                     <p className="mt-0.5 flex items-center gap-2 text-xs font-semibold text-brand-primary">
                       🎁 Gift card · −{formatPeso(o.creditApplied)}
@@ -534,6 +541,13 @@ export function CashierBoard({
                           className="rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
                         >
                           Paid (card)
+                        </button>
+                        <button
+                          onClick={() => setSplitTarget({ id: o.id, label: t.label, remaining: Math.max(0, o.net - o.paid) })}
+                          disabled={busy === o.id}
+                          className="rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
+                        >
+                          Split
                         </button>
                         <button
                           onClick={() => setEditOrderTarget({ id: o.id, label: t.label })}
@@ -877,6 +891,16 @@ export function CashierBoard({
           label={giftCardTarget.label}
           onClose={() => setGiftCardTarget(null)}
           onApplied={(t) => setTables(t)}
+        />
+      )}
+
+      {splitTarget && (
+        <SplitPaymentModal
+          orderId={splitTarget.id}
+          label={splitTarget.label}
+          remaining={splitTarget.remaining}
+          onClose={() => setSplitTarget(null)}
+          onResult={(t) => setTables(t)}
         />
       )}
     </div>

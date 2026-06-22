@@ -13,6 +13,7 @@ import {
 } from "@/server/orders/build-order";
 import type { DinerCategory } from "@/lib/cart/types";
 import { computeDiscount, netTotal, type DiscountKind } from "@/lib/discount";
+import { pesosToCentavos } from "@/lib/money";
 import { formatOrderNumber } from "@/lib/orders/order-number";
 import { isVoidReason } from "@/lib/orders/void-reasons";
 import { writeAudit } from "@/server/audit/log";
@@ -27,6 +28,7 @@ export interface CashierOrder {
   discountAmount: number;
   discountLabel: string | null;
   creditApplied: number; // centavos paid by a redeemed gift card
+  paid: number; // centavos already tendered (split/partial payments)
   net: number; // total - discount - credit
   billRequested: boolean;
   paidOnline: boolean; // a confirmed gateway (PayMongo) payment exists
@@ -150,7 +152,7 @@ export async function getCashierTables(): Promise<CashierTable[]> {
         createdAt: true,
         table: { select: { id: true, tableNumber: true } },
         _count: { select: { items: true } },
-        payments: { where: { status: "paid" }, select: { gateway: true } },
+        payments: { where: { status: "paid" }, select: { gateway: true, amount: true } },
       },
     }),
   );
@@ -212,6 +214,7 @@ export async function getCashierTables(): Promise<CashierTable[]> {
     const discountAmount = disc?.amount ?? 0;
     const creditApplied = credits.get(o.id) ?? 0;
     const net = netTotal(o.total, discountAmount, creditApplied);
+    const paid = o.payments.reduce((s, p) => s + (p.amount ?? 0), 0);
     t.orders.push({
       id: o.id,
       status: o.status,
@@ -220,6 +223,7 @@ export async function getCashierTables(): Promise<CashierTable[]> {
       discountAmount,
       discountLabel: disc?.label ?? null,
       creditApplied,
+      paid,
       net,
       billRequested: o.billRequested,
       paidOnline: o.payments.some((p) => p.gateway === "paymongo"),
@@ -227,7 +231,7 @@ export async function getCashierTables(): Promise<CashierTable[]> {
       createdAt: o.createdAt.toISOString(),
       itemCount: o._count.items,
     });
-    if (o.paymentStatus !== "paid") t.outstanding += net;
+    if (o.paymentStatus !== "paid") t.outstanding += Math.max(0, net - paid);
     if (o.billRequested) t.billRequested = true;
   }
 
@@ -383,8 +387,11 @@ export async function markOrderPaid(
     await tenantDb(staff.restaurantId, async (tx) => {
       const order = await tx.order.findFirst({ where: { id: orderId }, select: { total: true } });
       if (!order) throw new Error("Order not found");
-      const amount = netTotal(order.total, disc?.amount ?? 0, credit);
-      netPaid = amount;
+      const net = netTotal(order.total, disc?.amount ?? 0, credit);
+      // Settle only what's still owed after any prior split/partial tenders.
+      const agg = await tx.payment.aggregate({ where: { orderId, status: "paid" }, _sum: { amount: true } });
+      const amount = Math.max(0, net - (agg._sum.amount ?? 0));
+      netPaid = net;
       // updateMany (not update) so it doesn't read the whole row back — keeps
       // working even if the prod schema lags (e.g. missing newer columns).
       await tx.order.updateMany({
@@ -392,9 +399,11 @@ export async function markOrderPaid(
         // Paying in person settles the order: mark paid AND close it.
         data: { paymentStatus: "paid", billRequested: false, status: "closed" },
       });
-      await tx.payment.create({
-        data: { orderId, amount, method, gateway: "manual", status: "paid" },
-      });
+      if (amount > 0) {
+        await tx.payment.create({
+          data: { orderId, amount, method, gateway: "manual", status: "paid" },
+        });
+      }
     });
   } catch (e) {
     console.error("markOrderPaid failed", e);
@@ -412,6 +421,85 @@ export async function markOrderPaid(
 
   await notifyOrdersChanged(staff.restaurantId);
   return { ok: true, tables: await getCashierTables(), printTicket: clientPrintNeeded };
+}
+
+export type PartialPaymentResult =
+  | { ok: true; settled: boolean; remaining: number; tables: CashierTable[]; printTicket?: boolean }
+  | { ok: false; error: string };
+
+/**
+ * Split / partial payment — record one tender (cash or card) toward an order's
+ * net. The amount is clamped server-side to what's still owed; when the running
+ * total of tenders covers the net, the order is settled (paid + closed) and the
+ * receipt prints. Money is never trusted from the client.
+ */
+export async function recordPartialPayment(
+  orderId: string,
+  amountPesos: number,
+  method: "cash" | "card_terminal",
+): Promise<PartialPaymentResult> {
+  let staff;
+  try {
+    staff = await requireStaff(["cashier", "admin"]);
+  } catch {
+    return { ok: false, error: "Not allowed." };
+  }
+  const requested = pesosToCentavos(Number(amountPesos) || 0);
+  if (requested <= 0) return { ok: false, error: "Enter an amount." };
+
+  const disc = (await discountMap(staff.restaurantId, [orderId])).get(orderId);
+  const credit = (await creditMap(staff.restaurantId, [orderId])).get(orderId) ?? 0;
+  let settled = false;
+  let remaining = 0;
+
+  try {
+    await tenantDb(staff.restaurantId, async (tx) => {
+      const order = await tx.order.findFirst({
+        where: { id: orderId, paymentStatus: { not: "paid" } },
+        select: { total: true },
+      });
+      if (!order) throw new Error("This order is already settled.");
+      const net = netTotal(order.total, disc?.amount ?? 0, credit);
+      const agg = await tx.payment.aggregate({
+        where: { orderId, status: "paid" },
+        _sum: { amount: true },
+      });
+      const paidSoFar = agg._sum.amount ?? 0;
+      const owed = Math.max(0, net - paidSoFar);
+      if (owed <= 0) throw new Error("This order is already fully paid.");
+
+      const amount = Math.min(requested, owed);
+      await tx.payment.create({
+        data: { orderId, amount, method, gateway: "manual", status: "paid" },
+      });
+      remaining = owed - amount;
+      if (remaining <= 0) {
+        settled = true;
+        await tx.order.updateMany({
+          where: { id: orderId },
+          data: { paymentStatus: "paid", billRequested: false, status: "closed" },
+        });
+      }
+    });
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Couldn't record the payment." };
+  }
+
+  let printTicket = false;
+  if (settled) {
+    const phone = (await orderMetaMap(staff.restaurantId, [orderId])).get(orderId)?.customerPhone ?? null;
+    // Award loyalty on the full net once the order is settled.
+    const disc2 = (await discountMap(staff.restaurantId, [orderId])).get(orderId);
+    const credit2 = (await creditMap(staff.restaurantId, [orderId])).get(orderId) ?? 0;
+    const order = await tenantDb(staff.restaurantId, (tx) =>
+      tx.order.findFirst({ where: { id: orderId }, select: { total: true } }),
+    );
+    if (order) await awardPointsForOrder(staff.restaurantId, orderId, netTotal(order.total, disc2?.amount ?? 0, credit2), phone);
+    printTicket = (await printReceipt(staff.restaurantId, orderId)).clientPrintNeeded;
+  }
+
+  await notifyOrdersChanged(staff.restaurantId);
+  return { ok: true, settled, remaining, tables: await getCashierTables(), printTicket };
 }
 
 /** Close (settle) an order so it leaves the active boards. */
