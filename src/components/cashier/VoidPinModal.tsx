@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { voidOrder, type CashierTable } from "@/server/orders/cashier";
+import { VOID_REASONS } from "@/lib/orders/void-reasons";
 
 /** PIN prompt to authorize voiding an unpaid order. */
 export function VoidPinModal({
@@ -16,6 +17,7 @@ export function VoidPinModal({
   onVoided: (tables: CashierTable[]) => void;
 }) {
   const [pin, setPin] = useState("");
+  const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -23,7 +25,7 @@ export function VoidPinModal({
     setBusy(true);
     setError(null);
     try {
-      const res = await voidOrder(orderId, pin);
+      const res = await voidOrder(orderId, pin, reason);
       if (res.ok) {
         if (res.tables) onVoided(res.tables);
         onClose();
@@ -45,17 +47,29 @@ export function VoidPinModal({
           <button onClick={onClose} className="text-plum-ink/40 hover:text-plum-ink">✕</button>
         </div>
         <p className="mb-3 text-sm text-plum-ink/55">
-          Voiding <span className="font-semibold text-plum-ink">{label}</span>. Enter the void PIN to
-          confirm.
+          Voiding <span className="font-semibold text-plum-ink">{label}</span>. Pick a reason and enter
+          the manager void PIN.
         </p>
+        <label className="mb-1 block text-xs font-semibold text-plum-ink/60">Reason</label>
+        <select
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          className="mb-3 w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+        >
+          <option value="">Select a reason…</option>
+          {VOID_REASONS.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
         <input
-          autoFocus
           type="password"
           inputMode="numeric"
           value={pin}
           onChange={(e) => setPin(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && pin && submit()}
-          placeholder="PIN"
+          onKeyDown={(e) => e.key === "Enter" && pin && reason && submit()}
+          placeholder="Manager PIN"
           className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-center tracking-[0.4em]"
         />
         {error && <p className="mt-2 text-sm text-guava">{error}</p>}
@@ -68,7 +82,7 @@ export function VoidPinModal({
           </button>
           <button
             onClick={submit}
-            disabled={busy || !pin}
+            disabled={busy || !pin || !reason}
             className="flex-1 rounded-full bg-guava py-2.5 text-sm font-semibold text-white disabled:opacity-60"
           >
             {busy ? "Voiding…" : "Void order"}
