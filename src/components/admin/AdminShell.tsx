@@ -50,6 +50,7 @@ const ITEM_FEATURE: Record<string, string> = {
   "/admin/payments": "onlinePayments",
   "/admin/domains": "customDomain",
   "/admin/floor": "floorPlan",
+  "/admin/reservations": "reservations",
 };
 
 type Item = { label: string; href: string; d: string };
@@ -62,6 +63,7 @@ const NAV: { group: string; items: Item[] }[] = [
       { label: "Modifiers", href: "/admin/modifiers", d: I.layers },
       { label: "Tables & QR", href: "/admin/tables", d: I.grid },
       { label: "Floor plan", href: "/admin/floor", d: I.grid },
+      { label: "Reservations", href: "/admin/reservations", d: I.grid },
     ],
   },
   {
