@@ -14,6 +14,8 @@ import {
 import type { DinerCategory } from "@/lib/cart/types";
 import { computeDiscount, netTotal, type DiscountKind } from "@/lib/discount";
 import { formatOrderNumber } from "@/lib/orders/order-number";
+import { isVoidReason } from "@/lib/orders/void-reasons";
+import { writeAudit } from "@/server/audit/log";
 import { awardPointsForOrder, getBalance, getLoyaltyConfig, redeemPoints, enrollAccount } from "@/server/loyalty/loyalty";
 import { notifyCustomer, restaurantDisplayName } from "@/server/sms/notify";
 
@@ -489,6 +491,7 @@ export async function reopenOrder(
 export async function voidOrder(
   orderId: string,
   pin: string,
+  reason?: string,
 ): Promise<{ ok: boolean; tables?: CashierTable[]; error?: string }> {
   let staff;
   try {
@@ -499,11 +502,51 @@ export async function voidOrder(
 
   const entered = (pin ?? "").trim();
   if (!entered) return { ok: false, error: "Enter the void PIN." };
+  const reasonText = (reason ?? "").trim();
+  if (!reasonText || !isVoidReason(reasonText)) return { ok: false, error: "Select a reason for the void." };
 
-  // Read the configured PIN (best-effort — column may lag on prod).
+  const pinCheck = await checkVoidPin(staff.restaurantId, entered);
+  if (!pinCheck.ok) return { ok: false, error: pinCheck.error };
+
+  try {
+    await tenantDb(staff.restaurantId, async (tx) => {
+      const before = await tx.order.findFirst({
+        where: { id: orderId, paymentStatus: { not: "paid" } },
+        select: { id: true, status: true, total: true, tableId: true },
+      });
+      if (!before) throw new Error("Only an unpaid order can be voided.");
+      // Cancelled status removes it from the board; tag voidedAt for reconciliation.
+      await tx.order.updateMany({
+        where: { id: orderId, paymentStatus: { not: "paid" } },
+        data: { status: "cancelled", billRequested: false, voidedAt: new Date() },
+      });
+      await writeAudit(tx, staff.restaurantId, {
+        actorStaffId: staff.staffUserId,
+        actorEmail: staff.email,
+        action: "order.void",
+        entityType: "order",
+        entityId: orderId,
+        reason: reasonText,
+        before: { status: before.status, total: before.total },
+        after: { status: "cancelled" },
+      });
+    });
+  } catch (e) {
+    console.error("voidOrder failed", e);
+    return { ok: false, error: e instanceof Error ? e.message : "Could not void the order." };
+  }
+  await notifyOrdersChanged(staff.restaurantId);
+  return { ok: true, tables: await getCashierTables() };
+}
+
+/** Verifies the cashier void PIN (best-effort read — column may lag on prod). */
+async function checkVoidPin(
+  restaurantId: string,
+  entered: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
   let configured: string | null = null;
   try {
-    const r = await tenantDb(staff.restaurantId, (tx) =>
+    const r = await tenantDb(restaurantId, (tx) =>
       tx.restaurant.findFirst({ select: { cashierVoidPin: true } }),
     );
     configured = r?.cashierVoidPin ?? null;
@@ -512,27 +555,133 @@ export async function voidOrder(
   }
   if (!configured) return { ok: false, error: "No void PIN set. Ask an admin to set one in Settings." };
   if (entered !== configured) return { ok: false, error: "Incorrect PIN." };
+  return { ok: true };
+}
+
+export interface EditableItem {
+  id: string;
+  name: string;
+  quantity: number;
+  lineTotal: number; // centavos (unit incl. modifiers × qty)
+}
+
+/** Items on an open, unpaid order — for the manager edit (void-item) view. */
+export async function getOrderItems(orderId: string): Promise<EditableItem[]> {
+  let staff;
+  try {
+    staff = await requireStaff(["cashier", "admin"]);
+  } catch {
+    return [];
+  }
+  const order = await tenantDb(staff.restaurantId, (tx) =>
+    tx.order.findFirst({
+      where: { id: orderId, paymentStatus: { not: "paid" } },
+      select: {
+        items: {
+          select: {
+            id: true,
+            nameAtTime: true,
+            quantity: true,
+            unitPrice: true,
+            modifiers: { select: { priceDeltaAtTime: true } },
+          },
+        },
+      },
+    }),
+  );
+  if (!order) return [];
+  return order.items.map((i) => ({
+    id: i.id,
+    name: i.nameAtTime,
+    quantity: i.quantity,
+    lineTotal: (i.unitPrice + i.modifiers.reduce((s, m) => s + m.priceDeltaAtTime, 0)) * i.quantity,
+  }));
+}
+
+/**
+ * Manager edit — void a single line item from an unpaid order. Requires the
+ * void PIN + a reason, recomputes the order total SERVER-SIDE from the
+ * remaining items (never trusts the client), and logs to the audit trail. If
+ * the last item is removed, the whole order is voided.
+ */
+export async function voidOrderItem(
+  orderId: string,
+  itemId: string,
+  pin: string,
+  reason?: string,
+): Promise<{ ok: boolean; tables?: CashierTable[]; error?: string }> {
+  let staff;
+  try {
+    staff = await requireStaff(["cashier", "admin"]);
+  } catch {
+    return { ok: false, error: "Not allowed." };
+  }
+  const entered = (pin ?? "").trim();
+  if (!entered) return { ok: false, error: "Enter the void PIN." };
+  const reasonText = (reason ?? "").trim();
+  if (!reasonText || !isVoidReason(reasonText)) return { ok: false, error: "Select a reason." };
+
+  const pinCheck = await checkVoidPin(staff.restaurantId, entered);
+  if (!pinCheck.ok) return { ok: false, error: pinCheck.error };
 
   try {
-    await tenantDb(staff.restaurantId, (tx) =>
-      // Only unpaid orders can be voided; cancelled status removes it from the board.
-      tx.order.updateMany({
+    await tenantDb(staff.restaurantId, async (tx) => {
+      const order = await tx.order.findFirst({
         where: { id: orderId, paymentStatus: { not: "paid" } },
-        data: { status: "cancelled", billRequested: false },
-      }),
-    );
+        select: {
+          id: true,
+          total: true,
+          items: {
+            select: {
+              id: true,
+              nameAtTime: true,
+              quantity: true,
+              unitPrice: true,
+              modifiers: { select: { priceDeltaAtTime: true } },
+            },
+          },
+        },
+      });
+      if (!order) throw new Error("Only an unpaid order can be edited.");
+      const target = order.items.find((i) => i.id === itemId);
+      if (!target) throw new Error("Item not found on this order.");
+
+      const lineValue = (it: (typeof order.items)[number]) =>
+        (it.unitPrice + it.modifiers.reduce((s, m) => s + m.priceDeltaAtTime, 0)) * it.quantity;
+      const remaining = order.items.filter((i) => i.id !== itemId);
+      const newTotal = remaining.reduce((s, i) => s + lineValue(i), 0);
+
+      // Remove the line (its modifiers cascade) and recompute the order total.
+      await tx.orderItem.delete({ where: { id: itemId } });
+
+      if (remaining.length === 0) {
+        // Nothing left — void the whole order.
+        await tx.order.update({
+          where: { id: orderId },
+          data: { total: 0, status: "cancelled", billRequested: false, voidedAt: new Date() },
+        });
+      } else {
+        await tx.order.update({ where: { id: orderId }, data: { total: newTotal } });
+      }
+
+      await writeAudit(tx, staff.restaurantId, {
+        actorStaffId: staff.staffUserId,
+        actorEmail: staff.email,
+        action: "order.item_void",
+        entityType: "order_item",
+        entityId: itemId,
+        reason: reasonText,
+        before: {
+          orderId,
+          item: { name: target.nameAtTime, quantity: target.quantity, lineTotal: lineValue(target) },
+          orderTotal: order.total,
+        },
+        after: { orderTotal: remaining.length === 0 ? 0 : newTotal, orderVoided: remaining.length === 0 },
+      });
+    });
   } catch (e) {
-    console.error("voidOrder failed", e);
-    return { ok: false, error: e instanceof Error ? e.message : "Could not void the order." };
-  }
-  // Tag it as voided (best-effort) so it lists under "Voided today", separate
-  // from declined incoming orders. Works even if the column lags on prod.
-  try {
-    await tenantDb(staff.restaurantId, (tx) =>
-      tx.order.updateMany({ where: { id: orderId }, data: { voidedAt: new Date() } }),
-    );
-  } catch {
-    /* voidedAt column not migrated yet */
+    console.error("voidOrderItem failed", e);
+    return { ok: false, error: e instanceof Error ? e.message : "Could not edit the order." };
   }
   await notifyOrdersChanged(staff.restaurantId);
   return { ok: true, tables: await getCashierTables() };

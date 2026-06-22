@@ -247,6 +247,7 @@ model Restaurant {
   promotions      Promotion[]
   customers       CustomerContact[]
   smsCampaigns    SmsCampaign[]
+  auditLogs       AuditLog[]
   smsCreditLedger SmsCreditLedger[]
   invoices        RestaurantInvoice[]
   suppliers       Supplier[]
@@ -572,12 +573,23 @@ model ReferralEvent {
 // Tables & menu
 // ----------------------------------------------------------------------------
 
+enum TableStatus {
+  empty
+  occupied
+  needs_cleaning
+  reserved
+}
+
 model Table {
   id           String   @id @default(uuid())
   restaurantId String
   tableNumber  String // string so "T1", "Patio-3" etc. are allowed
   qrToken      String   @unique // non-guessable token embedded in the QR
   isCounter    Boolean  @default(false) // a single stall/takeout QR — issues order numbers, not a seat
+  status       TableStatus @default(empty) // floor-plan status (occupancy is also derived from open orders)
+  posX         Int? // floor-plan layout position
+  posY         Int?
+  seats        Int? // capacity (optional, used by reservations)
   createdAt    DateTime @default(now())
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
@@ -586,6 +598,28 @@ model Table {
   @@unique([restaurantId, tableNumber])
   @@index([restaurantId])
   @@map("tables")
+}
+
+/// Immutable audit trail — every sensitive change (voids, edits, discounts,
+/// status overrides) records who/what/when with before/after snapshots.
+model AuditLog {
+  id           String   @id @default(uuid())
+  restaurantId String
+  actorStaffId String? // StaffUser.id of who did it (null = system)
+  actorEmail   String? // snapshot of the actor's email for display
+  action       String // e.g. "order.void", "order.item_void", "table.status"
+  entityType   String // "order", "table", "order_item", …
+  entityId     String?
+  reason       String? // mandatory reason code/text for approvals
+  before       Json? // snapshot before the change
+  after        Json? // snapshot after the change
+  createdAt    DateTime @default(now())
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, createdAt])
+  @@index([restaurantId, entityType, entityId])
+  @@map("audit_logs")
 }
 
 model Category {

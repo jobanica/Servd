@@ -25,6 +25,7 @@ import { AddCustomerModal } from "./AddCustomerModal";
 import { ClosedOrdersModal } from "./ClosedOrdersModal";
 import { ShiftSummaryModal } from "./ShiftSummaryModal";
 import { VoidPinModal } from "./VoidPinModal";
+import { EditOrderModal } from "./EditOrderModal";
 import { CashOutModal } from "./CashOutModal";
 import { BluetoothPrinterButton } from "./BluetoothPrinterButton";
 import { printPaidTicket } from "@/server/printing/print";
@@ -52,6 +53,7 @@ export function CashierBoard({
   const [shiftOpen, setShiftOpen] = useState(false);
   const [cashOutOpen, setCashOutOpen] = useState(false);
   const [voidOrderTarget, setVoidOrderTarget] = useState<{ id: string; label: string } | null>(null);
+  const [editOrderTarget, setEditOrderTarget] = useState<{ id: string; label: string } | null>(null);
   const [discountOrder, setDiscountOrder] = useState<CashierTable["orders"][number] | null>(null);
   const [loyaltyOrderId, setLoyaltyOrderId] = useState<string | null>(null);
   const [waiterCalls, setWaiterCalls] = useState<{ id: string; tableNumber: string }[]>([]);
@@ -505,6 +507,13 @@ export function CashierBoard({
                           Paid (card)
                         </button>
                         <button
+                          onClick={() => setEditOrderTarget({ id: o.id, label: t.label })}
+                          disabled={busy === o.id}
+                          className="rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
+                        >
+                          Edit
+                        </button>
+                        <button
                           onClick={() => setVoidOrderTarget({ id: o.id, label: t.label })}
                           disabled={busy === o.id}
                           className="rounded-lg border border-guava/40 px-3 py-1.5 text-xs font-semibold text-guava disabled:opacity-60"
@@ -812,6 +821,15 @@ export function CashierBoard({
           label={voidOrderTarget.label}
           onClose={() => setVoidOrderTarget(null)}
           onVoided={(t) => setTables(t)}
+        />
+      )}
+
+      {editOrderTarget && (
+        <EditOrderModal
+          orderId={editOrderTarget.id}
+          label={editOrderTarget.label}
+          onClose={() => setEditOrderTarget(null)}
+          onChanged={(t) => setTables(t)}
         />
       )}
     </div>
