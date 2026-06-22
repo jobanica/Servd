@@ -24,6 +24,7 @@ import { LoyaltyRedeemModal } from "./LoyaltyRedeemModal";
 import { AddCustomerModal } from "./AddCustomerModal";
 import { ClosedOrdersModal } from "./ClosedOrdersModal";
 import { ShiftSummaryModal } from "./ShiftSummaryModal";
+import { ShiftNotesModal } from "./ShiftNotesModal";
 import { VoidPinModal } from "./VoidPinModal";
 import { EditOrderModal } from "./EditOrderModal";
 import { GiftCardModal } from "./GiftCardModal";
@@ -55,6 +56,7 @@ export function CashierBoard({
   const [closedOpen, setClosedOpen] = useState(false);
   const [shiftOpen, setShiftOpen] = useState(false);
   const [cashOutOpen, setCashOutOpen] = useState(false);
+  const [shiftNotesOpen, setShiftNotesOpen] = useState(false);
   const [voidOrderTarget, setVoidOrderTarget] = useState<{ id: string; label: string } | null>(null);
   const [editOrderTarget, setEditOrderTarget] = useState<{ id: string; label: string } | null>(null);
   const [giftCardTarget, setGiftCardTarget] = useState<{ id: string; label: string } | null>(null);
@@ -321,6 +323,7 @@ export function CashierBoard({
       <button onClick={() => setClosedOpen(true)} className={sidebarBtn}>Closed orders</button>
       <button onClick={() => setCashOutOpen(true)} className={sidebarBtn}>Cash out</button>
       <button onClick={() => setShiftOpen(true)} className={sidebarBtn}>End-of-shift summary</button>
+      <button onClick={() => setShiftNotesOpen(true)} className={sidebarBtn}>📝 Handover notes</button>
 
       <div className="my-1 border-t border-plum-ink/10" />
 
@@ -854,6 +857,8 @@ export function CashierBoard({
       {shiftOpen && <ShiftSummaryModal onClose={() => setShiftOpen(false)} />}
 
       {cashOutOpen && <CashOutModal onClose={() => setCashOutOpen(false)} />}
+
+      {shiftNotesOpen && <ShiftNotesModal onClose={() => setShiftNotesOpen(false)} />}
 
       {voidOrderTarget && (
         <VoidPinModal
