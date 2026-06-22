@@ -51,6 +51,8 @@ const ITEM_FEATURE: Record<string, string> = {
   "/admin/domains": "customDomain",
   "/admin/floor": "floorPlan",
   "/admin/reservations": "reservations",
+  "/admin/export": "dataExport",
+  "/admin/audit": "auditLog",
 };
 
 type Item = { label: string; href: string; d: string };
@@ -108,6 +110,8 @@ const NAV: { group: string; items: Item[] }[] = [
       { label: "Printing", href: "/admin/printing", d: I.print },
       { label: "Custom domain", href: "/admin/domains", d: I.globe },
       { label: "Billing", href: "/admin/billing", d: I.receipt },
+      { label: "Data export", href: "/admin/export", d: I.receipt },
+      { label: "Audit log", href: "/admin/audit", d: I.receipt },
     ],
   },
 ];

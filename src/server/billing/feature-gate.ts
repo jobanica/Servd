@@ -21,6 +21,8 @@ export type Feature =
   | "floorPlan"
   | "giftCards"
   | "reservations"
+  | "dataExport"
+  | "auditLog"
   | "accounting"
   | "inventory"
   | "hr"
@@ -38,6 +40,8 @@ const FEATURE_TIERS: Record<Feature, Tier[]> = {
   floorPlan: ["Growth", "Business"],
   giftCards: ["Growth", "Business"],
   reservations: ["Growth", "Business"],
+  dataExport: ["Growth", "Business"],
+  auditLog: ["Business"],
   customDomain: ["Growth", "Business"],
   accounting: ["Business"],
   inventory: ["Business"],
