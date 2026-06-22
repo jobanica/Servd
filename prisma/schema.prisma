@@ -255,6 +255,8 @@ model Restaurant {
   happyHours      HappyHour[]
   giftCards       GiftCard[]
   reservations    Reservation[]
+  cartLeads       CartLead[]
+  shiftNotes      ShiftNote[]
   smsCreditLedger SmsCreditLedger[]
   invoices        RestaurantInvoice[]
   suppliers       Supplier[]
@@ -1102,6 +1104,42 @@ model Order {
   @@index([restaurantId, orderNumber]) // daily counter-number lookup
   @@index([tableId])
   @@map("orders")
+}
+
+/// Shift handover notes — free-text left by one shift for the next.
+model ShiftNote {
+  id           String   @id @default(uuid())
+  restaurantId String
+  authorStaffId String?
+  authorName   String?
+  body         String
+  createdAt    DateTime @default(now())
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, createdAt])
+  @@map("shift_notes")
+}
+
+/// Online-ordering cart leads — captured when a diner enters their phone at
+/// checkout. If the order isn't placed, a cron sends a recovery message.
+model CartLead {
+  id            String    @id @default(uuid())
+  restaurantId  String
+  customerName  String?
+  customerPhone String
+  itemCount     Int       @default(0)
+  total         Int       @default(0) // centavos
+  status        String    @default("open") // open | converted | recovered
+  recoveredAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, status])
+  @@index([restaurantId, customerPhone])
+  @@map("cart_leads")
 }
 
 /// Reservations & waitlist. A booking with a time is a reservation; a `null`
