@@ -9,7 +9,8 @@ import { requireSuperAdmin } from "@/server/tenancy/current-user";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { runBillingCron, type CronSummary } from "@/server/billing/run-cron";
 import { saveXenditCreds } from "@/server/billing/platform-settings";
-import { provisionFreePlan } from "@/server/billing/subscription";
+import { provisionFreePlan, getFreePlan } from "@/server/billing/subscription";
+import { COMP_FOREVER } from "@/lib/billing/comp";
 import { uniqueSlug } from "@/lib/slug";
 import { addMonths } from "@/lib/billing/period";
 import { ALL_FEATURES, type Feature } from "@/lib/billing/features";
@@ -268,6 +269,60 @@ export async function compMonth(formData: FormData): Promise<void> {
       data: { status: "active", currentPeriodEnd: addMonths(base, 1), failedCharges: 0, cancelAtPeriodEnd: false },
     });
     await tx.restaurant.update({ where: { id: restaurantId }, data: { status: "active" } });
+  });
+  refresh();
+}
+
+/**
+ * Manually upgrade a subscriber to FULL ACCESS without payment. Implemented as a
+ * complimentary trial: a trialing subscription unlocks every feature, and the
+ * billing cron never bills or suspends a trial that hasn't ended — so a far-out
+ * (or chosen) end date = free access to everything until you revoke it.
+ */
+export async function grantFullAccess(formData: FormData): Promise<void> {
+  await requireSuperAdmin();
+  const restaurantId = String(formData.get("restaurantId"));
+  const duration = String(formData.get("duration") ?? "forever");
+  const months: Record<string, number> = { "1m": 1, "3m": 3, "12m": 12 };
+  const trialEndsAt = duration in months ? addMonths(new Date(), months[duration]) : COMP_FOREVER;
+  await systemDb(async (tx) => {
+    const sub = await ensureSubscription(tx, restaurantId);
+    await tx.subscription.update({
+      where: { id: sub.id },
+      data: {
+        status: "trialing",
+        trialEndsAt,
+        currentPeriodEnd: trialEndsAt,
+        cancelAtPeriodEnd: false,
+        failedCharges: 0,
+      },
+    });
+    await tx.restaurant.update({ where: { id: restaurantId }, data: { status: "active" } });
+  });
+  refresh();
+}
+
+/** End complimentary access — drop the subscriber back to the Free plan (active). */
+export async function revokeFullAccess(formData: FormData): Promise<void> {
+  await requireSuperAdmin();
+  const restaurantId = String(formData.get("restaurantId"));
+  await systemDb(async (tx) => {
+    const sub = await ensureSubscription(tx, restaurantId);
+    const free = await getFreePlan(tx);
+    await tx.subscription.update({
+      where: { id: sub.id },
+      data: {
+        ...(free ? { planId: free.id } : {}),
+        status: "active",
+        trialEndsAt: null,
+        cancelAtPeriodEnd: false,
+        failedCharges: 0,
+      },
+    });
+    await tx.restaurant.update({
+      where: { id: restaurantId },
+      data: { ...(free ? { planId: free.id } : {}), status: "active" },
+    });
   });
   refresh();
 }

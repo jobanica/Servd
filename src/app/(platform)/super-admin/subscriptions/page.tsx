@@ -5,7 +5,10 @@ import {
   extendTrial,
   compMonth,
   setRestaurantAccess,
+  grantFullAccess,
+  revokeFullAccess,
 } from "@/server/billing/super-admin-actions";
+import { isComplimentary } from "@/lib/billing/comp";
 import { addSmsCredits, setSenderName } from "@/server/sms/admin";
 import { formatPeso } from "@/lib/money";
 
@@ -66,10 +69,47 @@ export default async function SubscriptionsPage() {
               <div className="text-sm font-semibold">{formatPeso(s.priceMonthly)}/mo</div>
               <div className="text-xs text-plum-ink/50">
                 {s.status === "trialing"
-                  ? `trial ends ${fmtDate(s.trialEndsAt)}`
+                  ? isComplimentary(s.trialEndsAt)
+                    ? "full access · no end"
+                    : `trial ends ${fmtDate(s.trialEndsAt)}`
                   : `renews ${fmtDate(s.currentPeriodEnd)}`}
               </div>
             </summary>
+
+            {/* Manual upgrade — full access, no payment */}
+            <div className="flex flex-wrap items-end justify-between gap-3 border-t border-plum-ink/10 bg-brand-primary/5 px-4 py-3">
+              <div>
+                <p className="text-sm font-semibold text-plum-ink">
+                  🎁 Grant full access — no payment
+                  {s.status === "trialing" && isComplimentary(s.trialEndsAt) && (
+                    <span className="ml-2 rounded-full bg-mango/15 px-2 py-0.5 text-[11px] font-semibold text-mango">
+                      active
+                    </span>
+                  )}
+                </p>
+                <p className="text-xs text-plum-ink/55">
+                  Unlocks every feature for free until you revoke — no card, never billed or suspended.
+                </p>
+              </div>
+              <div className="flex items-end gap-2">
+                <form action={grantFullAccess} className="flex items-end gap-1">
+                  <input type="hidden" name="restaurantId" value={s.restaurantId} />
+                  <select name="duration" defaultValue="forever" className={field}>
+                    <option value="1m">1 month</option>
+                    <option value="3m">3 months</option>
+                    <option value="12m">1 year</option>
+                    <option value="forever">Until revoked</option>
+                  </select>
+                  <button className="rounded bg-brand-gradient px-3 py-1 text-xs font-semibold text-white">
+                    Grant full access
+                  </button>
+                </form>
+                <form action={revokeFullAccess}>
+                  <input type="hidden" name="restaurantId" value={s.restaurantId} />
+                  <button className={btn}>Revoke → Free</button>
+                </form>
+              </div>
+            </div>
 
             <div className="grid gap-4 border-t border-plum-ink/10 px-4 py-4 sm:grid-cols-2 lg:grid-cols-3">
               {/* Plan */}
