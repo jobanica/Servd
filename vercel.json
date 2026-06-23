@@ -8,7 +8,7 @@
     },
     {
       "path": "/api/cron/cart-recovery",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 2 * * *"
     }
   ]
 }
