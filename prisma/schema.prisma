@@ -163,6 +163,46 @@ model ProspectLead {
   @@map("prospect_leads")
 }
 
+/// Outreach CRM (platform/super-admin only): clients you message on Facebook,
+/// tracked through a follow-up sequence until they reply. Never tenant-visible.
+model CrmClient {
+  id          String     @id @default(uuid())
+  name        String
+  facebookUrl String?
+  contactName String?
+  phone       String?
+  email       String?
+  notes       String?
+  stage       String     @default("new") // new | in_sequence | replied | won | lost
+  step        Int        @default(0) // touches sent (0..TOTAL_TOUCHES)
+  lastTouchAt DateTime?
+  nextDueAt   DateTime? // when the next follow-up is due
+  repliedAt   DateTime?
+  source      String     @default("manual")
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  touches     CrmTouch[]
+
+  @@index([stage])
+  @@index([nextDueAt])
+  @@index([createdAt])
+  @@map("crm_clients")
+}
+
+/// One logged outreach touch (initial message / follow-up) for a CRM client.
+model CrmTouch {
+  id        String    @id @default(uuid())
+  clientId  String
+  client    CrmClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  step      Int
+  channel   String    @default("facebook")
+  label     String?
+  createdAt DateTime  @default(now())
+
+  @@index([clientId, createdAt])
+  @@map("crm_touches")
+}
+
 model Plan {
   id           String   @id @default(uuid())
   name         String

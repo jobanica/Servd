@@ -30,6 +30,7 @@ const I = {
   userPlus: "M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8M19 8v6M22 11h-6",
   chat: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z",
   pin: "M12 21s-7-6.2-7-11a7 7 0 0114 0c0 4.8-7 11-7 11z M12 10a2 2 0 100-4 2 2 0 000 4z",
+  inbox: "M22 12h-6l-2 3h-4l-2-3H2 M5 5h14l3 7v6a2 2 0 01-2 2H4a2 2 0 01-2-2v-6z",
   back: "M19 12H5M12 19l-7-7 7-7",
 };
 
@@ -38,6 +39,7 @@ const NAV = [
   { label: "Subscriptions", href: "/super-admin/subscriptions", d: I.card },
   { label: "Create account", href: "/super-admin/accounts", d: I.userPlus },
   { label: "Prospecting", href: "/super-admin/prospecting", d: I.pin },
+  { label: "Client CRM", href: "/super-admin/crm", d: I.inbox },
   { label: "Plans", href: "/super-admin/plans", d: I.layers },
   { label: "Invoices", href: "/super-admin/invoices", d: I.receipt },
   { label: "Payments", href: "/super-admin/payments", d: I.card },
