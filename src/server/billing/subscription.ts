@@ -54,13 +54,20 @@ export async function provisionFreePlan(
 ) {
   const plan = (await getFreePlan(tx)) ?? (await getDefaultPlan(tx));
   if (!plan) return; // no plans yet — skip; restaurant stays active
-  await tx.restaurant.update({ where: { id: restaurantId }, data: { planId: plan.id } });
+  // `select: { id }` keeps Prisma's RETURNING from referencing newer columns
+  // that a schema-lagged live DB may not have yet (e.g. lowStockAlertPhone).
+  await tx.restaurant.update({
+    where: { id: restaurantId },
+    data: { planId: plan.id },
+    select: { id: true },
+  });
   await tx.subscription.create({
     data: {
       restaurantId,
       planId: plan.id,
       status: "active", // lifetime free — never trials, never expires
     },
+    select: { id: true },
   });
 }
 
@@ -88,10 +95,13 @@ export async function listPlans() {
 /** Owner switches plan (takes effect on the current subscription). */
 export async function changePlan(restaurantId: string, planId: string) {
   return tenantDb(restaurantId, async (tx) => {
-    const sub = await tx.subscription.findFirst({ orderBy: { createdAt: "desc" } });
+    const sub = await tx.subscription.findFirst({
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
     if (!sub) throw new Error("No subscription");
-    await tx.subscription.update({ where: { id: sub.id }, data: { planId } });
-    await tx.restaurant.update({ where: { id: restaurantId }, data: { planId } });
+    await tx.subscription.update({ where: { id: sub.id }, data: { planId }, select: { id: true } });
+    await tx.restaurant.update({ where: { id: restaurantId }, data: { planId }, select: { id: true } });
   });
 }
 
@@ -137,9 +147,9 @@ export async function startPlan(restaurantId: string, planId: string) {
         }
       }
 
-      if (sub) await tx.subscription.update({ where: { id: sub.id }, data });
-      else await tx.subscription.create({ data: { restaurantId, ...data } as Prisma.SubscriptionUncheckedCreateInput });
-      await tx.restaurant.update({ where: { id: restaurantId }, data: { planId, status: "active" } });
+      if (sub) await tx.subscription.update({ where: { id: sub.id }, data, select: { id: true } });
+      else await tx.subscription.create({ data: { restaurantId, ...data } as Prisma.SubscriptionUncheckedCreateInput, select: { id: true } });
+      await tx.restaurant.update({ where: { id: restaurantId }, data: { planId, status: "active" }, select: { id: true } });
     });
 
   try {
@@ -154,11 +164,15 @@ export async function startPlan(restaurantId: string, planId: string) {
 /** Schedule cancellation at period end. */
 export async function cancelAtPeriodEnd(restaurantId: string) {
   return tenantDb(restaurantId, async (tx) => {
-    const sub = await tx.subscription.findFirst({ orderBy: { createdAt: "desc" } });
+    const sub = await tx.subscription.findFirst({
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
     if (!sub) return;
     await tx.subscription.update({
       where: { id: sub.id },
       data: { cancelAtPeriodEnd: true },
+      select: { id: true },
     });
   });
 }
