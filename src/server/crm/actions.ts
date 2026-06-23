@@ -154,6 +154,20 @@ const prospectSchema = z.object({
   email: z.string().trim().max(160).nullish(),
   website: z.string().trim().max(300).nullish(),
 });
+type ProspectInput = z.infer<typeof prospectSchema>;
+
+function crmCreateData(d: ProspectInput) {
+  return {
+    id: randomUUID(),
+    name: d.name,
+    facebookUrl: d.facebookUrl || null,
+    phone: d.phone || null,
+    email: d.email || null,
+    notes: d.website ? `Website: ${d.website}` : null,
+    stage: "new",
+    source: "prospecting",
+  };
+}
 
 /** Add a discovered prospect straight into the CRM (deduped by name). */
 export async function addProspectToCrm(
@@ -167,18 +181,7 @@ export async function addProspectToCrm(
     const created = await systemDb(async (tx) => {
       const existing = await tx.crmClient.findFirst({ where: { name: d.name }, select: { id: true } });
       if (existing) return false;
-      await tx.crmClient.create({
-        data: {
-          id: randomUUID(),
-          name: d.name,
-          facebookUrl: d.facebookUrl || null,
-          phone: d.phone || null,
-          email: d.email || null,
-          notes: d.website ? `Website: ${d.website}` : null,
-          stage: "new",
-          source: "prospecting",
-        },
-      });
+      await tx.crmClient.create({ data: crmCreateData(d) });
       return true;
     });
     if (!created) return { ok: true, duplicate: true };
@@ -188,4 +191,37 @@ export async function addProspectToCrm(
   revalidatePath(PATH);
   revalidatePath("/super-admin/prospecting");
   return { ok: true };
+}
+
+/** Add many prospects at once (skips any already in the CRM, by name). */
+export async function addProspectsToCrm(
+  inputs: z.input<typeof prospectSchema>[],
+): Promise<{ ok?: boolean; added?: number; skipped?: number; error?: string }> {
+  await requireSuperAdmin();
+  let added = 0;
+  let skipped = 0;
+  try {
+    await systemDb(async (tx) => {
+      for (const raw of inputs) {
+        const parsed = prospectSchema.safeParse(raw);
+        if (!parsed.success) {
+          skipped++;
+          continue;
+        }
+        const d = parsed.data;
+        const existing = await tx.crmClient.findFirst({ where: { name: d.name }, select: { id: true } });
+        if (existing) {
+          skipped++;
+          continue;
+        }
+        await tx.crmClient.create({ data: crmCreateData(d) });
+        added++;
+      }
+    });
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Couldn't add to CRM. Run the CRM migration?" };
+  }
+  revalidatePath(PATH);
+  revalidatePath("/super-admin/prospecting");
+  return { ok: true, added, skipped };
 }

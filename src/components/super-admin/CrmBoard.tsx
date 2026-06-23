@@ -61,7 +61,12 @@ export function CrmBoard({ clients }: { clients: CrmClientRow[] }) {
   const [view, setView] = useState<"list" | "board">("board");
   const [showAdd, setShowAdd] = useState(clients.length === 0);
   const [addState, addAction] = useActionState<CrmActionState, FormData>(addClient, null);
-  const dragId = useRef<string | null>(null);
+
+  // Pointer-based drag (works with both mouse and touch).
+  const dragMeta = useRef<{ id: string; from: CrmStage } | null>(null);
+  const [dragging, setDragging] = useState<{ id: string; name: string } | null>(null);
+  const [hoverStage, setHoverStage] = useState<CrmStage | null>(null);
+  const [ghost, setGhost] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // The add form clears on success via key remount.
   const formKey = addState?.ok ? "ok" : "form";
@@ -99,12 +104,34 @@ export function CrmBoard({ clients }: { clients: CrmClientRow[] }) {
     });
   }
 
-  function dropOn(stage: CrmStage) {
-    const id = dragId.current;
-    dragId.current = null;
-    if (!id) return;
-    const c = clients.find((x) => x.id === id);
-    if (c && c.stage !== stage) act(() => setStage(id, stage));
+  function stageUnder(x: number, y: number): CrmStage | null {
+    const col = document.elementFromPoint(x, y)?.closest("[data-stage]");
+    const s = col?.getAttribute("data-stage");
+    return s && (COLUMNS as string[]).includes(s) ? (s as CrmStage) : null;
+  }
+
+  function startDrag(e: React.PointerEvent, c: CrmClientRow) {
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    dragMeta.current = { id: c.id, from: c.stage };
+    setDragging({ id: c.id, name: c.name });
+    setGhost({ x: e.clientX, y: e.clientY });
+  }
+
+  function moveDrag(e: React.PointerEvent) {
+    if (!dragMeta.current) return;
+    setGhost({ x: e.clientX, y: e.clientY });
+    setHoverStage(stageUnder(e.clientX, e.clientY));
+  }
+
+  function endDrag(e: React.PointerEvent) {
+    const meta = dragMeta.current;
+    dragMeta.current = null;
+    setDragging(null);
+    setHoverStage(null);
+    if (!meta) return;
+    const target = stageUnder(e.clientX, e.clientY);
+    if (target && target !== meta.from) act(() => setStage(meta.id, target));
   }
 
   async function copy(text: string, id: string) {
@@ -270,12 +297,14 @@ export function CrmBoard({ clients }: { clients: CrmClientRow[] }) {
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
             {COLUMNS.map((stage) => {
               const items = clients.filter((c) => c.stage === stage);
+              const hovered = hoverStage === stage && !!dragging;
               return (
                 <div
                   key={stage}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => dropOn(stage)}
-                  className="rounded-tile border border-plum-ink/10 bg-cream/40 p-2"
+                  data-stage={stage}
+                  className={`rounded-tile border bg-cream/40 p-2 transition ${
+                    hovered ? "border-brand-primary ring-2 ring-brand-primary/30" : "border-plum-ink/10"
+                  }`}
                 >
                   <div className="mb-2 flex items-center justify-between px-1">
                     <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STAGE_STYLE[stage]}`}>
@@ -287,31 +316,50 @@ export function CrmBoard({ clients }: { clients: CrmClientRow[] }) {
                     {items.map((c) => (
                       <div
                         key={c.id}
-                        draggable
-                        onDragStart={() => {
-                          dragId.current = c.id;
-                        }}
-                        className="cursor-grab rounded-lg border border-plum-ink/10 bg-white p-2 shadow-sm active:cursor-grabbing"
+                        className={`rounded-lg border border-plum-ink/10 bg-white p-2 shadow-sm ${
+                          dragging?.id === c.id ? "opacity-40" : ""
+                        }`}
                       >
-                        <p className="text-sm font-semibold leading-tight">{c.name}</p>
-                        <div className="mt-1 flex items-center justify-between text-[11px] text-plum-ink/50">
-                          <span>
-                            {c.step}/{TOTAL_TOUCHES} touches
-                          </span>
-                          {c.stage === "in_sequence" && c.nextDueAt && (
-                            <span className={isDue(c) ? "font-semibold text-guava" : ""}>{fromNow(c.nextDueAt)}</span>
-                          )}
-                        </div>
-                        {c.facebookUrl && (
-                          <a
-                            href={c.facebookUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-1 block text-[11px] font-semibold text-[#1877f2]"
+                        <div className="flex items-start gap-1.5">
+                          <span
+                            onPointerDown={(e) => startDrag(e, c)}
+                            onPointerMove={moveDrag}
+                            onPointerUp={endDrag}
+                            role="button"
+                            aria-label="Drag to move"
+                            className="mt-0.5 shrink-0 cursor-grab touch-none select-none text-plum-ink/30 active:cursor-grabbing"
                           >
-                            facebook ↗
-                          </a>
-                        )}
+                            <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
+                              <circle cx="9" cy="6" r="1.6" />
+                              <circle cx="15" cy="6" r="1.6" />
+                              <circle cx="9" cy="12" r="1.6" />
+                              <circle cx="15" cy="12" r="1.6" />
+                              <circle cx="9" cy="18" r="1.6" />
+                              <circle cx="15" cy="18" r="1.6" />
+                            </svg>
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold leading-tight">{c.name}</p>
+                            <div className="mt-1 flex items-center justify-between text-[11px] text-plum-ink/50">
+                              <span>
+                                {c.step}/{TOTAL_TOUCHES} touches
+                              </span>
+                              {c.stage === "in_sequence" && c.nextDueAt && (
+                                <span className={isDue(c) ? "font-semibold text-guava" : ""}>{fromNow(c.nextDueAt)}</span>
+                              )}
+                            </div>
+                            {c.facebookUrl && (
+                              <a
+                                href={c.facebookUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-1 block text-[11px] font-semibold text-[#1877f2]"
+                              >
+                                facebook ↗
+                              </a>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     ))}
                     {items.length === 0 && (
@@ -428,9 +476,20 @@ export function CrmBoard({ clients }: { clients: CrmClientRow[] }) {
 
       <p className="text-xs text-plum-ink/40">
         Sequence: 1 initial message + {FOLLOW_UPS} follow-ups over ~4 weeks. Clients stay in the
-        queue until you mark them replied. Drag cards between columns to move a client. Facebook
-        doesn&apos;t allow auto-detecting replies, so tap “They replied” when they message back.
+        queue until you mark them replied. Drag the grip (⋮⋮) to move a card between columns — works
+        on phone too. Facebook doesn&apos;t allow auto-detecting replies, so tap “They replied” when
+        they message back.
       </p>
+
+      {/* Floating label that follows the pointer/finger while dragging. */}
+      {dragging && (
+        <div
+          className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-brand-primary bg-white px-3 py-1.5 text-xs font-semibold shadow-xl"
+          style={{ left: ghost.x, top: ghost.y }}
+        >
+          {dragging.name}
+        </div>
+      )}
     </div>
   );
 }

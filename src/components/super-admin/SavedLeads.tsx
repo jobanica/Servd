@@ -8,7 +8,7 @@ import {
   enrichProspect,
   deleteProspect,
 } from "@/server/prospecting/actions";
-import { addProspectToCrm } from "@/server/crm/actions";
+import { addProspectToCrm, addProspectsToCrm } from "@/server/crm/actions";
 import { PROSPECT_STATUSES, type ProspectStatus } from "@/lib/prospecting/types";
 import type { ProspectLeadRow } from "@/server/prospecting/queries";
 
@@ -32,8 +32,33 @@ export function SavedLeads({ leads }: { leads: ProspectLeadRow[] }) {
   const [enriching, setEnriching] = useState<string | null>(null);
   const [filter, setFilter] = useState<ProspectStatus | "all">("all");
   const [crmAdded, setCrmAdded] = useState<Record<string, "added" | "dupe">>({});
+  const [bulkAdding, setBulkAdding] = useState(false);
+  const [bulkResult, setBulkResult] = useState<{ added: number; skipped: number } | null>(null);
 
   const shown = filter === "all" ? leads : leads.filter((l) => l.status === filter);
+
+  async function addAllToCrm() {
+    setBulkAdding(true);
+    setBulkResult(null);
+    const res = await addProspectsToCrm(
+      shown.map((l) => ({
+        name: l.name,
+        facebookUrl: l.facebook,
+        phone: l.phone,
+        email: l.email,
+        website: l.website,
+      })),
+    );
+    setBulkAdding(false);
+    if (res.error) return;
+    setBulkResult({ added: res.added ?? 0, skipped: res.skipped ?? 0 });
+    setCrmAdded((prev) => {
+      const next = { ...prev };
+      for (const l of shown) next[l.id] = next[l.id] ?? "added";
+      return next;
+    });
+    router.refresh();
+  }
 
   async function toCrm(l: ProspectLeadRow) {
     const res = await addProspectToCrm({
@@ -95,6 +120,17 @@ export function SavedLeads({ leads }: { leads: ProspectLeadRow[] }) {
             )}
           </button>
         ))}
+        <button
+          onClick={addAllToCrm}
+          disabled={bulkAdding}
+          className="ml-auto rounded-full border border-brand-primary/40 px-3 py-1 text-xs font-semibold text-brand-primary hover:bg-brand-primary/5 disabled:opacity-60"
+        >
+          {bulkAdding
+            ? "Adding…"
+            : bulkResult
+              ? `Added ${bulkResult.added} · ${bulkResult.skipped} already in CRM`
+              : `+ Add ${filter === "all" ? "all" : "these"} to CRM`}
+        </button>
       </div>
 
       <div className="overflow-x-auto rounded-tile border border-plum-ink/10 bg-white">
