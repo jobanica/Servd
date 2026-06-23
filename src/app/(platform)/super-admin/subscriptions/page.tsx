@@ -5,10 +5,9 @@ import {
   extendTrial,
   compMonth,
   setRestaurantAccess,
-  grantFullAccess,
-  revokeFullAccess,
 } from "@/server/billing/super-admin-actions";
 import { isComplimentary } from "@/lib/billing/comp";
+import { GrantAccessControl } from "@/components/super-admin/GrantAccessControl";
 import { addSmsCredits, setSenderName } from "@/server/sms/admin";
 import { formatPeso } from "@/lib/money";
 
@@ -91,24 +90,7 @@ export default async function SubscriptionsPage() {
                   Unlocks every feature for free until you revoke — no card, never billed or suspended.
                 </p>
               </div>
-              <div className="flex items-end gap-2">
-                <form action={grantFullAccess} className="flex items-end gap-1">
-                  <input type="hidden" name="restaurantId" value={s.restaurantId} />
-                  <select name="duration" defaultValue="forever" className={field}>
-                    <option value="1m">1 month</option>
-                    <option value="3m">3 months</option>
-                    <option value="12m">1 year</option>
-                    <option value="forever">Until revoked</option>
-                  </select>
-                  <button className="rounded bg-brand-gradient px-3 py-1 text-xs font-semibold text-white">
-                    Grant full access
-                  </button>
-                </form>
-                <form action={revokeFullAccess}>
-                  <input type="hidden" name="restaurantId" value={s.restaurantId} />
-                  <button className={btn}>Revoke → Free</button>
-                </form>
-              </div>
+              <GrantAccessControl restaurantId={s.restaurantId} />
             </div>
 
             <div className="grid gap-4 border-t border-plum-ink/10 px-4 py-4 sm:grid-cols-2 lg:grid-cols-3">
