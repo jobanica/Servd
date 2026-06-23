@@ -375,31 +375,34 @@ export function WebOrder(props: WebOrderProps) {
       </header>
 
       <div className="mx-auto grid max-w-7xl gap-4 p-4 lg:grid-cols-[230px_1fr_330px]">
-        {/* Left sidebar */}
+        {/* Left sidebar — sticky so the categories stay visible while you scroll
+            the menu (and after jumping to a category). */}
         <aside className="hidden lg:block">
-          <div className="rounded-xl bg-white p-3 shadow-sm">
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" className="w-full rounded-lg border border-plum-ink/10 px-3 py-2 text-sm" />
-          </div>
-          <div className="mt-3 rounded-xl bg-white p-2 shadow-sm">
-            <p className="px-2 py-1 font-heading text-xs font-bold uppercase tracking-wide text-plum-ink/50">Menu</p>
-            <ul>
-              {nonEmpty.map((c) => (
-                <li key={c.id}>
-                  <a href={`#cat-${c.id}`} className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-plum-ink/80 hover:bg-gray-100">
-                    <span className="flex h-6 w-6 items-center justify-center rounded bg-gray-100 text-xs font-bold text-plum-ink/50">{c.name.charAt(0)}</span>
-                    {c.name}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-          {loyalty?.enabled && (
-            <div className="mt-3 rounded-xl bg-white p-4 text-center shadow-sm">
-              <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-red-600 text-xl text-white">🔔</div>
-              <p className="mt-2 text-sm font-semibold text-plum-ink">Special Offers</p>
-              <p className="text-xs text-plum-ink/50">Earn points on every order</p>
+          <div className="sticky top-20 max-h-[calc(100vh-6rem)] space-y-3 overflow-y-auto pb-4">
+            <div className="rounded-xl bg-white p-3 shadow-sm">
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" className="w-full rounded-lg border border-plum-ink/10 px-3 py-2 text-sm" />
             </div>
-          )}
+            <div className="rounded-xl bg-white p-2 shadow-sm">
+              <p className="px-2 py-1 font-heading text-xs font-bold uppercase tracking-wide text-plum-ink/50">Menu</p>
+              <ul>
+                {nonEmpty.map((c) => (
+                  <li key={c.id}>
+                    <a href={`#cat-${c.id}`} className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-plum-ink/80 hover:bg-gray-100">
+                      <span className="flex h-6 w-6 items-center justify-center rounded bg-gray-100 text-xs font-bold text-plum-ink/50">{c.name.charAt(0)}</span>
+                      {c.name}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            {loyalty?.enabled && (
+              <div className="rounded-xl bg-white p-4 text-center shadow-sm">
+                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-red-600 text-xl text-white">🔔</div>
+                <p className="mt-2 text-sm font-semibold text-plum-ink">Special Offers</p>
+                <p className="text-xs text-plum-ink/50">Earn points on every order</p>
+              </div>
+            )}
+          </div>
         </aside>
 
         {/* Center */}
