@@ -203,8 +203,8 @@ export async function assignPlan(formData: FormData): Promise<void> {
   if (!planId) return;
   await systemDb(async (tx) => {
     const sub = await ensureSubscription(tx, restaurantId, planId);
-    await tx.subscription.update({ where: { id: sub.id }, data: { planId } });
-    await tx.restaurant.update({ where: { id: restaurantId }, data: { planId } });
+    await tx.subscription.update({ where: { id: sub.id }, data: { planId }, select: { id: true } });
+    await tx.restaurant.update({ where: { id: restaurantId }, data: { planId }, select: { id: true } });
   });
   refresh();
 }
@@ -226,10 +226,11 @@ export async function setSubscriptionStatus(formData: FormData): Promise<void> {
         // Re-activating clears the dunning counter and cancel flag.
         ...(status === "active" ? { failedCharges: 0, cancelAtPeriodEnd: false } : {}),
       },
+      select: { id: true },
     });
     // Active/trialing → restore access; cancelled/past_due → suspend access.
     const restaurantStatus = status === "active" || status === "trialing" ? "active" : "suspended";
-    await tx.restaurant.update({ where: { id: restaurantId }, data: { status: restaurantStatus } });
+    await tx.restaurant.update({ where: { id: restaurantId }, data: { status: restaurantStatus }, select: { id: true } });
   });
   refresh();
 }
@@ -248,8 +249,9 @@ export async function extendTrial(formData: FormData): Promise<void> {
     await tx.subscription.update({
       where: { id: sub.id },
       data: { status: "trialing", trialEndsAt, currentPeriodEnd: trialEndsAt, cancelAtPeriodEnd: false },
+      select: { id: true },
     });
-    await tx.restaurant.update({ where: { id: restaurantId }, data: { status: "active" } });
+    await tx.restaurant.update({ where: { id: restaurantId }, data: { status: "active" }, select: { id: true } });
   });
   refresh();
 }
@@ -267,8 +269,9 @@ export async function compMonth(formData: FormData): Promise<void> {
     await tx.subscription.update({
       where: { id: sub.id },
       data: { status: "active", currentPeriodEnd: addMonths(base, 1), failedCharges: 0, cancelAtPeriodEnd: false },
+      select: { id: true },
     });
-    await tx.restaurant.update({ where: { id: restaurantId }, data: { status: "active" } });
+    await tx.restaurant.update({ where: { id: restaurantId }, data: { status: "active" }, select: { id: true } });
   });
   refresh();
 }
@@ -288,6 +291,8 @@ export async function grantFullAccess(_prev: ActionState, formData: FormData): P
     const trialEndsAt = duration in months ? addMonths(new Date(), months[duration]) : COMP_FOREVER;
     await systemDb(async (tx) => {
       const sub = await ensureSubscription(tx, restaurantId);
+      // select: { id } so Prisma's RETURNING doesn't reference schema-lagged
+      // columns the live DB may not have yet (that was the 500 source).
       await tx.subscription.update({
         where: { id: sub.id },
         data: {
@@ -297,8 +302,13 @@ export async function grantFullAccess(_prev: ActionState, formData: FormData): P
           cancelAtPeriodEnd: false,
           failedCharges: 0,
         },
+        select: { id: true },
       });
-      await tx.restaurant.update({ where: { id: restaurantId }, data: { status: "active" } });
+      await tx.restaurant.update({
+        where: { id: restaurantId },
+        data: { status: "active" },
+        select: { id: true },
+      });
     });
   } catch (e) {
     console.error("grantFullAccess failed", e);
@@ -325,10 +335,12 @@ export async function revokeFullAccess(_prev: ActionState, formData: FormData): 
           cancelAtPeriodEnd: false,
           failedCharges: 0,
         },
+        select: { id: true },
       });
       await tx.restaurant.update({
         where: { id: restaurantId },
         data: { ...(free ? { planId: free.id } : {}), status: "active" },
+        select: { id: true },
       });
     });
   } catch (e) {
@@ -345,7 +357,7 @@ export async function setRestaurantAccess(formData: FormData): Promise<void> {
   const restaurantId = String(formData.get("restaurantId"));
   const access = String(formData.get("access")); // "active" | "suspended"
   if (access !== "active" && access !== "suspended") return;
-  await systemDb((tx) => tx.restaurant.update({ where: { id: restaurantId }, data: { status: access } }));
+  await systemDb((tx) => tx.restaurant.update({ where: { id: restaurantId }, data: { status: access }, select: { id: true } }));
   refresh();
 }
 

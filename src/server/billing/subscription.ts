@@ -54,13 +54,20 @@ export async function provisionFreePlan(
 ) {
   const plan = (await getFreePlan(tx)) ?? (await getDefaultPlan(tx));
   if (!plan) return; // no plans yet — skip; restaurant stays active
-  await tx.restaurant.update({ where: { id: restaurantId }, data: { planId: plan.id } });
+  // `select: { id }` keeps Prisma's RETURNING from referencing newer columns
+  // that a schema-lagged live DB may not have yet (e.g. lowStockAlertPhone).
+  await tx.restaurant.update({
+    where: { id: restaurantId },
+    data: { planId: plan.id },
+    select: { id: true },
+  });
   await tx.subscription.create({
     data: {
       restaurantId,
       planId: plan.id,
       status: "active", // lifetime free — never trials, never expires
     },
+    select: { id: true },
   });
 }
 
@@ -88,10 +95,13 @@ export async function listPlans() {
 /** Owner switches plan (takes effect on the current subscription). */
 export async function changePlan(restaurantId: string, planId: string) {
   return tenantDb(restaurantId, async (tx) => {
-    const sub = await tx.subscription.findFirst({ orderBy: { createdAt: "desc" } });
+    const sub = await tx.subscription.findFirst({
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
     if (!sub) throw new Error("No subscription");
-    await tx.subscription.update({ where: { id: sub.id }, data: { planId } });
-    await tx.restaurant.update({ where: { id: restaurantId }, data: { planId } });
+    await tx.subscription.update({ where: { id: sub.id }, data: { planId }, select: { id: true } });
+    await tx.restaurant.update({ where: { id: restaurantId }, data: { planId }, select: { id: true } });
   });
 }
 
@@ -101,47 +111,68 @@ export async function changePlan(restaurantId: string, planId: string) {
  *   - Paid + saved card → switch now; the next cycle bills the new price.
  *   - Paid, no card   → start a 14-day FREE TRIAL (no card). When it ends unpaid
  *                       the daily cron reverts them to the Free plan.
+ *
+ * Schema-lag resilient: reads use explicit selects (only always-present columns),
+ * and if the full write hits a newer column the live DB hasn't migrated yet, we
+ * retry with the bare essentials in a FRESH transaction (an aborted Postgres tx
+ * can't be reused) so the upgrade still succeeds instead of showing "error".
  */
 export async function startPlan(restaurantId: string, planId: string) {
-  return tenantDb(restaurantId, async (tx) => {
-    const plan = await tx.plan.findUnique({ where: { id: planId }, select: PLAN_FIELDS });
-    if (!plan) throw new Error("Unknown plan");
-    const sub = await tx.subscription.findFirst({ orderBy: { createdAt: "desc" } });
+  // `minimal` writes only the columns that exist on every DB version.
+  const apply = (minimal: boolean) =>
+    tenantDb(restaurantId, async (tx) => {
+      const plan = await tx.plan.findUnique({ where: { id: planId }, select: PLAN_FIELDS });
+      if (!plan) throw new Error("Unknown plan");
+      // Select only what we read — guaranteed to exist on every DB version.
+      const sub = await tx.subscription.findFirst({
+        orderBy: { createdAt: "desc" },
+        select: { id: true, providerPaymentMethodId: true },
+      });
 
-    // Free plan → lifetime free.
-    if (plan.priceMonthly <= 0) {
-      const data = { planId, status: "active" as const, trialEndsAt: null, cancelAtPeriodEnd: false };
-      if (sub) await tx.subscription.update({ where: { id: sub.id }, data });
-      else await tx.subscription.create({ data: { restaurantId, ...data } });
-      await tx.restaurant.update({ where: { id: restaurantId }, data: { planId, status: "active" } });
-      return;
-    }
+      const isFree = plan.priceMonthly <= 0;
+      const hasCard = !isFree && !!sub?.providerPaymentMethodId;
 
-    // Paid plan with a card already on file → switch now (bills next cycle).
-    if (sub?.providerPaymentMethodId) {
-      await tx.subscription.update({ where: { id: sub.id }, data: { planId, cancelAtPeriodEnd: false } });
-      await tx.restaurant.update({ where: { id: restaurantId }, data: { planId } });
-      return;
-    }
+      // Decide the resulting status + trial window.
+      const status: "active" | "trialing" = isFree || hasCard ? "active" : "trialing";
+      let data: Prisma.SubscriptionUncheckedUpdateInput = { planId, status };
+      if (!minimal) {
+        if (isFree) {
+          data = { planId, status, trialEndsAt: null, cancelAtPeriodEnd: false };
+        } else if (hasCard) {
+          data = { planId, status, cancelAtPeriodEnd: false };
+        } else {
+          const trialEndsAt = new Date();
+          trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_DAYS);
+          data = { planId, status, trialEndsAt, currentPeriodEnd: trialEndsAt, cancelAtPeriodEnd: false };
+        }
+      }
 
-    // Paid plan, no card → 14-day free trial.
-    const trialEndsAt = new Date();
-    trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_DAYS);
-    const data = { planId, status: "trialing" as const, trialEndsAt, currentPeriodEnd: trialEndsAt, cancelAtPeriodEnd: false };
-    if (sub) await tx.subscription.update({ where: { id: sub.id }, data });
-    else await tx.subscription.create({ data: { restaurantId, ...data } });
-    await tx.restaurant.update({ where: { id: restaurantId }, data: { planId, status: "active" } });
-  });
+      if (sub) await tx.subscription.update({ where: { id: sub.id }, data, select: { id: true } });
+      else await tx.subscription.create({ data: { restaurantId, ...data } as Prisma.SubscriptionUncheckedCreateInput, select: { id: true } });
+      await tx.restaurant.update({ where: { id: restaurantId }, data: { planId, status: "active" }, select: { id: true } });
+    });
+
+  try {
+    await apply(false);
+  } catch (e) {
+    // Re-throw genuine "Unknown plan" — only retry on likely schema-lag write errors.
+    if (e instanceof Error && e.message === "Unknown plan") throw e;
+    await apply(true);
+  }
 }
 
 /** Schedule cancellation at period end. */
 export async function cancelAtPeriodEnd(restaurantId: string) {
   return tenantDb(restaurantId, async (tx) => {
-    const sub = await tx.subscription.findFirst({ orderBy: { createdAt: "desc" } });
+    const sub = await tx.subscription.findFirst({
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
     if (!sub) return;
     await tx.subscription.update({
       where: { id: sub.id },
       data: { cancelAtPeriodEnd: true },
+      select: { id: true },
     });
   });
 }

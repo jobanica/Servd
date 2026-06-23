@@ -30,9 +30,9 @@ const UPGRADE_LABEL: Record<string, string> = {
 export default async function BillingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ upgrade?: string }>;
+  searchParams: Promise<{ upgrade?: string; plan?: string }>;
 }) {
-  const { upgrade } = await searchParams;
+  const { upgrade, plan } = await searchParams;
   // allowSuspended so an owner can pay their way out of suspension here.
   const { restaurantId } = await requireAdminPage({ allowSuspended: true });
   const [sub, plans, invoices, pricing] = await Promise.all([
@@ -58,6 +58,25 @@ export default async function BillingPage({
         <Link href="/admin" className="text-sm text-plum-ink/50">← Dashboard</Link>
         <h1 className="font-heading text-2xl font-bold">Billing</h1>
       </div>
+
+      {/* Plan-switch result banners */}
+      {plan === "changed" && (
+        <div className="rounded-tile border border-brand-primary/30 bg-brand-primary/5 p-4 text-sm font-semibold text-brand-primary">
+          You&apos;re all set — your plan was updated. Paid plans start with a 14-day free trial; no
+          charge until it ends.
+        </div>
+      )}
+      {plan === "error" && (
+        <div className="rounded-tile border border-guava/40 bg-guava/10 p-4 text-sm text-plum-ink">
+          We couldn&apos;t switch your plan just now. Please try again in a moment — if it keeps
+          happening, contact support and we&apos;ll sort it out.
+        </div>
+      )}
+      {plan === "unavailable" && (
+        <div className="rounded-tile border border-mango/40 bg-mango/10 p-4 text-sm text-plum-ink">
+          That plan isn&apos;t available to switch to yet. Please refresh the page and try again.
+        </div>
+      )}
 
       {/* Upgrade prompt (redirected here from a gated feature) */}
       {upgrade && UPGRADE_LABEL[upgrade] && (
