@@ -39,6 +39,7 @@ export function FloorPlan({
   const [tables, setTables] = useState<FloorTable[]>(initialTables);
   const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ id: string; dx: number; dy: number; moved: boolean } | null>(null);
 
@@ -100,16 +101,27 @@ export function FloorPlan({
     }
     const t = tables.find((p) => p.id === d.id);
     if (t && t.posX != null && t.posY != null) {
-      await setTablePosition({ tableId: d.id, x: t.posX, y: t.posY });
+      const res = await setTablePosition({ tableId: d.id, x: t.posX, y: t.posY });
+      if (!res.ok) {
+        setError(res.error ?? "Couldn't save the layout.");
+        await refresh(); // snap back to the last saved positions
+      } else {
+        setError(null);
+      }
     }
   }
 
   async function changeStatus(id: string, status: EffectiveStatus) {
     setBusy(true);
-    await setTableStatus(id, status);
+    const res = await setTableStatus(id, status);
+    setBusy(false);
+    if (!res.ok) {
+      setError(res.error ?? "Couldn't update the table.");
+      return;
+    }
+    setError(null);
     setSelected(null);
     await refresh();
-    setBusy(false);
   }
 
   const rows = Math.ceil(tables.length / cols) || 1;
@@ -127,6 +139,12 @@ export function FloorPlan({
         ))}
         <span className="text-plum-ink/40">· drag to arrange · tap a table for options</span>
       </div>
+
+      {error && (
+        <p className="rounded-lg border border-guava/30 bg-guava/10 px-3 py-2 text-sm text-guava">
+          {error}
+        </p>
+      )}
 
       {tables.length === 0 ? (
         <p className="rounded-tile border border-plum-ink/10 bg-white p-6 text-sm text-plum-ink/50">

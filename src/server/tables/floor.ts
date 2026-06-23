@@ -5,8 +5,22 @@ import { z } from "zod";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireStaff } from "@/server/tenancy/current-user";
 import { requireAdminAction } from "@/server/tenancy/require-admin";
-import { writeAudit } from "@/server/audit/log";
+import { audit } from "@/server/audit/log";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
+
+/**
+ * Turn a raw DB error into something actionable. The floor-plan columns
+ * (tables.status/posX/posY) and the audit_logs table ship in a manual
+ * migration; if it hasn't been run, writes fail with "column/relation does not
+ * exist" — surface that instead of a silent no-op.
+ */
+function humanizeDbError(e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (/does not exist|Unknown (arg|column)|P2022|42703|42P01/i.test(msg)) {
+    return "Floor plan isn't set up on the database yet — run the add-floor-plan-and-audit.sql migration in Supabase, then try again.";
+  }
+  return msg;
+}
 
 /**
  * Visual floor plan. A table's occupancy is derived from its open unpaid orders
@@ -102,24 +116,37 @@ export async function setTableStatus(
   const parsed = STATUS.safeParse(status);
   if (!parsed.success) return { ok: false, error: "Invalid status." };
 
+  // The status change is the only thing that must succeed. Keep it in its own
+  // transaction so a missing audit_logs table can't poison and roll it back.
+  let before: { status: string | null } | null = null;
   try {
     await tenantDb(staff.restaurantId, async (tx) => {
-      const before = await tx.table.findFirst({ where: { id: tableId }, select: { status: true } });
+      before = await tx.table.findFirst({ where: { id: tableId }, select: { status: true } });
       await tx.table.update({ where: { id: tableId }, data: { status: parsed.data } });
-      await writeAudit(tx, staff.restaurantId, {
-        actorStaffId: staff.staffUserId,
-        actorEmail: staff.email,
-        action: "table.status",
-        entityType: "table",
-        entityId: tableId,
-        before: before ?? undefined,
-        after: { status: parsed.data },
-      });
     });
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Couldn't update the table." };
+    return { ok: false, error: humanizeDbError(e) };
   }
-  await notifyOrdersChanged(staff.restaurantId);
+
+  // Audit + realtime are best-effort — never let them fail the status change.
+  try {
+    await audit(staff.restaurantId, {
+      actorStaffId: staff.staffUserId,
+      actorEmail: staff.email,
+      action: "table.status",
+      entityType: "table",
+      entityId: tableId,
+      before: before ?? undefined,
+      after: { status: parsed.data },
+    });
+  } catch {
+    /* audit_logs not migrated — ignore */
+  }
+  try {
+    await notifyOrdersChanged(staff.restaurantId);
+  } catch {
+    /* realtime unavailable — ignore */
+  }
   revalidatePath("/admin/floor");
   return { ok: true };
 }
@@ -147,7 +174,7 @@ export async function setTablePosition(input: {
       }),
     );
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Couldn't save the layout." };
+    return { ok: false, error: humanizeDbError(e) };
   }
   return { ok: true };
 }
