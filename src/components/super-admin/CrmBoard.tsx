@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo, useState, useTransition } from "react";
+import { useActionState, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -35,6 +35,8 @@ const STAGE_STYLE: Record<CrmStage, string> = {
   lost: "bg-guava/15 text-guava",
 };
 
+const COLUMNS: CrmStage[] = ["new", "in_sequence", "replied", "won", "lost"];
+
 function fromNow(iso: string | null): string {
   if (!iso) return "";
   const diff = new Date(iso).getTime() - Date.now();
@@ -56,8 +58,10 @@ export function CrmBoard({ clients }: { clients: CrmClientRow[] }) {
   const [pending, startTransition] = useTransition();
   const [copied, setCopied] = useState<string | null>(null);
   const [filter, setFilter] = useState<CrmStage | "all">("all");
+  const [view, setView] = useState<"list" | "board">("board");
   const [showAdd, setShowAdd] = useState(clients.length === 0);
   const [addState, addAction] = useActionState<CrmActionState, FormData>(addClient, null);
+  const dragId = useRef<string | null>(null);
 
   // The add form clears on success via key remount.
   const formKey = addState?.ok ? "ok" : "form";
@@ -93,6 +97,14 @@ export function CrmBoard({ clients }: { clients: CrmClientRow[] }) {
       await fn();
       router.refresh();
     });
+  }
+
+  function dropOn(stage: CrmStage) {
+    const id = dragId.current;
+    dragId.current = null;
+    if (!id) return;
+    const c = clients.find((x) => x.id === id);
+    if (c && c.stage !== stage) act(() => setStage(id, stage));
   }
 
   async function copy(text: string, id: string) {
@@ -237,25 +249,99 @@ export function CrmBoard({ clients }: { clients: CrmClientRow[] }) {
 
       {/* Full pipeline */}
       <section>
-        <div className="mb-2 flex flex-wrap items-center gap-2">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-heading text-lg font-bold">Pipeline</h2>
-          {(["all", "new", "in_sequence", "replied", "won", "lost"] as const).map((s) => (
-            <button
-              key={s}
-              onClick={() => setFilter(s)}
-              className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                filter === s ? "bg-brand-gradient text-white" : "bg-plum-ink/5 text-plum-ink/60"
-              }`}
-            >
-              {s === "all" ? "All" : STAGE_LABEL[s]}
-              {s !== "all" && (
-                <span className="ml-1 opacity-70">{clients.filter((c) => c.stage === s).length}</span>
-              )}
-            </button>
-          ))}
+          <div className="inline-flex rounded-full border border-plum-ink/15 p-0.5">
+            {(["board", "list"] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${
+                  view === v ? "bg-brand-gradient text-white" : "text-plum-ink/55"
+                }`}
+              >
+                {v === "board" ? "Board" : "List"}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="overflow-x-auto rounded-tile border border-plum-ink/10 bg-white">
+        {view === "board" ? (
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+            {COLUMNS.map((stage) => {
+              const items = clients.filter((c) => c.stage === stage);
+              return (
+                <div
+                  key={stage}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => dropOn(stage)}
+                  className="rounded-tile border border-plum-ink/10 bg-cream/40 p-2"
+                >
+                  <div className="mb-2 flex items-center justify-between px-1">
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STAGE_STYLE[stage]}`}>
+                      {STAGE_LABEL[stage]}
+                    </span>
+                    <span className="text-xs text-plum-ink/40">{items.length}</span>
+                  </div>
+                  <div className="min-h-[64px] space-y-2">
+                    {items.map((c) => (
+                      <div
+                        key={c.id}
+                        draggable
+                        onDragStart={() => {
+                          dragId.current = c.id;
+                        }}
+                        className="cursor-grab rounded-lg border border-plum-ink/10 bg-white p-2 shadow-sm active:cursor-grabbing"
+                      >
+                        <p className="text-sm font-semibold leading-tight">{c.name}</p>
+                        <div className="mt-1 flex items-center justify-between text-[11px] text-plum-ink/50">
+                          <span>
+                            {c.step}/{TOTAL_TOUCHES} touches
+                          </span>
+                          {c.stage === "in_sequence" && c.nextDueAt && (
+                            <span className={isDue(c) ? "font-semibold text-guava" : ""}>{fromNow(c.nextDueAt)}</span>
+                          )}
+                        </div>
+                        {c.facebookUrl && (
+                          <a
+                            href={c.facebookUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-1 block text-[11px] font-semibold text-[#1877f2]"
+                          >
+                            facebook ↗
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                    {items.length === 0 && (
+                      <p className="px-1 py-4 text-center text-[11px] text-plum-ink/30">Drop here</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <>
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              {(["all", "new", "in_sequence", "replied", "won", "lost"] as const).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setFilter(s)}
+                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                    filter === s ? "bg-brand-gradient text-white" : "bg-plum-ink/5 text-plum-ink/60"
+                  }`}
+                >
+                  {s === "all" ? "All" : STAGE_LABEL[s]}
+                  {s !== "all" && (
+                    <span className="ml-1 opacity-70">{clients.filter((c) => c.stage === s).length}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <div className="overflow-x-auto rounded-tile border border-plum-ink/10 bg-white">
           <table className="w-full text-left text-sm">
             <thead className="text-plum-ink/50">
               <tr className="border-b border-plum-ink/10">
@@ -335,13 +421,15 @@ export function CrmBoard({ clients }: { clients: CrmClientRow[] }) {
               )}
             </tbody>
           </table>
-        </div>
+            </div>
+          </>
+        )}
       </section>
 
       <p className="text-xs text-plum-ink/40">
         Sequence: 1 initial message + {FOLLOW_UPS} follow-ups over ~4 weeks. Clients stay in the
-        queue until you mark them replied. Facebook doesn&apos;t allow auto-detecting replies, so tap
-        “They replied” when they message back.
+        queue until you mark them replied. Drag cards between columns to move a client. Facebook
+        doesn&apos;t allow auto-detecting replies, so tap “They replied” when they message back.
       </p>
     </div>
   );

@@ -8,6 +8,7 @@ import {
   enrichProspect,
   deleteProspect,
 } from "@/server/prospecting/actions";
+import { addProspectToCrm } from "@/server/crm/actions";
 import { PROSPECT_STATUSES, type ProspectStatus } from "@/lib/prospecting/types";
 import type { ProspectLeadRow } from "@/server/prospecting/queries";
 
@@ -30,8 +31,21 @@ export function SavedLeads({ leads }: { leads: ProspectLeadRow[] }) {
   const [pending, startTransition] = useTransition();
   const [enriching, setEnriching] = useState<string | null>(null);
   const [filter, setFilter] = useState<ProspectStatus | "all">("all");
+  const [crmAdded, setCrmAdded] = useState<Record<string, "added" | "dupe">>({});
 
   const shown = filter === "all" ? leads : leads.filter((l) => l.status === filter);
+
+  async function toCrm(l: ProspectLeadRow) {
+    const res = await addProspectToCrm({
+      name: l.name,
+      facebookUrl: l.facebook,
+      phone: l.phone,
+      email: l.email,
+      website: l.website,
+    });
+    if (res.error) return;
+    setCrmAdded((prev) => ({ ...prev, [l.id]: res.duplicate ? "dupe" : "added" }));
+  }
 
   function changeStatus(id: string, status: ProspectStatus) {
     startTransition(async () => {
@@ -146,6 +160,19 @@ export function SavedLeads({ leads }: { leads: ProspectLeadRow[] }) {
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex justify-end gap-2">
+                      {crmAdded[l.id] ? (
+                        <span className="rounded-lg bg-mango/15 px-2.5 py-1.5 text-xs font-semibold text-mango">
+                          {crmAdded[l.id] === "dupe" ? "In CRM" : "Added ✓"}
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => toCrm(l)}
+                          title="Add this lead to the outreach CRM"
+                          className="rounded-lg border border-brand-primary/40 px-2.5 py-1.5 text-xs font-semibold text-brand-primary hover:bg-brand-primary/5"
+                        >
+                          + Add to CRM
+                        </button>
+                      )}
                       {l.website && (!l.email || !l.facebook) && (
                         <button
                           onClick={() => enrich(l.id)}

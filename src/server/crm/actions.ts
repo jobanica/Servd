@@ -146,3 +146,46 @@ export async function deleteClient(id: string): Promise<void> {
   await systemDb((tx) => tx.crmClient.delete({ where: { id } }));
   revalidatePath(PATH);
 }
+
+const prospectSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  facebookUrl: z.string().trim().max(300).nullish(),
+  phone: z.string().trim().max(40).nullish(),
+  email: z.string().trim().max(160).nullish(),
+  website: z.string().trim().max(300).nullish(),
+});
+
+/** Add a discovered prospect straight into the CRM (deduped by name). */
+export async function addProspectToCrm(
+  input: z.input<typeof prospectSchema>,
+): Promise<{ ok?: boolean; duplicate?: boolean; error?: string }> {
+  await requireSuperAdmin();
+  const parsed = prospectSchema.safeParse(input);
+  if (!parsed.success) return { error: "Invalid prospect." };
+  const d = parsed.data;
+  try {
+    const created = await systemDb(async (tx) => {
+      const existing = await tx.crmClient.findFirst({ where: { name: d.name }, select: { id: true } });
+      if (existing) return false;
+      await tx.crmClient.create({
+        data: {
+          id: randomUUID(),
+          name: d.name,
+          facebookUrl: d.facebookUrl || null,
+          phone: d.phone || null,
+          email: d.email || null,
+          notes: d.website ? `Website: ${d.website}` : null,
+          stage: "new",
+          source: "prospecting",
+        },
+      });
+      return true;
+    });
+    if (!created) return { ok: true, duplicate: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Couldn't add to CRM. Run the CRM migration?" };
+  }
+  revalidatePath(PATH);
+  revalidatePath("/super-admin/prospecting");
+  return { ok: true };
+}
