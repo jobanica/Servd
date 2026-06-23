@@ -3,6 +3,7 @@ import { systemDb } from "@/server/tenancy/scoped-db";
 import { getBillingProvider } from "@/server/billing";
 import { nextBillingAction } from "@/lib/billing/lifecycle";
 import { addMonths } from "@/lib/billing/period";
+import { PLAN_FIELDS } from "@/server/billing/subscription";
 import {
   consumeCreditForCycle,
   onInvoicePaid,
@@ -29,11 +30,12 @@ export async function runBillingCron(now: Date = new Date()): Promise<CronSummar
   const [subs, freePlan] = await systemDb(async (tx) => [
     await tx.subscription.findMany({
       where: { status: { in: ["trialing", "active", "past_due"] } },
-      include: { plan: true },
+      include: { plan: { select: PLAN_FIELDS } },
     }),
     await tx.plan.findFirst({
       where: { isActive: true, priceMonthly: { lte: 0 } },
       orderBy: { priceMonthly: "asc" },
+      select: { id: true },
     }),
   ]);
 

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireStaff } from "@/server/tenancy/current-user";
 import { requireAdminAction } from "@/server/tenancy/require-admin";
@@ -63,13 +64,25 @@ export async function getFloorPlan(restaurantId: string): Promise<FloorTable[]> 
     );
   }
 
-  // Open unpaid orders per table → occupancy + amount owed.
-  const orders = await tenantDb(restaurantId, (tx) =>
-    tx.order.findMany({
-      where: { status: { in: [...OPEN] }, paymentStatus: { in: ["unpaid", "failed"] }, tableId: { not: null } },
-      select: { tableId: true, total: true, discountAmount: true, creditApplied: true },
-    }),
-  );
+  // Open unpaid orders per table → occupancy + amount owed. discountAmount /
+  // creditApplied ship in later migrations, so fall back to bare columns if
+  // they're not present yet (never let this 500 the floor plan).
+  type OrderRow = { tableId: string | null; total: number; discountAmount?: number; creditApplied?: number };
+  let orders: OrderRow[];
+  const where: Prisma.OrderWhereInput = {
+    status: { in: [...OPEN] },
+    paymentStatus: { in: ["unpaid", "failed"] },
+    tableId: { not: null },
+  };
+  try {
+    orders = await tenantDb(restaurantId, (tx) =>
+      tx.order.findMany({ where, select: { tableId: true, total: true, discountAmount: true, creditApplied: true } }),
+    );
+  } catch {
+    orders = await tenantDb(restaurantId, (tx) =>
+      tx.order.findMany({ where, select: { tableId: true, total: true } }),
+    );
+  }
   const byTable = new Map<string, { count: number; outstanding: number }>();
   for (const o of orders) {
     if (!o.tableId) continue;

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireAdminAction } from "@/server/tenancy/require-admin";
 import { getBillingProvider } from "@/server/billing";
-import { startPlan, cancelAtPeriodEnd } from "@/server/billing/subscription";
+import { startPlan, cancelAtPeriodEnd, PLAN_FIELDS } from "@/server/billing/subscription";
 import { addMonths } from "@/lib/billing/period";
 
 /**
@@ -20,7 +20,7 @@ export async function payNow(): Promise<{ ok?: boolean; checkoutUrl?: string; er
   const info = await tenantDb(restaurantId, async (tx) => {
     const sub = await tx.subscription.findFirst({
       orderBy: { createdAt: "desc" },
-      include: { plan: true },
+      include: { plan: { select: PLAN_FIELDS } },
     });
     if (!sub) throw new Error("No subscription");
     let invoice = await tx.restaurantInvoice.findFirst({

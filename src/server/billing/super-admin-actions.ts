@@ -186,8 +186,8 @@ async function ensureSubscription(tx: Prisma.TransactionClient, restaurantId: st
   });
   if (sub) return sub;
   const plan = planId
-    ? await tx.plan.findUnique({ where: { id: planId } })
-    : await tx.plan.findFirst({ where: { isActive: true }, orderBy: { priceMonthly: "asc" } });
+    ? await tx.plan.findUnique({ where: { id: planId }, select: { id: true } })
+    : await tx.plan.findFirst({ where: { isActive: true }, orderBy: { priceMonthly: "asc" }, select: { id: true } });
   if (!plan) throw new Error("No plan available");
   return tx.subscription.create({
     data: { restaurantId, planId: plan.id, status: "trialing" },

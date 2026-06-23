@@ -3,6 +3,21 @@ import { tenantDb, systemDb } from "@/server/tenancy/scoped-db";
 import { addMonths } from "@/lib/billing/period";
 
 /**
+ * Explicit plan fields — everything EXCEPT `features` (which ships in a later
+ * migration). Selecting columns explicitly means plan reads don't 500 if that
+ * column hasn't been added to the database yet.
+ */
+export const PLAN_FIELDS = {
+  id: true,
+  name: true,
+  priceMonthly: true,
+  limits: true,
+  trialDays: true,
+  isActive: true,
+  createdAt: true,
+} satisfies Prisma.PlanSelect;
+
+/**
  * Free trial length for a PAID plan — no credit card required. The Free plan is
  * lifetime (it never trials or expires); this only applies when an owner chooses
  * to try Growth or Business.
@@ -14,6 +29,7 @@ export async function getDefaultPlan(tx: Prisma.TransactionClient) {
   return tx.plan.findFirst({
     where: { isActive: true },
     orderBy: { priceMonthly: "asc" },
+    select: PLAN_FIELDS,
   });
 }
 
@@ -22,6 +38,7 @@ export async function getFreePlan(tx: Prisma.TransactionClient) {
   return tx.plan.findFirst({
     where: { isActive: true, priceMonthly: { lte: 0 } },
     orderBy: { priceMonthly: "asc" },
+    select: PLAN_FIELDS,
   });
 }
 
@@ -52,7 +69,7 @@ export async function getCurrentSubscription(restaurantId: string) {
   return tenantDb(restaurantId, (tx) =>
     tx.subscription.findFirst({
       orderBy: { createdAt: "desc" },
-      include: { plan: { include: { modules: true } } },
+      include: { plan: { select: { ...PLAN_FIELDS, modules: true } } },
     }),
   );
 }
@@ -63,7 +80,7 @@ export async function listPlans() {
     tx.plan.findMany({
       where: { isActive: true },
       orderBy: { priceMonthly: "asc" },
-      include: { modules: { where: { enabled: true } } },
+      select: { ...PLAN_FIELDS, modules: { where: { enabled: true } } },
     }),
   );
 }
@@ -87,7 +104,7 @@ export async function changePlan(restaurantId: string, planId: string) {
  */
 export async function startPlan(restaurantId: string, planId: string) {
   return tenantDb(restaurantId, async (tx) => {
-    const plan = await tx.plan.findUnique({ where: { id: planId } });
+    const plan = await tx.plan.findUnique({ where: { id: planId }, select: PLAN_FIELDS });
     if (!plan) throw new Error("Unknown plan");
     const sub = await tx.subscription.findFirst({ orderBy: { createdAt: "desc" } });
 
