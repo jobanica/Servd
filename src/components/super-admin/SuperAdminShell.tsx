@@ -29,6 +29,7 @@ const I = {
   receipt: "M5 3v18l2-1 2 1 2-1 2 1 2-1 2 1V3l-2 1-2-1-2 1-2-1-2 1z M9 8h6M9 12h6",
   userPlus: "M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8M19 8v6M22 11h-6",
   chat: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z",
+  pin: "M12 21s-7-6.2-7-11a7 7 0 0114 0c0 4.8-7 11-7 11z M12 10a2 2 0 100-4 2 2 0 000 4z",
   back: "M19 12H5M12 19l-7-7 7-7",
 };
 
@@ -36,6 +37,7 @@ const NAV = [
   { label: "Overview", href: "/super-admin", d: I.home },
   { label: "Subscriptions", href: "/super-admin/subscriptions", d: I.card },
   { label: "Create account", href: "/super-admin/accounts", d: I.userPlus },
+  { label: "Prospecting", href: "/super-admin/prospecting", d: I.pin },
   { label: "Plans", href: "/super-admin/plans", d: I.layers },
   { label: "Invoices", href: "/super-admin/invoices", d: I.receipt },
   { label: "Payments", href: "/super-admin/payments", d: I.card },

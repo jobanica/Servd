@@ -136,6 +136,33 @@ model PlatformFeedback {
   @@map("platform_feedback")
 }
 
+/// Sales-prospecting leads: restaurants discovered via OpenStreetMap that the
+/// platform owner can pursue. Platform-level (super-admin only) — never exposed
+/// to tenants. `source`+`sourceId` dedupes the same place across searches.
+model ProspectLead {
+  id         String    @id @default(uuid())
+  source     String    @default("osm") // discovery source
+  sourceId   String // e.g. "node/123" — stable per place
+  name       String
+  address    String?
+  latitude   Float?
+  longitude  Float?
+  phone      String?
+  website    String?
+  email      String?
+  facebook   String?
+  status     String    @default("new") // new | contacted | interested | converted | rejected
+  notes      String?
+  enrichedAt DateTime? // last time we scraped the website for email/FB
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([source, sourceId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("prospect_leads")
+}
+
 model Plan {
   id           String   @id @default(uuid())
   name         String
