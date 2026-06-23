@@ -17,6 +17,7 @@ const item: DinerItem = {
   videoUrl: null,
   videoPosterUrl: null,
   isAvailable: true,
+  dietaryTags: [],
   groups: [
     {
       id: "size",
