@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireAdminAction } from "@/server/tenancy/require-admin";
 import { getBillingProvider } from "@/server/billing";
@@ -65,9 +66,24 @@ export async function payNow(): Promise<{ ok?: boolean; checkoutUrl?: string; er
 
 export async function selectPlan(formData: FormData): Promise<void> {
   const { restaurantId } = await requireAdminAction();
-  const planId = String(formData.get("planId"));
-  await startPlan(restaurantId, planId);
+  const planId = String(formData.get("planId") ?? "").trim();
+  if (!planId) {
+    // No plan row mapped to this tier yet (e.g. plan names not synced).
+    redirect("/admin/billing?plan=unavailable");
+  }
+
+  let ok = false;
+  try {
+    await startPlan(restaurantId, planId);
+    ok = true;
+  } catch (e) {
+    // Never surface a raw server-action crash to the owner — show a friendly
+    // banner instead so the billing page stays usable.
+    console.error("selectPlan failed", e);
+  }
+
   revalidatePath("/admin/billing");
+  redirect(ok ? "/admin/billing?plan=changed" : "/admin/billing?plan=error");
 }
 
 export async function cancelSubscription(): Promise<void> {
