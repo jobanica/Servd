@@ -16,7 +16,9 @@ export default async function SuperAdminAccountsPage() {
         <h1 className="font-heading text-2xl font-bold">Create business</h1>
         <p className="text-sm text-plum-ink/50">
           Create a business with just its name, a username, and the location — no email needed. The
-          owner sets their email from their own dashboard.
+          owner sets their email from their own dashboard. Every business starts with{" "}
+          <span className="font-semibold text-plum-ink/70">lifetime free access</span> to the Free
+          plan; they can try a paid plan free for 14 days (no card) whenever they want.
         </p>
       </div>
 

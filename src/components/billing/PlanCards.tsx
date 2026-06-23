@@ -89,7 +89,7 @@ export function PlanCards({
                   featured ? "btn-brand text-white" : "border border-plum-ink/15"
                 }`}
               >
-                Start free trial
+                {price <= 0 ? "Get started free" : "Start 14-day free trial"}
               </Link>
             ) : isCurrent ? (
               <p className="mt-6 rounded-full border border-brand-primary/30 bg-brand-primary/5 py-3 text-center text-sm font-semibold text-brand-primary">
@@ -103,7 +103,7 @@ export function PlanCards({
                     featured ? "btn-brand text-white" : "border border-plum-ink/15"
                   }`}
                 >
-                  Switch to {info.name}
+                  {price <= 0 ? "Switch to Free" : `Try ${info.name} free`}
                 </button>
               </form>
             ) : (

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireAdminAction } from "@/server/tenancy/require-admin";
 import { getBillingProvider } from "@/server/billing";
-import { changePlan, cancelAtPeriodEnd } from "@/server/billing/subscription";
+import { startPlan, cancelAtPeriodEnd } from "@/server/billing/subscription";
 import { addMonths } from "@/lib/billing/period";
 
 /**
@@ -66,7 +66,7 @@ export async function payNow(): Promise<{ ok?: boolean; checkoutUrl?: string; er
 export async function selectPlan(formData: FormData): Promise<void> {
   const { restaurantId } = await requireAdminAction();
   const planId = String(formData.get("planId"));
-  await changePlan(restaurantId, planId);
+  await startPlan(restaurantId, planId);
   revalidatePath("/admin/billing");
 }
 

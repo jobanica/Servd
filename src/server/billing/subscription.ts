@@ -2,13 +2,14 @@ import type { Prisma } from "@prisma/client";
 import { tenantDb, systemDb } from "@/server/tenancy/scoped-db";
 import { addMonths } from "@/lib/billing/period";
 
-/** Free trial length — full access to every feature. */
-export const TRIAL_DAYS = 30;
-
 /**
- * Picks the default signup plan: the cheapest active plan (e.g. Free).
- * Returns null if no plans are seeded yet (trial still works, just unlimited).
+ * Free trial length for a PAID plan — no credit card required. The Free plan is
+ * lifetime (it never trials or expires); this only applies when an owner chooses
+ * to try Growth or Business.
  */
+export const TRIAL_DAYS = 14;
+
+/** The lowest-priced active plan = the Free tier. */
 export async function getDefaultPlan(tx: Prisma.TransactionClient) {
   return tx.plan.findFirst({
     where: { isActive: true },
@@ -16,27 +17,32 @@ export async function getDefaultPlan(tx: Prisma.TransactionClient) {
   });
 }
 
+/** The Free (₱0) plan, if one is seeded — used for lifetime-free access. */
+export async function getFreePlan(tx: Prisma.TransactionClient) {
+  return tx.plan.findFirst({
+    where: { isActive: true, priceMonthly: { lte: 0 } },
+    orderBy: { priceMonthly: "asc" },
+  });
+}
+
 /**
- * Provisions a 30-day (plan.trialDays) trialing subscription for a brand-new
- * restaurant and links the plan. Call inside a super-admin tx during signup.
+ * Provisions LIFETIME FREE access for a brand-new restaurant: an active
+ * subscription on the Free plan with no trial and no expiry. Owners upgrade to a
+ * paid plan later (with a 14-day trial) from the billing page. Call inside a
+ * super-admin tx during signup / account creation.
  */
-export async function startTrial(
+export async function provisionFreePlan(
   tx: Prisma.TransactionClient,
   restaurantId: string,
 ) {
-  const plan = await getDefaultPlan(tx);
-  if (!plan) return; // no plans yet — skip; restaurant stays unlimited/active
-  const trialEndsAt = new Date();
-  trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_DAYS);
-
+  const plan = (await getFreePlan(tx)) ?? (await getDefaultPlan(tx));
+  if (!plan) return; // no plans yet — skip; restaurant stays active
   await tx.restaurant.update({ where: { id: restaurantId }, data: { planId: plan.id } });
   await tx.subscription.create({
     data: {
       restaurantId,
       planId: plan.id,
-      status: "trialing",
-      trialEndsAt,
-      currentPeriodEnd: trialEndsAt,
+      status: "active", // lifetime free — never trials, never expires
     },
   });
 }
@@ -69,6 +75,45 @@ export async function changePlan(restaurantId: string, planId: string) {
     if (!sub) throw new Error("No subscription");
     await tx.subscription.update({ where: { id: sub.id }, data: { planId } });
     await tx.restaurant.update({ where: { id: restaurantId }, data: { planId } });
+  });
+}
+
+/**
+ * Owner picks a plan from the billing page:
+ *   - Free            → lifetime free, active immediately (no trial, no expiry).
+ *   - Paid + saved card → switch now; the next cycle bills the new price.
+ *   - Paid, no card   → start a 14-day FREE TRIAL (no card). When it ends unpaid
+ *                       the daily cron reverts them to the Free plan.
+ */
+export async function startPlan(restaurantId: string, planId: string) {
+  return tenantDb(restaurantId, async (tx) => {
+    const plan = await tx.plan.findUnique({ where: { id: planId } });
+    if (!plan) throw new Error("Unknown plan");
+    const sub = await tx.subscription.findFirst({ orderBy: { createdAt: "desc" } });
+
+    // Free plan → lifetime free.
+    if (plan.priceMonthly <= 0) {
+      const data = { planId, status: "active" as const, trialEndsAt: null, cancelAtPeriodEnd: false };
+      if (sub) await tx.subscription.update({ where: { id: sub.id }, data });
+      else await tx.subscription.create({ data: { restaurantId, ...data } });
+      await tx.restaurant.update({ where: { id: restaurantId }, data: { planId, status: "active" } });
+      return;
+    }
+
+    // Paid plan with a card already on file → switch now (bills next cycle).
+    if (sub?.providerPaymentMethodId) {
+      await tx.subscription.update({ where: { id: sub.id }, data: { planId, cancelAtPeriodEnd: false } });
+      await tx.restaurant.update({ where: { id: restaurantId }, data: { planId } });
+      return;
+    }
+
+    // Paid plan, no card → 14-day free trial.
+    const trialEndsAt = new Date();
+    trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_DAYS);
+    const data = { planId, status: "trialing" as const, trialEndsAt, currentPeriodEnd: trialEndsAt, cancelAtPeriodEnd: false };
+    if (sub) await tx.subscription.update({ where: { id: sub.id }, data });
+    else await tx.subscription.create({ data: { restaurantId, ...data } });
+    await tx.restaurant.update({ where: { id: restaurantId }, data: { planId, status: "active" } });
   });
 }
 

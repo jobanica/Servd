@@ -26,12 +26,16 @@ export interface CronSummary {
  */
 export async function runBillingCron(now: Date = new Date()): Promise<CronSummary> {
   const provider = await getBillingProvider();
-  const subs = await systemDb((tx) =>
-    tx.subscription.findMany({
+  const [subs, freePlan] = await systemDb(async (tx) => [
+    await tx.subscription.findMany({
       where: { status: { in: ["trialing", "active", "past_due"] } },
       include: { plan: true },
     }),
-  );
+    await tx.plan.findFirst({
+      where: { isActive: true, priceMonthly: { lte: 0 } },
+      orderBy: { priceMonthly: "asc" },
+    }),
+  ]);
 
   const s: CronSummary = { processed: subs.length, charged: 0, failed: 0, awaiting: 0, suspended: 0, cancelled: 0 };
 
@@ -48,6 +52,28 @@ export async function runBillingCron(now: Date = new Date()): Promise<CronSummar
       now,
     );
     const amount = sub.plan.priceMonthly;
+
+    // A 14-day paid trial that ended without a saved card → revert to the Free
+    // plan (lifetime free) rather than suspend. Free is always there to fall
+    // back to, so an un-converted trial just becomes a free account.
+    const trialEnded = sub.status === "trialing" && !!sub.trialEndsAt && sub.trialEndsAt <= now;
+    if (trialEnded && !sub.providerPaymentMethodId && amount > 0 && freePlan) {
+      await systemDb(async (tx) => {
+        await tx.subscription.update({
+          where: { id: sub.id },
+          data: {
+            planId: freePlan.id,
+            status: "active",
+            trialEndsAt: null,
+            currentPeriodEnd: addMonths(now, 1),
+            failedCharges: 0,
+            cancelAtPeriodEnd: false,
+          },
+        });
+        await tx.restaurant.update({ where: { id: sub.restaurantId }, data: { planId: freePlan.id, status: "active" } });
+      });
+      continue;
+    }
 
     if (decision.action === "none") continue;
 

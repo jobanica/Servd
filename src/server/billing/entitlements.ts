@@ -37,7 +37,7 @@ export async function getEntitlements(restaurantId: string): Promise<Entitlement
       },
     });
 
-    // Free trial = full access: all modules, no limits, for 30 days.
+    // Paid-plan trial (14 days, no card) = full access: all modules, no limits.
     let onTrial = false;
     try {
       const sub = await tx.subscription.findFirst({

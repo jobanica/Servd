@@ -120,7 +120,8 @@ export default async function BillingPage({
       <div>
         <h2 className="mb-1 font-heading text-lg font-bold">Choose your plan</h2>
         <p className="mb-4 text-sm text-plum-ink/55">
-          Switch any time — changes apply to your next renewal.
+          Free is yours for life. Try any paid plan free for 14 days — no credit card. If you
+          don&apos;t add payment, you simply roll back to Free.
         </p>
         <PlanCards mode="switch" currentPlanName={sub?.plan.name ?? null} planIdByName={planIdByName} priceByTier={priceByTier} />
       </div>
