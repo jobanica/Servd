@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/server/tenancy/current-user";
 import { tenantDb } from "@/server/tenancy/scoped-db";
-import { getEntitledFeatures, getPlanAccess } from "@/server/billing/feature-gate";
+import { getEntitledFeatures } from "@/server/billing/feature-gate";
 import { AdminShell } from "@/components/admin/AdminShell";
 
 /**
@@ -18,7 +18,7 @@ export default async function AdminLayout({
     return <>{children}</>;
   }
 
-  const [restaurant, features, access] = await Promise.all([
+  const [restaurant, features] = await Promise.all([
     tenantDb(user.restaurantId, (tx) =>
       tx.restaurant.findFirstOrThrow({
         select: {
@@ -33,7 +33,6 @@ export default async function AdminLayout({
       }),
     ),
     getEntitledFeatures(user.restaurantId),
-    getPlanAccess(user.restaurantId),
   ]);
 
   return (
@@ -48,8 +47,8 @@ export default async function AdminLayout({
         brandPrimaryColor: restaurant.brandPrimaryColor,
         brandAccentColor: restaurant.brandAccentColor,
       }}
-      // Full white-label (no "Powered by Servd") is a Business-tier perk.
-      fullWhiteLabel={access.tier === "Business"}
+      // Full white-label (no "Powered by Servd") is now a per-plan feature.
+      fullWhiteLabel={features.has("whiteLabel")}
       features={[...features]}
     >
       {children}

@@ -3,12 +3,24 @@
 import { useActionState } from "react";
 import { createPlan, updatePlan, type ActionState } from "@/server/billing/super-admin-actions";
 import type { PlanRow } from "@/server/billing/super-admin";
+import { FEATURE_META } from "@/lib/billing/features";
 
 const MODULES: { key: string; label: string }[] = [
   { key: "inventory", label: "Inventory" },
   { key: "hris", label: "HR / payroll" },
   { key: "custom_domain", label: "Custom domain" },
 ];
+
+// Feature toggles grouped for the editor (order follows FEATURE_META).
+const FEATURE_GROUPS = FEATURE_META.reduce<{ group: string; items: typeof FEATURE_META }[]>(
+  (acc, meta) => {
+    const last = acc[acc.length - 1];
+    if (last && last.group === meta.group) last.items.push(meta);
+    else acc.push({ group: meta.group, items: [meta] });
+    return acc;
+  },
+  [],
+);
 
 /**
  * Create or edit a plan. When `plan` is provided it edits in place; otherwise it
@@ -74,6 +86,38 @@ export function PlanForm({ plan }: { plan?: PlanRow }) {
               />
               {m.label}
             </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Per-plan feature control. Toggling these applies live to every
+          subscription currently on this plan. */}
+      <div className="rounded-lg border border-plum-ink/10 bg-cream/40 p-3">
+        <label className={label}>Included features</label>
+        <p className="mb-2 -mt-0.5 text-xs text-plum-ink/45">
+          Tick what this plan unlocks. Changes apply immediately to every restaurant on the plan.
+          (Core ordering, POS &amp; kitchen are always included.)
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {FEATURE_GROUPS.map((g) => (
+            <div key={g.group}>
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-plum-ink/40">
+                {g.group}
+              </p>
+              <div className="space-y-1">
+                {g.items.map((f) => (
+                  <label key={f.key} className="flex items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      name={`feature_${f.key}`}
+                      defaultChecked={plan?.features.includes(f.key)}
+                      className="mt-0.5"
+                    />
+                    <span>{f.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       </div>

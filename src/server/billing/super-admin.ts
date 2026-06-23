@@ -1,6 +1,12 @@
 import "server-only";
 
 import { systemDb } from "@/server/tenancy/scoped-db";
+import {
+  asTier,
+  defaultFeaturesForTier,
+  sanitizeFeatures,
+  type Feature,
+} from "@/lib/billing/features";
 
 export interface BusinessRow {
   id: string;
@@ -208,36 +214,59 @@ export interface PlanRow {
   isActive: boolean;
   limits: { maxTables?: number; maxStaff?: number; smsIncluded?: number };
   modules: string[];
+  features: Feature[]; // gateable features this plan grants
   subscriberCount: number;
 }
 
+const PLAN_SELECT = {
+  id: true,
+  name: true,
+  priceMonthly: true,
+  trialDays: true,
+  isActive: true,
+  limits: true,
+  modules: { where: { enabled: true }, select: { module: true } },
+  _count: { select: { subscriptions: true } },
+} as const;
+
 /** All plans (active + inactive) with subscriber counts, for the plans page. */
 export async function listAllPlans(): Promise<PlanRow[]> {
-  const plans = await systemDb((tx) =>
-    tx.plan.findMany({
-      orderBy: { priceMonthly: "asc" },
-      select: {
-        id: true,
-        name: true,
-        priceMonthly: true,
-        trialDays: true,
-        isActive: true,
-        limits: true,
-        modules: { where: { enabled: true }, select: { module: true } },
-        _count: { select: { subscriptions: true } },
-      },
-    }),
-  );
-  return plans.map((p) => ({
-    id: p.id,
-    name: p.name,
-    priceMonthly: p.priceMonthly,
-    trialDays: p.trialDays,
-    isActive: p.isActive,
-    limits: (p.limits as PlanRow["limits"] | null) ?? {},
-    modules: p.modules.map((m) => m.module),
-    subscriberCount: p._count.subscriptions,
-  }));
+  // Try with the per-plan features column; fall back to tier defaults if the
+  // migration hasn't run yet so the plans page keeps working.
+  try {
+    const plans = await systemDb((tx) =>
+      tx.plan.findMany({
+        orderBy: { priceMonthly: "asc" },
+        select: { ...PLAN_SELECT, features: true },
+      }),
+    );
+    return plans.map((p) => ({
+      id: p.id,
+      name: p.name,
+      priceMonthly: p.priceMonthly,
+      trialDays: p.trialDays,
+      isActive: p.isActive,
+      limits: (p.limits as PlanRow["limits"] | null) ?? {},
+      modules: p.modules.map((m) => m.module),
+      features: sanitizeFeatures(p.features ?? []),
+      subscriberCount: p._count.subscriptions,
+    }));
+  } catch {
+    const plans = await systemDb((tx) =>
+      tx.plan.findMany({ orderBy: { priceMonthly: "asc" }, select: PLAN_SELECT }),
+    );
+    return plans.map((p) => ({
+      id: p.id,
+      name: p.name,
+      priceMonthly: p.priceMonthly,
+      trialDays: p.trialDays,
+      isActive: p.isActive,
+      limits: (p.limits as PlanRow["limits"] | null) ?? {},
+      modules: p.modules.map((m) => m.module),
+      features: defaultFeaturesForTier(asTier(p.name)),
+      subscriberCount: p._count.subscriptions,
+    }));
+  }
 }
 
 export interface InvoiceRow {

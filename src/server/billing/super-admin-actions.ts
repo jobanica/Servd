@@ -12,6 +12,7 @@ import { saveXenditCreds } from "@/server/billing/platform-settings";
 import { provisionFreePlan } from "@/server/billing/subscription";
 import { uniqueSlug } from "@/lib/slug";
 import { addMonths } from "@/lib/billing/period";
+import { ALL_FEATURES, type Feature } from "@/lib/billing/features";
 
 export type ActionState =
   | { ok?: boolean; message?: string; error?: string; credentials?: { username: string; password: string } }
@@ -70,6 +71,23 @@ function modulesFromForm(formData: FormData): PlanModuleType[] {
   return ALL_MODULES.filter((m) => formData.get(`module_${m}`) === "on");
 }
 
+function featuresFromForm(formData: FormData): Feature[] {
+  return ALL_FEATURES.filter((f) => formData.get(`feature_${f}`) === "on");
+}
+
+/**
+ * Persist a plan's enabled features. Runs in its OWN transaction (best-effort)
+ * so a not-yet-migrated `features` column can't poison/roll back the main plan
+ * save — and so changes apply live to every subscription on the plan.
+ */
+async function setPlanFeatures(planId: string, features: Feature[]): Promise<void> {
+  try {
+    await systemDb((tx) => tx.plan.update({ where: { id: planId }, data: { features } }));
+  } catch {
+    /* `plan.features` column not migrated yet — skip; tier defaults still apply */
+  }
+}
+
 async function syncModules(tx: Prisma.TransactionClient, planId: string, modules: PlanModuleType[]) {
   const enabled = new Set(modules);
   for (const m of ALL_MODULES) {
@@ -98,18 +116,21 @@ export async function createPlan(_prev: ActionState, formData: FormData): Promis
   const { name, price, trialDays, maxTables, maxStaff, smsIncluded } = parsed.data;
   const priceMonthly = Math.round(price * 100);
   const limits = buildLimits({ maxTables, maxStaff, smsIncluded });
+  let planId: string;
   try {
-    await systemDb(async (tx) => {
+    planId = await systemDb(async (tx) => {
       const plan = await tx.plan.create({
         data: { name, priceMonthly, trialDays, limits, isActive: true },
         select: { id: true },
       });
       await syncModules(tx, plan.id, modulesFromForm(formData));
+      return plan.id;
     });
   } catch (e) {
     console.error("createPlan failed", e);
     return { error: e instanceof Error ? e.message : "Couldn't create the plan." };
   }
+  await setPlanFeatures(planId, featuresFromForm(formData));
   refresh();
   return { ok: true, message: `Plan “${name}” created.` };
 }
@@ -139,6 +160,7 @@ export async function updatePlan(_prev: ActionState, formData: FormData): Promis
     console.error("updatePlan failed", e);
     return { error: e instanceof Error ? e.message : "Couldn't update the plan." };
   }
+  await setPlanFeatures(id, featuresFromForm(formData));
   refresh();
   return { ok: true, message: "Plan updated." };
 }

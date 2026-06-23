@@ -168,6 +168,7 @@ model Plan {
   name         String
   priceMonthly Int // store money in centavos (integers) to avoid float errors
   limits       Json // e.g. { maxTables, maxStaff, smsIncluded }
+  features     String[] @default([]) // gateable feature keys this plan grants (super-admin controlled)
   trialDays    Int      @default(30) // free-trial length for new signups
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())

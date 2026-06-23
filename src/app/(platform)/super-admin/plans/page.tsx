@@ -11,8 +11,9 @@ export default async function PlansPage() {
       <div>
         <h1 className="font-heading text-2xl font-bold">Plans</h1>
         <p className="text-sm text-plum-ink/50">
-          The subscription tiers restaurants can be on. Price, trial length, limits and add-on
-          modules all drive what each tenant is entitled to.
+          The subscription tiers restaurants can be on. Price, limits, and the features you tick
+          for each plan drive exactly what every tenant is entitled to — toggle a feature and it
+          applies live to every restaurant on that plan.
         </p>
       </div>
 
