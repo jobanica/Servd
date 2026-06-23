@@ -27,10 +27,15 @@ export async function getOnboardingState(
         onboardingCompletedAt: true,
         logoUrl: true,
         brandPrimaryColor: true,
-        displayName: true,
         paymentOnlineEnabled: true,
+        printerConfig: true,
       },
     });
+    // The owner has "chosen a printer method" once they save the printing form,
+    // which stamps printerConfig.configured. (displayName is auto-filled at
+    // signup, so it can't count as a real branding action.)
+    const printerConfigured =
+      !!(r.printerConfig as { configured?: boolean } | null)?.configured;
     const [itemCount, tableCount] = await Promise.all([
       tx.menuItem.count(),
       tx.table.count(),
@@ -41,7 +46,7 @@ export async function getOnboardingState(
         key: "branding",
         label: "Add your branding",
         href: "/admin/branding",
-        done: !!(r.logoUrl || r.brandPrimaryColor || r.displayName),
+        done: !!(r.logoUrl || r.brandPrimaryColor),
       },
       {
         key: "menu",
@@ -65,7 +70,7 @@ export async function getOnboardingState(
         key: "printer",
         label: "Choose a printer method",
         href: "/admin/printing",
-        done: true, // a sensible default already exists
+        done: printerConfigured,
       },
     ];
 

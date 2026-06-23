@@ -63,6 +63,9 @@ export async function updatePrintSettings(
       footer: trimOrNull(parsed.data.receiptFooter),
     };
 
+    // Mark the printer method as deliberately chosen (drives onboarding).
+    cfg.configured = true;
+
     await tx.restaurant.update({
       where: { id: restaurantId },
       data: {
@@ -70,6 +73,7 @@ export async function updatePrintSettings(
         autoPrint: parsed.data.autoPrint,
         printerConfig: cfg as object,
       },
+      select: { id: true },
     });
   });
 
