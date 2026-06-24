@@ -1,17 +1,11 @@
 "use client";
 
-import { useActionState, useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-import {
-  addClient,
-  logTouch,
-  markReplied,
-  setStage,
-  deleteClient,
-  type CrmActionState,
-} from "@/server/crm/actions";
+import { logTouch, markReplied, setStage, deleteClient } from "@/server/crm/actions";
 import type { CrmClientRow, CrmStage } from "@/server/crm/queries";
+import { AddClientForm } from "./AddClientForm";
 import {
   SEQUENCE,
   TOTAL_TOUCHES,
@@ -60,16 +54,12 @@ export function CrmBoard({ clients }: { clients: CrmClientRow[] }) {
   const [filter, setFilter] = useState<CrmStage | "all">("all");
   const [view, setView] = useState<"list" | "board">("board");
   const [showAdd, setShowAdd] = useState(clients.length === 0);
-  const [addState, addAction] = useActionState<CrmActionState, FormData>(addClient, null);
 
   // Pointer-based drag (works with both mouse and touch).
   const dragMeta = useRef<{ id: string; from: CrmStage } | null>(null);
   const [dragging, setDragging] = useState<{ id: string; name: string } | null>(null);
   const [hoverStage, setHoverStage] = useState<CrmStage | null>(null);
   const [ghost, setGhost] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-
-  // The add form clears on success via key remount.
-  const formKey = addState?.ok ? "ok" : "form";
 
   const metrics = useMemo(() => {
     const m = { total: clients.length, due: 0, scheduled: 0, replied: 0, won: 0, lost: 0, contacted: 0 };
@@ -181,23 +171,9 @@ export function CrmBoard({ clients }: { clients: CrmClientRow[] }) {
         </div>
 
         {showAdd && (
-          <form
-            key={formKey}
-            action={addAction}
-            className="mb-4 grid gap-2 rounded-tile border border-plum-ink/10 bg-white p-3 sm:grid-cols-2"
-          >
-            <input name="name" required placeholder="Business name *" className="rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
-            <input name="facebookUrl" placeholder="Facebook page URL" className="rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
-            <input name="contactName" placeholder="Contact name (optional)" className="rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
-            <input name="phone" placeholder="Phone (optional)" className="rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
-            <input name="email" placeholder="Email (optional)" className="rounded-lg border border-plum-ink/15 px-3 py-2 text-sm sm:col-span-2" />
-            <textarea name="notes" rows={2} placeholder="Notes (optional)" className="rounded-lg border border-plum-ink/15 px-3 py-2 text-sm sm:col-span-2" />
-            <div className="flex items-center gap-3 sm:col-span-2">
-              <button className="rounded-full bg-brand-gradient px-4 py-2 text-sm font-semibold text-white">Add client</button>
-              {addState?.error && <span className="text-sm text-guava">{addState.error}</span>}
-              {addState?.ok && <span className="text-sm text-mango">Added ✓</span>}
-            </div>
-          </form>
+          <div className="mb-4">
+            <AddClientForm onAdded={() => router.refresh()} />
+          </div>
         )}
 
         {dueList.length === 0 ? (
@@ -411,6 +387,10 @@ export function CrmBoard({ clients }: { clients: CrmClientRow[] }) {
                     <td className="px-3 py-2">
                       <span className="font-medium">{c.name}</span>
                       {c.contactName && <span className="block text-xs text-plum-ink/45">{c.contactName}</span>}
+                      {c.address && <span className="block text-xs text-plum-ink/40">📍 {c.address}</span>}
+                      {(c.phone || c.email) && (
+                        <span className="block text-xs text-plum-ink/40">{[c.phone, c.email].filter(Boolean).join(" · ")}</span>
+                      )}
                       {c.facebookUrl && (
                         <a href={c.facebookUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-[#1877f2]">
                           facebook ↗

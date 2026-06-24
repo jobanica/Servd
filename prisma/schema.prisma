@@ -172,6 +172,7 @@ model CrmClient {
   contactName String?
   phone       String?
   email       String?
+  address     String?
   notes       String?
   stage       String     @default("new") // new | in_sequence | replied | won | lost
   step        Int        @default(0) // touches sent (0..TOTAL_TOUCHES)

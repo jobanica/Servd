@@ -7,6 +7,7 @@ import { z } from "zod";
 import { requireSuperAdmin } from "@/server/tenancy/current-user";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { SEQUENCE, TOTAL_TOUCHES, addDays } from "@/lib/crm/sequence";
+import { scrapeFacebookPage, type FbInfo } from "./fb-scrape";
 import type { CrmStage } from "./queries";
 
 const PATH = "/super-admin/crm";
@@ -19,10 +20,17 @@ const clientSchema = z.object({
   contactName: z.string().trim().max(120).optional().or(z.literal("")),
   phone: z.string().trim().max(40).optional().or(z.literal("")),
   email: z.string().trim().max(160).optional().or(z.literal("")),
+  address: z.string().trim().max(300).optional().or(z.literal("")),
   notes: z.string().trim().max(2000).optional().or(z.literal("")),
 });
 
-/** Add a client to the CRM (manually). */
+/** Auto-fill business details from a public Facebook page (best-effort). */
+export async function autofillFromFacebook(url: string): Promise<FbInfo | { error: string }> {
+  await requireSuperAdmin();
+  return scrapeFacebookPage(url);
+}
+
+/** Add a client to the CRM (manually). Resilient to a not-yet-migrated address column. */
 export async function addClient(_prev: CrmActionState, formData: FormData): Promise<CrmActionState> {
   await requireSuperAdmin();
   const parsed = clientSchema.safeParse({
@@ -31,27 +39,37 @@ export async function addClient(_prev: CrmActionState, formData: FormData): Prom
     contactName: formData.get("contactName") ?? "",
     phone: formData.get("phone") ?? "",
     email: formData.get("email") ?? "",
+    address: formData.get("address") ?? "",
     notes: formData.get("notes") ?? "",
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   const d = parsed.data;
+  const base = {
+    id: randomUUID(),
+    name: d.name,
+    facebookUrl: d.facebookUrl || null,
+    contactName: d.contactName || null,
+    phone: d.phone || null,
+    email: d.email || null,
+    notes: d.notes || null,
+    stage: "new",
+  };
   try {
     await systemDb((tx) =>
-      tx.crmClient.create({
-        data: {
-          id: randomUUID(),
-          name: d.name,
-          facebookUrl: d.facebookUrl || null,
-          contactName: d.contactName || null,
-          phone: d.phone || null,
-          email: d.email || null,
-          notes: d.notes || null,
-          stage: "new",
-        },
-      }),
+      tx.crmClient.create({ data: { ...base, address: d.address || null }, select: { id: true } }),
     );
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Couldn't add the client. Run the CRM migration?" };
+    const msg = e instanceof Error ? e.message : "";
+    // address column not migrated yet → retry without it.
+    if (/address|column|Unknown arg/i.test(msg)) {
+      try {
+        await systemDb((tx) => tx.crmClient.create({ data: base, select: { id: true } }));
+      } catch (e2) {
+        return { error: e2 instanceof Error ? e2.message : "Couldn't add the client." };
+      }
+    } else {
+      return { error: msg || "Couldn't add the client. Run the CRM migration?" };
+    }
   }
   revalidatePath(PATH);
   return { ok: true };
@@ -84,6 +102,7 @@ export async function logTouch(id: string): Promise<{ ok?: boolean; error?: stri
       await tx.crmClient.update({
         where: { id },
         data: { step: newStep, lastTouchAt: now, nextDueAt, stage: "in_sequence" },
+        select: { id: true },
       });
     });
   } catch (e) {
@@ -101,6 +120,7 @@ export async function markReplied(id: string): Promise<{ ok?: boolean; error?: s
       tx.crmClient.update({
         where: { id },
         data: { stage: "replied", repliedAt: new Date(), nextDueAt: null },
+        select: { id: true },
       }),
     );
   } catch (e) {
@@ -126,6 +146,7 @@ export async function setStage(id: string, stage: CrmStage): Promise<void> {
         ...(clearDue ? { nextDueAt: null } : {}),
         ...(stage === "replied" ? { repliedAt: new Date() } : {}),
       },
+      select: { id: true },
     }),
   );
   revalidatePath(PATH);
@@ -135,7 +156,11 @@ export async function setStage(id: string, stage: CrmStage): Promise<void> {
 export async function updateNotes(id: string, notes: string): Promise<void> {
   await requireSuperAdmin();
   await systemDb((tx) =>
-    tx.crmClient.update({ where: { id }, data: { notes: notes.slice(0, 2000) || null } }),
+    tx.crmClient.update({
+      where: { id },
+      data: { notes: notes.slice(0, 2000) || null },
+      select: { id: true },
+    }),
   );
   revalidatePath(PATH);
 }
@@ -181,7 +206,7 @@ export async function addProspectToCrm(
     const created = await systemDb(async (tx) => {
       const existing = await tx.crmClient.findFirst({ where: { name: d.name }, select: { id: true } });
       if (existing) return false;
-      await tx.crmClient.create({ data: crmCreateData(d) });
+      await tx.crmClient.create({ data: crmCreateData(d), select: { id: true } });
       return true;
     });
     if (!created) return { ok: true, duplicate: true };
@@ -214,7 +239,7 @@ export async function addProspectsToCrm(
           skipped++;
           continue;
         }
-        await tx.crmClient.create({ data: crmCreateData(d) });
+        await tx.crmClient.create({ data: crmCreateData(d), select: { id: true } });
         added++;
       }
     });
