@@ -185,7 +185,7 @@ export function CrmBoard({ clients }: { clients: CrmClientRow[] }) {
             {dueList.map((c) => {
               const next = nextStep(c.step);
               if (!next) return null;
-              const msg = renderMessage(next.message, c.name);
+              const msg = renderMessage(next.message, c.name, c.contactName);
               return (
                 <div key={c.id} className="rounded-tile border border-plum-ink/10 bg-white p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -212,7 +212,7 @@ export function CrmBoard({ clients }: { clients: CrmClientRow[] }) {
                     </div>
                   </div>
 
-                  <div className="mt-3 rounded-lg bg-cream/60 p-3 text-sm text-plum-ink/80">{msg}</div>
+                  <div className="mt-3 whitespace-pre-line rounded-lg bg-cream/60 p-3 text-sm text-plum-ink/80">{msg}</div>
 
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button

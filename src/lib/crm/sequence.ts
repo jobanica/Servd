@@ -23,7 +23,12 @@ export const SEQUENCE: SequenceStep[] = [
     label: "Initial message",
     waitDays: 0,
     message:
-      "Hi {name}! 👋 I help restaurants here take orders straight from a QR code and run the kitchen, cashier and receipts from one app (Servd) — no app for diners to download. Mind if I send you a quick 1-minute demo?",
+      "Hi [Name]! Nakita ko si [Business Name] sa delivery apps. 👀\n\n" +
+      "Grabe po kasi ang commissions ngayon —30% per order na nawawala sa profit niyo.\n\n" +
+      "Sa 100,000 revenue, 30,000 sa app, mas malaki pa kita ng Food Panda kesa sa Restaurant nyo.\n\n" +
+      "Pwede po namin kayo gawan ng ONLINE ORDERING SYSTEM, pag order ng customer, automatic papasok sa POS nyo tapos 0% commission pa\n\n" +
+      "Libre lang po, wala kayong babayaran.\n\n" +
+      "May personalized demo na po ako para sa [Business Name] — okay lang po bang i-share?",
   },
   {
     step: 2,
@@ -31,7 +36,9 @@ export const SEQUENCE: SequenceStep[] = [
     label: "Follow-up 1 — gentle bump",
     waitDays: 2,
     message:
-      "Hi {name}, just floating my message back up 🙂 Would a quick look at how Servd speeds up your orders be useful? Happy to keep it short.",
+      "Hi [Name], pa-follow up lang po sa message ko 🙂\n\n" +
+      "Yung sariling online ordering system po para sa [Business Name] — diretso pasok sa POS nyo, walang 30% commission na kinakaltas. " +
+      "Gusto nyo po bang makita muna yung quick demo?",
   },
   {
     step: 3,
@@ -39,7 +46,9 @@ export const SEQUENCE: SequenceStep[] = [
     label: "Follow-up 2 — new angle",
     waitDays: 3,
     message:
-      "Hey {name}! Totally understand you're busy. A lot of restaurants nearby are moving to QR ordering — want me to send a short video so you can watch whenever it's convenient?",
+      "Hi po! Alam ko po busy kayo sa [Business Name]. 🙏\n\n" +
+      "Marami na pong restaurant dito ang lumipat sa sariling ordering page para hindi na kainin ng app ang kita nila. " +
+      "Padalhan ko po kayo ng 1-minute video para makita nyo kahit anong oras — okay lang po?",
   },
   {
     step: 4,
@@ -47,7 +56,8 @@ export const SEQUENCE: SequenceStep[] = [
     label: "Follow-up 3 — remove the risk",
     waitDays: 5,
     message:
-      "Hi {name}, I can set you up with a free account so you can try it on a few tables with zero cost and zero commitment. Want me to get it ready for you?",
+      "Hi [Name], libre lang po talaga — wala kayong babayaran at walang commission per order.\n\n" +
+      "Gusto nyo po bang i-set up ko muna para sa [Business Name] para masubukan nyo nang walang risk?",
   },
   {
     step: 5,
@@ -55,7 +65,8 @@ export const SEQUENCE: SequenceStep[] = [
     label: "Follow-up 4 — soft check-in",
     waitDays: 7,
     message:
-      "Hi {name}, I don't want to keep bugging you 🙏 — should I check back later, or is now just not the right time for digitizing your ordering?",
+      "Hi po, ayaw ko po kayong istorbohin 🙏 — tama lang po bang i-check ko ulit kayo mamaya, " +
+      "o hindi pa po tamang panahon para sa [Business Name]?",
   },
   {
     step: 6,
@@ -63,7 +74,9 @@ export const SEQUENCE: SequenceStep[] = [
     label: "Break-up — close the loop",
     waitDays: 10,
     message:
-      "Hi {name}, I'll close the loop here so I'm not cluttering your inbox. If you ever want to take orders by QR and tidy up your operations, just message me anytime — wishing you full tables! 🍽️",
+      "Hi [Name], dito ko na po isasara para hindi na po dumami sa inbox nyo. 🙂\n\n" +
+      "Kung balang araw gusto nyo na pong magkaroon ng sariling online ordering (walang commission) para sa [Business Name], " +
+      "message nyo lang po ako anytime. Sana po laging puno ang [Business Name]! 🍽️",
     breakup: true,
   },
 ];
@@ -79,9 +92,15 @@ export function nextStep(step: number): SequenceStep | null {
   return step < SEQUENCE.length ? SEQUENCE[step] : null;
 }
 
-/** Fill {name} into a step's message. */
-export function renderMessage(message: string, name: string): string {
-  return message.replace(/\{name\}/g, name || "there");
+/**
+ * Fill a step's message: [Business Name] → the business, [Name] → the contact
+ * person (falls back to a polite "po" when no contact name is on file).
+ */
+export function renderMessage(message: string, business: string, contact?: string | null): string {
+  const greet = (contact && contact.trim()) || "po";
+  return message
+    .replace(/\[Business Name\]/g, business || "your restaurant")
+    .replace(/\[Name\]/g, greet);
 }
 
 export function addDays(base: Date, days: number): Date {
