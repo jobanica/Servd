@@ -12,6 +12,7 @@ import {
   FOLLOW_UPS,
   nextStep,
   renderMessage,
+  type SequenceStep,
 } from "@/lib/crm/sequence";
 
 const STAGE_LABEL: Record<CrmStage, string> = {
@@ -47,7 +48,13 @@ function isDue(c: CrmClientRow): boolean {
   return !!c.nextDueAt && new Date(c.nextDueAt).getTime() <= Date.now();
 }
 
-export function CrmBoard({ clients }: { clients: CrmClientRow[] }) {
+export function CrmBoard({
+  clients,
+  sequence = SEQUENCE,
+}: {
+  clients: CrmClientRow[];
+  sequence?: SequenceStep[];
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [copied, setCopied] = useState<string | null>(null);
@@ -183,7 +190,7 @@ export function CrmBoard({ clients }: { clients: CrmClientRow[] }) {
         ) : (
           <div className="space-y-3">
             {dueList.map((c) => {
-              const next = nextStep(c.step);
+              const next = nextStep(c.step, sequence);
               if (!next) return null;
               const msg = renderMessage(next.message, c.name, c.contactName);
               return (

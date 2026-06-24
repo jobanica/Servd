@@ -1,8 +1,28 @@
 import "server-only";
 
 import { systemDb } from "@/server/tenancy/scoped-db";
+import { mergeSequence, type SequenceOverride, type SequenceStep } from "@/lib/crm/sequence";
 
 export type CrmStage = "new" | "in_sequence" | "replied" | "won" | "lost";
+
+/**
+ * The effective follow-up sequence = defaults merged with the owner's saved
+ * overrides. Falls back to defaults if the column isn't migrated yet, so the
+ * CRM keeps working before the migration is run.
+ */
+export async function getCrmSequence(): Promise<SequenceStep[]> {
+  try {
+    const row = await systemDb((tx) =>
+      tx.platformSetting.findUnique({
+        where: { id: "platform" },
+        select: { crmSequence: true },
+      }),
+    );
+    return mergeSequence(row?.crmSequence as SequenceOverride[] | null | undefined);
+  } catch {
+    return mergeSequence(null); // column not migrated → defaults
+  }
+}
 
 export interface CrmClientRow {
   id: string;
