@@ -1,10 +1,11 @@
-import { listClients } from "@/server/crm/queries";
+import { listClients, getCrmSequence } from "@/server/crm/queries";
 import { CrmBoard } from "@/components/super-admin/CrmBoard";
+import { CrmSequenceEditor } from "@/components/super-admin/CrmSequenceEditor";
 
 export const metadata = { title: "Client CRM · Servd" };
 
 export default async function CrmPage() {
-  const clients = await listClients();
+  const [clients, sequence] = await Promise.all([listClients(), getCrmSequence()]);
 
   return (
     <div className="space-y-6">
@@ -17,7 +18,9 @@ export default async function CrmPage() {
         </p>
       </div>
 
-      <CrmBoard clients={clients} />
+      <CrmSequenceEditor sequence={sequence} />
+
+      <CrmBoard clients={clients} sequence={sequence} />
     </div>
   );
 }

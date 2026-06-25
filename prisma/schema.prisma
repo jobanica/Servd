@@ -114,6 +114,7 @@ model PlatformSetting {
   id              String   @id @default("platform")
   billingProvider String? // "xendit" | "paymongo" | null
   xenditCredsEnc  String? // encrypted JSON { secretKey, callbackToken }
+  crmSequence     Json? // owner-edited CRM follow-up messages (overrides defaults)
   updatedAt       DateTime @updatedAt
 
   @@map("platform_settings")

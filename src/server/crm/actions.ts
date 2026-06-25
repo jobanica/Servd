@@ -6,9 +6,9 @@ import { z } from "zod";
 
 import { requireSuperAdmin } from "@/server/tenancy/current-user";
 import { systemDb } from "@/server/tenancy/scoped-db";
-import { SEQUENCE, TOTAL_TOUCHES, addDays } from "@/lib/crm/sequence";
+import { SEQUENCE, TOTAL_TOUCHES, addDays, mergeSequence, type SequenceOverride } from "@/lib/crm/sequence";
 import { scrapeFacebookPage, type FbInfo } from "./fb-scrape";
-import type { CrmStage } from "./queries";
+import { getCrmSequence, type CrmStage } from "./queries";
 
 const PATH = "/super-admin/crm";
 
@@ -81,6 +81,8 @@ export async function addClient(_prev: CrmActionState, formData: FormData): Prom
  */
 export async function logTouch(id: string): Promise<{ ok?: boolean; error?: string }> {
   await requireSuperAdmin();
+  // Use the owner's edited sequence for labels + scheduling (falls back to defaults).
+  const sequence = await getCrmSequence();
   try {
     await systemDb(async (tx) => {
       const client = await tx.crmClient.findUnique({
@@ -91,8 +93,8 @@ export async function logTouch(id: string): Promise<{ ok?: boolean; error?: stri
       if (client.stage === "replied" || client.stage === "won") return; // no more outreach
 
       const newStep = Math.min(client.step + 1, TOTAL_TOUCHES);
-      const sent = SEQUENCE[newStep - 1]; // the touch just sent (0-based)
-      const upcoming = newStep < TOTAL_TOUCHES ? SEQUENCE[newStep] : null;
+      const sent = sequence[newStep - 1]; // the touch just sent (0-based)
+      const upcoming = newStep < TOTAL_TOUCHES ? sequence[newStep] : null;
       const now = new Date();
       const nextDueAt = upcoming ? addDays(now, upcoming.waitDays) : null;
 
@@ -163,6 +165,83 @@ export async function updateNotes(id: string, notes: string): Promise<void> {
     }),
   );
   revalidatePath(PATH);
+}
+
+const sequenceStepSchema = z.object({
+  step: z.coerce.number().int().min(1).max(TOTAL_TOUCHES),
+  label: z.string().trim().max(80).optional().or(z.literal("")),
+  waitDays: z.coerce.number().int().min(0).max(90).optional(),
+  message: z.string().trim().min(1, "Message can't be empty").max(2000),
+});
+
+/**
+ * Save the owner-edited follow-up sequence (message text, label, wait days per
+ * step). Stored as overrides on the single platform_settings row; structural
+ * fields (step order, break-up flag) stay fixed. Best-effort: if the column
+ * isn't migrated yet we surface a clear error instead of crashing.
+ */
+export async function saveCrmSequence(
+  steps: SequenceOverride[],
+): Promise<{ ok?: boolean; error?: string }> {
+  await requireSuperAdmin();
+  const parsed = z.array(sequenceStepSchema).max(TOTAL_TOUCHES).safeParse(steps);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid messages." };
+  }
+  // Normalise through the merge helper so what we store is exactly what we use.
+  const merged = mergeSequence(
+    parsed.data.map((s) => ({
+      step: s.step,
+      label: s.label || undefined,
+      waitDays: s.waitDays,
+      message: s.message,
+    })),
+  );
+  const overrides: SequenceOverride[] = merged.map((s) => ({
+    step: s.step,
+    label: s.label,
+    waitDays: s.waitDays,
+    message: s.message,
+  }));
+  try {
+    await systemDb((tx) =>
+      tx.platformSetting.upsert({
+        where: { id: "platform" },
+        create: { id: "platform", crmSequence: overrides as object },
+        update: { crmSequence: overrides as object },
+      }),
+    );
+  } catch (e) {
+    return {
+      error:
+        e instanceof Error && /crmSequence|column/i.test(e.message)
+          ? "Add the crmSequence column first (run prisma/manual/add-crm-sequence.sql)."
+          : e instanceof Error
+            ? e.message
+            : "Couldn't save the messages.",
+    };
+  }
+  revalidatePath(PATH);
+  return { ok: true };
+}
+
+/** Reset the follow-up sequence back to the built-in defaults. */
+export async function resetCrmSequence(): Promise<{ ok?: boolean; error?: string }> {
+  await requireSuperAdmin();
+  try {
+    // Empty array → mergeSequence() falls back to the built-in defaults.
+    await systemDb((tx) =>
+      tx.platformSetting.upsert({
+        where: { id: "platform" },
+        create: { id: "platform", crmSequence: [] },
+        update: { crmSequence: [] },
+      }),
+    );
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Couldn't reset." };
+  }
+  revalidatePath(PATH);
+  return { ok: true };
 }
 
 /** Remove a client (and their touch history) from the CRM. */
