@@ -150,7 +150,7 @@ export default async function Home() {
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 py-16 lg:grid-cols-2 lg:py-24">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full border border-brand-primary/20 bg-brand-primary/10 px-3 py-1 text-xs font-semibold text-brand-primary">
-              ✨ Free setup · Lifetime free access
+              ✨ Free setup · 30-day free trial
             </span>
             <h1 className="mt-5 font-heading text-5xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
               We&apos;ll digitize your{" "}
@@ -162,7 +162,7 @@ export default async function Home() {
                 "We'll generate your QR codes.",
                 "We'll set up your menu.",
                 "We'll train your staff.",
-                "You run service free, for life — no card, no expiry.",
+                "Try every feature free for 30 days — no card, no commitment.",
               ].map((line) => (
                 <li key={line} className="flex items-center gap-3 text-plum-ink/75">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-gradient text-xs text-white">
@@ -174,7 +174,7 @@ export default async function Home() {
             </ul>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/signup" className="rounded-full px-7 py-3.5 font-semibold btn-brand shadow-lg">
-                Start free — for life
+                Start free — 30 days
               </Link>
               <a href="#how" className="rounded-full border border-plum-ink/15 bg-white px-7 py-3.5 font-semibold">
                 See how it works
@@ -365,7 +365,7 @@ export default async function Home() {
               processes that stay, no matter who is on shift.
             </p>
             <Link href="/signup" className="mt-7 inline-block rounded-full px-7 py-3.5 font-semibold btn-brand shadow-lg">
-              Start free — for life
+              Start free — 30 days
             </Link>
           </div>
         </div>
@@ -472,8 +472,8 @@ export default async function Home() {
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="font-heading text-4xl font-extrabold tracking-tight">Simple, honest pricing</h2>
           <p className="mt-3 text-plum-ink/70">
-            Start on Free and stay free — <strong>forever, no card</strong>. Want more? Try any
-            paid plan free for 14 days, no credit card required.
+            Every new account starts with a <strong>30-day free trial of everything</strong> — no
+            card. After that, stay on the Free plan forever, or upgrade to Growth or Business.
           </p>
         </div>
         <div className="mt-12">
@@ -506,7 +506,7 @@ export default async function Home() {
             ["Do diners need to download an app?", "No. They scan the QR on the table and your menu opens in their browser — order and pay right there."],
             ["Where does the money go?", "Straight to your own PayMongo account. Servd uses connected accounts, so we never hold your funds."],
             ["Can I use my own branding?", "Yes — your logo, colors, tagline, and even your own domain. Diners only ever see your brand."],
-            ["Is it really free?", "Yes — the Free plan is free for life, no card and no expiry. It runs QR dine-in ordering, your kitchen display and cashier POS. Want online ordering, payments, marketing or the back office? Try any paid plan free for 14 days, no credit card required."],
+            ["Is there a free trial?", "Yes — every new account starts with a 30-day free trial of every feature, no card required. When the trial ends you're moved to the Free plan automatically (QR dine-in ordering, kitchen display and cashier POS) — keep using it for free forever, or upgrade to Growth or Business for online ordering, payments, marketing and the back office."],
             ["Does it work on iPad for the cashier?", "Yes. Printing supports cloud/poll printers and AirPrint so it works on any device."],
           ].map(([q, a]) => (
             <details key={q} className="group rounded-tile border border-plum-ink/10 bg-white p-5">
@@ -525,7 +525,7 @@ export default async function Home() {
         <div className="rounded-tile bg-plum-ink px-8 py-14 text-center text-cream">
           <h2 className="font-heading text-4xl font-extrabold tracking-tight">Ready to serve smarter?</h2>
           <p className="mx-auto mt-3 max-w-md text-cream/70">
-            Launch your QR ordering in minutes. Free for life — no card required.
+            Launch your QR ordering in minutes. 30 days free — no card required.
           </p>
           <Link href="/signup" className="mt-7 inline-block rounded-full px-8 py-3.5 font-semibold btn-brand shadow-lg">
             Start your restaurant
