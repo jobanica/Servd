@@ -9,7 +9,7 @@ import { requireSuperAdmin } from "@/server/tenancy/current-user";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { runBillingCron, type CronSummary } from "@/server/billing/run-cron";
 import { saveXenditCreds } from "@/server/billing/platform-settings";
-import { provisionFreePlan, getFreePlan } from "@/server/billing/subscription";
+import { provisionTrial, getFreePlan } from "@/server/billing/subscription";
 import { COMP_FOREVER } from "@/lib/billing/comp";
 import { uniqueSlug } from "@/lib/slug";
 import { addMonths } from "@/lib/billing/period";
@@ -480,7 +480,7 @@ export async function createRestaurantAccount(_prev: ActionState, formData: Form
         },
         select: { id: true },
       });
-      await provisionFreePlan(tx, restaurant.id);
+      await provisionTrial(tx, restaurant.id);
     });
   } catch (e) {
     // Roll back the orphaned auth user so the email can be reused.
@@ -564,7 +564,7 @@ export async function createBusinessAccount(_prev: ActionState, formData: FormDa
         },
         select: { id: true },
       });
-      await provisionFreePlan(tx, restaurant.id);
+      await provisionTrial(tx, restaurant.id);
     });
   } catch (e) {
     try {

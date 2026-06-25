@@ -38,8 +38,8 @@ export default function SignupPage() {
       <p className="mt-1 text-sm text-plum-ink/60">{t("signupSubtitle")}</p>
 
       <div className="mt-4 rounded-lg border border-brand-primary/20 bg-brand-primary/5 px-4 py-3 text-sm text-plum-ink/75">
-        <span className="font-semibold text-brand-primary">✨ Lifetime free access</span> — run
-        service free forever, no card. Upgrade later with a 14-day free trial.
+        <span className="font-semibold text-brand-primary">✨ 30-day free trial</span> — every
+        feature unlocked, no card. After 30 days you move to the Free plan unless you upgrade.
       </div>
 
       <form action={action} className="mt-6 space-y-4">

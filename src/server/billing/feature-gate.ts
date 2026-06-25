@@ -96,3 +96,32 @@ export async function requireFeaturePage(restaurantId: string, feature: Feature)
     redirect(`/admin/billing?upgrade=${feature}`);
   }
 }
+
+export interface TrialInfo {
+  onTrial: boolean;
+  trialEndsAt: string | null; // ISO
+  planName: string | null;
+}
+
+/** Trial status for the dashboard countdown banner. Safe before migrations. */
+export async function getTrialInfo(restaurantId: string): Promise<TrialInfo> {
+  try {
+    return await systemDb(async (tx) => {
+      const sub = await tx.subscription.findFirst({
+        where: { restaurantId },
+        orderBy: { createdAt: "desc" },
+        select: { status: true, trialEndsAt: true, plan: { select: { name: true } } },
+      });
+      const onTrial =
+        sub?.status === "trialing" && sub.trialEndsAt != null && sub.trialEndsAt.getTime() > Date.now();
+      return {
+        onTrial,
+        trialEndsAt: sub?.trialEndsAt ? sub.trialEndsAt.toISOString() : null,
+        planName: sub?.plan?.name ?? null,
+      };
+    });
+  } catch {
+    return { onTrial: false, trialEndsAt: null, planName: null };
+  }
+}
+

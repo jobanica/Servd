@@ -18,17 +18,28 @@ export const PLAN_FIELDS = {
 } satisfies Prisma.PlanSelect;
 
 /**
- * Free trial length for a PAID plan — no credit card required. The Free plan is
- * lifetime (it never trials or expires); this only applies when an owner chooses
- * to try Growth or Business.
+ * Free trial length for a PAID plan an existing owner chooses from the billing
+ * page — no credit card required.
  */
 export const TRIAL_DAYS = 14;
+
+/** New-account trial length: every new restaurant starts on a Business trial. */
+export const SIGNUP_TRIAL_DAYS = 30;
 
 /** The lowest-priced active plan = the Free tier. */
 export async function getDefaultPlan(tx: Prisma.TransactionClient) {
   return tx.plan.findFirst({
     where: { isActive: true },
     orderBy: { priceMonthly: "asc" },
+    select: PLAN_FIELDS,
+  });
+}
+
+/** The highest-priced active plan = the top tier (Business). */
+export async function getTopPlan(tx: Prisma.TransactionClient) {
+  return tx.plan.findFirst({
+    where: { isActive: true },
+    orderBy: { priceMonthly: "desc" },
     select: PLAN_FIELDS,
   });
 }
@@ -43,10 +54,37 @@ export async function getFreePlan(tx: Prisma.TransactionClient) {
 }
 
 /**
- * Provisions LIFETIME FREE access for a brand-new restaurant: an active
- * subscription on the Free plan with no trial and no expiry. Owners upgrade to a
- * paid plan later (with a 14-day trial) from the billing page. Call inside a
- * super-admin tx during signup / account creation.
+ * Provisions a brand-new restaurant with a 30-day BUSINESS TRIAL — every feature
+ * unlocked, no card. When it ends unpaid the daily billing cron downgrades them
+ * to the Free plan. Call inside a super-admin tx during signup / account creation.
+ */
+export async function provisionTrial(tx: Prisma.TransactionClient, restaurantId: string) {
+  const plan = (await getTopPlan(tx)) ?? (await getDefaultPlan(tx));
+  if (!plan) return; // no plans yet — skip; restaurant stays active
+  const trialEndsAt = new Date();
+  trialEndsAt.setDate(trialEndsAt.getDate() + SIGNUP_TRIAL_DAYS);
+  // `select: { id }` keeps Prisma's RETURNING from referencing newer columns a
+  // schema-lagged live DB may not have yet.
+  await tx.restaurant.update({
+    where: { id: restaurantId },
+    data: { planId: plan.id },
+    select: { id: true },
+  });
+  await tx.subscription.create({
+    data: {
+      restaurantId,
+      planId: plan.id,
+      status: "trialing",
+      trialEndsAt,
+      currentPeriodEnd: trialEndsAt,
+    },
+    select: { id: true },
+  });
+}
+
+/**
+ * Provisions LIFETIME FREE access on the Free plan (kept for completeness; new
+ * accounts now use provisionTrial). Call inside a super-admin tx.
  */
 export async function provisionFreePlan(
   tx: Prisma.TransactionClient,

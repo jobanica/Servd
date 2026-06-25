@@ -6,7 +6,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { uniqueSlug } from "@/lib/slug";
-import { provisionFreePlan } from "@/server/billing/subscription";
+import { provisionTrial } from "@/server/billing/subscription";
 import { recordReferralAtSignup } from "@/server/referrals/attribution";
 
 export type SignupState = { ok?: boolean; error?: string } | null;
@@ -81,8 +81,8 @@ export async function signUpRestaurant(
           },
           select: { id: true },
         });
-        // Lifetime free access on the Free plan (upgrade later with a trial).
-        await provisionFreePlan(tx, restaurant.id);
+        // 30-day Business trial — every feature unlocked, no card.
+        await provisionTrial(tx, restaurant.id);
         // Record referral attribution (self-referral blocked + audited inside).
         await recordReferralAtSignup(tx, {
           newRestaurantId: restaurant.id,
