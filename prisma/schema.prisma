@@ -838,6 +838,7 @@ enum StockReason {
   received // from a purchase order
   adjustment // manual correction
   count // reconciled by a stock count
+  usage // manually taken/requested for use (prep, staff meal, etc.)
 }
 
 enum PurchaseOrderStatus {

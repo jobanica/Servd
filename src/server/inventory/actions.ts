@@ -107,7 +107,7 @@ async function applyMovement(
   itemId: string,
   newStock: number,
   changeQty: number,
-  reason: "waste" | "adjustment" | "count",
+  reason: "waste" | "adjustment" | "count" | "usage",
   note?: string,
 ) {
   await tenantDb(restaurantId, async (tx) => {
@@ -131,6 +131,33 @@ export async function recordWaste(formData: FormData): Promise<void> {
   if (amount <= 0) return;
   const inv = await tenantDb(restaurantId, (tx) => tx.inventoryItem.findFirstOrThrow({ where: { id } }));
   await applyMovement(restaurantId, id, inv.stockQty - amount, -amount, "waste", "Waste");
+  revalidatePath("/admin/inventory");
+}
+
+/**
+ * Take / request an ingredient: deduct stock and log a `usage` movement (who
+ * took it / what for). This is how stock goes down outside of order sales — prep,
+ * staff meals, transfers, etc. Falls back to an `adjustment` movement if the
+ * `usage` enum value hasn't been migrated yet.
+ */
+export async function recordWithdrawal(formData: FormData): Promise<void> {
+  const { restaurantId } = await requireAdminAction();
+  await ensureModule(restaurantId);
+  const id = String(formData.get("id"));
+  const amount = Number(formData.get("qty") ?? 0);
+  if (!(amount > 0)) return;
+  const reason = String(formData.get("note") ?? "").trim();
+  const note = reason ? `Taken — ${reason.slice(0, 120)}` : "Ingredient taken";
+  const inv = await tenantDb(restaurantId, (tx) =>
+    tx.inventoryItem.findFirstOrThrow({ where: { id }, select: { stockQty: true } }),
+  );
+  const newStock = inv.stockQty - amount;
+  try {
+    await applyMovement(restaurantId, id, newStock, -amount, "usage", note);
+  } catch {
+    // `usage` enum value not migrated yet → record it as an adjustment instead.
+    await applyMovement(restaurantId, id, newStock, -amount, "adjustment", note);
+  }
   revalidatePath("/admin/inventory");
 }
 

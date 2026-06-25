@@ -10,6 +10,7 @@ import {
   deleteInventoryItem,
   recordWaste,
   recordCount,
+  recordWithdrawal,
   deleteSupplier,
   setAutoOutOfStock,
   setLowStockAlertPhone,
@@ -108,7 +109,7 @@ export default async function InventoryPage() {
           <thead className="text-plum-ink/50">
             <tr>
               <th className="p-3">Ingredient</th><th>Stock</th><th>Cost/unit</th><th>Reorder</th>
-              <th>Waste</th><th>Count</th><th></th>
+              <th>Take</th><th>Waste</th><th>Count</th><th></th>
             </tr>
           </thead>
           <tbody>
@@ -122,6 +123,14 @@ export default async function InventoryPage() {
                 <td>{i.stockQty} {i.unit}</td>
                 <td>{formatPeso(i.costPerUnit)}</td>
                 <td>{i.reorderLevel}</td>
+                <td>
+                  <form action={recordWithdrawal} className="flex gap-1">
+                    <input type="hidden" name="id" value={i.id} />
+                    <input name="qty" type="number" step="0.01" min="0" placeholder="qty" className="w-14 rounded border border-plum-ink/15 px-1 py-0.5 text-xs" />
+                    <input name="note" placeholder="for…" className="w-20 rounded border border-plum-ink/15 px-1 py-0.5 text-xs" />
+                    <button className="text-xs font-semibold text-brand-primary">take</button>
+                  </form>
+                </td>
                 <td>
                   <form action={recordWaste} className="flex gap-1">
                     <input type="hidden" name="id" value={i.id} />
@@ -145,7 +154,7 @@ export default async function InventoryPage() {
               </tr>
             ))}
             {items.length === 0 && (
-              <tr><td colSpan={7} className="p-3 text-sm text-plum-ink/40">No ingredients yet.</td></tr>
+              <tr><td colSpan={8} className="p-3 text-sm text-plum-ink/40">No ingredients yet.</td></tr>
             )}
           </tbody>
         </table>
