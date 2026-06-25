@@ -4,6 +4,7 @@ import { tenantDb } from "@/server/tenancy/scoped-db";
 import { hasModule } from "@/server/billing/entitlements";
 import { getDomainProvider } from "@/server/domains";
 import { SubdomainForm, CustomDomainForm } from "@/components/admin/DomainForms";
+import { DomainInstructions } from "@/components/admin/DomainInstructions";
 import { refreshDomainStatus, removeCustomDomain } from "@/server/domains/actions";
 
 export default async function DomainsPage() {
@@ -48,6 +49,12 @@ export default async function DomainsPage() {
           <SubdomainForm current={restaurant.subdomain ?? ""} rootDomain={rootDomain} />
           <CustomDomainForm current={restaurant.customDomain ?? ""} />
 
+          <DomainInstructions
+            domain={restaurant.customDomain ?? null}
+            verified={!!restaurant.customDomainVerifiedAt}
+            records={verification}
+          />
+
           {restaurant.customDomain && (
             <div className="rounded-tile border border-plum-ink/10 bg-white p-5">
               <div className="flex items-center justify-between">
@@ -62,33 +69,6 @@ export default async function DomainsPage() {
                   {restaurant.customDomainVerifiedAt ? "Verified · SSL active" : "Pending DNS"}
                 </span>
               </div>
-
-              {!restaurant.customDomainVerifiedAt && (
-                <div className="mt-3 text-sm">
-                  <p className="text-plum-ink/60">Add these DNS records at your registrar:</p>
-                  {verification.length > 0 ? (
-                    <table className="mt-2 w-full text-left text-xs">
-                      <thead className="text-plum-ink/40">
-                        <tr><th className="py-1">Type</th><th>Name</th><th>Value</th></tr>
-                      </thead>
-                      <tbody>
-                        {verification.map((v, i) => (
-                          <tr key={i} className="border-t border-plum-ink/10">
-                            <td className="py-1">{v.type}</td>
-                            <td className="break-all">{v.domain}</td>
-                            <td className="break-all">{v.value}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <p className="mt-2 text-xs text-plum-ink/50">
-                      Point an A record to <code>76.76.21.21</code> or a CNAME to{" "}
-                      <code>cname.vercel-dns.com</code>, then refresh.
-                    </p>
-                  )}
-                </div>
-              )}
 
               <div className="mt-4 flex gap-2">
                 <form action={refreshDomainStatus}>
