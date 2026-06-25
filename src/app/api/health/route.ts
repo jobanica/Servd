@@ -35,6 +35,16 @@ export async function GET(req: Request) {
     sms: !!process.env.SEMAPHORE_API_KEY,
   };
 
+  // Custom-domain automation (Vercel API). When providerConfigured is true,
+  // connecting a tenant domain auto-adds it to the project, verifies it, and
+  // issues SSL. Booleans only — never the token itself.
+  const domains = {
+    providerConfigured: !!process.env.VERCEL_TOKEN && !!process.env.VERCEL_PROJECT_ID,
+    VERCEL_TOKEN: !!process.env.VERCEL_TOKEN,
+    VERCEL_PROJECT_ID: !!process.env.VERCEL_PROJECT_ID,
+    VERCEL_TEAM_ID: !!process.env.VERCEL_TEAM_ID,
+  };
+
   let db: Record<string, unknown> = { connected: false };
   try {
     db = await systemDb(async (tx) => {
@@ -130,5 +140,5 @@ export async function GET(req: Request) {
     db.schemaCurrent === true &&
     (db.planCount as number) > 0;
 
-  return Response.json({ healthy, env, routing, features, db, billing }, { status: healthy ? 200 : 503 });
+  return Response.json({ healthy, env, routing, features, domains, db, billing }, { status: healthy ? 200 : 503 });
 }
