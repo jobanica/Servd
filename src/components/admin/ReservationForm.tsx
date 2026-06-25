@@ -4,7 +4,11 @@ import { useActionState, useState } from "react";
 import { createReservation, type FormState } from "@/server/reservations/reservations";
 import { SubmitButton } from "./SubmitButton";
 
-export function ReservationForm() {
+export function ReservationForm({
+  tables = [],
+}: {
+  tables?: { id: string; tableNumber: string }[];
+}) {
   const [state, action] = useActionState<FormState, FormData>(createReservation, null);
   const [kind, setKind] = useState<"reservation" | "waitlist">("reservation");
 
@@ -45,6 +49,24 @@ export function ReservationForm() {
             <input name="when" type="datetime-local" className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2" />
           </label>
         )}
+        <label className="block text-sm">
+          <span className="font-medium">Table (optional)</span>
+          <select
+            name="tableId"
+            defaultValue=""
+            className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2"
+          >
+            <option value="">No table yet</option>
+            {tables.map((t) => (
+              <option key={t.id} value={t.id}>
+                Table {t.tableNumber}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1 block text-xs text-plum-ink/45">
+            Picking a table marks it reserved on the floor plan.
+          </span>
+        </label>
       </div>
 
       <label className="block text-sm">

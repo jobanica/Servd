@@ -88,7 +88,7 @@ export default async function ReservationsPage() {
         </p>
       </div>
 
-      <ReservationForm />
+      <ReservationForm tables={tables.map((t) => ({ id: t.id, tableNumber: t.tableNumber }))} />
 
       <div>
         <h2 className="mb-2 font-heading text-lg font-bold">Upcoming reservations</h2>

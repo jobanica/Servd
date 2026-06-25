@@ -57,6 +57,7 @@ const schema = z
     partySize: z.coerce.number().int().min(1, "Party size?").max(100),
     kind: z.enum(["reservation", "waitlist"]),
     when: z.string().trim().optional().or(z.literal("")), // datetime-local
+    tableId: z.string().trim().max(64).optional().or(z.literal("")),
     note: z.string().trim().max(300).optional().or(z.literal("")),
   })
   .superRefine((v, ctx) => {
@@ -73,12 +74,14 @@ export async function createReservation(_prev: FormState, formData: FormData): P
     partySize: formData.get("partySize"),
     kind: formData.get("kind"),
     when: formData.get("when") ?? "",
+    tableId: formData.get("tableId") ?? "",
     note: formData.get("note") ?? "",
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   const v = parsed.data;
 
   const reservedAt = v.kind === "reservation" && v.when ? new Date(v.when) : null;
+  const tableId = v.tableId || null;
   try {
     await tenantDb(restaurantId, (tx) =>
       tx.reservation.create({
@@ -89,14 +92,28 @@ export async function createReservation(_prev: FormState, formData: FormData): P
           partySize: v.partySize,
           reservedAt,
           status: v.kind === "waitlist" ? "waitlisted" : "booked",
+          tableId,
           note: v.note || null,
         },
+        select: { id: true },
       }),
     );
   } catch {
     return { error: "Couldn't save. Make sure the reservations migration has been run." };
   }
+  // Best-effort: mark the chosen table "reserved" on the floor plan. Done in its
+  // own step so a not-yet-migrated table.status column can't fail the booking.
+  if (tableId) {
+    try {
+      await tenantDb(restaurantId, (tx) =>
+        tx.table.updateMany({ where: { id: tableId }, data: { status: "reserved" } }),
+      );
+    } catch {
+      /* floor-plan migration not run yet — the table just won't show reserved */
+    }
+  }
   revalidatePath("/admin/reservations");
+  revalidatePath("/admin/floor");
   return { ok: true };
 }
 
