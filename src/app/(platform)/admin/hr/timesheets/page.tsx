@@ -3,6 +3,7 @@ import { requireHrPage } from "@/server/hr/guard";
 import { listTimeEntries } from "@/server/hr/queries";
 import { approveTimeEntry } from "@/server/hr/actions";
 import { computeHours } from "@/lib/hr/hours";
+import { manilaDateTime, manilaTime } from "@/lib/time/manila";
 
 export default async function TimesheetsPage() {
   const { restaurantId, eligible } = await requireHrPage();
@@ -32,13 +33,13 @@ export default async function TimesheetsPage() {
                 <tr key={e.id} className="border-t border-plum-ink/10">
                   <td className="p-3">{e.employee.fullName}</td>
                   <td>
-                    {e.clockIn.toLocaleString()}
+                    {manilaDateTime(e.clockIn)}
                     {e.clockInPhotoUrl && (
                       <a href={`/api/hr/clock-photo?path=${encodeURIComponent(e.clockInPhotoUrl)}`} target="_blank" rel="noopener" className="ml-1 text-brand-primary" title="Clock-in photo">📷</a>
                     )}
                   </td>
                   <td>
-                    {e.clockOut ? e.clockOut.toLocaleTimeString() : <span className="text-mango">open</span>}
+                    {e.clockOut ? manilaTime(e.clockOut) : <span className="text-mango">open</span>}
                     {e.clockOutPhotoUrl && (
                       <a href={`/api/hr/clock-photo?path=${encodeURIComponent(e.clockOutPhotoUrl)}`} target="_blank" rel="noopener" className="ml-1 text-brand-primary" title="Clock-out photo">📷</a>
                     )}

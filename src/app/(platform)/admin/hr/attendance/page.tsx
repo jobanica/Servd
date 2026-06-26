@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { requireHrPage } from "@/server/hr/guard";
 import { getAttendanceToday } from "@/server/hr/attendance";
+import { manilaTime, manilaDate } from "@/lib/time/manila";
 
-function time(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
+const time = manilaTime;
 
 export default async function AttendanceDashboard() {
   const { restaurantId, eligible } = await requireHrPage();
@@ -22,7 +21,7 @@ export default async function AttendanceDashboard() {
       <div>
         <Link href="/admin/hr" className="text-sm text-plum-ink/50">← HR</Link>
         <h1 className="font-heading text-2xl font-bold">Attendance — today</h1>
-        <p className="text-sm text-plum-ink/50">{new Date().toLocaleDateString()}</p>
+        <p className="text-sm text-plum-ink/50">{manilaDate(new Date())}</p>
       </div>
 
       {/* KPIs */}

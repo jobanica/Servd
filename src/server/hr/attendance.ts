@@ -1,6 +1,8 @@
 import "server-only";
 
 import { tenantDb } from "@/server/tenancy/scoped-db";
+import { startOfManilaDay } from "@/lib/orders/order-number";
+import { manilaDayKey } from "@/lib/time/manila";
 
 export interface AttendanceToday {
   totalActive: number;
@@ -12,8 +14,9 @@ export interface AttendanceToday {
 
 /** Live attendance snapshot for today: who's on the clock, who's in, who's out. */
 export async function getAttendanceToday(restaurantId: string): Promise<AttendanceToday> {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
+  // "Today" is the restaurant's local (Manila) day, not the server's UTC day —
+  // otherwise clock-ins early in the Manila morning land in the wrong day.
+  const start = startOfManilaDay();
   const now = Date.now();
 
   return tenantDb(restaurantId, async (tx) => {
@@ -71,13 +74,15 @@ export async function getAttendanceToday(restaurantId: string): Promise<Attendan
 
 export interface LateRow {
   name: string;
-  date: string; // YYYY-MM-DD (UTC)
+  date: string; // YYYY-MM-DD (Manila)
   shiftStart: string; // ISO
   clockIn: string; // ISO
   minutesLate: number;
 }
 
-const dayKey = (d: Date) => d.toISOString().slice(0, 10);
+// Bucket by the restaurant's local (Manila) calendar day so a shift and its
+// clock-in match even when the UTC date rolls over mid-evening.
+const dayKey = manilaDayKey;
 
 /**
  * Late arrivals over a date range: an employee's first clock-in of a day vs the

@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { requireHrPage } from "@/server/hr/guard";
 import { getLateReport } from "@/server/hr/attendance";
+import { manilaTime } from "@/lib/time/manila";
 
-function time(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
+const time = manilaTime;
 
 export default async function LateReportPage({
   searchParams,
