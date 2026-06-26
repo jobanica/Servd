@@ -48,19 +48,21 @@ Rules:
 - Read EVERY visible item. Never invent items that aren't on the menu.
 - Output the JSON object only.`;
 
-export async function scanMenuImages(imageUrls: string[]): Promise<ScanResult> {
+export async function scanMenuMedia(media: { url: string; pdf: boolean }[]): Promise<ScanResult> {
   if (!process.env.ANTHROPIC_API_KEY) {
     return { ok: false, error: "AI scanning isn't configured on this server (no ANTHROPIC_API_KEY)." };
   }
-  if (imageUrls.length === 0) return { ok: false, error: "Upload a menu photo first." };
+  if (media.length === 0) return { ok: false, error: "Upload a menu photo or PDF first." };
 
   let text: string;
   try {
     const client = new Anthropic();
-    const blocks: Anthropic.ContentBlockParam[] = imageUrls.map((url) => ({
-      type: "image",
-      source: { type: "url", url },
-    }));
+    // PDFs are document blocks; photos are image blocks. Claude fetches the URL.
+    const blocks: Anthropic.ContentBlockParam[] = media.map((m) =>
+      m.pdf
+        ? { type: "document", source: { type: "url", url: m.url } }
+        : { type: "image", source: { type: "url", url: m.url } },
+    );
     const message = await client.messages.create({
       model: "claude-opus-4-8",
       max_tokens: 8192,

@@ -4,6 +4,7 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { logTouch, markReplied, setStage, deleteClient } from "@/server/crm/actions";
+import { createDemoFromClient } from "@/server/storefront-demo/actions";
 import type { CrmClientRow, CrmStage } from "@/server/crm/queries";
 import { AddClientForm } from "./AddClientForm";
 import {
@@ -244,6 +245,14 @@ export function CrmBoard({
                     </button>
                     <button
                       disabled={pending}
+                      onClick={() => act(() => createDemoFromClient(c.id))}
+                      title="Build a demo online-ordering storefront pre-filled from this client"
+                      className="rounded-lg border border-brand-primary/40 px-3 py-1.5 text-xs font-semibold text-brand-primary hover:bg-brand-primary/5 disabled:opacity-60"
+                    >
+                      🏪 Make demo
+                    </button>
+                    <button
+                      disabled={pending}
                       onClick={() => act(() => setStage(c.id, "lost"))}
                       className="rounded-lg px-3 py-1.5 text-xs font-semibold text-plum-ink/50 hover:bg-plum-ink/5 disabled:opacity-60"
                     >
@@ -423,6 +432,14 @@ export function CrmBoard({
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex justify-end gap-1.5">
+                        <button
+                          disabled={pending}
+                          onClick={() => act(() => createDemoFromClient(c.id))}
+                          title="Build a demo storefront from this client"
+                          className="rounded-lg border border-brand-primary/40 px-2.5 py-1.5 text-xs font-semibold text-brand-primary hover:bg-brand-primary/5 disabled:opacity-60"
+                        >
+                          🏪 Demo
+                        </button>
                         {(c.stage === "replied" || c.stage === "won") && (
                           <button
                             disabled={pending}

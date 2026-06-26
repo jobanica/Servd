@@ -12,8 +12,9 @@ import { pesosToCentavos } from "@/lib/money";
 import { getTopPlan } from "@/server/billing/subscription";
 import { COMP_FOREVER } from "@/lib/billing/comp";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { uploadMenuImage } from "@/server/storage/menu-images";
-import { scanMenuImages } from "./ai-scan";
+import { uploadMenuImage, uploadMenuImageBytes } from "@/server/storage/menu-images";
+import { ALLOWED_MENU_DOC_TYPES } from "@/lib/validation/menu";
+import { scanMenuMedia } from "./ai-scan";
 
 export type FormState = { ok?: boolean; error?: string } | null;
 
@@ -45,11 +46,57 @@ const createSchema = z.object({
 });
 
 /**
+ * Provision a demo storefront tenant (no login) + a complimentary open-ended
+ * trial so onlineOrdering stays unlocked. Returns the new restaurant id. Shared
+ * by the create form and the "create from CRM client" shortcut.
+ */
+async function provisionDemo(d: {
+  name: string;
+  address: string;
+  phone: string;
+  tagline: string;
+  logoUrl: string;
+}): Promise<string> {
+  return systemDb(async (tx) => {
+    const slug = await uniqueSlug(
+      d.name,
+      async (s) => !!(await tx.restaurant.findUnique({ where: { slug: s }, select: { id: true } })),
+    );
+    const r = await tx.restaurant.create({
+      data: {
+        name: d.name,
+        displayName: d.name,
+        slug,
+        status: "active",
+        logoUrl: d.logoUrl || null,
+        tagline: d.tagline || null,
+        // Storefront contact reads from printerConfig.receipt (no extra column).
+        printerConfig: receiptJson(d.address, d.phone),
+      },
+      select: { id: true },
+    });
+    const plan = await getTopPlan(tx);
+    if (plan) {
+      await tx.restaurant.update({ where: { id: r.id }, data: { planId: plan.id }, select: { id: true } });
+      await tx.subscription.create({
+        data: {
+          restaurantId: r.id,
+          planId: plan.id,
+          status: "trialing",
+          trialEndsAt: COMP_FOREVER,
+          currentPeriodEnd: COMP_FOREVER,
+        },
+        select: { id: true },
+      });
+    }
+    return r.id;
+  });
+}
+
+/**
  * Create a DEMO online-ordering storefront for a prospect — a real tenant with
- * a live /r/{slug} page, but NO login account. We give it a complimentary
- * (open-ended) trial so the online-ordering feature is unlocked indefinitely
- * until you convert or delete it. Foot-in-the-door: show them they already have
- * a commission-free ordering system.
+ * a live /r/{slug} page, but NO login account. Foot-in-the-door: show them they
+ * already have a commission-free ordering system.
  */
 export async function createDemoStorefront(_prev: FormState, formData: FormData): Promise<FormState> {
   await requireSuperAdmin();
@@ -65,44 +112,38 @@ export async function createDemoStorefront(_prev: FormState, formData: FormData)
 
   let id: string;
   try {
-    id = await systemDb(async (tx) => {
-      const slug = await uniqueSlug(
-        d.name,
-        async (s) => !!(await tx.restaurant.findUnique({ where: { slug: s }, select: { id: true } })),
-      );
-      const r = await tx.restaurant.create({
-        data: {
-          name: d.name,
-          displayName: d.name,
-          slug,
-          status: "active",
-          logoUrl: d.logoUrl || null,
-          tagline: d.tagline || null,
-          // Storefront contact reads from printerConfig.receipt (no extra column).
-          printerConfig: receiptJson(d.address ?? "", d.phone ?? ""),
-        },
-        select: { id: true },
-      });
-      // Complimentary open-ended trial → onlineOrdering stays unlocked.
-      const plan = await getTopPlan(tx);
-      if (plan) {
-        await tx.restaurant.update({ where: { id: r.id }, data: { planId: plan.id }, select: { id: true } });
-        await tx.subscription.create({
-          data: {
-            restaurantId: r.id,
-            planId: plan.id,
-            status: "trialing",
-            trialEndsAt: COMP_FOREVER,
-            currentPeriodEnd: COMP_FOREVER,
-          },
-          select: { id: true },
-        });
-      }
-      return r.id;
+    id = await provisionDemo({
+      name: d.name,
+      address: d.address ?? "",
+      phone: d.phone ?? "",
+      tagline: d.tagline ?? "",
+      logoUrl: d.logoUrl ?? "",
     });
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Couldn't create the storefront." };
   }
+  revalidatePath(PATH);
+  redirect(detailPath(id));
+}
+
+/** One-click: build a demo storefront pre-filled from a CRM client's details. */
+export async function createDemoFromClient(clientId: string): Promise<void> {
+  await requireSuperAdmin();
+  const base = await systemDb((tx) =>
+    tx.crmClient.findUnique({ where: { id: clientId }, select: { name: true, phone: true } }),
+  );
+  if (!base) return;
+  // address column is best-effort (later migration).
+  let address = "";
+  try {
+    const a = await systemDb((tx) =>
+      tx.crmClient.findUnique({ where: { id: clientId }, select: { address: true } }),
+    );
+    address = a?.address ?? "";
+  } catch {
+    /* address column not migrated yet */
+  }
+  const id = await provisionDemo({ name: base.name, address, phone: base.phone ?? "", tagline: "", logoUrl: "" });
   revalidatePath(PATH);
   redirect(detailPath(id));
 }
@@ -202,16 +243,28 @@ export async function scanDemoMenu(_prev: ScanState, formData: FormData): Promis
   await requireSuperAdmin();
   const restaurantId = String(formData.get("restaurantId"));
   const files = formData.getAll("images").filter((f): f is File => f instanceof File && f.size > 0);
-  if (files.length === 0) return { error: "Choose at least one menu photo to scan." };
+  if (files.length === 0) return { error: "Choose at least one menu photo or PDF to scan." };
 
-  let urls: string[];
+  const media: { url: string; pdf: boolean }[] = [];
   try {
-    urls = await Promise.all(files.slice(0, 4).map((f) => uploadMenuImage(restaurantId, f)));
+    for (const f of files.slice(0, 4)) {
+      if (!ALLOWED_MENU_DOC_TYPES.includes(f.type as never)) {
+        return { error: "Use JPEG / PNG / WebP photos or a PDF." };
+      }
+      if (f.type === "application/pdf") {
+        const bytes = new Uint8Array(await f.arrayBuffer());
+        const url = await uploadMenuImageBytes(restaurantId, bytes, "pdf", "application/pdf");
+        media.push({ url, pdf: true });
+      } else {
+        const url = await uploadMenuImage(restaurantId, f);
+        media.push({ url, pdf: false });
+      }
+    }
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Couldn't upload the photo." };
+    return { error: e instanceof Error ? e.message : "Couldn't upload the file." };
   }
 
-  const res = await scanMenuImages(urls);
+  const res = await scanMenuMedia(media);
   if (!res.ok) return { error: res.error };
 
   let added = 0;

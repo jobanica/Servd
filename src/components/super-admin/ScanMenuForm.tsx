@@ -8,13 +8,13 @@ export function ScanMenuForm({ restaurantId }: { restaurantId: string }) {
   return (
     <form action={action} className="rounded-tile border border-brand-primary/25 bg-brand-primary/5 p-4">
       <input type="hidden" name="restaurantId" value={restaurantId} />
-      <p className="font-heading font-bold text-plum-ink">✨ Scan a menu photo</p>
+      <p className="font-heading font-bold text-plum-ink">✨ Scan a menu (photo or PDF)</p>
       <p className="text-xs text-plum-ink/55">
-        Upload a photo of their printed menu — AI reads it and fills in the categories &amp; items for
-        you (you can edit after). JPEG / PNG / WebP, up to 4 photos.
+        Upload a photo or PDF of their printed menu — AI reads it and fills in the categories &amp;
+        items for you (you can edit after). JPEG / PNG / WebP / PDF, up to 4 files.
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <input name="images" type="file" accept="image/jpeg,image/png,image/webp" multiple className="text-xs" />
+        <input name="images" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple className="text-xs" />
         <button
           disabled={pending}
           className="rounded-full bg-brand-gradient px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
