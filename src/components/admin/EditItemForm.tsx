@@ -17,6 +17,7 @@ type Item = {
   imageUrl: string | null;
   videoUrl: string | null;
   dietaryTags?: string[];
+  dailyLimit?: number | null;
 };
 
 export function EditItemForm({
@@ -90,6 +91,22 @@ export function EditItemForm({
             defaultChecked={item.isAvailable}
           />
           Available (in stock)
+        </label>
+        <label className="block text-sm sm:col-span-2">
+          <span className="font-medium">Daily servings limit</span>
+          <input
+            name="dailyLimit"
+            type="number"
+            min="0"
+            step="1"
+            defaultValue={item.dailyLimit ?? ""}
+            placeholder="Unlimited"
+            className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2"
+          />
+          <span className="mt-1 block text-xs text-plum-ink/40">
+            How many you can sell per day. Once sold out, the item shows as
+            unavailable until the next day. Leave blank (or 0) for unlimited.
+          </span>
         </label>
       </div>
 

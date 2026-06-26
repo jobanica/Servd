@@ -7,6 +7,7 @@ import {
   orderItemsCreate,
   OrderValidationError,
 } from "@/server/orders/build-order";
+import { recordServingsSold } from "@/server/menu/servings";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
 import { getPublicStorefront, isOpenNow } from "@/server/storefront/storefront";
 import { getLoyaltyConfig, enrollAccount } from "@/server/loyalty/loyalty";
@@ -117,6 +118,9 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
       return { ok: false, error: "We couldn't place your order. Please try again." };
     }
   }
+
+  // Count these servings toward each item's daily cap (best-effort, own tx).
+  await recordServingsSold(restaurant.id, built.items);
 
   await notifyOrdersChanged(restaurant.id);
 

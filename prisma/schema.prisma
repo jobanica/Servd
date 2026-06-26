@@ -764,10 +764,28 @@ model MenuItem {
   translations     MenuItemTranslation[]
   recipeComponents RecipeComponent[]
   foodCost         MenuItemCost?
+  serving          MenuItemServing?
 
   @@index([restaurantId])
   @@index([categoryId])
   @@map("menu_items")
+}
+
+// Per-item daily servings cap (e.g. "only 5 of these per day"). Lives in its own
+// table so existing menu_items reads stay safe on a lagging DB. `soldToday` is
+// reset lazily against `soldOn` (the Manila day key) when counted.
+model MenuItemServing {
+  menuItemId   String  @id
+  restaurantId String
+  dailyLimit   Int? // null = unlimited (no cap)
+  soldToday    Int     @default(0)
+  soldOn       String? // Manila day key (YYYY-MM-DD) the count belongs to
+  updatedAt    DateTime @updatedAt
+
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@map("menu_item_servings")
 }
 
 model MenuItemTranslation {

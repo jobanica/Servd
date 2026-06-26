@@ -4,6 +4,7 @@ import { tenantDb } from "@/server/tenancy/scoped-db";
 import { unitPrice, validateSelection } from "@/lib/cart/pricing";
 import { effectivePrice } from "@/lib/pricing/happy-hour";
 import { getActiveHappyHoursTenant } from "@/server/pricing/happy-hour";
+import { getServingStates } from "@/server/menu/servings";
 import type { DinerItem, Selection } from "@/lib/cart/types";
 
 /**
@@ -65,13 +66,32 @@ export async function buildValidatedOrder(
   // is never trusted for the discounted price).
   const happyHours = await getActiveHappyHoursTenant(restaurantId);
 
+  // Daily servings caps (only items with a configured limit appear here).
+  const servings = await getServingStates(restaurantId, itemIds);
+
   let total = 0;
   const items: BuiltOrderItem[] = [];
+  const usedByItem = new Map<string, number>(); // cumulative qty this order, per item
 
   for (const line of lines) {
     const dbItem = itemMap.get(line.itemId);
     if (!dbItem) throw new OrderValidationError("An item is no longer on the menu.");
     if (!dbItem.isAvailable) throw new OrderValidationError(`"${dbItem.name}" is sold out.`);
+
+    // Enforce the per-day servings cap (counts every line of this item together).
+    const cap = servings.get(dbItem.id);
+    if (cap && cap.remaining != null) {
+      const wanted = (usedByItem.get(dbItem.id) ?? 0) + line.quantity;
+      if (cap.remaining <= 0) {
+        throw new OrderValidationError(`"${dbItem.name}" is sold out for today.`);
+      }
+      if (wanted > cap.remaining) {
+        throw new OrderValidationError(
+          `Only ${cap.remaining} "${dbItem.name}" left for today.`,
+        );
+      }
+      usedByItem.set(dbItem.id, wanted);
+    }
 
     const effBase = effectivePrice(
       dbItem.price,

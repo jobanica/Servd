@@ -6,6 +6,7 @@ import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireAdminAction } from "@/server/tenancy/require-admin";
 import { uploadMenuImage } from "@/server/storage/menu-images";
 import { uploadMenuVideo } from "@/server/storage/menu-videos";
+import { setDailyLimit } from "@/server/menu/servings";
 import { pesosToCentavos } from "@/lib/money";
 import { sanitizeTags } from "@/lib/menu/dietary";
 import {
@@ -187,9 +188,27 @@ export async function updateItem(
     }),
   );
   await saveFoodCost(restaurantId, id, formData.get("costPesos"));
+  await saveDailyLimit(restaurantId, id, formData.get("dailyLimit"));
   await refresh();
   revalidatePath(`/admin/menu/${id}`);
   return { ok: true };
+}
+
+/**
+ * Persist a menu item's daily servings cap from the form. A blank/zero value
+ * clears the cap (unlimited). The field is absent on some forms (null) → leave
+ * the existing setting untouched. Best-effort.
+ */
+async function saveDailyLimit(
+  restaurantId: string,
+  menuItemId: string,
+  raw: FormDataEntryValue | null,
+): Promise<void> {
+  if (raw == null) return; // field not on this form → don't touch
+  const s = String(raw).trim();
+  const n = s === "" ? 0 : Math.floor(Number(s));
+  const limit = Number.isFinite(n) && n > 0 ? n : null; // 0 / blank / invalid → no cap
+  await setDailyLimit(restaurantId, menuItemId, limit);
 }
 
 /** Upsert a menu item's food cost (for accounting COGS). Best-effort. */

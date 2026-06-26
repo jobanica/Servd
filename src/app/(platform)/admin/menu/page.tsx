@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
 import { getMenu } from "@/server/menu/queries";
+import { getServingStates } from "@/server/menu/servings";
 import { formatPeso } from "@/lib/money";
 import { AddCategoryForm } from "@/components/admin/AddCategoryForm";
 import { AddItemForm } from "@/components/admin/AddItemForm";
@@ -19,6 +20,7 @@ export const maxDuration = 60;
 export default async function MenuPage() {
   const { restaurantId } = await requireAdminPage();
   const categories = await getMenu(restaurantId);
+  const servings = await getServingStates(restaurantId);
   // AI menu import is a paid feature (Growth & Business). Gate on both the API
   // key being configured AND the restaurant's plan including it.
   const aiImportEnabled =
@@ -94,6 +96,19 @@ export default async function MenuPage() {
                         Out of stock
                       </span>
                     )}
+                    {(() => {
+                      const cap = servings.get(item.id);
+                      if (!cap || cap.remaining == null) return null;
+                      return cap.remaining <= 0 ? (
+                        <span className="rounded-full bg-guava/15 px-2 py-0.5 text-xs font-medium text-guava">
+                          Sold out today
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-brand-primary/10 px-2 py-0.5 text-xs font-medium text-brand-primary">
+                          {cap.remaining} / {cap.dailyLimit} left today
+                        </span>
+                      );
+                    })()}
                   </div>
                   {item.description && (
                     <p className="truncate text-sm text-plum-ink/50">

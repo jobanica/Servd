@@ -5,6 +5,7 @@ import { requireStaff } from "@/server/tenancy/current-user";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
 import { autoPrintIfEnabled, printReceipt, printKitchenIfNeeded } from "@/server/printing/print";
 import { getPublicMenu } from "@/server/menu/public-menu";
+import { recordServingsSold } from "@/server/menu/servings";
 import {
   buildValidatedOrder,
   orderItemsCreate,
@@ -1076,6 +1077,9 @@ export async function createCashierOrder(input: {
     }
     return { ok: false, error: msg };
   }
+
+  // Count these servings toward each item's daily cap (best-effort, own tx).
+  await recordServingsSold(staff.restaurantId, built.items);
 
   await notifyOrdersChanged(staff.restaurantId);
   await autoPrintIfEnabled(staff.restaurantId, orderId);
