@@ -6,6 +6,7 @@ import { getAnalytics } from "@/server/analytics/queries";
 import { getFeedbackList } from "@/server/feedback/queries";
 import { listInventory } from "@/server/inventory/queries";
 import { hasModule } from "@/server/billing/entitlements";
+import { getPlanAccess } from "@/server/billing/feature-gate";
 import { formatPeso } from "@/lib/money";
 import { RevenueChart } from "@/components/analytics/Charts";
 import { getAiInsights, aiInsightsEnabled } from "@/server/ai/insights";
@@ -117,8 +118,19 @@ export default async function AdminHome() {
   if (week?.summary.avgRating != null) ruleInsights.push(`⭐ 7-day average rating: ${week.summary.avgRating}`);
   if (ruleInsights.length === 0) ruleInsights.push("Add menu items and share your table QR codes to start seeing insights here.");
 
+  // AI (Claude) insights are a paid feature — not available on the Free plan.
+  // The free tier still gets the rule-based "Smart insights" below. Trials and
+  // Growth/Business get the AI version. Fail open if the lookup errors.
+  let aiAllowed = true;
+  try {
+    const access = await getPlanAccess(rid);
+    aiAllowed = access.onTrial || access.tier !== "Free";
+  } catch {
+    aiAllowed = true;
+  }
+
   // Real Claude-generated insights (falls back to rule-based on any failure).
-  const aiOn = aiInsightsEnabled();
+  const aiOn = aiInsightsEnabled() && aiAllowed;
   const aiInsights = aiOn
     ? await safe(
         getAiInsights(rid, {
@@ -244,7 +256,13 @@ export default async function AdminHome() {
             <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${insightsAreAi ? "bg-brand-primary/10 text-brand-primary" : "bg-plum-ink/5 text-plum-ink/45"}`}>
               {insightsAreAi ? "✨ Claude AI" : "Rule-based"}
             </span>
-            {!aiOn && <span className="text-[11px] text-plum-ink/40">Set ANTHROPIC_API_KEY to enable AI insights</span>}
+            {!aiAllowed ? (
+              <Link href="/admin/billing" className="text-[11px] font-semibold text-brand-primary">
+                ✨ Upgrade to unlock AI insights
+              </Link>
+            ) : (
+              !aiOn && <span className="text-[11px] text-plum-ink/40">AI insights unavailable right now</span>
+            )}
           </div>
           <ul className="space-y-2 text-sm text-plum-ink/75">
             {insights.map((t, i) => <li key={i}>{t}</li>)}

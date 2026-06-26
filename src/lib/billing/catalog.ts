@@ -130,6 +130,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
     group: "Operations & back office",
     rows: [
       { label: "Analytics & reports", Free: true, Growth: true, Business: true },
+      { label: "AI-powered insights (Claude)", Free: false, Growth: true, Business: true },
       { label: "Shift handover notes", Free: true, Growth: true, Business: true },
       { label: "Staff performance reports", Free: true, Growth: true, Business: true },
       { label: "Data export (sales, orders, menu)", Free: false, Growth: true, Business: true },
