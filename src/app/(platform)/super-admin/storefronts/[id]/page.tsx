@@ -8,9 +8,12 @@ import {
   addItem,
   deleteItem,
   toggleItem,
+  uploadItemPhoto,
   deleteDemoStorefront,
 } from "@/server/storefront-demo/actions";
 import { CopyLink } from "@/components/super-admin/CopyLink";
+import { ScanMenuForm } from "@/components/super-admin/ScanMenuForm";
+import { ConvertDemoForm } from "@/components/super-admin/ConvertDemoForm";
 import { formatPeso } from "@/lib/money";
 
 export default async function StorefrontDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -71,9 +74,14 @@ export default async function StorefrontDetailPage({ params }: { params: Promise
         </div>
       </form>
 
+      {/* Convert demo → real account */}
+      <ConvertDemoForm restaurantId={s.id} />
+
       {/* Menu builder */}
       <div className="space-y-4">
         <h2 className="font-heading text-lg font-bold">Menu</h2>
+
+        <ScanMenuForm restaurantId={s.id} />
 
         {s.categories.map((cat) => (
           <div key={cat.id} className="rounded-tile border border-plum-ink/10 bg-white p-4">
@@ -90,14 +98,28 @@ export default async function StorefrontDetailPage({ params }: { params: Promise
               <ul className="mb-3 divide-y divide-plum-ink/5">
                 {cat.items.map((it) => (
                   <li key={it.id} className="flex items-center justify-between gap-3 py-2 text-sm">
-                    <div className="min-w-0">
-                      <span className={`font-medium ${it.isAvailable ? "" : "text-plum-ink/40 line-through"}`}>
-                        {it.name}
-                      </span>
-                      {it.description && <span className="block text-xs text-plum-ink/45">{it.description}</span>}
+                    <div className="flex min-w-0 items-center gap-2">
+                      {it.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={it.imageUrl} alt={it.name} className="h-9 w-9 shrink-0 rounded object-cover" />
+                      ) : (
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-cream text-[10px] text-plum-ink/40">no img</span>
+                      )}
+                      <div className="min-w-0">
+                        <span className={`font-medium ${it.isAvailable ? "" : "text-plum-ink/40 line-through"}`}>
+                          {it.name}
+                        </span>
+                        {it.description && <span className="block text-xs text-plum-ink/45">{it.description}</span>}
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="font-semibold">{formatPeso(it.price)}</span>
+                      <form action={uploadItemPhoto} className="flex items-center gap-1">
+                        <input type="hidden" name="restaurantId" value={s.id} />
+                        <input type="hidden" name="id" value={it.id} />
+                        <input name="image" type="file" accept="image/jpeg,image/png,image/webp" className="w-24 text-[10px]" />
+                        <button className="rounded border border-plum-ink/15 px-1.5 py-0.5 text-[11px] hover:bg-cream" title="Upload photo">📷</button>
+                      </form>
                       <form action={toggleItem}>
                         <input type="hidden" name="restaurantId" value={s.id} />
                         <input type="hidden" name="id" value={it.id} />
@@ -124,8 +146,10 @@ export default async function StorefrontDetailPage({ params }: { params: Promise
               <input name="name" required placeholder="Item name" className="rounded-lg border border-plum-ink/15 px-2 py-1.5 text-sm" />
               <input name="price" type="number" step="0.01" min="0" placeholder="₱ price" className="rounded-lg border border-plum-ink/15 px-2 py-1.5 text-sm" />
               <button className="rounded-lg bg-brand-primary px-3 py-1.5 text-sm font-semibold text-white">Add item</button>
-              <input name="description" placeholder="Short description (optional)" className="rounded-lg border border-plum-ink/15 px-2 py-1.5 text-sm sm:col-span-2" />
-              <input name="imageUrl" placeholder="Image URL (optional)" className="rounded-lg border border-plum-ink/15 px-2 py-1.5 text-sm" />
+              <input name="description" placeholder="Short description (optional)" className="rounded-lg border border-plum-ink/15 px-2 py-1.5 text-sm sm:col-span-3" />
+              <label className="text-xs text-plum-ink/55 sm:col-span-3">
+                Photo (optional): <input name="image" type="file" accept="image/jpeg,image/png,image/webp" className="text-xs" />
+              </label>
             </form>
           </div>
         ))}
