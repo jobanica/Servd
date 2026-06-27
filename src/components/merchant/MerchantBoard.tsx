@@ -10,6 +10,7 @@ import {
   acceptMerchantOrder,
   rejectMerchantOrder,
   advanceMerchantOrder,
+  createTestOrder,
   type MerchantData,
   type MerchantOrder,
   type MerchantAdvance,
@@ -81,6 +82,7 @@ export function MerchantBoard({
   const [rejecting, setRejecting] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [live, setLive] = useState(false);
+  const [testMsg, setTestMsg] = useState<string | null>(null);
   const alarm = useOrderAlarm();
   useWakeLock(true);
 
@@ -149,6 +151,13 @@ export function MerchantBoard({
     const res = await advanceMerchantOrder(orderId, to);
     if (res.data) setData(res.data);
     setBusy(null);
+  }
+
+  async function sendTest() {
+    setTestMsg(null);
+    const res = await createTestOrder();
+    if (res.data) setData(res.data);
+    if (!res.ok) setTestMsg(res.error ?? "Couldn't send a test order.");
   }
 
   // ---- Audio-unlock gate (browsers block sound until a user gesture) --------
@@ -355,6 +364,20 @@ export function MerchantBoard({
             })}
           </ul>
         )}
+
+        {/* Test order — verify the alarm + customer tracker end-to-end */}
+        <div className="mt-6 rounded-tile border border-dashed border-plum-ink/15 bg-white p-3 text-center">
+          <button
+            onClick={sendTest}
+            className="rounded-full border border-brand-primary px-4 py-2 text-sm font-semibold text-brand-primary"
+          >
+            🧪 Send test order
+          </button>
+          <p className="mt-1.5 text-xs text-plum-ink/45">
+            Rings the alarm with a sample order. Reject it after to clear it.
+          </p>
+          {testMsg && <p className="mt-1 text-xs font-semibold text-guava">{testMsg}</p>}
+        </div>
 
         {/* History */}
         <button
