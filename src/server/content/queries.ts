@@ -1,7 +1,7 @@
 import "server-only";
 
 import { systemDb } from "@/server/tenancy/scoped-db";
-import type { ScriptType } from "@/lib/content/script";
+import type { ScriptType, GeneratedScript } from "@/lib/content/script";
 
 export interface ScheduledScriptRow {
   id: string;
@@ -86,6 +86,68 @@ export async function listRecentScripts(limit = 50): Promise<ScheduledScriptRow[
       }),
     );
     return (rows as RawRow[]).map(toRow);
+  } catch {
+    return [];
+  }
+}
+
+export interface LibraryScriptRow extends ScheduledScriptRow {
+  pillarId: string | null;
+  saves: number | null;
+  shares: number | null;
+  dms: number | null;
+  postedAt: string | null;
+  script: GeneratedScript; // reconstructed for Copy-as-Markdown / preview
+}
+
+const LIBRARY_SELECT = {
+  ...ROW_SELECT,
+  pillarId: true,
+  saves: true,
+  shares: true,
+  dms: true,
+  postedAt: true,
+  hook: true,
+  body: true,
+  cta: true,
+  production: true,
+} as const;
+
+/** Full library: every script with performance fields + the script body. */
+export async function listLibraryScripts(limit = 200): Promise<LibraryScriptRow[]> {
+  try {
+    const rows = await systemDb((tx) =>
+      tx.contentScript.findMany({
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        select: LIBRARY_SELECT,
+      }),
+    );
+    return (rows as unknown as Array<RawRow & {
+      pillarId: string | null;
+      saves: number | null;
+      shares: number | null;
+      dms: number | null;
+      postedAt: Date | null;
+      hook: GeneratedScript["hook"];
+      body: GeneratedScript["body"];
+      cta: GeneratedScript["cta"];
+      production: GeneratedScript["production"];
+    }>).map((r) => ({
+      ...toRow(r),
+      pillarId: r.pillarId,
+      saves: r.saves,
+      shares: r.shares,
+      dms: r.dms,
+      postedAt: r.postedAt?.toISOString() ?? null,
+      script: {
+        title: r.title,
+        hook: r.hook,
+        body: r.body,
+        cta: r.cta ?? null,
+        production: r.production,
+      },
+    }));
   } catch {
     return [];
   }

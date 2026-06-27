@@ -24,8 +24,18 @@ const SECTIONS = [
     desc: "Schedule posts and eyeball the jab/hook ratio.",
     ready: true,
   },
-  { href: "#", title: "Library", desc: "All scripts, performance, and remix winners.", ready: false },
-  { href: "#", title: "Settings", desc: "Edit the brand voice, jab ratio, and pillars.", ready: false },
+  {
+    href: "/super-admin/content-engine/library",
+    title: "Library",
+    desc: "All scripts, performance, and remix winners.",
+    ready: true,
+  },
+  {
+    href: "/super-admin/content-engine/settings",
+    title: "Settings",
+    desc: "Edit the brand voice, jab ratio, and pillars.",
+    ready: true,
+  },
 ];
 
 export default async function ContentEnginePage() {
