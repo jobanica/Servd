@@ -114,6 +114,7 @@ export function WebOrderTracker({
   const [deliveryStatus, setDeliveryStatus] = useState<string | null>(null);
   const [orderNumber, setOrderNumber] = useState<number | null>(null);
   const [total, setTotal] = useState(0);
+  const [prepMinutes, setPrepMinutes] = useState<number | null>(null);
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
   const prevStatus = useRef<string>("pending");
   const prevDelivery = useRef<string | null>(null);
@@ -125,6 +126,7 @@ export function WebOrderTracker({
     setDeliveryStatus(res.deliveryStatus);
     setOrderNumber(res.orderNumber);
     setTotal(res.total);
+    setPrepMinutes(res.prepMinutes);
     setRestaurantId(res.restaurantId);
 
     // Chime + notify on the meaningful transitions.
@@ -195,6 +197,11 @@ export function WebOrderTracker({
           </p>
         )}
         <p className="mt-2 text-sm text-plum-ink/60">{stage.detail}</p>
+        {prepMinutes != null && (status === "new" || status === "preparing") && (
+          <p className="mt-1 text-sm font-semibold text-brand-primary">
+            Estimated ready in ~{prepMinutes} min
+          </p>
+        )}
 
         {/* Live progress steps */}
         {status !== "cancelled" && (

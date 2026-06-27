@@ -251,7 +251,8 @@ export async function printPaidTicket(orderId: string): Promise<PrintDispatch> {
 export async function printKitchenTicket(orderId: string): Promise<PrintDispatch> {
   let staff;
   try {
-    staff = await requireStaff(["cashier", "admin"]);
+    // The merchant "Incoming Orders" screen also auto-prints kitchen tickets.
+    staff = await requireStaff(["cashier", "admin", "merchant"]);
   } catch {
     return { ok: false, handledOnServer: false, message: "Not allowed." };
   }

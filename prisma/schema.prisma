@@ -29,6 +29,7 @@ enum StaffRole {
   cashier
   manager // HR / scheduling
   admin // restaurant owner/admin
+  merchant // online "Incoming Orders" screen only (no full cashier UI)
 }
 
 enum RestaurantStatus {
@@ -1285,6 +1286,8 @@ model Order {
   inventoryDeductedAt DateTime? // set once stock is deducted (idempotency)
   servedAt      DateTime? // set when the cashier confirms the food was served
   voidedAt      DateTime? // set when a cashier voids the (unpaid) order
+  prepMinutes   Int? // prep-time estimate (minutes) a merchant sets on accept
+  cancelReason  String? // reason a merchant rejected the order
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 

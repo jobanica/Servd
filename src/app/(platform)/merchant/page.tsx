@@ -1,0 +1,47 @@
+import { redirect } from "next/navigation";
+import Link from "next/link";
+import { getCurrentUser } from "@/server/tenancy/current-user";
+import { tenantDb } from "@/server/tenancy/scoped-db";
+import { hasFeature } from "@/server/billing/feature-gate";
+import { getMerchantOrders } from "@/server/orders/merchant";
+import { MerchantBoard } from "@/components/merchant/MerchantBoard";
+
+// The realtime alarm screen must never be statically cached.
+export const dynamic = "force-dynamic";
+
+export default async function MerchantPage() {
+  const user = await getCurrentUser();
+  if (!user || user.kind !== "staff" || !["merchant", "admin", "cashier"].includes(user.role)) {
+    redirect("/login");
+  }
+
+  // Online ordering is the whole point of this screen — gate on the plan.
+  const entitled = await hasFeature(user.restaurantId, "onlineOrdering");
+  if (!entitled) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-cream px-6 text-center">
+        <h1 className="font-heading text-2xl font-bold text-plum-ink">Online ordering isn&apos;t on your plan</h1>
+        <p className="max-w-sm text-sm text-plum-ink/60">
+          The Incoming Orders screen needs the online-ordering feature (Growth plan and up). Ask the
+          restaurant owner to upgrade.
+        </p>
+        <Link href="/admin/billing?upgrade=onlineOrdering" className="rounded-full px-6 py-3 font-semibold btn-brand">
+          See plans
+        </Link>
+      </div>
+    );
+  }
+
+  const [restaurant, initial] = await Promise.all([
+    tenantDb(user.restaurantId, (tx) => tx.restaurant.findFirst({ select: { name: true } })),
+    getMerchantOrders(),
+  ]);
+
+  return (
+    <MerchantBoard
+      restaurantId={user.restaurantId}
+      restaurantName={restaurant?.name ?? "Your restaurant"}
+      initial={initial}
+    />
+  );
+}

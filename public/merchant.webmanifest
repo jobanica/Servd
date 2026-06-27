@@ -1,0 +1,19 @@
+{
+  "name": "Servd Orders",
+  "short_name": "Orders",
+  "description": "Servd incoming online orders for merchants",
+  "start_url": "/merchant",
+  "scope": "/merchant",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#3B1E54",
+  "theme_color": "#FF7A1A",
+  "icons": [
+    {
+      "src": "/brand/servd-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
