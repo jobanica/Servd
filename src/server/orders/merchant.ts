@@ -323,3 +323,50 @@ export async function advanceMerchantOrder(
   if (changed > 0) await notifyOrdersChanged(rid);
   return { ok: true, data: await loadMerchantData(rid) };
 }
+
+/**
+ * Create a clearly-labelled TEST online order so staff can verify the alarm,
+ * the accept/reject flow and the customer tracker end-to-end on the tablet. It
+ * goes through the real Order model (pending, no table) so it behaves exactly
+ * like a genuine online order — just reject it afterwards to clear it.
+ */
+export async function createTestOrder(): Promise<MerchantActionResult> {
+  let staff;
+  try {
+    staff = await requireStaff(MERCHANT_ROLES);
+  } catch {
+    return { ok: false, error: "Not allowed." };
+  }
+  const rid = staff.restaurantId;
+
+  // Use a real menu item (FK requirement) — the first one we can find.
+  const item = await tenantDb(rid, (tx) =>
+    tx.menuItem.findFirst({ orderBy: { createdAt: "asc" }, select: { id: true, name: true, price: true } }),
+  );
+  if (!item) {
+    return { ok: false, error: "Add at least one menu item first, then send a test order." };
+  }
+
+  try {
+    await tenantDb(rid, (tx) =>
+      tx.order.create({
+        data: {
+          restaurantId: rid,
+          status: "pending",
+          paymentStatus: "unpaid",
+          orderType: "takeout",
+          customerName: "🧪 TEST ORDER — please reject",
+          customerPhone: "0000000000",
+          total: item.price,
+          items: { create: [{ menuItemId: item.id, nameAtTime: item.name, quantity: 1, unitPrice: item.price }] },
+        },
+        select: { id: true },
+      }),
+    );
+  } catch {
+    return { ok: false, error: "Couldn't create the test order. Please try again." };
+  }
+
+  await notifyOrdersChanged(rid); // fires the alarm just like a real order
+  return { ok: true, data: await loadMerchantData(rid) };
+}
