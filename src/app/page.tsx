@@ -150,18 +150,24 @@ export default async function Home() {
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 py-16 lg:grid-cols-2 lg:py-24">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full border border-brand-primary/20 bg-brand-primary/10 px-3 py-1 text-xs font-semibold text-brand-primary">
-              ✨ Free setup · 30-day free trial
+              ✨ Free setup · Keep 100% of your sales
             </span>
             <h1 className="mt-5 font-heading text-5xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
-              We&apos;ll digitize your{" "}
-              <span className="bg-brand-gradient bg-clip-text text-transparent">restaurant for free</span>.
+              Stop paying{" "}
+              <span className="bg-brand-gradient bg-clip-text text-transparent">30% commission</span>{" "}
+              to delivery apps.
             </h1>
+            <p className="mt-5 max-w-md text-lg text-plum-ink/70">
+              Every GrabFood &amp; Foodpanda order quietly takes up to{" "}
+              <span className="font-semibold text-plum-ink">30% of your hard-earned sales</span>. Get your
+              own ordering website + QR menu so customers order direct — and you keep every peso.
+            </p>
             <ul className="mt-6 max-w-md space-y-2.5">
               {[
-                "We'll create your ordering website.",
-                "We'll generate your QR codes.",
-                "We'll set up your menu.",
-                "We'll train your staff.",
+                "Your own ordering website — 0% commission, forever.",
+                "We'll generate your QR codes so diners order direct.",
+                "We'll set up your menu and train your staff.",
+                "Collection or delivery — the order (and the customer) stays yours.",
                 "Try every feature free for 30 days — no card, no commitment.",
               ].map((line) => (
                 <li key={line} className="flex items-center gap-3 text-plum-ink/75">
