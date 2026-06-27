@@ -205,6 +205,84 @@ model CrmTouch {
   @@map("crm_touches")
 }
 
+// ----------------------------------------------------------------------------
+// Content Engine (platform/super-admin only): Taglish short-form video scripts
+// for Servd's OWN marketing, built on the Jab-Jab-Jab-Right-Hook framework.
+// Internal tool — never tenant-visible. All access via systemDb + RLS super_only.
+// ----------------------------------------------------------------------------
+
+enum ContentPillarKind {
+  JAB
+  RIGHT_HOOK
+}
+
+enum ContentScriptStatus {
+  IDEA
+  SCRIPTED
+  FILMED
+  POSTED
+}
+
+/// The brand voice + framework config the generator follows. One row ("Servd").
+model ContentBrandProfile {
+  id           String   @id @default(cuid())
+  name         String   @default("Servd")
+  systemPrompt String // editable brand/voice prompt
+  jabRatio     Int      @default(3) // jabs per 1 right hook — configurable
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  pillars ContentPillar[]
+  scripts ContentScript[]
+
+  @@map("content_brand_profiles")
+}
+
+/// A content theme. Jabs give value; right hooks make the ask.
+model ContentPillar {
+  id          String              @id @default(cuid())
+  brandId     String
+  brand       ContentBrandProfile @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  kind        ContentPillarKind
+  name        String
+  description String
+  active      Boolean             @default(true)
+  scripts     ContentScript[]
+
+  @@index([brandId])
+  @@map("content_pillars")
+}
+
+/// A generated (or hand-edited) short-form video script.
+model ContentScript {
+  id           String              @id @default(cuid())
+  brandId      String
+  brand        ContentBrandProfile @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  pillarId     String?
+  pillar       ContentPillar?      @relation(fields: [pillarId], references: [id], onDelete: SetNull)
+  type         ContentPillarKind
+  platform     String // "reels" | "tiktok" | "facebook"
+  lengthSec    Int
+  title        String
+  hook         Json // { visual, audio, textOverlay }
+  body         Json // [{ time, action, line }]
+  cta          Json? // { verbal, text, action } | null (null for jabs)
+  production   Json // { music, bRoll, graphics }
+  status       ContentScriptStatus @default(IDEA)
+  saves        Int?
+  shares       Int?
+  dms          Int?
+  postedAt     DateTime?
+  scheduledFor DateTime?
+  createdById  String? // platform admin id/email, if known
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  @@index([brandId, createdAt])
+  @@index([status])
+  @@map("content_scripts")
+}
+
 model Plan {
   id           String   @id @default(uuid())
   name         String
