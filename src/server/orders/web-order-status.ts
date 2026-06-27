@@ -20,6 +20,7 @@ export interface WebOrderStatusResult {
   orderType: string; // takeout | delivery (online orders)
   total: number; // centavos
   orderNumber: number | null; // daily ticket number, if any
+  prepMinutes: number | null; // ETA the merchant set on accept, if any
 }
 
 export async function getWebOrderStatus(
@@ -41,7 +42,7 @@ export async function getWebOrderStatus(
     });
     if (!order) return null;
 
-    // orderType / deliveryStatus / orderNumber columns may lag on prod — read
+    // orderType / deliveryStatus / prepMinutes columns may lag on prod — read
     // them best-effort so the tracker never breaks before a migration runs.
     let orderType = "takeout";
     let deliveryStatus: string | null = null;
@@ -54,6 +55,14 @@ export async function getWebOrderStatus(
       deliveryStatus = extra?.deliveryStatus ?? null;
     } catch {
       /* columns not migrated yet */
+    }
+
+    let prepMinutes: number | null = null;
+    try {
+      const p = await tx.order.findFirst({ where: { id: orderId }, select: { prepMinutes: true } });
+      prepMinutes = p?.prepMinutes ?? null;
+    } catch {
+      /* prepMinutes not migrated yet */
     }
 
     let orderNumber: number | null = null;
@@ -72,6 +81,7 @@ export async function getWebOrderStatus(
       orderType,
       total: order.total,
       orderNumber,
+      prepMinutes,
     };
   });
 }
