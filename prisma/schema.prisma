@@ -283,6 +283,22 @@ model ContentScript {
   @@map("content_scripts")
 }
 
+/// Per-call generation log for cost visibility (token spend) + the daily cap.
+model ContentGenerationLog {
+  id           String   @id @default(cuid())
+  brandId      String?
+  model        String
+  mode         String // "single" | "batch"
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  scriptId     String?
+  ok           Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("content_generation_logs")
+}
+
 model Plan {
   id           String   @id @default(uuid())
   name         String

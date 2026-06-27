@@ -6,6 +6,8 @@ import { requireSuperAdmin } from "@/server/tenancy/current-user";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { getOrCreateBrand } from "@/server/content/brand";
 import { generateScript } from "@/server/content/claude";
+import { DAILY_CAP, generationsToday, logGeneration } from "@/server/content/usage";
+import { withinCap } from "@/lib/content/limits";
 
 const inputSchema = z.object({
   type: z.enum(["JAB", "RIGHT_HOOK"]),
@@ -58,6 +60,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unknown pillar." }, { status: 400 });
   }
 
+  // 3b. Daily cap (spend / runaway guard).
+  if (!withinCap(await generationsToday(), 1, DAILY_CAP)) {
+    return NextResponse.json(
+      { error: `Daily generation cap (${DAILY_CAP}) reached. Try again tomorrow.` },
+      { status: 429 },
+    );
+  }
+
   // 4. Recent titles for de-dup.
   const recent = await systemDb((tx) =>
     tx.contentScript.findMany({
@@ -80,6 +90,14 @@ export async function POST(req: Request) {
     recentTitles: recent.map((r) => r.title),
   });
   if (!gen.ok) {
+    await logGeneration({
+      brandId: brand.id,
+      model: gen.model,
+      mode: "single",
+      inputTokens: gen.usage.inputTokens,
+      outputTokens: gen.usage.outputTokens,
+      ok: false,
+    });
     return NextResponse.json({ error: gen.error }, { status: 502 });
   }
 
@@ -102,6 +120,16 @@ export async function POST(req: Request) {
       select: { id: true },
     }),
   );
+
+  await logGeneration({
+    brandId: brand.id,
+    model: gen.model,
+    mode: "single",
+    inputTokens: gen.usage.inputTokens,
+    outputTokens: gen.usage.outputTokens,
+    scriptId: saved.id,
+    ok: true,
+  });
 
   return NextResponse.json({
     id: saved.id,

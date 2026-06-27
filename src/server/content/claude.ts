@@ -37,9 +37,14 @@ export interface GenerateOpts {
   batch?: boolean;
 }
 
+export interface Usage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
 export type GenerateResult =
-  | { ok: true; script: GeneratedScript; usage: { inputTokens: number; outputTokens: number } }
-  | { ok: false; error: string };
+  | { ok: true; script: GeneratedScript; usage: Usage; model: string }
+  | { ok: false; error: string; usage: Usage; model: string };
 
 function buildUserMessage(opts: GenerateOpts): string {
   return [
@@ -60,15 +65,15 @@ function buildUserMessage(opts: GenerateOpts): string {
  * giving up — so malformed output never crashes the caller.
  */
 export async function generateScript(opts: GenerateOpts): Promise<GenerateResult> {
+  const model = opts.batch ? BATCH_MODEL : MODEL;
+  let usage: Usage = { inputTokens: 0, outputTokens: 0 };
+
   if (!contentEngineEnabled()) {
-    return { ok: false, error: "ANTHROPIC_API_KEY is not configured on the server." };
+    return { ok: false, error: "The Claude API key is not configured on the server.", usage, model };
   }
 
   const client = new Anthropic();
-  const model = opts.batch ? BATCH_MODEL : MODEL;
   const baseMsg = buildUserMessage(opts);
-
-  let usage = { inputTokens: 0, outputTokens: 0 };
 
   const call = async (extra: string): Promise<string> => {
     const res = await client.messages.create({
@@ -95,9 +100,9 @@ export async function generateScript(opts: GenerateOpts): Promise<GenerateResult
         await call("Your previous reply was not valid JSON. Reply with ONLY the JSON object — no prose, no code fences."),
       );
     }
-    if (!parsed.ok) return { ok: false, error: parsed.error };
-    return { ok: true, script: enforceTypeInvariants(parsed.script, opts.type), usage };
+    if (!parsed.ok) return { ok: false, error: parsed.error, usage, model };
+    return { ok: true, script: enforceTypeInvariants(parsed.script, opts.type), usage, model };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Generation failed." };
+    return { ok: false, error: e instanceof Error ? e.message : "Generation failed.", usage, model };
   }
 }

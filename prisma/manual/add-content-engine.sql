@@ -72,6 +72,20 @@ DO $$ BEGIN
     FOREIGN KEY ("pillarId") REFERENCES "content_pillars"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 EXCEPTION WHEN duplicate_object THEN null; END $$;
 
+CREATE TABLE IF NOT EXISTS "content_generation_logs" (
+  "id"           TEXT NOT NULL,
+  "brandId"      TEXT,
+  "model"        TEXT NOT NULL,
+  "mode"         TEXT NOT NULL,
+  "inputTokens"  INTEGER NOT NULL DEFAULT 0,
+  "outputTokens" INTEGER NOT NULL DEFAULT 0,
+  "scriptId"     TEXT,
+  "ok"           BOOLEAN NOT NULL DEFAULT true,
+  "createdAt"    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "content_generation_logs_pkey" PRIMARY KEY ("id")
+);
+CREATE INDEX IF NOT EXISTS "content_generation_logs_createdAt_idx" ON "content_generation_logs"("createdAt");
+
 -- Platform-only: only the super-admin context may read/write (no tenant access).
 ALTER TABLE "content_brand_profiles" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "content_brand_profiles" FORCE ROW LEVEL SECURITY;
@@ -89,4 +103,10 @@ ALTER TABLE "content_scripts" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "content_scripts" FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS super_only ON "content_scripts";
 CREATE POLICY super_only ON "content_scripts" FOR ALL
+  USING (app.is_super_admin()) WITH CHECK (app.is_super_admin());
+
+ALTER TABLE "content_generation_logs" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "content_generation_logs" FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS super_only ON "content_generation_logs";
+CREATE POLICY super_only ON "content_generation_logs" FOR ALL
   USING (app.is_super_admin()) WITH CHECK (app.is_super_admin());
