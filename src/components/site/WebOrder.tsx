@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { formatPeso, formatDelta } from "@/lib/money";
 import {
   unitPrice,
@@ -14,6 +13,7 @@ import type { CartLine, DinerCategory, DinerItem, Selection } from "@/lib/cart/t
 import { placeWebOrder } from "@/server/orders/web-order";
 import { captureCartLead } from "@/server/marketing/cart-recovery";
 import { LocationPicker } from "./LocationPicker";
+import { WebOrderTracker } from "./WebOrderTracker";
 
 function lineId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -220,17 +220,14 @@ export function WebOrder(props: WebOrderProps) {
 
   if (placedId) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-100 px-5 py-16">
-        <div className="max-w-md rounded-2xl bg-white p-8 text-center shadow">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-600 text-3xl text-white">✓</div>
-          <h1 className="mt-4 font-heading text-2xl font-bold text-plum-ink">Order placed!</h1>
-          <p className="mt-2 text-sm text-plum-ink/60">
-            {restaurantName} received your {orderType === "delivery" ? "delivery" : "pickup"} order. Reference{" "}
-            <span className="font-semibold">#{placedId.slice(0, 8).toUpperCase()}</span>. They&apos;ll call {phone} to confirm.
-          </p>
-          <Link href={home} className="mt-6 inline-block rounded-full bg-red-600 px-6 py-3 font-semibold text-white">Back to menu</Link>
-        </div>
-      </div>
+      <WebOrderTracker
+        slug={slug}
+        orderId={placedId}
+        orderType={orderType}
+        restaurantName={restaurantName}
+        phone={phone}
+        homeHref={home}
+      />
     );
   }
 
