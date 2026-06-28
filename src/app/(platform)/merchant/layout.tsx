@@ -6,6 +6,10 @@ export const metadata: Metadata = {
   title: "Incoming Orders — Servd",
   manifest: "/merchant.webmanifest",
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Orders" },
+  icons: {
+    icon: [{ url: "/brand/icon-192.png", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/brand/icon-apple-180.png", sizes: "180x180", type: "image/png" }],
+  },
 };
 
 export const viewport: Viewport = {

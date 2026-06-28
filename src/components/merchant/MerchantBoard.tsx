@@ -18,6 +18,7 @@ import {
 } from "@/server/orders/merchant";
 import { useOrderAlarm } from "./useOrderAlarm";
 import { useWakeLock } from "./useWakeLock";
+import { InstallButton } from "./InstallButton";
 
 const PREP_CHOICES = [10, 15, 20, 30, 45];
 const REJECT_LABELS: { key: RejectReason; label: string }[] = [
@@ -175,6 +176,7 @@ export function MerchantBoard({
         >
           🔔 Tap to start
         </button>
+        <InstallButton subtle />
       </div>
     );
   }
@@ -190,6 +192,7 @@ export function MerchantBoard({
           <p className="text-xs text-plum-ink/50">Incoming online orders</p>
         </div>
         <div className="flex items-center gap-3 text-sm">
+          <InstallButton />
           <label className="flex items-center gap-2 font-semibold text-plum-ink/70">
             <input type="checkbox" checked={autoPrint} onChange={(e) => setAutoPrint(e.target.checked)} />
             Auto-print
