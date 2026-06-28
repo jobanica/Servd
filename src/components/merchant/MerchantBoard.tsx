@@ -19,6 +19,7 @@ import {
 import { useOrderAlarm } from "./useOrderAlarm";
 import { useWakeLock } from "./useWakeLock";
 import { InstallButton } from "./InstallButton";
+import { DeliveryRiderPanel } from "@/components/delivery/DeliveryRiderPanel";
 
 const PREP_CHOICES = [10, 15, 20, 30, 45];
 const REJECT_LABELS: { key: RejectReason; label: string }[] = [
@@ -84,12 +85,14 @@ export function MerchantBoard({
   const [showHistory, setShowHistory] = useState(false);
   const [live, setLive] = useState(false);
   const [testMsg, setTestMsg] = useState<string | null>(null);
+  const [pulse, setPulse] = useState(0); // bumped on refresh → rider panels re-fetch
   const alarm = useOrderAlarm();
   useWakeLock(true);
 
   const refresh = useCallback(async () => {
     try {
       setData(await getMerchantOrders());
+      setPulse((p) => p + 1);
     } catch {
       /* transient — the poll will retry */
     }
@@ -365,6 +368,7 @@ export function MerchantBoard({
                       🖨️
                     </button>
                   </div>
+                  {o.orderType === "delivery" && <DeliveryRiderPanel orderId={o.id} pulse={pulse} />}
                 </li>
               );
             })}

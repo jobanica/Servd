@@ -1210,6 +1210,48 @@ model Order {
   @@map("orders")
 }
 
+/// Per-restaurant third-party delivery provider config. Standalone (no Prisma
+/// relation) so existing restaurant reads stay safe on a lagging DB; the FK is
+/// enforced in prisma/manual/add-delivery-bookings.sql.
+model DeliverySettings {
+  id               String   @id @default(uuid())
+  restaurantId     String   @unique
+  provider         String   @default("manual") // manual | deeplink | api
+  providerKey      String? // informational, e.g. "lalamove"
+  deepLinkTemplate String? // URL template with {pickup}/{dropoff}/… tokens
+  apiBaseUrl       String?
+  credentialsEnc   String? // AES-GCM encryptJson({ apiKey, webhookSecret })
+  enabled          Boolean  @default(true)
+  updatedAt        DateTime @updatedAt
+
+  @@map("delivery_settings")
+}
+
+/// A third-party rider booking attached to a delivery order. One per order.
+model DeliveryBooking {
+  id           String   @id @default(uuid())
+  restaurantId String
+  orderId      String   @unique
+  provider     String // manual | deeplink | api
+  providerKey  String?
+  bookingRef   String? // the provider's booking id
+  status       String   @default("manual") // searching|assigned|picked_up|delivered|cancelled|failed|manual
+  fee          Int? // centavos
+  etaMinutes   Int?
+  riderName    String?
+  riderPhone   String?
+  riderLat     Float?
+  riderLng     Float?
+  trackingUrl  String?
+  raw          Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([restaurantId])
+  @@index([bookingRef])
+  @@map("delivery_bookings")
+}
+
 /// Shift handover notes — free-text left by one shift for the next.
 model ShiftNote {
   id           String   @id @default(uuid())
