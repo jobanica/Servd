@@ -10,6 +10,7 @@ import {
   cancelBooking,
   type BookingView,
   type DeliveryMode,
+  type Dropoff,
 } from "@/server/delivery/booking";
 
 const STATUS_META: Record<string, { label: string; cls: string }> = {
@@ -35,9 +36,79 @@ function bookLabel(mode: DeliveryMode): string {
  * live status + rider info, and exposes manual status controls / retry +
  * manual fallback on failure. `pulse` re-fetches when the parent board refreshes.
  */
+function CopyCoords({ dropoff }: { dropoff: Dropoff }) {
+  const [copied, setCopied] = useState(false);
+  const coords = dropoff.lat != null && dropoff.lng != null ? `${dropoff.lat},${dropoff.lng}` : null;
+
+  async function copy(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (!coords && !dropoff.address) return null;
+  return (
+    <div className="mt-2 rounded-xl bg-cream px-3 py-2 text-xs">
+      <p className="font-semibold text-plum-ink/60">Customer location (copy into your delivery app)</p>
+      {dropoff.address && <p className="mt-1 text-plum-ink/80">📍 {dropoff.address}</p>}
+      {coords ? (
+        <>
+          <p className="mt-1 font-mono text-sm font-semibold text-plum-ink">{coords}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              onClick={() => copy(coords)}
+              className="rounded-lg border border-plum-ink/15 bg-white px-3 py-1.5 font-semibold"
+            >
+              {copied ? "Copied ✓" : "Copy coordinates"}
+            </button>
+            {dropoff.address && (
+              <button
+                onClick={() => copy(dropoff.address!)}
+                className="rounded-lg border border-plum-ink/15 bg-white px-3 py-1.5 font-semibold"
+              >
+                Copy address
+              </button>
+            )}
+            <a
+              href={`https://maps.google.com/?q=${coords}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg border border-plum-ink/15 bg-white px-3 py-1.5 font-semibold"
+            >
+              Google Maps
+            </a>
+            <a
+              href={`https://waze.com/ul?ll=${coords}&navigate=yes`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg border border-plum-ink/15 bg-white px-3 py-1.5 font-semibold"
+            >
+              Waze
+            </a>
+          </div>
+        </>
+      ) : (
+        dropoff.address && (
+          <button
+            onClick={() => copy(dropoff.address!)}
+            className="mt-2 rounded-lg border border-plum-ink/15 bg-white px-3 py-1.5 font-semibold"
+          >
+            {copied ? "Copied ✓" : "Copy address"}
+          </button>
+        )
+      )}
+    </div>
+  );
+}
+
 export function DeliveryRiderPanel({ orderId, pulse = 0 }: { orderId: string; pulse?: number }) {
   const [booking, setBooking] = useState<BookingView | null>(null);
   const [mode, setMode] = useState<DeliveryMode>("manual");
+  const [dropoff, setDropoff] = useState<Dropoff | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fallback, setFallback] = useState(false);
@@ -46,6 +117,7 @@ export function DeliveryRiderPanel({ orderId, pulse = 0 }: { orderId: string; pu
     const res = await getBooking(orderId);
     setBooking(res.booking);
     setMode(res.mode);
+    setDropoff(res.dropoff);
   }, [orderId]);
 
   useEffect(() => {
@@ -76,14 +148,15 @@ export function DeliveryRiderPanel({ orderId, pulse = 0 }: { orderId: string; pu
     setBusy(false);
   }
 
-  // No booking yet → a single Book button.
+  // No booking yet → coordinates to copy + a single Book button.
   if (!booking || booking.status === "cancelled") {
     return (
       <div className="mt-2">
+        {dropoff && <CopyCoords dropoff={dropoff} />}
         <button
           onClick={onBook}
           disabled={busy}
-          className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white disabled:opacity-50"
+          className="mt-2 w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white disabled:opacity-50"
         >
           {busy ? "Booking…" : bookLabel(mode)}
         </button>
@@ -139,6 +212,9 @@ export function DeliveryRiderPanel({ orderId, pulse = 0 }: { orderId: string; pu
           {isManual ? "Open in provider app ↗" : "Track rider ↗"}
         </a>
       )}
+
+      {/* Customer coordinates to copy into the delivery app (esp. for manual). */}
+      {!terminal && dropoff && <CopyCoords dropoff={dropoff} />}
 
       {error && <p className="mt-2 text-xs font-semibold text-guava">{error}</p>}
 

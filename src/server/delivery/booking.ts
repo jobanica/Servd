@@ -165,16 +165,28 @@ async function currentBooking(restaurantId: string, orderId: string): Promise<Bo
   }
 }
 
-/** Booking (if any) + the tenant's configured mode — drives the UI panel. */
-export async function getBooking(orderId: string): Promise<{ booking: BookingView | null; mode: DeliveryMode }> {
+export interface Dropoff {
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+}
+
+/** Booking (if any) + the tenant's mode + the customer dropoff — drives the UI. */
+export async function getBooking(
+  orderId: string,
+): Promise<{ booking: BookingView | null; mode: DeliveryMode; dropoff: Dropoff | null }> {
   let staff;
   try {
     staff = await requireStaff([...ROLES]);
   } catch {
-    return { booking: null, mode: "manual" };
+    return { booking: null, mode: "manual", dropoff: null };
   }
   const resolved = await resolveProvider(staff.restaurantId);
-  return { booking: await currentBooking(staff.restaurantId, orderId), mode: resolved.mode };
+  const order = await loadOrder(staff.restaurantId, orderId).catch(() => null);
+  const dropoff = order
+    ? { address: order.dropoff.address || null, lat: order.dropoff.lat ?? null, lng: order.dropoff.lng ?? null }
+    : null;
+  return { booking: await currentBooking(staff.restaurantId, orderId), mode: resolved.mode, dropoff };
 }
 
 /** Book a rider through the tenant's configured provider. */
