@@ -743,6 +743,9 @@ model ProgramSetting {
   cookieDays           Int      @default(30)
   clawbackDays         Int      @default(60)
   minPayout            Int      @default(50000) // centavos = ₱500
+  // Configurable withholding % applied to payout statements (PH reporting). NOT
+  // tax advice — 0 by default; an accountant should confirm the correct rate.
+  withholdingPct       Int      @default(0)
   updatedAt            DateTime @updatedAt
 
   @@map("program_settings")

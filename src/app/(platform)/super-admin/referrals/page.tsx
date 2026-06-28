@@ -42,6 +42,11 @@ export default async function SuperAdminReferralsPage() {
             payoutModel: settings.payoutModel,
             bountyAmountPesos: settings.bountyAmount / 100,
             minPayoutPesos: settings.minPayout / 100,
+            withholdingPct: settings.withholdingPct,
+            bonusTiers: settings.bonusTiers.map((t) => ({
+              activeReferrals: t.activeReferrals,
+              amountPesos: t.amount / 100,
+            })),
           }}
         />
       </section>

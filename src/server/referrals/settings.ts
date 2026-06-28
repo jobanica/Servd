@@ -16,6 +16,8 @@ export interface ProgramSettings {
   cookieDays: number;
   clawbackDays: number;
   minPayout: number;
+  /** Configurable withholding % for payout statements (PH reporting). */
+  withholdingPct: number;
 }
 
 /** Canonical milestone bonuses (centavos) — fallback if not set in the DB. */
@@ -38,6 +40,7 @@ export const DEFAULT_PROGRAM_SETTINGS: ProgramSettings = {
   cookieDays: 30,
   clawbackDays: 60,
   minPayout: 50000,
+  withholdingPct: 0,
 };
 
 /** Parse + sanitize the stored bonus tiers JSON; fall back to the defaults. */
@@ -71,6 +74,7 @@ export async function getProgramSettings(): Promise<ProgramSettings> {
       cookieDays: row.cookieDays,
       clawbackDays: row.clawbackDays,
       minPayout: row.minPayout,
+      withholdingPct: row.withholdingPct ?? 0,
     };
   } catch {
     return DEFAULT_PROGRAM_SETTINGS;

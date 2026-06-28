@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { requireSuperAdmin } from "@/server/tenancy/current-user";
 import { systemDb } from "@/server/tenancy/scoped-db";
+import { parseBonusTiers } from "@/server/referrals/settings";
 
 export type SettingsState = { ok?: boolean; error?: string } | null;
 
@@ -17,7 +19,24 @@ const schema = z.object({
   payoutModel: z.enum(["recurring", "bounty"]),
   bountyAmount: z.coerce.number().int().min(0), // pesos (form) → centavos
   minPayout: z.coerce.number().int().min(0), // pesos (form) → centavos
+  withholdingPct: z.coerce.number().int().min(0).max(100),
+  bonusTiers: z.string().optional(), // JSON [{activeReferrals, amountPesos}]
 });
+
+/** Parse the bonus-tier editor's JSON (amounts in PESOS) → sanitized centavos. */
+function bonusTiersFromForm(raw: string | undefined) {
+  if (!raw) return undefined;
+  try {
+    const arr = JSON.parse(raw) as Array<{ activeReferrals: unknown; amountPesos: unknown }>;
+    const centavos = arr.map((t) => ({
+      activeReferrals: Number(t.activeReferrals),
+      amount: Math.round(Number(t.amountPesos) * 100),
+    }));
+    return parseBonusTiers(centavos); // sanitizes + sorts
+  } catch {
+    return undefined; // leave tiers unchanged on bad input
+  }
+}
 
 /** Super-admin: update the program settings (singleton). */
 export async function updateProgramSettings(
@@ -35,14 +54,20 @@ export async function updateProgramSettings(
     payoutModel: formData.get("payoutModel") ?? "recurring",
     bountyAmount: formData.get("bountyAmount"),
     minPayout: formData.get("minPayout"),
+    withholdingPct: formData.get("withholdingPct") ?? 0,
+    bonusTiers: formData.get("bonusTiers") ?? undefined,
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
 
+  const { bonusTiers, ...scalars } = parsed.data;
+  const tiers = bonusTiersFromForm(bonusTiers);
+
   // Form sends bounty + min payout in PESOS; store centavos.
   const data = {
-    ...parsed.data,
-    bountyAmount: Math.round(parsed.data.bountyAmount * 100),
-    minPayout: Math.round(parsed.data.minPayout * 100),
+    ...scalars,
+    bountyAmount: Math.round(scalars.bountyAmount * 100),
+    minPayout: Math.round(scalars.minPayout * 100),
+    ...(tiers ? { bonusTiersJson: tiers as unknown as Prisma.InputJsonValue } : {}),
   };
 
   try {

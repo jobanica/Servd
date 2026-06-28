@@ -65,3 +65,21 @@ describe("formatPHP", () => {
     expect(formatPHP(1999.6)).toBe("₱2,000");
   });
 });
+
+import { withholdingAmount, netPayout } from "@/lib/partners/statement";
+
+describe("payout statement — withholding (configurable, not tax advice)", () => {
+  it("computes withholding at a percentage of gross (centavos)", () => {
+    expect(withholdingAmount(100000, 0)).toBe(0);
+    expect(withholdingAmount(100000, 10)).toBe(10000);
+    expect(withholdingAmount(199900, 5)).toBe(9995);
+  });
+  it("net = gross − withholding, never negative", () => {
+    expect(netPayout(100000, 10)).toBe(90000);
+    expect(netPayout(100000, 0)).toBe(100000);
+  });
+  it("clamps the percentage to 0..100", () => {
+    expect(withholdingAmount(100000, -5)).toBe(0);
+    expect(withholdingAmount(100000, 150)).toBe(100000);
+  });
+});

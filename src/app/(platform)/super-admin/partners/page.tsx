@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireSuperAdminPage } from "@/server/tenancy/require-admin";
 import { getPartnersOverview } from "@/server/partners/admin-queries";
 import { setPartnerStatus, createPayoutBatch, setPayoutStatus } from "@/server/partners/admin";
@@ -112,7 +113,13 @@ export default async function SuperAdminPartnersPage() {
                   <span className="font-semibold">{formatPeso(po.amount)}</span>{" "}
                   <span className="text-plum-ink/45">({po.status})</span>
                 </span>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
+                  <Link
+                    href={`/super-admin/partners/statement/${po.id}`}
+                    className="rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold hover:bg-cream"
+                  >
+                    Statement
+                  </Link>
                   {po.status === "requested" && (
                     <form action={setPayoutStatus}>
                       <input type="hidden" name="id" value={po.id} />
