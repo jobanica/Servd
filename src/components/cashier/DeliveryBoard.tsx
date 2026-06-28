@@ -6,6 +6,7 @@ import { getDeliveryOrders, markOutForDelivery, markDelivered, type DeliveryOrde
 import { acceptOrder } from "@/server/orders/cashier";
 import { formatPeso } from "@/lib/money";
 import { MiniMap } from "./MiniMap";
+import { DeliveryRiderPanel } from "@/components/delivery/DeliveryRiderPanel";
 
 function CopyButton({ text, label }: { text: string; label: string }) {
   const [done, setDone] = useState(false);
@@ -37,10 +38,12 @@ export function DeliveryBoard({
   const [orders, setOrders] = useState<DeliveryOrder[]>(initial);
   const [busy, setBusy] = useState<string | null>(null);
   const [live, setLive] = useState(false);
+  const [pulse, setPulse] = useState(0); // bumped on refresh → rider panels re-fetch
 
   const refresh = useCallback(async () => {
     try {
       setOrders(await getDeliveryOrders());
+      setPulse((p) => p + 1);
     } catch {
       /* transient */
     }
@@ -160,6 +163,9 @@ export function DeliveryBoard({
                 ) : (
                   <p className="mt-3 text-center text-xs text-plum-ink/40">Preparing — waiting for the kitchen to finish.</p>
                 )}
+
+                {/* Third-party rider booking */}
+                <DeliveryRiderPanel orderId={o.id} pulse={pulse} />
               </section>
             );
           })}

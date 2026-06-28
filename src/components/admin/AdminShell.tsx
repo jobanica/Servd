@@ -109,6 +109,7 @@ const NAV: { group: string; items: Item[] }[] = [
       { label: "Online website", href: "/admin/storefront", d: I.globe },
       { label: "Branding", href: "/admin/branding", d: I.brush },
       { label: "Online payment", href: "/admin/payments", d: I.card },
+      { label: "Delivery partners", href: "/admin/delivery", d: I.box },
       { label: "Printing", href: "/admin/printing", d: I.print },
       { label: "Custom domain", href: "/admin/domains", d: I.globe },
       { label: "Billing", href: "/admin/billing", d: I.receipt },
