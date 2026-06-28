@@ -206,11 +206,14 @@ export function MerchantBoard({
 
       {/* FULL-SCREEN incoming-order alert (the loud one) */}
       {topIncoming && (
-        <div className="fixed inset-0 z-40 flex flex-col bg-brand-primary/95 p-5 text-white backdrop-blur-sm">
+        <div
+          className="fixed inset-0 z-40 flex flex-col p-5 text-white"
+          style={{ background: "linear-gradient(160deg, #FF7A1A 0%, #FF4D6D 100%)" }}
+        >
           <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col">
             <div className="flex items-center justify-between">
               <p className="animate-pulse font-heading text-2xl font-extrabold">🔔 NEW ORDER</p>
-              <p className="text-sm text-white/80">
+              <p className="text-sm text-white/90">
                 {data.incoming.length > 1 ? `${data.incoming.length} waiting · ` : ""}
                 {minsAgo(topIncoming.createdAt)}
               </p>
@@ -249,19 +252,19 @@ export function MerchantBoard({
                       key={r.key}
                       disabled={busy === topIncoming.id}
                       onClick={() => reject(topIncoming.id, r.key)}
-                      className="rounded-2xl bg-white/15 py-5 text-lg font-bold ring-1 ring-white/30 disabled:opacity-50"
+                      className="rounded-2xl bg-white py-5 text-lg font-bold text-plum-ink shadow disabled:opacity-50"
                     >
                       {r.label}
                     </button>
                   ))}
                 </div>
-                <button onClick={() => setRejecting(null)} className="mt-3 w-full py-2 text-sm font-semibold text-white/70">
+                <button onClick={() => setRejecting(null)} className="mt-3 w-full py-2 text-sm font-semibold text-white">
                   ← Back
                 </button>
               </div>
             ) : (
               <div className="mt-4">
-                <p className="mb-2 text-center text-sm font-semibold text-white/85">
+                <p className="mb-2 text-center text-sm font-semibold text-white">
                   Accept &amp; set how long it&apos;ll take:
                 </p>
                 <div className="grid grid-cols-5 gap-2">
@@ -280,14 +283,14 @@ export function MerchantBoard({
                   <button
                     disabled={busy === topIncoming.id}
                     onClick={() => accept(topIncoming.id, null)}
-                    className="rounded-2xl bg-white/15 py-5 text-lg font-bold ring-1 ring-white/40 disabled:opacity-50"
+                    className="rounded-2xl bg-green-600 py-5 text-lg font-bold text-white shadow disabled:opacity-50"
                   >
                     ✓ Accept (no ETA)
                   </button>
                   <button
                     disabled={busy === topIncoming.id}
                     onClick={() => setRejecting(topIncoming.id)}
-                    className="rounded-2xl bg-guava py-5 text-lg font-bold disabled:opacity-50"
+                    className="rounded-2xl bg-guava py-5 text-lg font-bold text-white shadow disabled:opacity-50"
                   >
                     ✕ Reject
                   </button>
