@@ -11,15 +11,15 @@ const schema = z.object({
   track1CreditMonths: z.coerce.number().int().min(0).max(12),
   cookieDays: z.coerce.number().int().min(1).max(180),
   clawbackDays: z.coerce.number().int().min(0).max(365),
-  track2CommissionPct: z.coerce.number().int().min(0).max(100),
-  track2ResellerPct: z.coerce.number().int().min(0).max(100),
-  track2DurationMonths: z.coerce.number().int().min(0).max(60),
+  commissionPctYear1: z.coerce.number().int().min(0).max(100),
+  commissionPctOngoing: z.coerce.number().int().min(0).max(100),
+  track2DurationMonths: z.coerce.number().int().min(0).max(60), // year-1 boundary
   payoutModel: z.enum(["recurring", "bounty"]),
-  bountyAmount: z.coerce.number().int().min(0), // centavos
-  minPayout: z.coerce.number().int().min(0), // centavos
+  bountyAmount: z.coerce.number().int().min(0), // pesos (form) → centavos
+  minPayout: z.coerce.number().int().min(0), // pesos (form) → centavos
 });
 
-/** Super-admin: update Track-1 program settings (singleton). */
+/** Super-admin: update the program settings (singleton). */
 export async function updateProgramSettings(
   _prev: SettingsState,
   formData: FormData,
@@ -29,8 +29,8 @@ export async function updateProgramSettings(
     track1CreditMonths: formData.get("track1CreditMonths"),
     cookieDays: formData.get("cookieDays"),
     clawbackDays: formData.get("clawbackDays"),
-    track2CommissionPct: formData.get("track2CommissionPct"),
-    track2ResellerPct: formData.get("track2ResellerPct"),
+    commissionPctYear1: formData.get("commissionPctYear1"),
+    commissionPctOngoing: formData.get("commissionPctOngoing"),
     track2DurationMonths: formData.get("track2DurationMonths"),
     payoutModel: formData.get("payoutModel") ?? "recurring",
     bountyAmount: formData.get("bountyAmount"),

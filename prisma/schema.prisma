@@ -730,9 +730,14 @@ model AccountCredit {
 model ProgramSetting {
   id                   String   @id @default("program")
   track1CreditMonths   Int      @default(1)
-  track2CommissionPct  Int      @default(25)
-  track2ResellerPct    Int      @default(35)
-  track2DurationMonths Int      @default(12)
+  // FINAL Track-2 terms: flat year-1 % then ongoing % for life (single rate for
+  // all partners). track2CommissionPct/ResellerPct are deprecated/unused.
+  commissionPctYear1   Int      @default(30)
+  commissionPctOngoing Int      @default(10)
+  bonusTiersJson       Json? // [{ activeReferrals, amount(centavos) }] — milestone bonuses
+  track2CommissionPct  Int      @default(25) // deprecated (superseded by commissionPctYear1)
+  track2ResellerPct    Int      @default(35) // deprecated
+  track2DurationMonths Int      @default(12) // year-1 boundary in months
   bountyAmount         Int      @default(0) // centavos (bounty payout model)
   payoutModel          String   @default("recurring") // recurring | bounty
   cookieDays           Int      @default(30)
@@ -741,6 +746,22 @@ model ProgramSetting {
   updatedAt            DateTime @updatedAt
 
   @@map("program_settings")
+}
+
+/// One-time milestone bonus earned by a partner at an active-referral tier.
+/// Earned once per tier (unique), paid through the normal payout batch flow.
+model PartnerBonus {
+  id        String   @id @default(uuid())
+  partnerId String
+  tierCount Int // the milestone (e.g. 10/25/50/100/250)
+  amount    Int // centavos
+  status    String   @default("earned") // earned | paid
+  payoutId  String?
+  earnedAt  DateTime @default(now())
+
+  @@unique([partnerId, tierCount])
+  @@index([partnerId, status])
+  @@map("partner_bonuses")
 }
 
 /// Append-only audit / fraud trail for the referral program.

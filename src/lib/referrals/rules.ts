@@ -102,13 +102,12 @@ export type PayoutModel = "recurring" | "bounty";
 
 export interface CommissionInput {
   payoutModel: PayoutModel;
-  tier: PartnerTier;
   /** Count of PAID months so far for the referred restaurant (incl. this one). */
   paidMonthCount: number;
   invoiceAmount: number; // centavos, the paid invoice
-  affiliatePct: number; // e.g. 25
-  resellerPct: number; // e.g. 35
-  durationMonths: number; // recurring window
+  year1Pct: number; // e.g. 30 — months 1..year1Months
+  ongoingPct: number; // e.g. 10 — every month after, for life
+  year1Months: number; // e.g. 12 — the first-year boundary
   bountyAmount: number; // centavos (bounty model)
   /** Whether a bounty was already granted for this referral (idempotency). */
   bountyAlreadyGranted: boolean;
@@ -116,7 +115,13 @@ export interface CommissionInput {
 
 /**
  * The commission (centavos) a partner earns from a paid invoice, or null if
- * none applies. Recurring: a % of each paid month within the duration window.
+ * none applies.
+ *
+ * Recurring (FINAL terms): `year1Pct` of each paid month for the first
+ * `year1Months` months, then `ongoingPct` every month after — for the LIFETIME
+ * of the subscription (no upper bound). Flat rate for all partners (the old
+ * affiliate/reseller split is superseded).
+ *
  * Bounty: a one-time amount once the referral reaches its 2nd paid month.
  */
 export function commissionForInvoice(i: CommissionInput): number | null {
@@ -125,11 +130,36 @@ export function commissionForInvoice(i: CommissionInput): number | null {
     if (i.paidMonthCount < 2) return null;
     return i.bountyAmount > 0 ? i.bountyAmount : null;
   }
-  // recurring
-  if (i.paidMonthCount < 1 || i.paidMonthCount > i.durationMonths) return null;
-  const pct = i.tier === "reseller" ? i.resellerPct : i.affiliatePct;
+  // recurring — two-tier, lifetime
+  if (i.paidMonthCount < 1) return null;
+  const pct = i.paidMonthCount <= i.year1Months ? i.year1Pct : i.ongoingPct;
   const amount = Math.round((Math.max(0, i.invoiceAmount) * Math.max(0, pct)) / 100);
   return amount > 0 ? amount : null;
+}
+
+// ----------------------------------------------------- Milestone bonuses (T2)
+
+export interface BonusTierDef {
+  /** Active paying referrals needed to unlock this one-time bonus. */
+  activeReferrals: number;
+  /** Bonus amount in CENTAVOS. */
+  amount: number;
+}
+
+/**
+ * Which milestone tiers are NEWLY earned, given the partner's current count of
+ * ACTIVE paying referrals and the tiers already earned (by their activeReferrals
+ * key). Bonuses stack (every crossed-and-unearned tier) and are earned ONCE —
+ * passing the already-earned keys makes this idempotent and means a later drop
+ * in active count never re-awards or claws back a bonus.
+ */
+export function newlyEarnedBonusTiers(
+  activeCount: number,
+  alreadyEarnedKeys: number[],
+  tiers: BonusTierDef[],
+): BonusTierDef[] {
+  const earned = new Set(alreadyEarnedKeys);
+  return tiers.filter((t) => activeCount >= t.activeReferrals && !earned.has(t.activeReferrals));
 }
 
 /** The "YYYY-MM" period bucket for a date (used for commissions/payouts). */

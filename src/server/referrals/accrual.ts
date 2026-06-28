@@ -5,10 +5,11 @@ import {
   isWithinClawbackWindow,
   creditCoversCycle,
   commissionForInvoice,
+  newlyEarnedBonusTiers,
   periodKey,
-  type PartnerTier,
   type PayoutModel,
 } from "@/lib/referrals/rules";
+import { parseBonusTiers, DEFAULT_BONUS_TIERS } from "@/server/referrals/settings";
 
 /** Read the program settings within the caller's transaction (no nested tx). */
 async function readSettings(tx: Prisma.TransactionClient) {
@@ -16,9 +17,10 @@ async function readSettings(tx: Prisma.TransactionClient) {
   return {
     track1CreditMonths: row?.track1CreditMonths ?? 1,
     clawbackDays: row?.clawbackDays ?? 60,
-    track2CommissionPct: row?.track2CommissionPct ?? 25,
-    track2ResellerPct: row?.track2ResellerPct ?? 35,
-    track2DurationMonths: row?.track2DurationMonths ?? 12,
+    commissionPctYear1: row?.commissionPctYear1 ?? 30,
+    commissionPctOngoing: row?.commissionPctOngoing ?? 10,
+    year1Months: row?.track2DurationMonths ?? 12,
+    bonusTiers: row ? parseBonusTiers(row.bonusTiersJson) : DEFAULT_BONUS_TIERS,
     bountyAmount: row?.bountyAmount ?? 0,
     payoutModel: (row?.payoutModel as PayoutModel) ?? "recurring",
   };
@@ -91,12 +93,11 @@ export async function onInvoicePaid(
       const bountyAlreadyGranted = (await tx.commission.count({ where: { referralId: referral.id } })) > 0;
       const amount = commissionForInvoice({
         payoutModel: settings.payoutModel,
-        tier: (partner.tier as PartnerTier) ?? "affiliate",
         paidMonthCount,
         invoiceAmount: invoice.amount,
-        affiliatePct: settings.track2CommissionPct,
-        resellerPct: settings.track2ResellerPct,
-        durationMonths: settings.track2DurationMonths,
+        year1Pct: settings.commissionPctYear1,
+        ongoingPct: settings.commissionPctOngoing,
+        year1Months: settings.year1Months,
         bountyAmount: settings.bountyAmount,
         bountyAlreadyGranted,
       });
@@ -119,7 +120,50 @@ export async function onInvoicePaid(
           // unique(referralId, invoiceId) — webhook retry; already accrued.
         }
       }
+
+      // Milestone bonuses: one-time, stacked, on ACTIVE paying referrals. Earned
+      // once per tier (unique partnerId+tierCount); a later drop never claws back.
+      try {
+        await accruePartnerBonuses(tx, referral.partnerId, settings.bonusTiers);
+      } catch {
+        // partner_bonuses not migrated yet — skip; commissions still accrue.
+      }
     }
+  }
+}
+
+/** Award any milestone bonuses a partner has newly crossed. Idempotent. */
+async function accruePartnerBonuses(
+  tx: Prisma.TransactionClient,
+  partnerId: string,
+  tiers: { activeReferrals: number; amount: number }[],
+): Promise<void> {
+  const activeCount = await tx.referral.count({ where: { partnerId, status: "paying" } });
+  const earned = await tx.partnerBonus.findMany({ where: { partnerId }, select: { tierCount: true } });
+  const newly = newlyEarnedBonusTiers(
+    activeCount,
+    earned.map((b) => b.tierCount),
+    tiers,
+  );
+  if (newly.length === 0) return;
+
+  await tx.partnerBonus.createMany({
+    data: newly.map((t) => ({
+      partnerId,
+      tierCount: t.activeReferrals,
+      amount: t.amount,
+      status: "earned",
+    })),
+    skipDuplicates: true,
+  });
+  for (const t of newly) {
+    await tx.referralEvent.create({
+      data: {
+        referralId: null,
+        type: "bonus_earned",
+        detailJson: { partnerId, tierCount: t.activeReferrals, amount: t.amount, activeCount },
+      },
+    });
   }
 }
 

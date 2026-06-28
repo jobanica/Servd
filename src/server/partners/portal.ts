@@ -63,8 +63,17 @@ export async function getPartnerDashboard(
       where: { partnerId },
       select: { amount: true, status: true },
     });
-    const accrued = commissions.filter((c) => c.status === "payable").reduce((s, c) => s + c.amount, 0);
-    const paid = commissions.filter((c) => c.status === "paid").reduce((s, c) => s + c.amount, 0);
+    // Milestone bonuses fold into the same accrued/paid totals.
+    const bonuses = await tx.partnerBonus.findMany({
+      where: { partnerId },
+      select: { amount: true, status: true },
+    });
+    const accrued =
+      commissions.filter((c) => c.status === "payable").reduce((s, c) => s + c.amount, 0) +
+      bonuses.filter((b) => b.status === "earned").reduce((s, b) => s + b.amount, 0);
+    const paid =
+      commissions.filter((c) => c.status === "paid").reduce((s, c) => s + c.amount, 0) +
+      bonuses.filter((b) => b.status === "paid").reduce((s, b) => s + b.amount, 0);
 
     const payouts = await tx.payout.findMany({
       where: { partnerId },

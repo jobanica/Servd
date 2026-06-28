@@ -1,11 +1,16 @@
 import "server-only";
 import { systemDb } from "@/server/tenancy/scoped-db";
+import type { BonusTierDef } from "@/lib/referrals/rules";
 
 export interface ProgramSettings {
   track1CreditMonths: number;
-  track2CommissionPct: number;
-  track2ResellerPct: number;
-  track2DurationMonths: number;
+  /** FINAL Track-2 terms: flat year-1 % then ongoing % for life. */
+  commissionPctYear1: number;
+  commissionPctOngoing: number;
+  /** Year-1 boundary in months (reuses track2DurationMonths). */
+  year1Months: number;
+  /** Milestone bonuses (centavos), stacked as active referrals cross each tier. */
+  bonusTiers: BonusTierDef[];
   bountyAmount: number;
   payoutModel: "recurring" | "bounty";
   cookieDays: number;
@@ -13,17 +18,40 @@ export interface ProgramSettings {
   minPayout: number;
 }
 
+/** Canonical milestone bonuses (centavos) — fallback if not set in the DB. */
+export const DEFAULT_BONUS_TIERS: BonusTierDef[] = [
+  { activeReferrals: 10, amount: 200_000 },
+  { activeReferrals: 25, amount: 500_000 },
+  { activeReferrals: 50, amount: 1_500_000 },
+  { activeReferrals: 100, amount: 4_000_000 },
+  { activeReferrals: 250, amount: 10_000_000 },
+];
+
 export const DEFAULT_PROGRAM_SETTINGS: ProgramSettings = {
   track1CreditMonths: 1,
-  track2CommissionPct: 25,
-  track2ResellerPct: 35,
-  track2DurationMonths: 12,
+  commissionPctYear1: 30,
+  commissionPctOngoing: 10,
+  year1Months: 12,
+  bonusTiers: DEFAULT_BONUS_TIERS,
   bountyAmount: 0,
   payoutModel: "recurring",
   cookieDays: 30,
   clawbackDays: 60,
   minPayout: 50000,
 };
+
+/** Parse + sanitize the stored bonus tiers JSON; fall back to the defaults. */
+export function parseBonusTiers(raw: unknown): BonusTierDef[] {
+  if (!Array.isArray(raw)) return DEFAULT_BONUS_TIERS;
+  const tiers = raw
+    .map((t) => {
+      const o = t as { activeReferrals?: unknown; amount?: unknown };
+      return { activeReferrals: Number(o?.activeReferrals), amount: Number(o?.amount) };
+    })
+    .filter((t) => Number.isFinite(t.activeReferrals) && t.activeReferrals > 0 && Number.isFinite(t.amount) && t.amount >= 0)
+    .sort((a, b) => a.activeReferrals - b.activeReferrals);
+  return tiers.length ? tiers : DEFAULT_BONUS_TIERS;
+}
 
 /** Read program settings (singleton). Falls back to defaults if not migrated. */
 export async function getProgramSettings(): Promise<ProgramSettings> {
@@ -34,9 +62,10 @@ export async function getProgramSettings(): Promise<ProgramSettings> {
     if (!row) return DEFAULT_PROGRAM_SETTINGS;
     return {
       track1CreditMonths: row.track1CreditMonths,
-      track2CommissionPct: row.track2CommissionPct,
-      track2ResellerPct: row.track2ResellerPct,
-      track2DurationMonths: row.track2DurationMonths,
+      commissionPctYear1: row.commissionPctYear1 ?? DEFAULT_PROGRAM_SETTINGS.commissionPctYear1,
+      commissionPctOngoing: row.commissionPctOngoing ?? DEFAULT_PROGRAM_SETTINGS.commissionPctOngoing,
+      year1Months: row.track2DurationMonths,
+      bonusTiers: parseBonusTiers(row.bonusTiersJson),
       bountyAmount: row.bountyAmount,
       payoutModel: (row.payoutModel as ProgramSettings["payoutModel"]) ?? "recurring",
       cookieDays: row.cookieDays,

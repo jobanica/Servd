@@ -47,8 +47,14 @@ export async function createPayoutBatch(formData: FormData): Promise<void> {
       where: { partnerId, status: "payable", payoutId: null },
       select: { id: true, amount: true },
     });
-    const total = commissions.reduce((s, c) => s + c.amount, 0);
-    if (commissions.length === 0 || total < minPayout) return; // rolls over
+    // Earned-but-unpaid milestone bonuses join the same batch.
+    const bonuses = await tx.partnerBonus.findMany({
+      where: { partnerId, status: "earned", payoutId: null },
+      select: { id: true, amount: true },
+    });
+    const total =
+      commissions.reduce((s, c) => s + c.amount, 0) + bonuses.reduce((s, b) => s + b.amount, 0);
+    if (commissions.length + bonuses.length === 0 || total < minPayout) return; // rolls over
 
     const payout = await tx.payout.create({
       data: {
@@ -60,10 +66,18 @@ export async function createPayoutBatch(formData: FormData): Promise<void> {
       },
       select: { id: true },
     });
-    await tx.commission.updateMany({
-      where: { id: { in: commissions.map((c) => c.id) } },
-      data: { payoutId: payout.id },
-    });
+    if (commissions.length) {
+      await tx.commission.updateMany({
+        where: { id: { in: commissions.map((c) => c.id) } },
+        data: { payoutId: payout.id },
+      });
+    }
+    if (bonuses.length) {
+      await tx.partnerBonus.updateMany({
+        where: { id: { in: bonuses.map((b) => b.id) } },
+        data: { payoutId: payout.id },
+      });
+    }
   });
   revalidate();
 }
@@ -79,6 +93,7 @@ export async function setPayoutStatus(formData: FormData): Promise<void> {
   await systemDb(async (tx) => {
     if (status === "paid") {
       await tx.commission.updateMany({ where: { payoutId: id }, data: { status: "paid" } });
+      await tx.partnerBonus.updateMany({ where: { payoutId: id }, data: { status: "paid" } });
       await tx.payout.update({ where: { id }, data: { status: "paid", paidAt: new Date() } });
     } else {
       await tx.payout.update({ where: { id }, data: { status: "approved" } });

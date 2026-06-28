@@ -7,8 +7,8 @@ export interface ProgramSettingsInitial {
   track1CreditMonths: number;
   cookieDays: number;
   clawbackDays: number;
-  track2CommissionPct: number;
-  track2ResellerPct: number;
+  commissionPctYear1: number;
+  commissionPctOngoing: number;
   track2DurationMonths: number;
   payoutModel: string;
   bountyAmountPesos: number;
@@ -44,15 +44,15 @@ export function ProgramSettingsForm({ initial }: { initial: ProgramSettingsIniti
         <p className="mb-2 text-sm font-bold">Track 2 — partners</p>
         <div className="grid gap-4 sm:grid-cols-3">
           <div>
-            <label className={label}>Affiliate %</label>
-            <input name="track2CommissionPct" type="number" min={0} max={100} defaultValue={initial.track2CommissionPct} className={field} />
+            <label className={label}>Year-1 commission %</label>
+            <input name="commissionPctYear1" type="number" min={0} max={100} defaultValue={initial.commissionPctYear1} className={field} />
           </div>
           <div>
-            <label className={label}>Reseller %</label>
-            <input name="track2ResellerPct" type="number" min={0} max={100} defaultValue={initial.track2ResellerPct} className={field} />
+            <label className={label}>Ongoing % (for life)</label>
+            <input name="commissionPctOngoing" type="number" min={0} max={100} defaultValue={initial.commissionPctOngoing} className={field} />
           </div>
           <div>
-            <label className={label}>Duration (months)</label>
+            <label className={label}>Year-1 length (months)</label>
             <input name="track2DurationMonths" type="number" min={0} max={60} defaultValue={initial.track2DurationMonths} className={field} />
           </div>
           <div>

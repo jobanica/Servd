@@ -4,19 +4,24 @@ import { PARTNER_PROGRAM, type PartnerProgram } from "@/lib/partners/program";
 import { getProgramSettings } from "@/server/referrals/settings";
 
 /**
- * The effective partner program for display + payout. The canonical terms live
- * in PARTNER_PROGRAM (shared with the commission engine); here we overlay any
- * value the affiliate backend genuinely exposes so the page can't drift from
- * the engine. Today only the first-year window maps cleanly
- * (program_settings.track2DurationMonths); the rates + bonus tiers are canonical
- * until the backend adds matching fields.
+ * The effective partner program for the public landing page. The payout engine
+ * and this page now read the SAME program_settings, so they can't drift: rates,
+ * the year-1 boundary, and the bonus tiers all come from the DB (with
+ * PARTNER_PROGRAM as the fallback default). Bonus amounts are stored in centavos
+ * in settings and shown in pesos here.
  */
 export async function getPartnerProgram(): Promise<PartnerProgram> {
   try {
     const s = await getProgramSettings();
     return {
       ...PARTNER_PROGRAM,
-      firstYearMonths: s.track2DurationMonths || PARTNER_PROGRAM.firstYearMonths,
+      firstYearPct: s.commissionPctYear1,
+      lifetimePct: s.commissionPctOngoing,
+      firstYearMonths: s.year1Months,
+      bonusTiers: s.bonusTiers.map((t) => ({
+        activeReferrals: t.activeReferrals,
+        bonusPesos: Math.round(t.amount / 100),
+      })),
     };
   } catch {
     return PARTNER_PROGRAM;

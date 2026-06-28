@@ -8,6 +8,7 @@ import {
   shouldAccrueFirstReward,
   creditCoversCycle,
   commissionForInvoice,
+  newlyEarnedBonusTiers,
   periodKey,
   type CommissionInput,
 } from "@/lib/referrals/rules";
@@ -107,30 +108,31 @@ describe("referral rules — clawback window", () => {
   });
 });
 
-describe("referral rules — Track 2 commissions", () => {
+describe("referral rules — Track 2 commissions (30% yr1 → 10% lifetime)", () => {
   const base: CommissionInput = {
     payoutModel: "recurring",
-    tier: "affiliate",
     paidMonthCount: 1,
     invoiceAmount: 199900,
-    affiliatePct: 25,
-    resellerPct: 35,
-    durationMonths: 12,
+    year1Pct: 30,
+    ongoingPct: 10,
+    year1Months: 12,
     bountyAmount: 50000,
     bountyAlreadyGranted: false,
   };
 
-  it("recurring: affiliate earns 25% each month within the window", () => {
-    expect(commissionForInvoice(base)).toBe(49975); // 25% of 199900
-    expect(commissionForInvoice({ ...base, paidMonthCount: 12 })).toBe(49975);
+  it("recurring: 30% for each of the first 12 months", () => {
+    expect(commissionForInvoice(base)).toBe(59970); // 30% of 199900
+    expect(commissionForInvoice({ ...base, paidMonthCount: 12 })).toBe(59970);
   });
 
-  it("recurring: reseller earns 35%", () => {
-    expect(commissionForInvoice({ ...base, tier: "reseller" })).toBe(69965);
+  it("recurring: 10% from month 13 onward — for life (no upper bound)", () => {
+    expect(commissionForInvoice({ ...base, paidMonthCount: 13 })).toBe(19990); // 10%
+    expect(commissionForInvoice({ ...base, paidMonthCount: 60 })).toBe(19990);
+    expect(commissionForInvoice({ ...base, paidMonthCount: 999 })).toBe(19990);
   });
 
-  it("recurring: nothing after the duration window", () => {
-    expect(commissionForInvoice({ ...base, paidMonthCount: 13 })).toBeNull();
+  it("recurring: nothing before the first paid month", () => {
+    expect(commissionForInvoice({ ...base, paidMonthCount: 0 })).toBeNull();
   });
 
   it("bounty: paid once after the 2nd paid month, never again", () => {
@@ -143,5 +145,35 @@ describe("referral rules — Track 2 commissions", () => {
   it("buckets dates into YYYY-MM periods", () => {
     expect(periodKey(new Date("2026-06-19T10:00:00Z"))).toBe("2026-06");
     expect(periodKey(new Date("2026-12-01T00:00:00Z"))).toBe("2026-12");
+  });
+});
+
+describe("referral rules — milestone bonuses (stacked, earned-once)", () => {
+  const tiers = [
+    { activeReferrals: 10, amount: 200_000 },
+    { activeReferrals: 25, amount: 500_000 },
+    { activeReferrals: 50, amount: 1_500_000 },
+    { activeReferrals: 100, amount: 4_000_000 },
+    { activeReferrals: 250, amount: 10_000_000 },
+  ];
+
+  it("unlocks nothing below the first tier", () => {
+    expect(newlyEarnedBonusTiers(9, [], tiers)).toEqual([]);
+  });
+
+  it("stacks every newly-crossed tier", () => {
+    const newly = newlyEarnedBonusTiers(50, [], tiers);
+    expect(newly.map((t) => t.activeReferrals)).toEqual([10, 25, 50]);
+  });
+
+  it("never re-awards a tier already earned (idempotent)", () => {
+    expect(newlyEarnedBonusTiers(25, [10, 25], tiers)).toEqual([]);
+    // crossing the next tier only awards the new one
+    expect(newlyEarnedBonusTiers(50, [10, 25], tiers).map((t) => t.activeReferrals)).toEqual([50]);
+  });
+
+  it("a later drop in active count never claws back (earned keys retained)", () => {
+    // count fell to 12 but 25 was already earned; nothing new, nothing reversed
+    expect(newlyEarnedBonusTiers(12, [10, 25], tiers)).toEqual([]);
   });
 });

@@ -41,8 +41,27 @@ export async function getPartnersOverview(): Promise<{ partners: PartnerOverview
         where: { status: "paid" },
         _sum: { amount: true },
       });
-      const payableBy = new Map(payableRows.map((r) => [r.partnerId, r._sum.amount ?? 0]));
-      const paidBy = new Map(paidRows.map((r) => [r.partnerId, r._sum.amount ?? 0]));
+      // Milestone bonuses count toward payable (earned, not yet in a payout) / paid.
+      const bonusPayableRows = await tx.partnerBonus.groupBy({
+        by: ["partnerId"],
+        where: { status: "earned", payoutId: null },
+        _sum: { amount: true },
+      });
+      const bonusPaidRows = await tx.partnerBonus.groupBy({
+        by: ["partnerId"],
+        where: { status: "paid" },
+        _sum: { amount: true },
+      });
+      const sumByPartner = (
+        ...groups: { partnerId: string; _sum: { amount: number | null } }[][]
+      ) => {
+        const m = new Map<string, number>();
+        for (const r of groups.flat())
+          m.set(r.partnerId, (m.get(r.partnerId) ?? 0) + (r._sum.amount ?? 0));
+        return m;
+      };
+      const payableBy = sumByPartner(payableRows, bonusPayableRows);
+      const paidBy = sumByPartner(paidRows, bonusPaidRows);
 
       const payoutRows = await tx.payout.findMany({
         orderBy: { createdAt: "desc" },
