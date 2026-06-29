@@ -167,6 +167,7 @@ async function currentBooking(restaurantId: string, orderId: string): Promise<Bo
 
 export interface Dropoff {
   address: string | null;
+  phone: string | null;
   lat: number | null;
   lng: number | null;
 }
@@ -184,7 +185,12 @@ export async function getBooking(
   const resolved = await resolveProvider(staff.restaurantId);
   const order = await loadOrder(staff.restaurantId, orderId).catch(() => null);
   const dropoff = order
-    ? { address: order.dropoff.address || null, lat: order.dropoff.lat ?? null, lng: order.dropoff.lng ?? null }
+    ? {
+        address: order.dropoff.address || null,
+        phone: order.dropoff.phone ?? null,
+        lat: order.dropoff.lat ?? null,
+        lng: order.dropoff.lng ?? null,
+      }
     : null;
   return { booking: await currentBooking(staff.restaurantId, orderId), mode: resolved.mode, dropoff };
 }
