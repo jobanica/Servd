@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { scriptToMarkdown, type GeneratedScript, type ScriptType } from "@/lib/content/script";
+import { scriptToMarkdown, scriptToTeleprompter, type GeneratedScript, type ScriptType } from "@/lib/content/script";
 
 export interface ScriptCardData {
   id?: string;
@@ -26,25 +26,26 @@ export function ScriptCard({
   onRegenerate?: () => void;
   regenerating?: boolean;
 }) {
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"md" | "tp" | null>(null);
   const isJab = data.type === "JAB";
 
-  async function copyMarkdown() {
+  async function copy(key: "md" | "tp", text: string) {
     try {
-      await navigator.clipboard.writeText(
-        scriptToMarkdown(data.script, {
-          type: data.type,
-          platform: data.platform,
-          lengthSec: data.lengthSec,
-          pillar: data.pillar ?? undefined,
-        }),
-      );
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      await navigator.clipboard.writeText(text);
+      setCopied(key);
+      setTimeout(() => setCopied(null), 1500);
     } catch {
       /* clipboard blocked — ignore */
     }
   }
+
+  const markdown = () =>
+    scriptToMarkdown(data.script, {
+      type: data.type,
+      platform: data.platform,
+      lengthSec: data.lengthSec,
+      pillar: data.pillar ?? undefined,
+    });
 
   return (
     <div className="rounded-tile border border-plum-ink/10 bg-white p-5">
@@ -158,10 +159,17 @@ export function ScriptCard({
       {/* Actions */}
       <div className="mt-4 flex flex-wrap gap-2">
         <button
-          onClick={copyMarkdown}
+          onClick={() => copy("tp", scriptToTeleprompter(data.script))}
+          className="rounded-lg bg-plum-ink px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+          title="Copy just the spoken lines for your teleprompter"
+        >
+          {copied === "tp" ? "Copied ✓" : "📋 Copy script (teleprompter)"}
+        </button>
+        <button
+          onClick={() => copy("md", markdown())}
           className="rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold hover:bg-cream"
         >
-          {copied ? "Copied ✓" : "Copy as Markdown"}
+          {copied === "md" ? "Copied ✓" : "Copy as Markdown"}
         </button>
         {onRegenerate && (
           <button

@@ -89,6 +89,21 @@ export function jabHasNoCta(script: GeneratedScript): boolean {
   return script.cta == null;
 }
 
+/**
+ * Render ONLY the spoken words, for a teleprompter: the hook line, every body
+ * line, then the CTA line — separated by blank lines, no times/actions/overlays
+ * or production notes. This is what the presenter reads aloud.
+ */
+export function scriptToTeleprompter(script: GeneratedScript): string {
+  const blocks: string[] = [];
+  if (script.hook.audio.trim()) blocks.push(script.hook.audio.trim());
+  for (const b of script.body) {
+    if (b.line.trim()) blocks.push(b.line.trim());
+  }
+  if (script.cta?.verbal.trim()) blocks.push(script.cta.verbal.trim());
+  return blocks.join("\n\n");
+}
+
 /** Render a script as copy-pasteable Markdown (for the "Copy as Markdown" action). */
 export function scriptToMarkdown(
   script: GeneratedScript,
