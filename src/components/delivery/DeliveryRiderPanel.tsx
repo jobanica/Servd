@@ -37,70 +37,50 @@ function bookLabel(mode: DeliveryMode): string {
  * manual fallback on failure. `pulse` re-fetches when the parent board refreshes.
  */
 function CopyCoords({ dropoff }: { dropoff: Dropoff }) {
-  const [copied, setCopied] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const coords = dropoff.lat != null && dropoff.lng != null ? `${dropoff.lat},${dropoff.lng}` : null;
 
-  async function copy(text: string) {
+  async function copy(key: string, text: string) {
     try {
       await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 1500);
     } catch {
       /* ignore */
     }
   }
+  const lbl = (key: string, base: string) => (copiedKey === key ? "Copied ✓" : base);
 
-  if (!coords && !dropoff.address) return null;
+  if (!coords && !dropoff.address && !dropoff.phone) return null;
+  const btn = "rounded-lg border border-plum-ink/15 bg-white px-3 py-1.5 font-semibold";
   return (
     <div className="mt-2 rounded-xl bg-cream px-3 py-2 text-xs">
       <p className="font-semibold text-plum-ink/60">Customer location (copy into your delivery app)</p>
       {dropoff.address && <p className="mt-1 text-plum-ink/80">📍 {dropoff.address}</p>}
-      {coords ? (
-        <>
-          <p className="mt-1 font-mono text-sm font-semibold text-plum-ink">{coords}</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <button
-              onClick={() => copy(coords)}
-              className="rounded-lg border border-plum-ink/15 bg-white px-3 py-1.5 font-semibold"
-            >
-              {copied ? "Copied ✓" : "Copy coordinates"}
-            </button>
-            {dropoff.address && (
-              <button
-                onClick={() => copy(dropoff.address!)}
-                className="rounded-lg border border-plum-ink/15 bg-white px-3 py-1.5 font-semibold"
-              >
-                Copy address
-              </button>
-            )}
-            <a
-              href={`https://maps.google.com/?q=${coords}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-lg border border-plum-ink/15 bg-white px-3 py-1.5 font-semibold"
-            >
-              Google Maps
-            </a>
-            <a
-              href={`https://waze.com/ul?ll=${coords}&navigate=yes`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-lg border border-plum-ink/15 bg-white px-3 py-1.5 font-semibold"
-            >
-              Waze
-            </a>
-          </div>
-        </>
-      ) : (
-        dropoff.address && (
-          <button
-            onClick={() => copy(dropoff.address!)}
-            className="mt-2 rounded-lg border border-plum-ink/15 bg-white px-3 py-1.5 font-semibold"
-          >
-            {copied ? "Copied ✓" : "Copy address"}
+      {dropoff.phone && <p className="mt-0.5 text-plum-ink/80">📞 {dropoff.phone}</p>}
+      {coords && <p className="mt-1 font-mono text-sm font-semibold text-plum-ink">{coords}</p>}
+      <div className="mt-2 flex flex-wrap gap-2">
+        {coords && (
+          <button onClick={() => copy("coords", coords)} className={btn}>
+            {lbl("coords", "Copy coordinates")}
           </button>
-        )
-      )}
+        )}
+        {dropoff.address && (
+          <button onClick={() => copy("address", dropoff.address!)} className={btn}>
+            {lbl("address", "Copy address")}
+          </button>
+        )}
+        {dropoff.phone && (
+          <button onClick={() => copy("phone", dropoff.phone!)} className={btn}>
+            {lbl("phone", "Copy phone number")}
+          </button>
+        )}
+        {coords && (
+          <a href={`https://maps.google.com/?q=${coords}`} target="_blank" rel="noopener noreferrer" className={btn}>
+            Google Maps
+          </a>
+        )}
+      </div>
     </div>
   );
 }
