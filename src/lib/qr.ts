@@ -51,3 +51,15 @@ export function qrSvg(data: string): Promise<string> {
     width: 220,
   });
 }
+
+/**
+ * Renders a QR code as a PNG data URL — handy for showing in an <img> and for a
+ * one-click download/share (e.g. sending a demo storefront's QR to a customer).
+ */
+export function qrPngDataUrl(data: string): Promise<string> {
+  return QRCode.toDataURL(data, {
+    errorCorrectionLevel: "M",
+    margin: 2,
+    width: 512,
+  });
+}

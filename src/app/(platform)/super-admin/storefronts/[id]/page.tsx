@@ -16,6 +16,7 @@ import { CopyLink } from "@/components/super-admin/CopyLink";
 import { ScanMenuForm } from "@/components/super-admin/ScanMenuForm";
 import { ConvertDemoForm } from "@/components/super-admin/ConvertDemoForm";
 import { formatPeso } from "@/lib/money";
+import { qrPngDataUrl } from "@/lib/qr";
 
 export default async function StorefrontDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -25,6 +26,7 @@ export default async function StorefrontDetailPage({ params }: { params: Promise
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://servdph.com";
   const url = `${appUrl}/r/${s.slug}`;
   const field = "w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm";
+  const qr = await qrPngDataUrl(url); // QR to the live ordering page — send to the customer
 
   return (
     <div className="space-y-6">
@@ -35,26 +37,48 @@ export default async function StorefrontDetailPage({ params }: { params: Promise
         <h1 className="font-heading text-2xl font-bold">{s.name}</h1>
       </div>
 
-      {/* Public link */}
+      {/* Public link + QR */}
       <div className="rounded-tile border border-brand-primary/20 bg-brand-primary/5 p-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-plum-ink/45">Live ordering page</p>
-        <p className="mt-1 break-all font-mono text-sm text-brand-primary">{url}</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-lg bg-brand-gradient px-3 py-1.5 text-xs font-semibold text-white"
-          >
-            Open storefront ↗
-          </a>
-          <CopyLink url={url} />
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-plum-ink/45">Live ordering page</p>
+            <p className="mt-1 break-all font-mono text-sm text-brand-primary">{url}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-lg bg-brand-gradient px-3 py-1.5 text-xs font-semibold text-white"
+              >
+                Open storefront ↗
+              </a>
+              <CopyLink url={url} />
+            </div>
+            {s.categories.every((c) => c.items.length === 0) && (
+              <p className="mt-2 text-xs text-plum-ink/55">
+                Add at least one menu item below so the storefront shows products.
+              </p>
+            )}
+          </div>
+
+          {/* Scannable QR — send this to the customer */}
+          <div className="shrink-0 text-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={qr}
+              alt={`QR code for ${s.name}`}
+              className="h-40 w-40 rounded-lg border border-plum-ink/10 bg-white p-2"
+            />
+            <a
+              href={qr}
+              download={`${s.slug}-qr.png`}
+              className="mt-2 inline-block rounded-lg border border-plum-ink/15 bg-white px-3 py-1.5 text-xs font-semibold hover:bg-cream"
+            >
+              ⬇ Download QR
+            </a>
+            <p className="mt-1 text-[11px] text-plum-ink/45">Scan to open the menu</p>
+          </div>
         </div>
-        {s.categories.every((c) => c.items.length === 0) && (
-          <p className="mt-2 text-xs text-plum-ink/55">
-            Add at least one menu item below so the storefront shows products.
-          </p>
-        )}
       </div>
 
       {/* Business details */}
