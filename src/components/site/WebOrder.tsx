@@ -47,6 +47,32 @@ export interface WebOrderProps {
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+/** "09:00" → "9:00 AM" for a cleaner, customer-facing time. */
+function to12h(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  if (Number.isNaN(h)) return hhmm;
+  const period = h < 12 ? "AM" : "PM";
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return `${hour12}:${String(m || 0).padStart(2, "0")} ${period}`;
+}
+
+/** Collapse consecutive identical days into ranges (e.g. "Mon–Fri · 9 AM–9 PM"). */
+function groupHours(hours: DayHours[]): { label: string; value: string }[] {
+  if (hours.length !== 7) return [];
+  const key = (h: DayHours) => (h.closed ? "closed" : `${h.open}-${h.close}`);
+  const rows: { label: string; value: string }[] = [];
+  let start = 0;
+  for (let i = 1; i <= 7; i++) {
+    if (i < 7 && key(hours[i]) === key(hours[start])) continue;
+    const h = hours[start];
+    const range = start === i - 1 ? DAY_LABELS[start] : `${DAY_LABELS[start]}–${DAY_LABELS[i - 1]}`;
+    const label = start === 0 && i === 7 ? "Every day" : range;
+    rows.push({ label, value: h.closed ? "Closed" : `${to12h(h.open)} – ${to12h(h.close)}` });
+    start = i;
+  }
+  return rows;
+}
+
 /** Inline modifier/quantity picker (no i18n dependency). */
 function ItemConfig({ item, onAdd, onCancel }: { item: DinerItem; onAdd: (l: CartLine) => void; onCancel: () => void }) {
   const [selection, setSelection] = useState<Selection>({});
@@ -432,43 +458,109 @@ export function WebOrder(props: WebOrderProps) {
           ))}
 
           {/* Info / footer */}
-          <section id="info" className="mt-8 grid gap-4 rounded-xl bg-white p-5 text-sm text-plum-ink/70 shadow-sm sm:grid-cols-2">
-            <div>
-              <p className="font-heading font-bold text-plum-ink">Store hours</p>
-              {hours && hours.length === 7 ? (
-                <ul className="mt-1 space-y-0.5">
-                  {hours.map((h, i) => (
-                    <li key={i} className="flex justify-between">
-                      <span>{DAY_LABELS[i]}</span>
-                      <span>{h.closed ? "Closed" : `${h.open}–${h.close}`}</span>
-                    </li>
+          <section id="info" className="mt-8 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-plum-ink/5">
+            <div className="grid gap-px bg-plum-ink/[0.06] sm:grid-cols-2">
+              {/* Hours */}
+              <div className="bg-white p-5">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-plum-ink/40">Store hours</h3>
+                  {typeof openNow === "boolean" && (
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                        openNow ? "bg-green-100 text-green-700" : "bg-plum-ink/10 text-plum-ink/50"
+                      }`}
+                    >
+                      <span className={`h-1.5 w-1.5 rounded-full ${openNow ? "bg-green-500" : "bg-plum-ink/40"}`} />
+                      {openNow ? "Open now" : "Closed now"}
+                    </span>
+                  )}
+                </div>
+                {(() => {
+                  const grouped = groupHours(hours ?? []);
+                  return grouped.length ? (
+                    <table className="mt-2.5 w-full text-sm">
+                      <tbody>
+                        {grouped.map((r, i) => (
+                          <tr key={i}>
+                            <td className="py-1 pr-4 text-plum-ink/55">{r.label}</td>
+                            <td className="py-1 text-right font-medium tabular-nums text-plum-ink/80">{r.value}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="mt-2.5 text-sm text-plum-ink/60">Please contact us for our opening hours.</p>
+                  );
+                })()}
+              </div>
+
+              {/* Ordering options */}
+              <div className="bg-white p-5">
+                <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-plum-ink/40">Ordering &amp; delivery</h3>
+                {zones.length > 0 ? (
+                  <>
+                    <p className="mt-2.5 text-sm text-plum-ink/70">Pickup &amp; delivery available. Delivery fee by area:</p>
+                    <table className="mt-1.5 w-full text-sm">
+                      <tbody>
+                        {zones.map((z) => (
+                          <tr key={z.name}>
+                            <td className="py-1 pr-4 text-plum-ink/55">{z.name}</td>
+                            <td className="py-1 text-right font-medium tabular-nums text-plum-ink/80">{formatPeso(z.fee)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </>
+                ) : (
+                  <p className="mt-2.5 text-sm text-plum-ink/70">
+                    Available for pickup and delivery. For delivery, place your order and we&apos;ll confirm
+                    availability and any fee for your area.
+                  </p>
+                )}
+              </div>
+
+              {/* Payment */}
+              <div className="bg-white p-5">
+                <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-plum-ink/40">Payment</h3>
+                <div className="mt-2.5 flex flex-wrap gap-2">
+                  {["Cash", ...(payOnline ? ["GCash", "Card"] : [])].map((m) => (
+                    <span
+                      key={m}
+                      className="rounded-full border border-plum-ink/10 bg-cream/60 px-3 py-1 text-xs font-semibold text-plum-ink/70"
+                    >
+                      {m}
+                    </span>
                   ))}
-                </ul>
-              ) : (
-                <p className="mt-1">Contact us for hours.</p>
-              )}
-            </div>
-            <div>
-              <p className="font-heading font-bold text-plum-ink">Delivery</p>
-              {zones.length > 0 ? (
-                <ul className="mt-1 space-y-0.5">
-                  {zones.map((z) => (
-                    <li key={z.name} className="flex justify-between"><span>{z.name}</span><span>{formatPeso(z.fee)}</span></li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-1">Pickup available. Ask us about delivery.</p>
-              )}
-            </div>
-            <div>
-              <p className="font-heading font-bold text-plum-ink">Payment methods</p>
-              <p className="mt-1">Cash on pickup / delivery.{payOnline ? " GCash & card available." : ""}</p>
-            </div>
-            <div>
-              <p className="font-heading font-bold text-plum-ink">Contact</p>
-              {contact?.address && <p className="mt-1">📍 {contact.address}</p>}
-              {contact?.phone && <p>📞 {contact.phone}</p>}
-              {!contact?.address && !contact?.phone && <p className="mt-1">Contact us in person or at the counter.</p>}
+                </div>
+                <p className="mt-2 text-xs text-plum-ink/45">Payable on pickup or delivery.</p>
+              </div>
+
+              {/* Contact */}
+              <div className="bg-white p-5">
+                <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-plum-ink/40">Contact</h3>
+                <div className="mt-2.5 space-y-1.5 text-sm">
+                  {contact?.address && (
+                    <a
+                      href={`https://maps.google.com/?q=${encodeURIComponent(contact.address)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-start gap-2 text-plum-ink/75 hover:text-brand-primary"
+                    >
+                      <span aria-hidden>📍</span>
+                      <span>{contact.address}</span>
+                    </a>
+                  )}
+                  {contact?.phone && (
+                    <a href={`tel:${contact.phone.replace(/[^\d+]/g, "")}`} className="flex items-center gap-2 text-plum-ink/75 hover:text-brand-primary">
+                      <span aria-hidden>📞</span>
+                      <span className="font-medium">{contact.phone}</span>
+                    </a>
+                  )}
+                  {!contact?.address && !contact?.phone && (
+                    <p className="text-plum-ink/60">Please contact us at the counter.</p>
+                  )}
+                </div>
+              </div>
             </div>
           </section>
         </main>
