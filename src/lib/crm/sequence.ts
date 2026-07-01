@@ -1,7 +1,8 @@
 /**
  * Cold-outreach follow-up sequence for the client CRM. Pure data — safe to
- * import on the client and server. The cadence is 1 initial message + 5
- * follow-ups over ~4 weeks; a client stays in the sequence until they reply.
+ * import on the client and server. The cadence is 1 initial message + 3
+ * follow-ups over ~10 days; if there's still no reply after the last follow-up,
+ * move the prospect to Revisit (30 days) instead of messaging further.
  *
  * `waitDays` = days to wait AFTER the previous touch before this one is due.
  * Messages use {name} as a placeholder for the business name.
@@ -53,31 +54,12 @@ export const SEQUENCE: SequenceStep[] = [
   {
     step: 4,
     key: "fu3",
-    label: "Follow-up 3 — remove the risk",
+    label: "Follow-up 3 — last try before revisit",
     waitDays: 5,
     message:
       "Hi [Name], libre lang po talaga — wala kayong babayaran at walang commission per order.\n\n" +
-      "Gusto nyo po bang i-set up ko muna para sa [Business Name] para masubukan nyo nang walang risk?",
-  },
-  {
-    step: 5,
-    key: "fu4",
-    label: "Follow-up 4 — soft check-in",
-    waitDays: 7,
-    message:
-      "Hi po, ayaw ko po kayong istorbohin 🙏 — tama lang po bang i-check ko ulit kayo mamaya, " +
-      "o hindi pa po tamang panahon para sa [Business Name]?",
-  },
-  {
-    step: 6,
-    key: "breakup",
-    label: "Break-up — close the loop",
-    waitDays: 10,
-    message:
-      "Hi [Name], dito ko na po isasara para hindi na po dumami sa inbox nyo. 🙂\n\n" +
-      "Kung balang araw gusto nyo na pong magkaroon ng sariling online ordering (walang commission) para sa [Business Name], " +
-      "message nyo lang po ako anytime. Sana po laging puno ang [Business Name]! 🍽️",
-    breakup: true,
+      "Gusto nyo po bang i-set up ko muna para sa [Business Name] para masubukan nyo nang walang risk? " +
+      "Kung busy pa po ngayon, babalikan ko na lang po kayo after ng ilang linggo. 🙂",
   },
 ];
 

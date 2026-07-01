@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-import { logTouch, markReplied, setStage, deleteClient } from "@/server/crm/actions";
+import { logTouch, markReplied, setStage, deleteClient, moveToRevisit, restartFromRevisit } from "@/server/crm/actions";
 import { createDemoFromClient } from "@/server/storefront-demo/actions";
 import type { CrmClientRow, CrmStage } from "@/server/crm/queries";
 import { AddClientForm } from "./AddClientForm";
@@ -22,6 +22,7 @@ const STAGE_LABEL: Record<CrmStage, string> = {
   replied: "Replied",
   won: "Won",
   lost: "Lost",
+  revisit: "Revisit",
 };
 const STAGE_STYLE: Record<CrmStage, string> = {
   new: "bg-plum-ink/10 text-plum-ink/70",
@@ -29,9 +30,14 @@ const STAGE_STYLE: Record<CrmStage, string> = {
   replied: "bg-amber-500/15 text-amber-700",
   won: "bg-mango/15 text-mango",
   lost: "bg-guava/15 text-guava",
+  revisit: "bg-violet-500/15 text-violet-700",
 };
 
-const COLUMNS: CrmStage[] = ["new", "in_sequence", "replied", "won", "lost"];
+const COLUMNS: CrmStage[] = ["new", "in_sequence", "replied", "won", "lost", "revisit"];
+
+/** How many cards to render per board column / list page before "show more". */
+const PAGE = 50;
+const COLUMN_CAP = 30;
 
 function fromNow(iso: string | null): string {
   if (!iso) return "";
@@ -49,6 +55,17 @@ function isDue(c: CrmClientRow): boolean {
   return !!c.nextDueAt && new Date(c.nextDueAt).getTime() <= Date.now();
 }
 
+/** In-sequence, all follow-ups sent, still no reply → ready to move to Revisit. */
+function isExhausted(c: CrmClientRow): boolean {
+  return c.stage === "in_sequence" && c.step >= TOTAL_TOUCHES && !c.nextDueAt && !c.repliedAt;
+}
+
+/** In the revisit bucket and the 30-day wait is up → time to re-approach. */
+function isRevisitDue(c: CrmClientRow): boolean {
+  if (c.stage !== "revisit") return false;
+  return !c.revisitAt || new Date(c.revisitAt).getTime() <= Date.now();
+}
+
 export function CrmBoard({
   clients,
   sequence = SEQUENCE,
@@ -62,6 +79,8 @@ export function CrmBoard({
   const [filter, setFilter] = useState<CrmStage | "all">("all");
   const [view, setView] = useState<"list" | "board">("board");
   const [showAdd, setShowAdd] = useState(clients.length === 0);
+  const [search, setSearch] = useState("");
+  const [listLimit, setListLimit] = useState(PAGE);
 
   // Pointer-based drag (works with both mouse and touch).
   const dragMeta = useRef<{ id: string; from: CrmStage } | null>(null);
@@ -93,7 +112,26 @@ export function CrmBoard({
     [clients],
   );
 
-  const shown = filter === "all" ? clients : clients.filter((c) => c.stage === filter);
+  // No reply after the last follow-up → prompt to move to Revisit.
+  const exhaustedList = useMemo(() => clients.filter(isExhausted), [clients]);
+  // Parked prospects whose 30-day wait is up → re-approach.
+  const revisitDueList = useMemo(
+    () =>
+      clients
+        .filter(isRevisitDue)
+        .sort((a, b) => (a.revisitAt ?? "0").localeCompare(b.revisitAt ?? "0")),
+    [clients],
+  );
+
+  const q = search.trim().toLowerCase();
+  const shown = useMemo(() => {
+    const byStage = filter === "all" ? clients : clients.filter((c) => c.stage === filter);
+    if (!q) return byStage;
+    return byStage.filter((c) =>
+      [c.name, c.contactName, c.phone, c.email, c.address].some((v) => v?.toLowerCase().includes(q)),
+    );
+  }, [clients, filter, q]);
+  const visible = shown.slice(0, listLimit);
 
   function act(fn: () => Promise<unknown>) {
     startTransition(async () => {
@@ -253,6 +291,14 @@ export function CrmBoard({
                     </button>
                     <button
                       disabled={pending}
+                      onClick={() => act(() => moveToRevisit(c.id))}
+                      title="Park this prospect and re-approach in 30 days"
+                      className="rounded-lg border border-violet-500/30 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-500/5 disabled:opacity-60"
+                    >
+                      → Revisit 30d
+                    </button>
+                    <button
+                      disabled={pending}
                       onClick={() => act(() => setStage(c.id, "lost"))}
                       className="rounded-lg px-3 py-1.5 text-xs font-semibold text-plum-ink/50 hover:bg-plum-ink/5 disabled:opacity-60"
                     >
@@ -265,6 +311,95 @@ export function CrmBoard({
           </div>
         )}
       </section>
+
+      {/* No reply after the last follow-up → move to Revisit */}
+      {exhaustedList.length > 0 && (
+        <section>
+          <h2 className="mb-2 font-heading text-lg font-bold">
+            Ready to revisit{" "}
+            <span className="text-sm font-normal text-plum-ink/50">
+              {exhaustedList.length} — no reply after {FOLLOW_UPS} follow-ups
+            </span>
+          </h2>
+          <div className="space-y-2">
+            {exhaustedList.map((c) => (
+              <div key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded-tile border border-plum-ink/10 bg-white p-3">
+                <div>
+                  <span className="font-semibold">{c.name}</span>
+                  {c.contactName && <span className="ml-2 text-xs text-plum-ink/45">{c.contactName}</span>}
+                  <span className="ml-2 text-xs text-plum-ink/40">all {TOTAL_TOUCHES} touches sent · no reply</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    disabled={pending}
+                    onClick={() => act(() => moveToRevisit(c.id))}
+                    className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                  >
+                    → Move to Revisit (30 days)
+                  </button>
+                  <button
+                    disabled={pending}
+                    onClick={() => act(() => markReplied(c.id))}
+                    className="rounded-lg bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-700 disabled:opacity-60"
+                  >
+                    They replied ✋
+                  </button>
+                  <button
+                    disabled={pending}
+                    onClick={() => act(() => setStage(c.id, "lost"))}
+                    className="rounded-lg px-3 py-1.5 text-xs font-semibold text-plum-ink/50 hover:bg-plum-ink/5 disabled:opacity-60"
+                  >
+                    Not interested
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Revisit bucket due to re-approach */}
+      {revisitDueList.length > 0 && (
+        <section>
+          <h2 className="mb-2 font-heading text-lg font-bold">
+            Revisits due{" "}
+            <span className="text-sm font-normal text-plum-ink/50">
+              {revisitDueList.length} — 30 days passed, re-approach now
+            </span>
+          </h2>
+          <div className="space-y-2">
+            {revisitDueList.map((c) => (
+              <div key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded-tile border border-violet-500/20 bg-violet-500/[0.03] p-3">
+                <div>
+                  <span className="font-semibold">{c.name}</span>
+                  {c.contactName && <span className="ml-2 text-xs text-plum-ink/45">{c.contactName}</span>}
+                  {c.facebookUrl && (
+                    <a href={c.facebookUrl} target="_blank" rel="noopener noreferrer" className="ml-2 text-xs font-semibold text-[#1877f2]">
+                      facebook ↗
+                    </a>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    disabled={pending}
+                    onClick={() => act(() => restartFromRevisit(c.id))}
+                    className="rounded-lg bg-brand-gradient px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                  >
+                    ↻ Start again (fresh message)
+                  </button>
+                  <button
+                    disabled={pending}
+                    onClick={() => act(() => setStage(c.id, "lost"))}
+                    className="rounded-lg px-3 py-1.5 text-xs font-semibold text-plum-ink/50 hover:bg-plum-ink/5 disabled:opacity-60"
+                  >
+                    Not interested
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Full pipeline */}
       <section>
@@ -286,9 +421,10 @@ export function CrmBoard({
         </div>
 
         {view === "board" ? (
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
             {COLUMNS.map((stage) => {
-              const items = clients.filter((c) => c.stage === stage);
+              const all = clients.filter((c) => c.stage === stage);
+              const items = all.slice(0, COLUMN_CAP);
               const hovered = hoverStage === stage && !!dragging;
               return (
                 <div
@@ -302,7 +438,7 @@ export function CrmBoard({
                     <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STAGE_STYLE[stage]}`}>
                       {STAGE_LABEL[stage]}
                     </span>
-                    <span className="text-xs text-plum-ink/40">{items.length}</span>
+                    <span className="text-xs text-plum-ink/40">{all.length}</span>
                   </div>
                   <div className="min-h-[64px] space-y-2">
                     {items.map((c) => (
@@ -357,6 +493,17 @@ export function CrmBoard({
                     {items.length === 0 && (
                       <p className="px-1 py-4 text-center text-[11px] text-plum-ink/30">Drop here</p>
                     )}
+                    {all.length > items.length && (
+                      <button
+                        onClick={() => {
+                          setFilter(stage);
+                          setView("list");
+                        }}
+                        className="w-full rounded-lg py-1.5 text-center text-[11px] font-semibold text-plum-ink/45 hover:bg-white"
+                      >
+                        +{all.length - items.length} more — view in list
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -365,10 +512,13 @@ export function CrmBoard({
         ) : (
           <>
             <div className="mb-2 flex flex-wrap items-center gap-2">
-              {(["all", "new", "in_sequence", "replied", "won", "lost"] as const).map((s) => (
+              {(["all", "new", "in_sequence", "replied", "won", "lost", "revisit"] as const).map((s) => (
                 <button
                   key={s}
-                  onClick={() => setFilter(s)}
+                  onClick={() => {
+                    setFilter(s);
+                    setListLimit(PAGE);
+                  }}
                   className={`rounded-full px-3 py-1 text-xs font-semibold ${
                     filter === s ? "bg-brand-gradient text-white" : "bg-plum-ink/5 text-plum-ink/60"
                   }`}
@@ -379,6 +529,19 @@ export function CrmBoard({
                   )}
                 </button>
               ))}
+            </div>
+
+            <div className="mb-2 flex items-center gap-2">
+              <input
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setListLimit(PAGE);
+                }}
+                placeholder="Search name, contact, phone, email, address…"
+                className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+              />
+              <span className="shrink-0 text-xs text-plum-ink/45">{shown.length} match{shown.length === 1 ? "" : "es"}</span>
             </div>
 
             <div className="overflow-x-auto rounded-tile border border-plum-ink/10 bg-white">
@@ -398,7 +561,7 @@ export function CrmBoard({
                   <td colSpan={5} className="px-3 py-6 text-center text-plum-ink/50">No clients here.</td>
                 </tr>
               ) : (
-                shown.map((c) => (
+                visible.map((c) => (
                   <tr key={c.id} className="border-t border-plum-ink/5 align-top">
                     <td className="px-3 py-2">
                       <span className="font-medium">{c.name}</span>
@@ -424,6 +587,8 @@ export function CrmBoard({
                     <td className="px-3 py-2 text-plum-ink/60">
                       {c.stage === "in_sequence" && c.nextDueAt ? (
                         <span className={isDue(c) ? "text-guava font-semibold" : ""}>{fromNow(c.nextDueAt)}</span>
+                      ) : c.stage === "revisit" ? (
+                        <span className="text-violet-700">revisit {fromNow(c.revisitAt)}</span>
                       ) : c.stage === "new" ? (
                         "not contacted"
                       ) : (
@@ -440,6 +605,25 @@ export function CrmBoard({
                         >
                           🏪 Demo
                         </button>
+                        {(c.stage === "new" || c.stage === "in_sequence") && (
+                          <button
+                            disabled={pending}
+                            onClick={() => act(() => moveToRevisit(c.id))}
+                            title="Park and re-approach in 30 days"
+                            className="rounded-lg border border-violet-500/30 px-2.5 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-500/5 disabled:opacity-60"
+                          >
+                            → Revisit
+                          </button>
+                        )}
+                        {c.stage === "revisit" && (
+                          <button
+                            disabled={pending}
+                            onClick={() => act(() => restartFromRevisit(c.id))}
+                            className="rounded-lg bg-violet-600 px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                          >
+                            ↻ Start again
+                          </button>
+                        )}
                         {(c.stage === "replied" || c.stage === "won") && (
                           <button
                             disabled={pending}
@@ -474,15 +658,26 @@ export function CrmBoard({
             </tbody>
           </table>
             </div>
+            {shown.length > visible.length && (
+              <div className="mt-2 text-center">
+                <button
+                  onClick={() => setListLimit((n) => n + PAGE)}
+                  className="rounded-full border border-plum-ink/15 px-4 py-2 text-xs font-semibold hover:bg-cream"
+                >
+                  Show more ({shown.length - visible.length} more)
+                </button>
+              </div>
+            )}
           </>
         )}
       </section>
 
       <p className="text-xs text-plum-ink/40">
-        Sequence: 1 initial message + {FOLLOW_UPS} follow-ups over ~4 weeks. Clients stay in the
-        queue until you mark them replied. Drag the grip (⋮⋮) to move a card between columns — works
-        on phone too. Facebook doesn&apos;t allow auto-detecting replies, so tap “They replied” when
-        they message back.
+        Sequence: 1 initial message + {FOLLOW_UPS} follow-ups over ~10 days. After the last follow-up
+        with no reply, tap <span className="font-semibold text-violet-700">Move to Revisit</span> to
+        park the prospect and re-approach in 30 days — that keeps the daily list short. Drag the grip
+        (⋮⋮) to move a card between columns. Facebook doesn&apos;t allow auto-detecting replies, so tap
+        “They replied” when they message back.
       </p>
 
       {/* Floating label that follows the pointer/finger while dragging. */}

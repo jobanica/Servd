@@ -3,7 +3,7 @@ import "server-only";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { mergeSequence, type SequenceOverride, type SequenceStep } from "@/lib/crm/sequence";
 
-export type CrmStage = "new" | "in_sequence" | "replied" | "won" | "lost";
+export type CrmStage = "new" | "in_sequence" | "replied" | "won" | "lost" | "revisit";
 
 /**
  * The effective follow-up sequence = defaults merged with the owner's saved
@@ -38,6 +38,7 @@ export interface CrmClientRow {
   lastTouchAt: string | null;
   nextDueAt: string | null;
   repliedAt: string | null;
+  revisitAt: string | null;
   source: string;
   createdAt: string;
 }
@@ -77,7 +78,7 @@ type BaseRow = {
   createdAt: Date;
 };
 
-function mapRow(r: BaseRow, address: string | null): CrmClientRow {
+function mapRow(r: BaseRow, address: string | null, revisitAt: Date | null): CrmClientRow {
   return {
     id: r.id,
     name: r.name,
@@ -92,13 +93,27 @@ function mapRow(r: BaseRow, address: string | null): CrmClientRow {
     lastTouchAt: r.lastTouchAt?.toISOString() ?? null,
     nextDueAt: r.nextDueAt?.toISOString() ?? null,
     repliedAt: r.repliedAt?.toISOString() ?? null,
+    revisitAt: revisitAt?.toISOString() ?? null,
     source: r.source,
     createdAt: r.createdAt.toISOString(),
   };
 }
 
-/** All CRM clients, newest first. Resilient to a not-yet-migrated address column. */
+/** All CRM clients, newest first. Resilient to not-yet-migrated later columns. */
 export async function listClients(limit = 1000): Promise<CrmClientRow[]> {
+  // Newest schema (address + revisitAt).
+  try {
+    const rows = await systemDb((tx) =>
+      tx.crmClient.findMany({
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        select: { ...BASE_SELECT, address: true, revisitAt: true },
+      }),
+    );
+    return rows.map((r) => mapRow(r, r.address, r.revisitAt));
+  } catch {
+    /* revisitAt column not migrated yet → try address-only */
+  }
   try {
     const rows = await systemDb((tx) =>
       tx.crmClient.findMany({
@@ -107,16 +122,16 @@ export async function listClients(limit = 1000): Promise<CrmClientRow[]> {
         select: { ...BASE_SELECT, address: true },
       }),
     );
-    return rows.map((r) => mapRow(r, r.address));
+    return rows.map((r) => mapRow(r, r.address, null));
   } catch {
-    // address column not migrated yet → read the base columns only.
-    try {
-      const rows = await systemDb((tx) =>
-        tx.crmClient.findMany({ orderBy: { createdAt: "desc" }, take: limit, select: BASE_SELECT }),
-      );
-      return rows.map((r) => mapRow(r, null));
-    } catch {
-      return []; // table not migrated yet
-    }
+    /* address column not migrated yet → base columns only */
+  }
+  try {
+    const rows = await systemDb((tx) =>
+      tx.crmClient.findMany({ orderBy: { createdAt: "desc" }, take: limit, select: BASE_SELECT }),
+    );
+    return rows.map((r) => mapRow(r, null, null));
+  } catch {
+    return []; // table not migrated yet
   }
 }

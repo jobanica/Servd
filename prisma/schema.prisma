@@ -176,11 +176,12 @@ model CrmClient {
   email       String?
   address     String?
   notes       String?
-  stage       String     @default("new") // new | in_sequence | replied | won | lost
+  stage       String     @default("new") // new | in_sequence | replied | won | lost | revisit
   step        Int        @default(0) // touches sent (0..TOTAL_TOUCHES)
   lastTouchAt DateTime?
   nextDueAt   DateTime? // when the next follow-up is due
   repliedAt   DateTime?
+  revisitAt   DateTime? // when to re-approach a no-reply prospect (revisit bucket)
   source      String     @default("manual")
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
@@ -188,6 +189,7 @@ model CrmClient {
 
   @@index([stage])
   @@index([nextDueAt])
+  @@index([revisitAt])
   @@index([createdAt])
   @@map("crm_clients")
 }

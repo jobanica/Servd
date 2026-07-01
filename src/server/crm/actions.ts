@@ -132,26 +132,79 @@ export async function markReplied(id: string): Promise<{ ok?: boolean; error?: s
   return { ok: true };
 }
 
-const STAGES: CrmStage[] = ["new", "in_sequence", "replied", "won", "lost"];
+const STAGES: CrmStage[] = ["new", "in_sequence", "replied", "won", "lost", "revisit"];
+
+/** Days a no-reply prospect waits in the Revisit bucket before re-approaching. */
+const REVISIT_DAYS = 30;
 
 /** Set a client's pipeline stage (e.g. won / lost / reopen). */
 export async function setStage(id: string, stage: CrmStage): Promise<void> {
   await requireSuperAdmin();
   if (!STAGES.includes(stage)) return;
-  // Won/lost stop follow-ups; reopening to in_sequence keeps the schedule.
+  if (stage === "revisit") {
+    await moveToRevisit(id);
+    return;
+  }
+  // Won/lost/replied stop follow-ups; reopening to in_sequence keeps the schedule.
   const clearDue = stage === "won" || stage === "lost" || stage === "replied";
-  await systemDb((tx) =>
-    tx.crmClient.update({
-      where: { id },
-      data: {
-        stage,
-        ...(clearDue ? { nextDueAt: null } : {}),
-        ...(stage === "replied" ? { repliedAt: new Date() } : {}),
-      },
-      select: { id: true },
-    }),
-  );
+  const data = {
+    stage,
+    ...(clearDue ? { nextDueAt: null } : {}),
+    ...(stage === "replied" ? { repliedAt: new Date() } : {}),
+  };
+  // Also clear any revisit date when leaving the revisit bucket (best-effort:
+  // the revisitAt column may not be migrated yet).
+  try {
+    await systemDb((tx) => tx.crmClient.update({ where: { id }, data: { ...data, revisitAt: null }, select: { id: true } }));
+  } catch {
+    await systemDb((tx) => tx.crmClient.update({ where: { id }, data, select: { id: true } }));
+  }
   revalidatePath(PATH);
+}
+
+/**
+ * Move a no-reply prospect to the Revisit bucket: parks them out of the active
+ * pipeline and schedules a re-approach ~30 days out. Best-effort on revisitAt so
+ * it still works (as a plain stage move) before the migration is run.
+ */
+export async function moveToRevisit(id: string, days = REVISIT_DAYS): Promise<{ ok?: boolean; error?: string }> {
+  await requireSuperAdmin();
+  const revisitAt = addDays(new Date(), days);
+  try {
+    await systemDb((tx) =>
+      tx.crmClient.update({ where: { id }, data: { stage: "revisit", nextDueAt: null, revisitAt }, select: { id: true } }),
+    );
+  } catch {
+    try {
+      await systemDb((tx) =>
+        tx.crmClient.update({ where: { id }, data: { stage: "revisit", nextDueAt: null }, select: { id: true } }),
+      );
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "Couldn't move to revisit." };
+    }
+  }
+  revalidatePath(PATH);
+  return { ok: true };
+}
+
+/**
+ * Re-approach a revisit prospect: back to the top of the funnel with a fresh
+ * initial message (step reset), so they reappear in "Send today".
+ */
+export async function restartFromRevisit(id: string): Promise<{ ok?: boolean; error?: string }> {
+  await requireSuperAdmin();
+  const data = { stage: "new", step: 0, nextDueAt: null, lastTouchAt: null };
+  try {
+    await systemDb((tx) => tx.crmClient.update({ where: { id }, data: { ...data, revisitAt: null }, select: { id: true } }));
+  } catch {
+    try {
+      await systemDb((tx) => tx.crmClient.update({ where: { id }, data, select: { id: true } }));
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "Couldn't restart." };
+    }
+  }
+  revalidatePath(PATH);
+  return { ok: true };
 }
 
 /** Update a client's notes. */
