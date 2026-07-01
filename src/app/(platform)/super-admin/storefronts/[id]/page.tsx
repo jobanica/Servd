@@ -66,7 +66,27 @@ export default async function StorefrontDetailPage({ params }: { params: Promise
         <input name="phone" defaultValue={s.phone ?? ""} placeholder="Phone" className={field} />
         <input name="address" defaultValue={s.address ?? ""} placeholder="Address" className={`sm:col-span-2 ${field}`} />
         <input name="tagline" defaultValue={s.tagline ?? ""} placeholder="Tagline" className={field} />
-        <input name="logoUrl" defaultValue={s.logoUrl ?? ""} placeholder="Logo image URL" className={field} />
+
+        {/* Business logo — upload a file, or paste an image URL. */}
+        <div className="sm:col-span-2">
+          <label className="mb-1 block text-xs font-semibold text-plum-ink/55">Business logo</label>
+          <div className="flex items-center gap-3">
+            {s.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={s.logoUrl} alt="Current logo" className="h-14 w-14 shrink-0 rounded-lg border border-plum-ink/10 object-cover" />
+            ) : (
+              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-cream text-[10px] text-plum-ink/40">
+                no logo
+              </span>
+            )}
+            <div className="min-w-0 flex-1 space-y-2">
+              <input name="logo" type="file" accept="image/jpeg,image/png,image/webp" className="block w-full text-xs" />
+              <input name="logoUrl" defaultValue={s.logoUrl ?? ""} placeholder="…or paste a logo image URL" className={`${field} text-xs`} />
+            </div>
+          </div>
+          <p className="mt-1 text-[11px] text-plum-ink/40">JPEG / PNG / WebP, up to 5 MB. Uploading a file replaces the URL.</p>
+        </div>
+
         <div className="sm:col-span-2">
           <button className="rounded-full border border-plum-ink/15 px-4 py-2 text-sm font-semibold hover:bg-cream">
             Save details

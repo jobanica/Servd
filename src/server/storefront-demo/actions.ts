@@ -154,16 +154,26 @@ export async function updateDemoDetails(formData: FormData): Promise<void> {
   const id = String(formData.get("id"));
   const name = String(formData.get("name") ?? "").trim();
   const tagline = String(formData.get("tagline") ?? "").trim();
-  const logoUrl = String(formData.get("logoUrl") ?? "").trim();
   const address = String(formData.get("address") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
+
+  // Logo: an uploaded file wins over the pasted URL. Blank both → leave as-is.
+  let logoUpdate: { logoUrl?: string | null } = {};
+  const logoFile = formData.get("logo");
+  const logoUrl = String(formData.get("logoUrl") ?? "").trim();
+  if (logoFile instanceof File && logoFile.size > 0) {
+    logoUpdate = { logoUrl: await uploadMenuImage(id, logoFile) };
+  } else if (formData.has("logoUrl")) {
+    logoUpdate = { logoUrl: logoUrl || null };
+  }
+
   await systemDb((tx) =>
     tx.restaurant.update({
       where: { id },
       data: {
         ...(name ? { name, displayName: name } : {}),
         tagline: tagline || null,
-        logoUrl: logoUrl || null,
+        ...logoUpdate,
         printerConfig: receiptJson(address, phone),
       },
       select: { id: true },
