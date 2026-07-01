@@ -243,6 +243,21 @@ export async function uploadItemPhoto(formData: FormData): Promise<void> {
   revalidatePath(detailPath(restaurantId));
 }
 
+/**
+ * Set an existing item's photo from a pasted image address (URL) — no download
+ * needed. Demo-storefront only. A blank URL clears the photo.
+ */
+export async function setItemPhotoUrl(formData: FormData): Promise<void> {
+  await requireSuperAdmin();
+  const restaurantId = String(formData.get("restaurantId"));
+  const id = String(formData.get("id"));
+  const raw = String(formData.get("imageUrl") ?? "").trim();
+  // Only accept http(s) image addresses (or blank to clear).
+  if (raw && !/^https?:\/\//i.test(raw)) return;
+  await systemDb((tx) => tx.menuItem.update({ where: { id }, data: { imageUrl: raw || null }, select: { id: true } }));
+  revalidatePath(detailPath(restaurantId));
+}
+
 export type ScanState = { ok?: boolean; added?: number; error?: string } | null;
 
 /**

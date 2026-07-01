@@ -9,6 +9,7 @@ import {
   deleteItem,
   toggleItem,
   uploadItemPhoto,
+  setItemPhotoUrl,
   deleteDemoStorefront,
 } from "@/server/storefront-demo/actions";
 import { CopyLink } from "@/components/super-admin/CopyLink";
@@ -140,6 +141,18 @@ export default async function StorefrontDetailPage({ params }: { params: Promise
                         <input name="image" type="file" accept="image/jpeg,image/png,image/webp" className="w-24 text-[10px]" />
                         <button className="rounded border border-plum-ink/15 px-1.5 py-0.5 text-[11px] hover:bg-cream" title="Upload photo">📷</button>
                       </form>
+                      <form action={setItemPhotoUrl} className="flex items-center gap-1">
+                        <input type="hidden" name="restaurantId" value={s.id} />
+                        <input type="hidden" name="id" value={it.id} />
+                        <input
+                          name="imageUrl"
+                          type="url"
+                          defaultValue={it.imageUrl ?? ""}
+                          placeholder="paste image address"
+                          className="w-32 rounded border border-plum-ink/15 px-1.5 py-0.5 text-[10px]"
+                        />
+                        <button className="rounded border border-plum-ink/15 px-1.5 py-0.5 text-[11px] hover:bg-cream" title="Use image address (no download)">🔗</button>
+                      </form>
                       <form action={toggleItem}>
                         <input type="hidden" name="restaurantId" value={s.id} />
                         <input type="hidden" name="id" value={it.id} />
@@ -167,8 +180,9 @@ export default async function StorefrontDetailPage({ params }: { params: Promise
               <input name="price" type="number" step="0.01" min="0" placeholder="₱ price" className="rounded-lg border border-plum-ink/15 px-2 py-1.5 text-sm" />
               <button className="rounded-lg bg-brand-primary px-3 py-1.5 text-sm font-semibold text-white">Add item</button>
               <input name="description" placeholder="Short description (optional)" className="rounded-lg border border-plum-ink/15 px-2 py-1.5 text-sm sm:col-span-3" />
+              <input name="imageUrl" type="url" placeholder="Paste an image address / URL (optional — no download needed)" className="rounded-lg border border-plum-ink/15 px-2 py-1.5 text-sm sm:col-span-3" />
               <label className="text-xs text-plum-ink/55 sm:col-span-3">
-                Photo (optional): <input name="image" type="file" accept="image/jpeg,image/png,image/webp" className="text-xs" />
+                …or upload a photo: <input name="image" type="file" accept="image/jpeg,image/png,image/webp" className="text-xs" />
               </label>
             </form>
           </div>
