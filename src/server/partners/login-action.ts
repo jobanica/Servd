@@ -16,3 +16,28 @@ export async function loginPartner(_prev: LoginState, formData: FormData): Promi
   if (error) return { error: error.message };
   redirect("/partner");
 }
+
+export type ResetState = { ok?: boolean; error?: string } | null;
+
+/**
+ * Send a partner a password-reset email. Reuses the shared /reset-password page
+ * but routes them back to the partner login afterwards. Always reports success
+ * (no account enumeration).
+ */
+export async function requestPartnerPasswordReset(
+  _prev: ResetState,
+  formData: FormData,
+): Promise<ResetState> {
+  const email = String(formData.get("email") ?? "").trim();
+  if (!email) return { error: "Enter your email address." };
+  const supabase = await createSupabaseServerClient();
+  const base = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  try {
+    await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${base}/reset-password?next=${encodeURIComponent("/partner/login")}`,
+    });
+  } catch {
+    /* ignore — still report success */
+  }
+  return { ok: true };
+}

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { loginPartner, type LoginState } from "@/server/partners/login-action";
 
@@ -14,7 +15,12 @@ export function PartnerLoginForm() {
         <input name="email" type="email" required className={field} />
       </div>
       <div>
-        <label className="block text-xs font-semibold uppercase tracking-wide text-plum-ink/50">Password</label>
+        <div className="flex items-center justify-between">
+          <label className="block text-xs font-semibold uppercase tracking-wide text-plum-ink/50">Password</label>
+          <Link href="/partner/forgot-password" className="text-xs font-semibold text-brand-primary">
+            Forgot password?
+          </Link>
+        </div>
         <input name="password" type="password" required className={field} />
       </div>
       {state?.error && <p className="text-sm text-guava">{state.error}</p>}

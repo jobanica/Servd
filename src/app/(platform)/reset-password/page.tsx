@@ -45,7 +45,15 @@ export default function ResetPasswordPage() {
       setError(error.message || "Couldn't update password.");
     } else {
       setDone(true);
-      setTimeout(() => router.push("/login"), 1500);
+      // Return to where the reset was requested from (e.g. /partner/login).
+      let next = "/login";
+      try {
+        const n = new URL(window.location.href).searchParams.get("next");
+        if (n && n.startsWith("/")) next = n; // only same-origin paths
+      } catch {
+        /* keep default */
+      }
+      setTimeout(() => router.push(next), 1500);
     }
   }
 
