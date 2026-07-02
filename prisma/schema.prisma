@@ -348,6 +348,9 @@ model Restaurant {
   slug   String           @unique // used in /order/{slug}/{tableToken}
   status RestaurantStatus @default(pending)
   planId String?
+  // Set when a partner creates this as a DEMO storefront (no login) to pitch a
+  // prospect. Null for real tenants + super-admin demos.
+  demoPartnerId String?
 
   // --- White-label branding (defaults give a clean "Servd look") ---
   displayName       String?
@@ -448,6 +451,7 @@ model Restaurant {
   menuItemCosts   MenuItemCost[]
   storefront      StorefrontSetting?
 
+  @@index([demoPartnerId])
   @@map("restaurants")
 }
 

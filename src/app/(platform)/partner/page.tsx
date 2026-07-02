@@ -1,6 +1,8 @@
 import { requirePartnerPage } from "@/server/partners/auth";
 import { getPartnerDashboard } from "@/server/partners/portal";
+import { listPartnerDemos } from "@/server/partners/demo-queries";
 import { ReferralLink } from "@/components/admin/ReferralLink";
+import { PartnerDemos } from "@/components/partner/PartnerDemos";
 import { AppIcon, Wordmark } from "@/components/Wordmark";
 import { formatPeso } from "@/lib/money";
 
@@ -33,6 +35,7 @@ export default async function PartnerPortalPage() {
   const data = await getPartnerDashboard(partner.id, true);
   const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const link = data.code ? `${base.replace(/\/$/, "")}/signup?ref=${data.code}` : "";
+  const demos = await listPartnerDemos(partner.id);
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
@@ -68,6 +71,10 @@ export default async function PartnerPortalPage() {
           <p className="text-xs text-plum-ink/50">Paid out</p>
           <p className="font-heading text-2xl font-extrabold">{formatPeso(data.paid)}</p>
         </div>
+      </div>
+
+      <div className="mt-4">
+        <PartnerDemos demos={demos} appUrl={base} />
       </div>
 
       <div className="mt-4 rounded-tile border border-plum-ink/10 bg-white p-5">

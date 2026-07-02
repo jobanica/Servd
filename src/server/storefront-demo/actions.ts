@@ -7,14 +7,11 @@ import { z } from "zod";
 
 import { requireSuperAdmin } from "@/server/tenancy/current-user";
 import { systemDb } from "@/server/tenancy/scoped-db";
-import { uniqueSlug } from "@/lib/slug";
 import { pesosToCentavos } from "@/lib/money";
-import { getTopPlan } from "@/server/billing/subscription";
-import { COMP_FOREVER } from "@/lib/billing/comp";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { uploadMenuImage, uploadMenuImageBytes } from "@/server/storage/menu-images";
-import { ALLOWED_MENU_DOC_TYPES } from "@/lib/validation/menu";
-import { scanMenuMedia } from "./ai-scan";
+import { uploadMenuImage } from "@/server/storage/menu-images";
+import { provisionDemo, receiptJson } from "./provision";
+import { scanAndSaveMenu } from "./scan-save";
 
 export type FormState = { ok?: boolean; error?: string } | null;
 
@@ -33,10 +30,6 @@ function tempPassword(): string {
 const PATH = "/super-admin/storefronts";
 const detailPath = (id: string) => `${PATH}/${id}`;
 
-function receiptJson(address: string, phone: string) {
-  return { receipt: { address: address || "", phone: phone || "" } };
-}
-
 const createSchema = z.object({
   name: z.string().trim().min(2, "Business name is required").max(80),
   address: z.string().trim().max(300).optional().or(z.literal("")),
@@ -44,54 +37,6 @@ const createSchema = z.object({
   tagline: z.string().trim().max(120).optional().or(z.literal("")),
   logoUrl: z.string().trim().max(400).optional().or(z.literal("")),
 });
-
-/**
- * Provision a demo storefront tenant (no login) + a complimentary open-ended
- * trial so onlineOrdering stays unlocked. Returns the new restaurant id. Shared
- * by the create form and the "create from CRM client" shortcut.
- */
-async function provisionDemo(d: {
-  name: string;
-  address: string;
-  phone: string;
-  tagline: string;
-  logoUrl: string;
-}): Promise<string> {
-  return systemDb(async (tx) => {
-    const slug = await uniqueSlug(
-      d.name,
-      async (s) => !!(await tx.restaurant.findUnique({ where: { slug: s }, select: { id: true } })),
-    );
-    const r = await tx.restaurant.create({
-      data: {
-        name: d.name,
-        displayName: d.name,
-        slug,
-        status: "active",
-        logoUrl: d.logoUrl || null,
-        tagline: d.tagline || null,
-        // Storefront contact reads from printerConfig.receipt (no extra column).
-        printerConfig: receiptJson(d.address, d.phone),
-      },
-      select: { id: true },
-    });
-    const plan = await getTopPlan(tx);
-    if (plan) {
-      await tx.restaurant.update({ where: { id: r.id }, data: { planId: plan.id }, select: { id: true } });
-      await tx.subscription.create({
-        data: {
-          restaurantId: r.id,
-          planId: plan.id,
-          status: "trialing",
-          trialEndsAt: COMP_FOREVER,
-          currentPeriodEnd: COMP_FOREVER,
-        },
-        select: { id: true },
-      });
-    }
-    return r.id;
-  });
-}
 
 /**
  * Create a DEMO online-ordering storefront for a prospect — a real tenant with
@@ -268,58 +213,10 @@ export async function scanDemoMenu(_prev: ScanState, formData: FormData): Promis
   await requireSuperAdmin();
   const restaurantId = String(formData.get("restaurantId"));
   const files = formData.getAll("images").filter((f): f is File => f instanceof File && f.size > 0);
-  if (files.length === 0) return { error: "Choose at least one menu photo or PDF to scan." };
-
-  const media: { url: string; pdf: boolean }[] = [];
-  try {
-    for (const f of files.slice(0, 4)) {
-      if (!ALLOWED_MENU_DOC_TYPES.includes(f.type as never)) {
-        return { error: "Use JPEG / PNG / WebP photos or a PDF." };
-      }
-      if (f.type === "application/pdf") {
-        const bytes = new Uint8Array(await f.arrayBuffer());
-        const url = await uploadMenuImageBytes(restaurantId, bytes, "pdf", "application/pdf");
-        media.push({ url, pdf: true });
-      } else {
-        const url = await uploadMenuImage(restaurantId, f);
-        media.push({ url, pdf: false });
-      }
-    }
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : "Couldn't upload the file." };
-  }
-
-  const res = await scanMenuMedia(media);
+  const res = await scanAndSaveMenu(restaurantId, files);
   if (!res.ok) return { error: res.error };
-
-  let added = 0;
-  try {
-    await systemDb(async (tx) => {
-      for (const c of res.categories) {
-        const cat = await tx.category.create({
-          data: { restaurantId, name: c.name.slice(0, 80) },
-          select: { id: true },
-        });
-        for (const it of c.items) {
-          await tx.menuItem.create({
-            data: {
-              restaurantId,
-              categoryId: cat.id,
-              name: it.name.slice(0, 120),
-              description: it.description || null,
-              price: pesosToCentavos(it.price),
-            },
-            select: { id: true },
-          });
-          added++;
-        }
-      }
-    });
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : "Couldn't save the scanned menu." };
-  }
   revalidatePath(detailPath(restaurantId));
-  return { ok: true, added };
+  return { ok: true, added: res.added };
 }
 
 export type ConvertState =
