@@ -752,6 +752,9 @@ model ProgramSetting {
   // Configurable withholding % applied to payout statements (PH reporting). NOT
   // tax advice — 0 by default; an accountant should confirm the correct rate.
   withholdingPct       Int      @default(0)
+  // Partner onboarding/training video shown on the partner dashboard. A YouTube/
+  // Vimeo link or a direct video URL (super-admin sets it).
+  partnerTrainingUrl   String?
   updatedAt            DateTime @updatedAt
 
   @@map("program_settings")

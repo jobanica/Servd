@@ -2,6 +2,8 @@ import Link from "next/link";
 import { requireSuperAdminPage } from "@/server/tenancy/require-admin";
 import { getPartnersOverview } from "@/server/partners/admin-queries";
 import { setPartnerStatus, createPayoutBatch, setPayoutStatus } from "@/server/partners/admin";
+import { getProgramSettings } from "@/server/referrals/settings";
+import { PartnerTrainingForm } from "@/components/super-admin/PartnerTrainingForm";
 import { formatPeso } from "@/lib/money";
 
 const STATUS_CLS: Record<string, string> = {
@@ -14,6 +16,7 @@ const STATUS_CLS: Record<string, string> = {
 export default async function SuperAdminPartnersPage() {
   await requireSuperAdminPage();
   const { partners, payouts } = await getPartnersOverview();
+  const settings = await getProgramSettings();
   const pending = partners.filter((p) => p.status === "pending");
   const active = partners.filter((p) => p.status !== "pending");
 
@@ -23,6 +26,15 @@ export default async function SuperAdminPartnersPage() {
         <h1 className="font-heading text-2xl font-bold">Partners</h1>
         <p className="text-sm text-plum-ink/50">Affiliate / reseller applications, commissions, and payouts.</p>
       </div>
+
+      <section className="rounded-tile border border-plum-ink/10 bg-white p-5">
+        <h2 className="mb-3 font-heading text-lg font-bold">Partner training video</h2>
+        <p className="mb-3 text-sm text-plum-ink/50">
+          Shown to every approved partner on their dashboard so they can learn the system and start
+          selling right away.
+        </p>
+        <PartnerTrainingForm current={settings.partnerTrainingUrl} />
+      </section>
 
       <section className="rounded-tile border border-plum-ink/10 bg-white p-5">
         <h2 className="mb-3 font-heading text-lg font-bold">Applications ({pending.length})</h2>

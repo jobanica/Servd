@@ -83,3 +83,30 @@ describe("payout statement — withholding (configurable, not tax advice)", () =
     expect(withholdingAmount(100000, 150)).toBe(100000);
   });
 });
+
+import { toEmbed } from "@/lib/partners/video";
+
+describe("training video — URL normalization", () => {
+  it("embeds YouTube watch / youtu.be / shorts links", () => {
+    expect(toEmbed("https://www.youtube.com/watch?v=abc123DEF45")).toEqual({
+      kind: "youtube",
+      src: "https://www.youtube.com/embed/abc123DEF45",
+    });
+    expect(toEmbed("https://youtu.be/abc123DEF45")?.src).toBe("https://www.youtube.com/embed/abc123DEF45");
+    expect(toEmbed("https://youtube.com/shorts/abc123DEF45")?.kind).toBe("youtube");
+  });
+  it("embeds Vimeo", () => {
+    expect(toEmbed("https://vimeo.com/123456789")).toEqual({
+      kind: "vimeo",
+      src: "https://player.vimeo.com/video/123456789",
+    });
+  });
+  it("treats a direct video file as a file", () => {
+    expect(toEmbed("https://cdn.example.com/training.mp4")?.kind).toBe("file");
+  });
+  it("falls back to a plain link, and null for empty", () => {
+    expect(toEmbed("https://example.com/watch")?.kind).toBe("link");
+    expect(toEmbed("")).toBeNull();
+    expect(toEmbed(null)).toBeNull();
+  });
+});

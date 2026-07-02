@@ -18,6 +18,8 @@ export interface ProgramSettings {
   minPayout: number;
   /** Configurable withholding % for payout statements (PH reporting). */
   withholdingPct: number;
+  /** Partner training video (YouTube/Vimeo link or direct URL). */
+  partnerTrainingUrl: string | null;
 }
 
 /** Canonical milestone bonuses (centavos) — fallback if not set in the DB. */
@@ -41,6 +43,7 @@ export const DEFAULT_PROGRAM_SETTINGS: ProgramSettings = {
   clawbackDays: 60,
   minPayout: 50000,
   withholdingPct: 0,
+  partnerTrainingUrl: null,
 };
 
 /** Parse + sanitize the stored bonus tiers JSON; fall back to the defaults. */
@@ -75,6 +78,7 @@ export async function getProgramSettings(): Promise<ProgramSettings> {
       clawbackDays: row.clawbackDays,
       minPayout: row.minPayout,
       withholdingPct: row.withholdingPct ?? 0,
+      partnerTrainingUrl: row.partnerTrainingUrl ?? null,
     };
   } catch {
     return DEFAULT_PROGRAM_SETTINGS;

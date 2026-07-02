@@ -1,8 +1,10 @@
 import { requirePartnerPage } from "@/server/partners/auth";
 import { getPartnerDashboard } from "@/server/partners/portal";
 import { listPartnerDemos } from "@/server/partners/demo-queries";
+import { getProgramSettings } from "@/server/referrals/settings";
 import { ReferralLink } from "@/components/admin/ReferralLink";
 import { PartnerDemos } from "@/components/partner/PartnerDemos";
+import { TrainingVideo } from "@/components/partner/TrainingVideo";
 import { AppIcon, Wordmark } from "@/components/Wordmark";
 import { formatPeso } from "@/lib/money";
 
@@ -36,6 +38,7 @@ export default async function PartnerPortalPage() {
   const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const link = data.code ? `${base.replace(/\/$/, "")}/signup?ref=${data.code}` : "";
   const demos = await listPartnerDemos(partner.id);
+  const settings = await getProgramSettings();
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
@@ -50,6 +53,12 @@ export default async function PartnerPortalPage() {
       </div>
 
       <h1 className="mt-6 font-heading text-2xl font-bold">Partner dashboard</h1>
+
+      {settings.partnerTrainingUrl && (
+        <div className="mt-4">
+          <TrainingVideo url={settings.partnerTrainingUrl} />
+        </div>
+      )}
 
       <div className="mt-4 rounded-tile border border-plum-ink/10 bg-white p-5">
         <p className="text-sm font-semibold">Your referral link</p>

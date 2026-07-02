@@ -10,6 +10,34 @@ function revalidate() {
   revalidatePath("/super-admin/partners");
 }
 
+export type TrainingState = { ok?: boolean; error?: string } | null;
+
+/** Set (or clear) the partner training video URL shown on the partner dashboard. */
+export async function setPartnerTrainingUrl(
+  _prev: TrainingState,
+  formData: FormData,
+): Promise<TrainingState> {
+  await requireSuperAdmin();
+  const url = String(formData.get("url") ?? "").trim();
+  if (url && !/^https?:\/\//i.test(url)) {
+    return { error: "Enter a full URL starting with http(s):// (or leave blank to remove)." };
+  }
+  try {
+    await systemDb((tx) =>
+      tx.programSetting.upsert({
+        where: { id: "program" },
+        create: { id: "program", partnerTrainingUrl: url || null },
+        update: { partnerTrainingUrl: url || null },
+      }),
+    );
+  } catch {
+    return { error: "Couldn't save. Make sure the referral migration has been run." };
+  }
+  revalidatePath("/super-admin/partners");
+  revalidatePath("/partner");
+  return { ok: true };
+}
+
 /** Approve / reject / suspend a partner. Approving issues their referral code. */
 export async function setPartnerStatus(formData: FormData): Promise<void> {
   await requireSuperAdmin();
