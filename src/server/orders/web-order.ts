@@ -8,6 +8,7 @@ import {
   OrderValidationError,
 } from "@/server/orders/build-order";
 import { recordServingsSold } from "@/server/menu/servings";
+import { recordVariantsSold } from "@/server/menu/variants";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
 import { getPublicStorefront, isOpenNow } from "@/server/storefront/storefront";
 import { getLoyaltyConfig, enrollAccount } from "@/server/loyalty/loyalty";
@@ -122,6 +123,10 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
 
   // Count these servings toward each item's daily cap (best-effort, own tx).
   await recordServingsSold(restaurant.id, built.items);
+  await recordVariantsSold(
+    restaurant.id,
+    built.items.filter((i) => i.variantId).map((i) => ({ variantId: i.variantId!, quantity: i.quantity })),
+  );
 
   await notifyOrdersChanged(restaurant.id);
 

@@ -238,10 +238,15 @@ export async function saveItemVariants(formData: FormData): Promise<void> {
   const id = String(formData.get("id"));
   const names = formData.getAll("variantName").map(String);
   const prices = formData.getAll("variantPrice").map(String);
-  const list = names.map((name, i) => ({
-    name,
-    price: pesosToCentavos(Number(prices[i]) || 0),
-  }));
+  const stocks = formData.getAll("variantStock").map(String);
+  const list = names.map((name, i) => {
+    const s = (stocks[i] ?? "").trim();
+    return {
+      name,
+      price: pesosToCentavos(Number(prices[i]) || 0),
+      stock: s === "" ? null : Math.max(0, Math.floor(Number(s) || 0)), // blank = unlimited
+    };
+  });
   await setItemVariants(restaurantId, id, list);
   await refresh();
   revalidatePath(`/admin/menu/${id}`);

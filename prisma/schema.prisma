@@ -910,6 +910,7 @@ model MenuItemVariant {
   menuItemId   String
   name         String // "Small", "1/2 kilo", "Large", …
   price        Int // absolute price in centavos
+  stock        Int? // pcs available for this size; null = untracked, 0 = sold out
   sortOrder    Int      @default(0)
   createdAt    DateTime @default(now())
 

@@ -33,13 +33,15 @@ function ItemConfig({
   onCancel: () => void;
 }) {
   const variants = item.variants ?? [];
-  const [variantId, setVariantId] = useState<string>(variants[0]?.id ?? "");
+  const inStock = (v: { stock?: number | null }) => v.stock == null || v.stock > 0;
+  const [variantId, setVariantId] = useState<string>((variants.find(inStock) ?? variants[0])?.id ?? "");
   const [selection, setSelection] = useState<Selection>({});
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState("");
   const [showError, setShowError] = useState(false);
 
   const chosenVariant = variants.find((v) => v.id === variantId) ?? null;
+  const variantOut = !!chosenVariant && !inStock(chosenVariant);
   const effItem = useMemo(() => (chosenVariant ? { ...item, price: chosenVariant.price } : item), [item, chosenVariant]);
   const price = useMemo(() => unitPrice(effItem, selection), [effItem, selection]);
   const error = useMemo(() => validateSelection(effItem, selection), [effItem, selection]);
@@ -55,7 +57,7 @@ function ItemConfig({
   }
 
   function add() {
-    if (error) {
+    if (error || variantOut) {
       setShowError(true);
       return;
     }
@@ -87,23 +89,32 @@ function ItemConfig({
             Size <span className="text-guava">*</span>
           </legend>
           <div className="mt-1 space-y-1">
-            {variants.map((v) => (
-              <label
-                key={v.id}
-                className="flex items-center justify-between rounded-md border border-plum-ink/10 bg-white px-2 py-1 text-sm"
-              >
-                <span className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name={`${item.id}-variant`}
-                    checked={variantId === v.id}
-                    onChange={() => setVariantId(v.id)}
-                  />
-                  {v.name}
-                </span>
-                <span className="font-semibold text-plum-ink">{formatPeso(v.price)}</span>
-              </label>
-            ))}
+            {variants.map((v) => {
+              const out = !inStock(v);
+              return (
+                <label
+                  key={v.id}
+                  className={`flex items-center justify-between rounded-md border border-plum-ink/10 bg-white px-2 py-1 text-sm ${out ? "opacity-50" : ""}`}
+                >
+                  <span className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name={`${item.id}-variant`}
+                      disabled={out}
+                      checked={variantId === v.id}
+                      onChange={() => setVariantId(v.id)}
+                    />
+                    {v.name}
+                    {out ? (
+                      <span className="text-xs font-semibold text-guava">Sold out</span>
+                    ) : v.stock != null ? (
+                      <span className="text-xs text-plum-ink/45">{v.stock} left</span>
+                    ) : null}
+                  </span>
+                  <span className="font-semibold text-plum-ink">{formatPeso(v.price)}</span>
+                </label>
+              );
+            })}
           </div>
         </fieldset>
       )}
@@ -162,10 +173,10 @@ function ItemConfig({
         </div>
         <button
           onClick={add}
-          disabled={!!error}
+          disabled={!!error || variantOut}
           className="flex-1 rounded-full py-2 text-sm font-semibold btn-brand disabled:opacity-50"
         >
-          Add · {formatPeso(price * quantity)}
+          {variantOut ? "Sold out" : `Add · ${formatPeso(price * quantity)}`}
         </button>
       </div>
     </div>

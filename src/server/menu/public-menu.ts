@@ -63,9 +63,12 @@ export async function getPublicMenu(
         id: v.id,
         name: v.name,
         price: effectivePrice(v.price, { id: item.id, categoryId: item.categoryId }, happyHours).price,
+        stock: v.stock,
       }));
       // For variant items, the card shows the lowest size as the "from" price.
       const fromPrice = variants.length > 0 ? Math.min(...variants.map((v) => v.price)) : eff.price;
+      // If every size is out of stock, the whole item is sold out.
+      const allSizesOut = variants.length > 0 && variants.every((v) => v.stock != null && v.stock <= 0);
       return {
       id: item.id,
       name: item.translations[0]?.name ?? item.name,
@@ -76,7 +79,7 @@ export async function getPublicMenu(
       imageUrl: item.imageUrl,
       videoUrl: item.videoUrl,
       videoPosterUrl: item.videoPosterUrl,
-      isAvailable: item.isAvailable && !cappedOut,
+      isAvailable: item.isAvailable && !cappedOut && !allSizesOut,
       dietaryTags: item.dietaryTags ?? [],
       groups: item.modifierGroups.map((link) => ({
         id: link.group.id,

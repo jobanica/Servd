@@ -34,6 +34,7 @@ export interface BuiltOrderItem {
   unitPrice: number;
   note: string | null;
   modifiers: { modifierId: string; nameAtTime: string; priceDeltaAtTime: number }[];
+  variantId?: string | null; // chosen size (for per-size stock decrement; not persisted on OrderItem)
 }
 
 export interface BuiltOrder {
@@ -76,6 +77,7 @@ export async function buildValidatedOrder(
   let total = 0;
   const items: BuiltOrderItem[] = [];
   const usedByItem = new Map<string, number>(); // cumulative qty this order, per item
+  const usedByVariant = new Map<string, number>(); // cumulative qty this order, per size
 
   for (const line of lines) {
     const dbItem = itemMap.get(line.itemId);
@@ -99,14 +101,32 @@ export async function buildValidatedOrder(
 
     // If the item has sizes, the chosen size sets the base price (re-resolved
     // from the DB — the client never dictates the amount). Fall back to the first
-    // size if none/an unknown one was sent; the size name rides on nameAtTime.
+    // in-stock size if none/an unknown one was sent; the size name rides on
+    // nameAtTime, and per-size stock (pcs) is enforced here.
     const variants = variantsMap.get(dbItem.id) ?? [];
     let baseAmount = dbItem.price;
     let nameAtTime = dbItem.name;
+    let chosenVariantId: string | null = null;
     if (variants.length > 0) {
-      const chosenVariant = variants.find((v) => v.id === line.variantId) ?? variants[0];
+      const chosenVariant =
+        variants.find((v) => v.id === line.variantId) ??
+        variants.find((v) => v.stock == null || v.stock > 0) ??
+        variants[0];
       baseAmount = chosenVariant.price;
       nameAtTime = `${dbItem.name} (${chosenVariant.name})`;
+      chosenVariantId = chosenVariant.id;
+
+      // Per-size stock: auto sold-out at 0, and can't over-order what's left.
+      if (chosenVariant.stock != null) {
+        const wanted = (usedByVariant.get(chosenVariant.id) ?? 0) + line.quantity;
+        if (chosenVariant.stock <= 0) {
+          throw new OrderValidationError(`"${nameAtTime}" is sold out.`);
+        }
+        if (wanted > chosenVariant.stock) {
+          throw new OrderValidationError(`Only ${chosenVariant.stock} of "${nameAtTime}" left.`);
+        }
+        usedByVariant.set(chosenVariant.id, wanted);
+      }
     }
 
     const effBase = effectivePrice(
@@ -163,6 +183,7 @@ export async function buildValidatedOrder(
       unitPrice: effBase, // happy-hour-adjusted base snapshot; deltas live on modifiers
       note: line.note ?? null,
       modifiers: chosen,
+      variantId: chosenVariantId,
     });
   }
 

@@ -14,6 +14,7 @@ import {
 } from "@/server/orders/build-order";
 import { resolvePromo } from "@/server/promotions/redeem";
 import { recordServingsSold } from "@/server/menu/servings";
+import { recordVariantsSold } from "@/server/menu/variants";
 import { startOfManilaDay } from "@/lib/orders/order-number";
 
 /**
@@ -124,6 +125,10 @@ export async function placeOrder(
 
   // Count these servings toward each item's daily cap (best-effort, own tx).
   await recordServingsSold(ctx.restaurantId, built.items);
+  await recordVariantsSold(
+    ctx.restaurantId,
+    built.items.filter((i) => i.variantId).map((i) => ({ variantId: i.variantId!, quantity: i.quantity })),
+  );
 
   // Alert the live cashier screen (the kitchen ticket prints on acceptance).
   await notifyOrdersChanged(ctx.restaurantId);

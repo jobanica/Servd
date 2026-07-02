@@ -76,12 +76,14 @@ function groupHours(hours: DayHours[]): { label: string; value: string }[] {
 /** Inline modifier/quantity picker (no i18n dependency). */
 function ItemConfig({ item, onAdd, onCancel }: { item: DinerItem; onAdd: (l: CartLine) => void; onCancel: () => void }) {
   const variants = item.variants ?? [];
-  const [variantId, setVariantId] = useState<string>(variants[0]?.id ?? "");
+  const inStock = (v: { stock?: number | null }) => v.stock == null || v.stock > 0;
+  const [variantId, setVariantId] = useState<string>((variants.find(inStock) ?? variants[0])?.id ?? "");
   const [selection, setSelection] = useState<Selection>({});
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState("");
   const [showError, setShowError] = useState(false);
   const chosenVariant = variants.find((v) => v.id === variantId) ?? null;
+  const variantOut = !!chosenVariant && !inStock(chosenVariant);
   const effItem = useMemo(() => (chosenVariant ? { ...item, price: chosenVariant.price } : item), [item, chosenVariant]);
   const price = useMemo(() => unitPrice(effItem, selection), [effItem, selection]);
   const error = useMemo(() => validateSelection(effItem, selection), [effItem, selection]);
@@ -96,7 +98,7 @@ function ItemConfig({ item, onAdd, onCancel }: { item: DinerItem; onAdd: (l: Car
     });
   }
   function add() {
-    if (error) return setShowError(true);
+    if (error || variantOut) return setShowError(true);
     onAdd({
       lineId: lineId(),
       itemId: item.id,
@@ -122,15 +124,23 @@ function ItemConfig({ item, onAdd, onCancel }: { item: DinerItem; onAdd: (l: Car
           <fieldset className="mt-4">
             <legend className="font-semibold text-plum-ink">Size <span className="text-guava">*</span></legend>
             <div className="mt-2 space-y-1">
-              {variants.map((v) => (
-                <label key={v.id} className="flex items-center justify-between rounded-lg border border-plum-ink/10 px-3 py-2 text-sm">
-                  <span className="flex items-center gap-2">
-                    <input type="radio" name="__variant" checked={variantId === v.id} onChange={() => setVariantId(v.id)} />
-                    {v.name}
-                  </span>
-                  <span className="font-semibold text-plum-ink">{formatPeso(v.price)}</span>
-                </label>
-              ))}
+              {variants.map((v) => {
+                const out = !inStock(v);
+                return (
+                  <label key={v.id} className={`flex items-center justify-between rounded-lg border border-plum-ink/10 px-3 py-2 text-sm ${out ? "opacity-50" : ""}`}>
+                    <span className="flex items-center gap-2">
+                      <input type="radio" name="__variant" disabled={out} checked={variantId === v.id} onChange={() => setVariantId(v.id)} />
+                      {v.name}
+                      {out ? (
+                        <span className="text-xs font-semibold text-guava">Sold out</span>
+                      ) : v.stock != null ? (
+                        <span className="text-xs text-plum-ink/45">{v.stock} left</span>
+                      ) : null}
+                    </span>
+                    <span className="font-semibold text-plum-ink">{formatPeso(v.price)}</span>
+                  </label>
+                );
+              })}
             </div>
           </fieldset>
         )}
@@ -162,8 +172,8 @@ function ItemConfig({ item, onAdd, onCancel }: { item: DinerItem; onAdd: (l: Car
             <span className="w-8 text-center font-semibold">{quantity}</span>
             <button onClick={() => setQuantity((q) => q + 1)} className="px-3 py-2 text-lg">+</button>
           </div>
-          <button onClick={add} disabled={!!error} className="flex-1 rounded-full bg-red-600 py-3 font-semibold text-white disabled:opacity-50">
-            Add · {formatPeso(price * quantity)}
+          <button onClick={add} disabled={!!error || variantOut} className="flex-1 rounded-full bg-red-600 py-3 font-semibold text-white disabled:opacity-50">
+            {variantOut ? "Sold out" : `Add · ${formatPeso(price * quantity)}`}
           </button>
         </div>
       </div>

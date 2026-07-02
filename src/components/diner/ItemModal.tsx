@@ -27,7 +27,10 @@ export function ItemModal({
   onClose: () => void;
 }) {
   const variants = item.variants ?? [];
-  const [variantId, setVariantId] = useState<string>(variants[0]?.id ?? "");
+  const inStock = (v: { stock?: number | null }) => v.stock == null || v.stock > 0;
+  const [variantId, setVariantId] = useState<string>(
+    (variants.find(inStock) ?? variants[0])?.id ?? "",
+  );
   const [selection, setSelection] = useState<Selection>({});
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState("");
@@ -36,6 +39,7 @@ export function ItemModal({
 
   // The chosen size sets the base price; modifiers add on top of it.
   const chosenVariant = variants.find((v) => v.id === variantId) ?? null;
+  const variantOut = !!chosenVariant && !inStock(chosenVariant);
   const effItem = useMemo(
     () => (chosenVariant ? { ...item, price: chosenVariant.price } : item),
     [item, chosenVariant],
@@ -59,7 +63,7 @@ export function ItemModal({
   }
 
   function handleAdd() {
-    if (error) {
+    if (error || variantOut) {
       setShowError(true);
       return;
     }
@@ -125,23 +129,34 @@ export function ItemModal({
               Size <span className="text-xs font-normal text-plum-ink/50">({t("required")})</span>
             </legend>
             <div className="mt-2 space-y-1">
-              {variants.map((v) => (
-                <label
-                  key={v.id}
-                  className="flex cursor-pointer items-center justify-between rounded-lg border border-plum-ink/10 px-3 py-2"
-                >
-                  <span className="flex items-center gap-2 text-sm">
-                    <input
-                      type="radio"
-                      name="__variant"
-                      checked={variantId === v.id}
-                      onChange={() => setVariantId(v.id)}
-                    />
-                    {v.name}
-                  </span>
-                  <span className="text-sm font-semibold text-brand-ink">{formatPeso(v.price)}</span>
-                </label>
-              ))}
+              {variants.map((v) => {
+                const out = !inStock(v);
+                return (
+                  <label
+                    key={v.id}
+                    className={`flex items-center justify-between rounded-lg border border-plum-ink/10 px-3 py-2 ${
+                      out ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 text-sm">
+                      <input
+                        type="radio"
+                        name="__variant"
+                        disabled={out}
+                        checked={variantId === v.id}
+                        onChange={() => setVariantId(v.id)}
+                      />
+                      {v.name}
+                      {out ? (
+                        <span className="text-xs font-semibold text-guava">Sold out</span>
+                      ) : v.stock != null ? (
+                        <span className="text-xs text-plum-ink/45">{v.stock} left</span>
+                      ) : null}
+                    </span>
+                    <span className="text-sm font-semibold text-brand-ink">{formatPeso(v.price)}</span>
+                  </label>
+                );
+              })}
             </div>
           </fieldset>
         )}
@@ -226,10 +241,10 @@ export function ItemModal({
           </div>
           <button
             onClick={handleAdd}
-            disabled={!!error}
+            disabled={!!error || variantOut}
             className="flex-1 rounded-full py-3 font-semibold btn-brand disabled:opacity-50"
           >
-            {t("add")} · {formatPeso(price * quantity)}
+            {variantOut ? "Sold out" : `${t("add")} · ${formatPeso(price * quantity)}`}
           </button>
         </div>
       </div>

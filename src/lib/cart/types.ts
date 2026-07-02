@@ -24,6 +24,7 @@ export interface DinerVariant {
   id: string;
   name: string;
   price: number; // absolute base price, centavos (happy-hour adjusted for display)
+  stock?: number | null; // pcs left for this size; null = untracked, 0 = sold out
 }
 
 export interface DinerItem {

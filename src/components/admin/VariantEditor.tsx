@@ -4,7 +4,7 @@ import { useState } from "react";
 import { saveItemVariants } from "@/server/menu/actions";
 import { SubmitButton } from "./SubmitButton";
 
-type Row = { name: string; price: string };
+type Row = { name: string; price: string; stock: string };
 
 /**
  * Editor for an item's sizes/variants (e.g. fish/pork by size or weight): a list
@@ -16,22 +16,26 @@ export function VariantEditor({
   initial,
 }: {
   itemId: string;
-  initial: { name: string; price: number }[];
+  initial: { name: string; price: number; stock?: number | null }[];
 }) {
   const [rows, setRows] = useState<Row[]>(
     initial.length > 0
-      ? initial.map((v) => ({ name: v.name, price: (v.price / 100).toFixed(2) }))
-      : [{ name: "", price: "" }],
+      ? initial.map((v) => ({
+          name: v.name,
+          price: (v.price / 100).toFixed(2),
+          stock: v.stock == null ? "" : String(v.stock),
+        }))
+      : [{ name: "", price: "", stock: "" }],
   );
 
   function update(i: number, patch: Partial<Row>) {
     setRows((r) => r.map((row, j) => (j === i ? { ...row, ...patch } : row)));
   }
   function addRow() {
-    setRows((r) => [...r, { name: "", price: "" }]);
+    setRows((r) => [...r, { name: "", price: "", stock: "" }]);
   }
   function removeRow(i: number) {
-    setRows((r) => (r.length <= 1 ? [{ name: "", price: "" }] : r.filter((_, j) => j !== i)));
+    setRows((r) => (r.length <= 1 ? [{ name: "", price: "", stock: "" }] : r.filter((_, j) => j !== i)));
   }
 
   return (
@@ -40,20 +44,27 @@ export function VariantEditor({
       <h2 className="font-heading text-lg font-bold">Sizes &amp; prices</h2>
       <p className="mt-0.5 text-sm text-plum-ink/55">
         For items sold in more than one size or weight (e.g. fish, pork). Add each size with its own
-        price — customers pick one when ordering. Leave empty if this item has a single price.
+        price and how many pcs are available — a size auto-marks sold out when it hits 0. Leave pcs
+        blank for unlimited, or leave everything empty if this item has a single price.
       </p>
 
       <div className="mt-3 space-y-2">
+        <div className="flex items-center gap-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-plum-ink/40">
+          <span className="flex-1">Size</span>
+          <span className="w-[104px]">Price</span>
+          <span className="w-20">Pcs left</span>
+          <span className="w-6" />
+        </div>
         {rows.map((row, i) => (
           <div key={i} className="flex items-center gap-2">
             <input
               name="variantName"
               value={row.name}
               onChange={(e) => update(i, { name: e.target.value })}
-              placeholder="Size — e.g. Small, 1/2 kilo, Large"
+              placeholder="e.g. Small, 1/2 kilo, Large"
               className="flex-1 rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
             />
-            <div className="flex items-center rounded-lg border border-plum-ink/15 px-2">
+            <div className="flex w-[104px] items-center rounded-lg border border-plum-ink/15 px-2">
               <span className="text-sm text-plum-ink/40">₱</span>
               <input
                 name="variantPrice"
@@ -63,13 +74,23 @@ export function VariantEditor({
                 step="0.01"
                 min="0"
                 placeholder="0.00"
-                className="w-24 px-1 py-2 text-sm outline-none"
+                className="w-full px-1 py-2 text-sm outline-none"
               />
             </div>
+            <input
+              name="variantStock"
+              value={row.stock}
+              onChange={(e) => update(i, { stock: e.target.value })}
+              type="number"
+              step="1"
+              min="0"
+              placeholder="∞"
+              className="w-20 rounded-lg border border-plum-ink/15 px-2 py-2 text-sm"
+            />
             <button
               type="button"
               onClick={() => removeRow(i)}
-              className="rounded-lg px-2 py-2 text-sm text-muted hover:text-guava"
+              className="w-6 rounded-lg py-2 text-sm text-muted hover:text-guava"
               aria-label="Remove size"
             >
               ✕
