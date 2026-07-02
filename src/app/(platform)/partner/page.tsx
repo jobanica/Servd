@@ -2,6 +2,7 @@ import { requirePartnerPage } from "@/server/partners/auth";
 import { getPartnerDashboard } from "@/server/partners/portal";
 import { listPartnerDemos } from "@/server/partners/demo-queries";
 import { getProgramSettings } from "@/server/referrals/settings";
+import { signOutPartner } from "@/server/partners/login-action";
 import { ReferralLink } from "@/components/admin/ReferralLink";
 import { PartnerDemos } from "@/components/partner/PartnerDemos";
 import { TrainingVideo } from "@/components/partner/TrainingVideo";
@@ -30,6 +31,11 @@ export default async function PartnerPortalPage() {
             ? "Your partner account is currently suspended. Contact Servd support."
             : "Thanks for applying! We'll email you once your partner account is approved."}
         </p>
+        <form action={signOutPartner} className="mt-6">
+          <button className="rounded-full border border-plum-ink/15 px-4 py-2 text-sm font-semibold text-plum-ink/70 hover:bg-cream">
+            Log out
+          </button>
+        </form>
       </div>
     );
   }
@@ -47,9 +53,16 @@ export default async function PartnerPortalPage() {
           <AppIcon size={26} />
           <Wordmark size="1.1rem" />
         </div>
-        <span className="text-sm text-plum-ink/50">
-          {partner.name} · {partner.tier}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-plum-ink/50">
+            {partner.name} · {partner.tier}
+          </span>
+          <form action={signOutPartner}>
+            <button className="rounded-full border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold text-plum-ink/70 hover:bg-cream">
+              Log out
+            </button>
+          </form>
+        </div>
       </div>
 
       <h1 className="mt-6 font-heading text-2xl font-bold">Partner dashboard</h1>
