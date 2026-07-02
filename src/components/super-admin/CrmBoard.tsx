@@ -112,6 +112,8 @@ export function CrmBoard({
     [clients],
   );
 
+  // Clients that already have a demo storefront built.
+  const demoList = useMemo(() => clients.filter((c) => c.demoRestaurantId), [clients]);
   // No reply after the last follow-up → prompt to move to Revisit.
   const exhaustedList = useMemo(() => clients.filter(isExhausted), [clients]);
   // Parked prospects whose 30-day wait is up → re-approach.
@@ -281,14 +283,24 @@ export function CrmBoard({
                     >
                       They replied ✋
                     </button>
-                    <button
-                      disabled={pending}
-                      onClick={() => act(() => createDemoFromClient(c.id))}
-                      title="Build a demo online-ordering storefront pre-filled from this client"
-                      className="rounded-lg border border-brand-primary/40 px-3 py-1.5 text-xs font-semibold text-brand-primary hover:bg-brand-primary/5 disabled:opacity-60"
-                    >
-                      🏪 Make demo
-                    </button>
+                    {c.demoRestaurantId ? (
+                      <a
+                        href={`/super-admin/storefronts/${c.demoRestaurantId}`}
+                        title="Open the demo storefront built for this client"
+                        className="rounded-lg bg-brand-gradient px-3 py-1.5 text-xs font-semibold text-white"
+                      >
+                        🏪 Open demo
+                      </a>
+                    ) : (
+                      <button
+                        disabled={pending}
+                        onClick={() => act(() => createDemoFromClient(c.id))}
+                        title="Build a demo online-ordering storefront pre-filled from this client"
+                        className="rounded-lg border border-brand-primary/40 px-3 py-1.5 text-xs font-semibold text-brand-primary hover:bg-brand-primary/5 disabled:opacity-60"
+                      >
+                        🏪 Make demo
+                      </button>
+                    )}
                     <button
                       disabled={pending}
                       onClick={() => act(() => moveToRevisit(c.id))}
@@ -401,6 +413,42 @@ export function CrmBoard({
         </section>
       )}
 
+      {/* Demos already created */}
+      {demoList.length > 0 && (
+        <section>
+          <h2 className="mb-2 font-heading text-lg font-bold">
+            🏪 Demos created{" "}
+            <span className="text-sm font-normal text-plum-ink/50">{demoList.length}</span>
+          </h2>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {demoList.map((c) => (
+              <div key={c.id} className="flex items-center justify-between gap-2 rounded-tile border border-brand-primary/20 bg-brand-primary/5 p-3">
+                <div className="min-w-0">
+                  <span className="block truncate font-semibold">{c.name}</span>
+                  <span className="text-xs text-plum-ink/50">
+                    {STAGE_LABEL[c.stage]}
+                    {c.facebookUrl && (
+                      <>
+                        {" · "}
+                        <a href={c.facebookUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-[#1877f2]">
+                          facebook ↗
+                        </a>
+                      </>
+                    )}
+                  </span>
+                </div>
+                <a
+                  href={`/super-admin/storefronts/${c.demoRestaurantId}`}
+                  className="shrink-0 rounded-lg bg-brand-gradient px-3 py-1.5 text-xs font-semibold text-white"
+                >
+                  Open demo →
+                </a>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Full pipeline */}
       <section>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -476,6 +524,14 @@ export function CrmBoard({
                                 <span className={isDue(c) ? "font-semibold text-guava" : ""}>{fromNow(c.nextDueAt)}</span>
                               )}
                             </div>
+                            {c.demoRestaurantId && (
+                              <a
+                                href={`/super-admin/storefronts/${c.demoRestaurantId}`}
+                                className="mt-1 inline-block rounded-full bg-brand-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-brand-primary"
+                              >
+                                🏪 demo ready
+                              </a>
+                            )}
                             {c.facebookUrl && (
                               <a
                                 href={c.facebookUrl}
@@ -597,14 +653,24 @@ export function CrmBoard({
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex justify-end gap-1.5">
-                        <button
-                          disabled={pending}
-                          onClick={() => act(() => createDemoFromClient(c.id))}
-                          title="Build a demo storefront from this client"
-                          className="rounded-lg border border-brand-primary/40 px-2.5 py-1.5 text-xs font-semibold text-brand-primary hover:bg-brand-primary/5 disabled:opacity-60"
-                        >
-                          🏪 Demo
-                        </button>
+                        {c.demoRestaurantId ? (
+                          <a
+                            href={`/super-admin/storefronts/${c.demoRestaurantId}`}
+                            title="Open the demo storefront built for this client"
+                            className="rounded-lg bg-brand-gradient px-2.5 py-1.5 text-xs font-semibold text-white"
+                          >
+                            🏪 Open demo
+                          </a>
+                        ) : (
+                          <button
+                            disabled={pending}
+                            onClick={() => act(() => createDemoFromClient(c.id))}
+                            title="Build a demo storefront from this client"
+                            className="rounded-lg border border-brand-primary/40 px-2.5 py-1.5 text-xs font-semibold text-brand-primary hover:bg-brand-primary/5 disabled:opacity-60"
+                          >
+                            🏪 Demo
+                          </button>
+                        )}
                         {(c.stage === "new" || c.stage === "in_sequence") && (
                           <button
                             disabled={pending}

@@ -182,6 +182,7 @@ model CrmClient {
   nextDueAt   DateTime? // when the next follow-up is due
   repliedAt   DateTime?
   revisitAt   DateTime? // when to re-approach a no-reply prospect (revisit bucket)
+  demoRestaurantId String? // the demo storefront created for this client, if any
   source      String     @default("manual")
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt

@@ -39,6 +39,7 @@ export interface CrmClientRow {
   nextDueAt: string | null;
   repliedAt: string | null;
   revisitAt: string | null;
+  demoRestaurantId: string | null;
   source: string;
   createdAt: string;
 }
@@ -78,7 +79,12 @@ type BaseRow = {
   createdAt: Date;
 };
 
-function mapRow(r: BaseRow, address: string | null, revisitAt: Date | null): CrmClientRow {
+function mapRow(
+  r: BaseRow,
+  address: string | null,
+  revisitAt: Date | null,
+  demoRestaurantId: string | null,
+): CrmClientRow {
   return {
     id: r.id,
     name: r.name,
@@ -94,6 +100,7 @@ function mapRow(r: BaseRow, address: string | null, revisitAt: Date | null): Crm
     nextDueAt: r.nextDueAt?.toISOString() ?? null,
     repliedAt: r.repliedAt?.toISOString() ?? null,
     revisitAt: revisitAt?.toISOString() ?? null,
+    demoRestaurantId,
     source: r.source,
     createdAt: r.createdAt.toISOString(),
   };
@@ -101,7 +108,19 @@ function mapRow(r: BaseRow, address: string | null, revisitAt: Date | null): Crm
 
 /** All CRM clients, newest first. Resilient to not-yet-migrated later columns. */
 export async function listClients(limit = 1000): Promise<CrmClientRow[]> {
-  // Newest schema (address + revisitAt).
+  // Newest schema (address + revisitAt + demoRestaurantId).
+  try {
+    const rows = await systemDb((tx) =>
+      tx.crmClient.findMany({
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        select: { ...BASE_SELECT, address: true, revisitAt: true, demoRestaurantId: true },
+      }),
+    );
+    return rows.map((r) => mapRow(r, r.address, r.revisitAt, r.demoRestaurantId));
+  } catch {
+    /* demoRestaurantId / revisitAt not migrated yet → try address + revisitAt */
+  }
   try {
     const rows = await systemDb((tx) =>
       tx.crmClient.findMany({
@@ -110,7 +129,7 @@ export async function listClients(limit = 1000): Promise<CrmClientRow[]> {
         select: { ...BASE_SELECT, address: true, revisitAt: true },
       }),
     );
-    return rows.map((r) => mapRow(r, r.address, r.revisitAt));
+    return rows.map((r) => mapRow(r, r.address, r.revisitAt, null));
   } catch {
     /* revisitAt column not migrated yet → try address-only */
   }
@@ -122,7 +141,7 @@ export async function listClients(limit = 1000): Promise<CrmClientRow[]> {
         select: { ...BASE_SELECT, address: true },
       }),
     );
-    return rows.map((r) => mapRow(r, r.address, null));
+    return rows.map((r) => mapRow(r, r.address, null, null));
   } catch {
     /* address column not migrated yet → base columns only */
   }
@@ -130,7 +149,7 @@ export async function listClients(limit = 1000): Promise<CrmClientRow[]> {
     const rows = await systemDb((tx) =>
       tx.crmClient.findMany({ orderBy: { createdAt: "desc" }, take: limit, select: BASE_SELECT }),
     );
-    return rows.map((r) => mapRow(r, null, null));
+    return rows.map((r) => mapRow(r, null, null, null));
   } catch {
     return []; // table not migrated yet
   }

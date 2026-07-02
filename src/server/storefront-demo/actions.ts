@@ -89,6 +89,14 @@ export async function createDemoFromClient(clientId: string): Promise<void> {
     /* address column not migrated yet */
   }
   const id = await provisionDemo({ name: base.name, address, phone: base.phone ?? "", tagline: "", logoUrl: "" });
+  // Link the demo back to the client so the pipeline shows "demo ready".
+  try {
+    await systemDb((tx) =>
+      tx.crmClient.update({ where: { id: clientId }, data: { demoRestaurantId: id }, select: { id: true } }),
+    );
+  } catch {
+    /* demoRestaurantId column not migrated yet — ignore */
+  }
   revalidatePath(PATH);
   redirect(detailPath(id));
 }
