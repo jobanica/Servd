@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   createPartnerDemo,
@@ -102,6 +103,12 @@ function DemoRow({ demo, appUrl }: { demo: PartnerDemoRow; appUrl: string }) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            href={`/partner/demo/${demo.id}`}
+            className="rounded-lg bg-brand-gradient px-3 py-1.5 text-xs font-semibold text-white"
+          >
+            Manage / menu →
+          </Link>
           <a
             href={url}
             target="_blank"

@@ -2,6 +2,18 @@ import "server-only";
 
 import { systemDb } from "@/server/tenancy/scoped-db";
 
+/** True if a demo storefront belongs to this partner (ownership gate). */
+export async function partnerOwnsDemo(id: string, partnerId: string): Promise<boolean> {
+  try {
+    const hit = await systemDb((tx) =>
+      tx.restaurant.findFirst({ where: { id, demoPartnerId: partnerId }, select: { id: true } }),
+    );
+    return !!hit;
+  } catch {
+    return false;
+  }
+}
+
 export interface PartnerDemoRow {
   id: string;
   name: string;

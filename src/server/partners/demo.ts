@@ -1,14 +1,18 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { systemDb } from "@/server/tenancy/scoped-db";
+import { pesosToCentavos } from "@/lib/money";
 import { getCurrentPartner } from "@/server/partners/auth";
-import { provisionDemo } from "@/server/storefront-demo/provision";
+import { provisionDemo, receiptJson } from "@/server/storefront-demo/provision";
 import { scanAndSaveMenu } from "@/server/storefront-demo/scan-save";
+import { uploadMenuImage } from "@/server/storage/menu-images";
 
 const PATH = "/partner";
+const demoPath = (id: string) => `/partner/demo/${id}`;
 
 export type DemoFormState = { ok?: boolean; error?: string } | null;
 export type DemoScanState = { ok?: boolean; added?: number; error?: string } | null;
@@ -26,6 +30,18 @@ async function ownDemo(restaurantId: string, partnerId: string): Promise<boolean
     tx.restaurant.findFirst({ where: { id: restaurantId, demoPartnerId: partnerId }, select: { id: true } }),
   );
   return !!hit;
+}
+
+/**
+ * Guard for void form actions on a demo the partner owns. Returns the
+ * restaurantId if the caller is an approved partner AND owns it, else null.
+ */
+async function guardOwnedDemo(formData: FormData): Promise<string | null> {
+  const p = await getCurrentPartner();
+  if (!p || p.status !== "approved") return null;
+  const restaurantId = String(formData.get("restaurantId") ?? "");
+  if (!restaurantId || !(await ownDemo(restaurantId, p.id))) return null;
+  return restaurantId;
 }
 
 const createSchema = z.object({
@@ -88,6 +104,7 @@ export async function scanPartnerDemoMenu(_prev: DemoScanState, formData: FormDa
   const res = await scanAndSaveMenu(restaurantId, files);
   if (!res.ok) return { error: res.error };
   revalidatePath(PATH);
+  revalidatePath(demoPath(restaurantId));
   return { ok: true, added: res.added };
 }
 
@@ -101,4 +118,146 @@ export async function deletePartnerDemo(formData: FormData): Promise<void> {
     tx.restaurant.deleteMany({ where: { id, demoPartnerId: partner.id } }),
   );
   revalidatePath(PATH);
+  redirect(PATH);
+}
+
+// --------------------------------------------------------------- Menu builder
+// All actions below are ownership-checked (the demo must belong to the partner)
+// and scope every write by restaurantId so a partner can only touch their own.
+
+/** Edit the demo's business details + logo (upload a file OR paste a URL). */
+export async function updatePartnerDemoDetails(formData: FormData): Promise<void> {
+  const restaurantId = await guardOwnedDemo(formData);
+  if (!restaurantId) return;
+  const name = String(formData.get("name") ?? "").trim();
+  const tagline = String(formData.get("tagline") ?? "").trim();
+  const address = String(formData.get("address") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").trim();
+
+  let logoUpdate: { logoUrl?: string | null } = {};
+  const logoFile = formData.get("logo");
+  const logoUrl = String(formData.get("logoUrl") ?? "").trim();
+  if (logoFile instanceof File && logoFile.size > 0) {
+    try {
+      logoUpdate = { logoUrl: await uploadMenuImage(restaurantId, logoFile) };
+    } catch {
+      /* keep any pasted URL on upload failure */
+    }
+  }
+  if (!logoUpdate.logoUrl && formData.has("logoUrl")) {
+    logoUpdate = { logoUrl: logoUrl || null };
+  }
+
+  await systemDb((tx) =>
+    tx.restaurant.update({
+      where: { id: restaurantId },
+      data: {
+        ...(name ? { name, displayName: name } : {}),
+        tagline: tagline || null,
+        ...logoUpdate,
+        printerConfig: receiptJson(address, phone),
+      },
+      select: { id: true },
+    }),
+  );
+  revalidatePath(demoPath(restaurantId));
+}
+
+export async function addPartnerCategory(formData: FormData): Promise<void> {
+  const restaurantId = await guardOwnedDemo(formData);
+  if (!restaurantId) return;
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return;
+  await systemDb((tx) => tx.category.create({ data: { restaurantId, name: name.slice(0, 80) }, select: { id: true } }));
+  revalidatePath(demoPath(restaurantId));
+}
+
+export async function deletePartnerCategory(formData: FormData): Promise<void> {
+  const restaurantId = await guardOwnedDemo(formData);
+  if (!restaurantId) return;
+  const id = String(formData.get("id") ?? "");
+  await systemDb((tx) => tx.category.deleteMany({ where: { id, restaurantId } }));
+  revalidatePath(demoPath(restaurantId));
+}
+
+export async function addPartnerItem(formData: FormData): Promise<void> {
+  const restaurantId = await guardOwnedDemo(formData);
+  if (!restaurantId) return;
+  const categoryId = String(formData.get("categoryId") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name || !categoryId) return;
+  // The category must belong to this same demo.
+  const cat = await systemDb((tx) =>
+    tx.category.findFirst({ where: { id: categoryId, restaurantId }, select: { id: true } }),
+  );
+  if (!cat) return;
+
+  const price = pesosToCentavos(Number(formData.get("price") ?? 0));
+  const description = String(formData.get("description") ?? "").trim() || null;
+  let imageUrl = String(formData.get("imageUrl") ?? "").trim() || null;
+  if (imageUrl && !/^https?:\/\//i.test(imageUrl)) imageUrl = null; // only http(s) addresses
+  const image = formData.get("image");
+  if (image instanceof File && image.size > 0) {
+    try {
+      imageUrl = await uploadMenuImage(restaurantId, image);
+    } catch {
+      /* keep any pasted URL on upload failure */
+    }
+  }
+  await systemDb((tx) =>
+    tx.menuItem.create({
+      data: { restaurantId, categoryId, name: name.slice(0, 120), price, description, imageUrl },
+      select: { id: true },
+    }),
+  );
+  revalidatePath(demoPath(restaurantId));
+}
+
+/** Set an item's photo from a pasted image address (no download). */
+export async function setPartnerItemPhotoUrl(formData: FormData): Promise<void> {
+  const restaurantId = await guardOwnedDemo(formData);
+  if (!restaurantId) return;
+  const id = String(formData.get("id") ?? "");
+  const raw = String(formData.get("imageUrl") ?? "").trim();
+  if (raw && !/^https?:\/\//i.test(raw)) return;
+  await systemDb((tx) =>
+    tx.menuItem.updateMany({ where: { id, restaurantId }, data: { imageUrl: raw || null } }),
+  );
+  revalidatePath(demoPath(restaurantId));
+}
+
+/** Replace an item's photo from an uploaded file. */
+export async function uploadPartnerItemPhoto(formData: FormData): Promise<void> {
+  const restaurantId = await guardOwnedDemo(formData);
+  if (!restaurantId) return;
+  const id = String(formData.get("id") ?? "");
+  const image = formData.get("image");
+  if (!(image instanceof File) || image.size === 0) return;
+  let imageUrl: string;
+  try {
+    imageUrl = await uploadMenuImage(restaurantId, image);
+  } catch {
+    return;
+  }
+  await systemDb((tx) => tx.menuItem.updateMany({ where: { id, restaurantId }, data: { imageUrl } }));
+  revalidatePath(demoPath(restaurantId));
+}
+
+export async function togglePartnerItem(formData: FormData): Promise<void> {
+  const restaurantId = await guardOwnedDemo(formData);
+  if (!restaurantId) return;
+  const id = String(formData.get("id") ?? "");
+  const available = formData.get("available") === "true";
+  await systemDb((tx) =>
+    tx.menuItem.updateMany({ where: { id, restaurantId }, data: { isAvailable: available } }),
+  );
+  revalidatePath(demoPath(restaurantId));
+}
+
+export async function deletePartnerItem(formData: FormData): Promise<void> {
+  const restaurantId = await guardOwnedDemo(formData);
+  if (!restaurantId) return;
+  const id = String(formData.get("id") ?? "");
+  await systemDb((tx) => tx.menuItem.deleteMany({ where: { id, restaurantId } }));
+  revalidatePath(demoPath(restaurantId));
 }
