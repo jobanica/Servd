@@ -26,16 +26,24 @@ export function ItemModal({
   onAdd: (line: CartLine) => void;
   onClose: () => void;
 }) {
+  const variants = item.variants ?? [];
+  const [variantId, setVariantId] = useState<string>(variants[0]?.id ?? "");
   const [selection, setSelection] = useState<Selection>({});
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState("");
   const [showError, setShowError] = useState(false);
   const t = useTranslations("item");
 
-  const price = useMemo(() => unitPrice(item, selection), [item, selection]);
+  // The chosen size sets the base price; modifiers add on top of it.
+  const chosenVariant = variants.find((v) => v.id === variantId) ?? null;
+  const effItem = useMemo(
+    () => (chosenVariant ? { ...item, price: chosenVariant.price } : item),
+    [item, chosenVariant],
+  );
+  const price = useMemo(() => unitPrice(effItem, selection), [effItem, selection]);
   const error = useMemo(
-    () => validateSelection(item, selection),
-    [item, selection],
+    () => validateSelection(effItem, selection),
+    [effItem, selection],
   );
 
   function toggle(groupId: string, modId: string, single: boolean, max: number) {
@@ -58,12 +66,13 @@ export function ItemModal({
     onAdd({
       lineId: lineId(),
       itemId: item.id,
-      name: item.name,
-      basePrice: item.price,
+      name: chosenVariant ? `${item.name} (${chosenVariant.name})` : item.name,
+      basePrice: effItem.price,
       unitPrice: price,
       quantity,
-      modifiers: selectionToLineModifiers(item, selection),
+      modifiers: selectionToLineModifiers(effItem, selection),
       note: note.trim() || undefined,
+      variantId: chosenVariant?.id,
     });
   }
 
@@ -108,6 +117,33 @@ export function ItemModal({
           <div className="mt-3">
             <VideoPlayer url={item.videoUrl} poster={item.videoPosterUrl ?? item.imageUrl} />
           </div>
+        )}
+
+        {variants.length > 0 && (
+          <fieldset className="mt-5">
+            <legend className="font-semibold text-brand-ink">
+              Size <span className="text-xs font-normal text-plum-ink/50">({t("required")})</span>
+            </legend>
+            <div className="mt-2 space-y-1">
+              {variants.map((v) => (
+                <label
+                  key={v.id}
+                  className="flex cursor-pointer items-center justify-between rounded-lg border border-plum-ink/10 px-3 py-2"
+                >
+                  <span className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="__variant"
+                      checked={variantId === v.id}
+                      onChange={() => setVariantId(v.id)}
+                    />
+                    {v.name}
+                  </span>
+                  <span className="text-sm font-semibold text-brand-ink">{formatPeso(v.price)}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
         )}
 
         {item.groups.map((group) => {

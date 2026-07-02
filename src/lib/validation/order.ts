@@ -18,6 +18,8 @@ export const placeOrderSchema = z.object({
         note: z.string().trim().max(200).optional(),
         // Flat list of chosen modifier ids; server maps them back to groups.
         modifierIds: z.array(z.string().uuid()).max(50).default([]),
+        // Chosen size/variant id (server re-resolves its price).
+        variantId: z.string().uuid().optional(),
       }),
     )
     .min(1, "Your cart is empty")

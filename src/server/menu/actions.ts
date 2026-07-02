@@ -7,6 +7,7 @@ import { requireAdminAction } from "@/server/tenancy/require-admin";
 import { uploadMenuImage } from "@/server/storage/menu-images";
 import { uploadMenuVideo } from "@/server/storage/menu-videos";
 import { setDailyLimit } from "@/server/menu/servings";
+import { setItemVariants } from "@/server/menu/variants";
 import { pesosToCentavos } from "@/lib/money";
 import { sanitizeTags } from "@/lib/menu/dietary";
 import {
@@ -226,6 +227,24 @@ async function saveFoodCost(restaurantId: string, menuItemId: string, raw: FormD
   } catch {
     /* menu_item_costs table not migrated yet — ignore */
   }
+}
+
+/**
+ * Save an item's sizes/variants (name + price rows). Replaces the full list.
+ * Submitted as parallel arrays: variantName[] + variantPrice[] (pesos).
+ */
+export async function saveItemVariants(formData: FormData): Promise<void> {
+  const { restaurantId } = await requireAdminAction();
+  const id = String(formData.get("id"));
+  const names = formData.getAll("variantName").map(String);
+  const prices = formData.getAll("variantPrice").map(String);
+  const list = names.map((name, i) => ({
+    name,
+    price: pesosToCentavos(Number(prices[i]) || 0),
+  }));
+  await setItemVariants(restaurantId, id, list);
+  await refresh();
+  revalidatePath(`/admin/menu/${id}`);
 }
 
 /** Out-of-stock toggle, used straight from the menu list. */

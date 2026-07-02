@@ -89,7 +89,7 @@ export type PreviewResult =
 export async function previewPromoCode(input: {
   slug: string;
   code: string;
-  lines: { itemId: string; quantity: number; modifierIds?: string[] }[];
+  lines: { itemId: string; quantity: number; modifierIds?: string[]; variantId?: string }[];
 }): Promise<PreviewResult> {
   const code = (input.code ?? "").trim();
   if (!code) return { ok: false, error: "Enter a code." };
@@ -110,6 +110,7 @@ export async function previewPromoCode(input: {
         itemId: l.itemId,
         quantity: l.quantity,
         modifierIds: l.modifierIds ?? [],
+        variantId: l.variantId,
       })),
     );
   } catch (e) {

@@ -886,10 +886,31 @@ model MenuItem {
   recipeComponents RecipeComponent[]
   foodCost         MenuItemCost?
   serving          MenuItemServing?
+  variants         MenuItemVariant[]
 
   @@index([restaurantId])
   @@index([categoryId])
   @@map("menu_items")
+}
+
+// Per-item sizes/variants (e.g. fish/pork sold by size or weight): one item with
+// several named options, each its own absolute price (centavos). The chosen
+// variant replaces the item's base price — separate from modifiers. Own table so
+// existing menu_items reads stay safe on a lagging DB.
+model MenuItemVariant {
+  id           String   @id @default(uuid())
+  restaurantId String
+  menuItemId   String
+  name         String // "Small", "1/2 kilo", "Large", …
+  price        Int // absolute price in centavos
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  @@index([menuItemId])
+  @@index([restaurantId])
+  @@map("menu_item_variants")
 }
 
 // Per-item daily servings cap (e.g. "only 5 of these per day"). Lives in its own

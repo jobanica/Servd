@@ -5,6 +5,8 @@ import { tenantDb } from "@/server/tenancy/scoped-db";
 import { getItem, getCategories, getModifierGroups } from "@/server/menu/queries";
 import { getMenuItemCost } from "@/server/menu/cost";
 import { getServingStates } from "@/server/menu/servings";
+import { getItemVariants } from "@/server/menu/variants";
+import { VariantEditor } from "@/components/admin/VariantEditor";
 import { formatDelta } from "@/lib/money";
 import { EditItemForm } from "@/components/admin/EditItemForm";
 import { ItemTranslationForm } from "@/components/admin/ItemTranslationForm";
@@ -34,6 +36,7 @@ export default async function EditItemPage({
 
   const foodCost = await getMenuItemCost(restaurantId, itemId);
   const servingState = (await getServingStates(restaurantId, [itemId])).get(itemId);
+  const variants = await getItemVariants(restaurantId, itemId);
   const translationByLocale = new Map(translations.map((tr) => [tr.locale, tr]));
 
   // Recipe (inventory module).
@@ -68,6 +71,8 @@ export default async function EditItemPage({
         }}
         categories={categories}
       />
+
+      <VariantEditor itemId={item.id} initial={variants} />
 
       <section className="rounded-tile border border-plum-ink/10 bg-white p-5">
         <h2 className="font-heading text-lg font-bold">Modifier groups</h2>

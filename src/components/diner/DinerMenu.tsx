@@ -77,11 +77,12 @@ function ProductCard({
           </span>
         )}
 
-        {/* price pill (struck-through original when on happy hour) */}
+        {/* price pill (struck-through original when on happy hour; "from" for sizes) */}
         <span className="absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-brand-primary px-2.5 py-1 text-xs font-extrabold text-white shadow">
           {item.originalPrice && item.originalPrice > item.price && (
             <span className="font-medium text-white/70 line-through">{formatPeso(item.originalPrice)}</span>
           )}
+          {item.variants && item.variants.length > 0 && <span className="font-medium">from</span>}
           {formatPeso(item.price)}
         </span>
 
@@ -249,6 +250,7 @@ export function DinerMenu({
         quantity: l.quantity,
         note: l.note,
         modifierIds: l.modifiers.map((m) => m.modifierId),
+        variantId: l.variantId,
       })),
     });
   }
@@ -272,6 +274,7 @@ export function DinerMenu({
           itemId: l.itemId,
           quantity: l.quantity,
           modifierIds: l.modifiers.map((m) => m.modifierId),
+          variantId: l.variantId,
         })),
       });
       if (res.ok) {
