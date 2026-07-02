@@ -30,6 +30,7 @@ const schema = z.object({
         quantity: z.coerce.number().int().min(1).max(99),
         note: z.string().trim().max(200).optional(),
         modifierIds: z.array(z.string().uuid()).max(50).default([]),
+        variantId: z.string().uuid().optional(),
       }),
     )
     .min(1, "Your cart is empty")

@@ -3,6 +3,7 @@ import type { DinerCategory } from "@/lib/cart/types";
 import { effectivePrice } from "@/lib/pricing/happy-hour";
 import { getActiveHappyHours } from "@/server/pricing/happy-hour";
 import { getServingStates } from "@/server/menu/servings";
+import { getVariantsMap } from "@/server/menu/variants";
 
 /**
  * Loads a restaurant's full menu for the diner page, by restaurantId. Returns
@@ -44,6 +45,8 @@ export async function getPublicMenu(
   // Daily servings caps — an item that's hit its cap shows as sold out for today.
   const itemIds = categories.flatMap((c) => c.menuItems.map((i) => i.id));
   const servings = await getServingStates(restaurantId, itemIds);
+  // Sizes/variants per item (best-effort).
+  const variantsMap = await getVariantsMap(itemIds);
 
   // Overlay the requested locale's translations, falling back to base text.
   return categories.map((c) => ({
@@ -54,12 +57,22 @@ export async function getPublicMenu(
       // Out of daily servings → sold out for the rest of today.
       const cap = servings.get(item.id);
       const cappedOut = cap?.remaining != null && cap.remaining <= 0;
+      // Sizes/variants: each priced through happy-hour like the base price.
+      const rawVariants = variantsMap.get(item.id) ?? [];
+      const variants = rawVariants.map((v) => ({
+        id: v.id,
+        name: v.name,
+        price: effectivePrice(v.price, { id: item.id, categoryId: item.categoryId }, happyHours).price,
+      }));
+      // For variant items, the card shows the lowest size as the "from" price.
+      const fromPrice = variants.length > 0 ? Math.min(...variants.map((v) => v.price)) : eff.price;
       return {
       id: item.id,
       name: item.translations[0]?.name ?? item.name,
       description: item.translations[0]?.description ?? item.description,
-      price: eff.price,
-      originalPrice: eff.discount > 0 ? eff.originalPrice : null,
+      price: fromPrice,
+      originalPrice: eff.discount > 0 && variants.length === 0 ? eff.originalPrice : null,
+      ...(variants.length > 0 ? { variants } : {}),
       imageUrl: item.imageUrl,
       videoUrl: item.videoUrl,
       videoPosterUrl: item.videoPosterUrl,

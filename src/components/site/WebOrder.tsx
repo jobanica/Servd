@@ -75,12 +75,16 @@ function groupHours(hours: DayHours[]): { label: string; value: string }[] {
 
 /** Inline modifier/quantity picker (no i18n dependency). */
 function ItemConfig({ item, onAdd, onCancel }: { item: DinerItem; onAdd: (l: CartLine) => void; onCancel: () => void }) {
+  const variants = item.variants ?? [];
+  const [variantId, setVariantId] = useState<string>(variants[0]?.id ?? "");
   const [selection, setSelection] = useState<Selection>({});
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState("");
   const [showError, setShowError] = useState(false);
-  const price = useMemo(() => unitPrice(item, selection), [item, selection]);
-  const error = useMemo(() => validateSelection(item, selection), [item, selection]);
+  const chosenVariant = variants.find((v) => v.id === variantId) ?? null;
+  const effItem = useMemo(() => (chosenVariant ? { ...item, price: chosenVariant.price } : item), [item, chosenVariant]);
+  const price = useMemo(() => unitPrice(effItem, selection), [effItem, selection]);
+  const error = useMemo(() => validateSelection(effItem, selection), [effItem, selection]);
 
   function toggle(g: string, m: string, single: boolean, max: number) {
     setSelection((prev) => {
@@ -96,12 +100,13 @@ function ItemConfig({ item, onAdd, onCancel }: { item: DinerItem; onAdd: (l: Car
     onAdd({
       lineId: lineId(),
       itemId: item.id,
-      name: item.name,
-      basePrice: item.price,
+      name: chosenVariant ? `${item.name} (${chosenVariant.name})` : item.name,
+      basePrice: effItem.price,
       unitPrice: price,
       quantity,
-      modifiers: selectionToLineModifiers(item, selection),
+      modifiers: selectionToLineModifiers(effItem, selection),
       note: note.trim() || undefined,
+      variantId: chosenVariant?.id,
     });
   }
 
@@ -113,6 +118,22 @@ function ItemConfig({ item, onAdd, onCancel }: { item: DinerItem; onAdd: (l: Car
           <button onClick={onCancel} className="text-2xl leading-none text-plum-ink/40">×</button>
         </div>
         {item.description && <p className="mt-1 text-sm text-plum-ink/60">{item.description}</p>}
+        {variants.length > 0 && (
+          <fieldset className="mt-4">
+            <legend className="font-semibold text-plum-ink">Size <span className="text-guava">*</span></legend>
+            <div className="mt-2 space-y-1">
+              {variants.map((v) => (
+                <label key={v.id} className="flex items-center justify-between rounded-lg border border-plum-ink/10 px-3 py-2 text-sm">
+                  <span className="flex items-center gap-2">
+                    <input type="radio" name="__variant" checked={variantId === v.id} onChange={() => setVariantId(v.id)} />
+                    {v.name}
+                  </span>
+                  <span className="font-semibold text-plum-ink">{formatPeso(v.price)}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        )}
         {item.groups.map((group) => {
           const single = group.maxSelect === 1;
           const chosen = selection[group.id] ?? [];
@@ -166,7 +187,10 @@ function ProductCard({ item, onPick }: { item: DinerItem; onPick: (i: DinerItem)
       <p className="font-semibold text-plum-ink">{item.name}</p>
       {item.description && <p className="mt-0.5 line-clamp-2 text-xs text-plum-ink/50">{item.description}</p>}
       <div className="mt-2 flex items-center justify-between">
-        <span className="font-bold text-plum-ink">{formatPeso(item.price)}</span>
+        <span className="font-bold text-plum-ink">
+          {item.variants && item.variants.length > 0 && <span className="text-xs font-medium text-plum-ink/50">from </span>}
+          {formatPeso(item.price)}
+        </span>
         <button
           onClick={() => onPick(item)}
           disabled={!item.isAvailable}
@@ -215,7 +239,8 @@ export function WebOrder(props: WebOrderProps) {
 
   function pick(item: DinerItem) {
     if (!item.isAvailable) return;
-    if (item.groups.length === 0) {
+    // Items with modifiers OR sizes need the picker; only plain items shortcut.
+    if (item.groups.length === 0 && !(item.variants && item.variants.length > 0)) {
       setLines((p) => [...p, { lineId: lineId(), itemId: item.id, name: item.name, basePrice: item.price, unitPrice: item.price, quantity: 1, modifiers: [] }]);
     } else setConfigItem(item);
   }
@@ -237,7 +262,7 @@ export function WebOrder(props: WebOrderProps) {
       deliveryZone: orderType === "delivery" ? zone || undefined : undefined,
       lat: orderType === "delivery" ? geo?.lat : undefined,
       lng: orderType === "delivery" ? geo?.lng : undefined,
-      lines: lines.map((l) => ({ itemId: l.itemId, quantity: l.quantity, note: l.note, modifierIds: l.modifiers.map((m) => m.modifierId) })),
+      lines: lines.map((l) => ({ itemId: l.itemId, quantity: l.quantity, note: l.note, modifierIds: l.modifiers.map((m) => m.modifierId), variantId: l.variantId })),
     });
     setBusy(false);
     if (res.ok) setPlacedId(res.orderId);

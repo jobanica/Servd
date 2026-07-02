@@ -5,6 +5,7 @@ import { unitPrice, validateSelection } from "@/lib/cart/pricing";
 import { effectivePrice } from "@/lib/pricing/happy-hour";
 import { getActiveHappyHoursTenant } from "@/server/pricing/happy-hour";
 import { getServingStates } from "@/server/menu/servings";
+import { getVariantsMap } from "@/server/menu/variants";
 import type { DinerItem, Selection } from "@/lib/cart/types";
 
 /**
@@ -23,6 +24,7 @@ export interface OrderLineInput {
   quantity: number;
   note?: string | null;
   modifierIds: string[];
+  variantId?: string | null; // chosen size, if the item has variants
 }
 
 export interface BuiltOrderItem {
@@ -68,6 +70,8 @@ export async function buildValidatedOrder(
 
   // Daily servings caps (only items with a configured limit appear here).
   const servings = await getServingStates(restaurantId, itemIds);
+  // Sizes/variants per item (best-effort). Prices are re-resolved server-side.
+  const variantsMap = await getVariantsMap(itemIds);
 
   let total = 0;
   const items: BuiltOrderItem[] = [];
@@ -93,8 +97,20 @@ export async function buildValidatedOrder(
       usedByItem.set(dbItem.id, wanted);
     }
 
+    // If the item has sizes, the chosen size sets the base price (re-resolved
+    // from the DB — the client never dictates the amount). Fall back to the first
+    // size if none/an unknown one was sent; the size name rides on nameAtTime.
+    const variants = variantsMap.get(dbItem.id) ?? [];
+    let baseAmount = dbItem.price;
+    let nameAtTime = dbItem.name;
+    if (variants.length > 0) {
+      const chosenVariant = variants.find((v) => v.id === line.variantId) ?? variants[0];
+      baseAmount = chosenVariant.price;
+      nameAtTime = `${dbItem.name} (${chosenVariant.name})`;
+    }
+
     const effBase = effectivePrice(
-      dbItem.price,
+      baseAmount,
       { id: dbItem.id, categoryId: dbItem.categoryId },
       happyHours,
     ).price;
@@ -142,7 +158,7 @@ export async function buildValidatedOrder(
 
     items.push({
       menuItemId: dbItem.id,
-      nameAtTime: dbItem.name,
+      nameAtTime, // includes the chosen size, e.g. "Bangus (Large)"
       quantity: line.quantity,
       unitPrice: effBase, // happy-hour-adjusted base snapshot; deltas live on modifiers
       note: line.note ?? null,

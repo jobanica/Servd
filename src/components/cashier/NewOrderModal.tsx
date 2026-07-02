@@ -32,13 +32,17 @@ function ItemConfig({
   onAdd: (line: CartLine) => void;
   onCancel: () => void;
 }) {
+  const variants = item.variants ?? [];
+  const [variantId, setVariantId] = useState<string>(variants[0]?.id ?? "");
   const [selection, setSelection] = useState<Selection>({});
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState("");
   const [showError, setShowError] = useState(false);
 
-  const price = useMemo(() => unitPrice(item, selection), [item, selection]);
-  const error = useMemo(() => validateSelection(item, selection), [item, selection]);
+  const chosenVariant = variants.find((v) => v.id === variantId) ?? null;
+  const effItem = useMemo(() => (chosenVariant ? { ...item, price: chosenVariant.price } : item), [item, chosenVariant]);
+  const price = useMemo(() => unitPrice(effItem, selection), [effItem, selection]);
+  const error = useMemo(() => validateSelection(effItem, selection), [effItem, selection]);
 
   function toggle(groupId: string, modId: string, single: boolean, max: number) {
     setSelection((prev) => {
@@ -58,12 +62,13 @@ function ItemConfig({
     onAdd({
       lineId: lineId(),
       itemId: item.id,
-      name: item.name,
-      basePrice: item.price,
+      name: chosenVariant ? `${item.name} (${chosenVariant.name})` : item.name,
+      basePrice: effItem.price,
       unitPrice: price,
       quantity,
-      modifiers: selectionToLineModifiers(item, selection),
+      modifiers: selectionToLineModifiers(effItem, selection),
       note: note.trim() || undefined,
+      variantId: chosenVariant?.id,
     });
   }
 
@@ -75,6 +80,33 @@ function ItemConfig({
           ×
         </button>
       </div>
+
+      {variants.length > 0 && (
+        <fieldset className="mt-3">
+          <legend className="text-xs font-semibold uppercase tracking-wide text-plum-ink/50">
+            Size <span className="text-guava">*</span>
+          </legend>
+          <div className="mt-1 space-y-1">
+            {variants.map((v) => (
+              <label
+                key={v.id}
+                className="flex items-center justify-between rounded-md border border-plum-ink/10 bg-white px-2 py-1 text-sm"
+              >
+                <span className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name={`${item.id}-variant`}
+                    checked={variantId === v.id}
+                    onChange={() => setVariantId(v.id)}
+                  />
+                  {v.name}
+                </span>
+                <span className="font-semibold text-plum-ink">{formatPeso(v.price)}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
 
       {item.groups.map((group) => {
         const single = group.maxSelect === 1;
@@ -178,8 +210,8 @@ export function NewOrderModal({
 
   function pickItem(item: DinerItem) {
     if (!item.isAvailable) return;
-    // No modifiers → add straight away; otherwise open the config panel.
-    if (item.groups.length === 0) {
+    // No modifiers AND no sizes → add straight away; otherwise open the panel.
+    if (item.groups.length === 0 && !(item.variants && item.variants.length > 0)) {
       setLines((prev) => [
         ...prev,
         {
@@ -211,6 +243,7 @@ export function NewOrderModal({
         quantity: l.quantity,
         note: l.note,
         modifierIds: l.modifiers.map((m) => m.modifierId),
+        variantId: l.variantId,
       })),
     });
     setSubmitting(false);
