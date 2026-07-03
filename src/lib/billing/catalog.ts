@@ -25,7 +25,7 @@ export const TIER_INFO: Record<Tier, TierInfo> = {
     pricePesos: 0,
     tagline: "Everything to take orders and run service — free for life.",
     highlights: [
-      "Up to 5 tables & 3 staff",
+      "1 dine-in table QR & 3 staff",
       "QR dine-in + counter/takeout order numbers",
       "Kitchen display & cashier POS",
       "Split payments, split bills & tips",
@@ -98,7 +98,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
       { label: "Reservations & waitlist", Free: false, Growth: true, Business: true },
       { label: "Online ordering website", Free: false, Growth: true, Business: true },
       { label: "Pickup & delivery orders", Free: false, Growth: true, Business: true },
-      { label: "Tables included", Free: "5", Growth: "20", Business: "Unlimited" },
+      { label: "Tables included", Free: "1", Growth: "20", Business: "Unlimited" },
       { label: "Staff accounts", Free: "3", Growth: "15", Business: "Unlimited" },
     ],
   },
