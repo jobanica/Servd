@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useTranslations } from "next-intl";
 import { AppIcon, Wordmark } from "@/components/Wordmark";
 import { signIn } from "./actions";
 
 export default function LoginPage() {
   const [state, formAction, pending] = useActionState(signIn, null);
+  const [showPassword, setShowPassword] = useState(false);
   const t = useTranslations("auth");
 
   return (
@@ -38,14 +39,24 @@ export default function LoginPage() {
           <label className="block text-sm font-medium" htmlFor="password">
             {t("password")}
           </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            required
-            autoComplete="current-password"
-            className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2"
-          />
+          <div className="relative mt-1">
+            <input
+              id="password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              required
+              autoComplete="current-password"
+              className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 pr-16"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((s) => !s)}
+              aria-pressed={showPassword}
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-xs font-semibold text-plum-ink/50 hover:text-plum-ink"
+            >
+              {showPassword ? "Hide" : "Show"}
+            </button>
+          </div>
         </div>
 
         <div className="text-right">
