@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { tenantDb, systemDb } from "@/server/tenancy/scoped-db";
@@ -58,6 +59,23 @@ export async function createEmployee(_p: FormState, formData: FormData): Promise
   }
   revalidatePath("/admin/hr");
   return { ok: true };
+}
+
+/**
+ * Delete an employee. Cascades remove their attendance/time entries, leave, and
+ * documents; their shifts become unassigned; a linked staff login is unlinked
+ * (not deleted). To keep records instead, set status to "inactive".
+ */
+export async function deleteEmployee(formData: FormData): Promise<void> {
+  const { restaurantId } = await requireHrAction();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  // Scope by restaurantId so an admin can only delete their own staff.
+  await tenantDb(restaurantId, (tx) =>
+    tx.employee.deleteMany({ where: { id, restaurantId } }),
+  );
+  revalidatePath("/admin/hr");
+  redirect("/admin/hr");
 }
 
 export async function updateEmployee(formData: FormData): Promise<void> {

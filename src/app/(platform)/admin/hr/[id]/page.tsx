@@ -11,7 +11,9 @@ import {
   setAvailability,
   deleteAvailability,
   setLeaveBalance,
+  deleteEmployee,
 } from "@/server/hr/actions";
+import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
@@ -138,6 +140,24 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
             })}
           </div>
         )}
+      </div>
+
+      {/* Danger zone */}
+      <div className="rounded-tile border border-guava/30 bg-guava/5 p-5">
+        <h2 className="font-heading text-lg font-bold text-guava">Danger zone</h2>
+        <p className="mt-1 text-sm text-plum-ink/60">
+          Deleting removes this employee and their attendance, time entries, leave, and documents.
+          To keep records instead, set their status to <span className="font-semibold">inactive</span> above.
+        </p>
+        <form action={deleteEmployee} className="mt-3">
+          <input type="hidden" name="id" value={employee.id} />
+          <ConfirmSubmitButton
+            confirmText={`Delete ${employee.fullName}? This permanently removes their attendance and HR records and can't be undone.`}
+            className="rounded-full bg-guava px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+          >
+            Delete employee
+          </ConfirmSubmitButton>
+        </form>
       </div>
     </div>
   );
