@@ -1,0 +1,15 @@
+{
+  "name": "servd-outreach-worker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FFmpeg render worker for Servd outreach videos (stitch intro + pre-baked tail).",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0"
+  }
+}

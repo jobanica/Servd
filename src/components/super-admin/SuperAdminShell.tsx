@@ -33,6 +33,7 @@ const I = {
   inbox: "M22 12h-6l-2 3h-4l-2-3H2 M5 5h14l3 7v6a2 2 0 01-2 2H4a2 2 0 01-2-2v-6z",
   store: "M3 9l1.5-5h15L21 9M4 9v10a1 1 0 001 1h14a1 1 0 001-1V9M3 9h18M9 20v-6h6v6",
   film: "M3 4h18v16H3zM7 4v16M17 4v16M3 9h4M17 9h4M3 15h4M17 15h4",
+  video: "M15 10l4.55-2.28A1 1 0 0121 8.62v6.76a1 1 0 01-1.45.9L15 14M4 6h9a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z",
   back: "M19 12H5M12 19l-7-7 7-7",
 };
 
@@ -43,6 +44,7 @@ const NAV = [
   { label: "Demo storefronts", href: "/super-admin/storefronts", d: I.store },
   { label: "Prospecting", href: "/super-admin/prospecting", d: I.pin },
   { label: "Client CRM", href: "/super-admin/crm", d: I.inbox },
+  { label: "Outreach videos", href: "/super-admin/outreach", d: I.video },
   { label: "Content Engine", href: "/super-admin/content-engine", d: I.film },
   { label: "Plans", href: "/super-admin/plans", d: I.layers },
   { label: "Invoices", href: "/super-admin/invoices", d: I.receipt },

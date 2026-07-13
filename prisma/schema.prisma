@@ -187,12 +187,34 @@ model CrmClient {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   touches     CrmTouch[]
+  outreachVideos OutreachVideo[]
 
   @@index([stage])
   @@index([nextDueAt])
   @@index([revisitAt])
   @@index([createdAt])
   @@map("crm_clients")
+}
+
+/// Personalized outreach video (super-admin only): the operator records a short
+/// personalized intro on their phone (QR handoff), which is stitched with a
+/// pre-baked tail into one vertical MP4 to send manually via Messenger.
+model OutreachVideo {
+  id                   String    @id @default(uuid())
+  crmClientId          String
+  status               String    @default("awaiting_recording") // awaiting_recording | uploading | rendering | ready | failed
+  recordToken          String?   @unique // short-lived, single-use handoff token for the phone
+  recordTokenExpiresAt DateTime?
+  introPath            String? // raw phone recording (storage path)
+  finalPath            String? // rendered / final MP4 (storage path)
+  errorMessage         String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  crmClient CrmClient @relation(fields: [crmClientId], references: [id], onDelete: Cascade)
+
+  @@index([crmClientId])
+  @@map("outreach_videos")
 }
 
 /// One logged outreach touch (initial message / follow-up) for a CRM client.
