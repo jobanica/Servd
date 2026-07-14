@@ -27,14 +27,33 @@ export function StorefrontForm({
         <p className="mt-1 text-sm text-plum-ink/50">Shown on your website (Philippine time).</p>
         <div className="mt-4 space-y-2">
           {DAY_LABELS.map((label, i) => (
-            <div key={i} className="flex flex-wrap items-center gap-3">
-              <span className="w-10 text-sm font-semibold text-plum-ink/70">{label}</span>
-              <input type="time" name={`open_${i}`} defaultValue={initial.hours[i]?.open ?? "09:00"} className="rounded-lg border border-plum-ink/15 px-2 py-1.5 text-sm" />
-              <span className="text-plum-ink/40">–</span>
-              <input type="time" name={`close_${i}`} defaultValue={initial.hours[i]?.close ?? "21:00"} className="rounded-lg border border-plum-ink/15 px-2 py-1.5 text-sm" />
-              <label className="flex items-center gap-1.5 text-sm text-plum-ink/60">
-                <input type="checkbox" name={`closed_${i}`} defaultChecked={initial.hours[i]?.closed} /> Closed
-              </label>
+            <div
+              key={i}
+              className="rounded-lg border border-plum-ink/10 p-3 sm:flex sm:items-center sm:gap-3 sm:border-0 sm:p-0"
+            >
+              {/* Day + Closed toggle */}
+              <div className="flex items-center justify-between sm:contents">
+                <span className="text-sm font-semibold text-plum-ink/70 sm:w-10">{label}</span>
+                <label className="flex items-center gap-1.5 text-sm text-plum-ink/60 sm:order-last">
+                  <input type="checkbox" name={`closed_${i}`} defaultChecked={initial.hours[i]?.closed} /> Closed
+                </label>
+              </div>
+              {/* Open – Close (full-width on phones) */}
+              <div className="mt-2 flex items-center gap-2 sm:mt-0">
+                <input
+                  type="time"
+                  name={`open_${i}`}
+                  defaultValue={initial.hours[i]?.open ?? "09:00"}
+                  className="min-w-0 flex-1 rounded-lg border border-plum-ink/15 px-2 py-2 text-sm sm:flex-none"
+                />
+                <span className="shrink-0 text-plum-ink/40">–</span>
+                <input
+                  type="time"
+                  name={`close_${i}`}
+                  defaultValue={initial.hours[i]?.close ?? "21:00"}
+                  className="min-w-0 flex-1 rounded-lg border border-plum-ink/15 px-2 py-2 text-sm sm:flex-none"
+                />
+              </div>
             </div>
           ))}
         </div>
