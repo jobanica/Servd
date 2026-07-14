@@ -43,11 +43,15 @@ export async function getPlanAccess(restaurantId: string): Promise<PlanAccess> {
       const onTrial =
         sub?.status === "trialing" && sub.trialEndsAt != null && sub.trialEndsAt.getTime() > Date.now();
       const tier = asTier(sub?.plan?.name);
-      // Stored features are authoritative once configured; otherwise fall back
-      // to the tier defaults (an unknown plan name fails open to everything).
+      const tierDefaults = tier ? defaultFeaturesForTier(tier) : ALL_FEATURES;
       const stored = sanitizeFeatures(sub?.plan?.features ?? []);
+      // During a trial, grant the FULL trialed tier so every feature of that tier
+      // is unlocked (Growth trial → all Growth features), even if the plan's
+      // stored list is customized/incomplete — but still no higher-tier features.
+      // Off-trial, the plan's stored features are authoritative (falling back to
+      // the tier defaults; an unknown plan name fails open to everything).
       const features = new Set<Feature>(
-        stored.length ? stored : tier ? defaultFeaturesForTier(tier) : ALL_FEATURES,
+        onTrial ? tierDefaults : stored.length ? stored : tierDefaults,
       );
       return { tier, onTrial, features };
     });
