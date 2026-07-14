@@ -90,12 +90,12 @@ export default async function BillingPage({
       {trialDays !== null && (
         <div className="rounded-tile border border-brand-primary/30 bg-brand-primary/5 p-5">
           <p className="font-heading text-lg font-bold text-brand-primary">
-            ✨ You&apos;re on the free trial — every feature unlocked
+            ✨ You&apos;re on the {sub?.plan.name ?? ""} free trial
           </p>
           <p className="mt-1 text-sm text-plum-ink/70">
-            {trialDays} day{trialDays === 1 ? "" : "s"} left. Inventory, HR, custom domain, AI
-            insights, promotions and more are all included at no cost during your trial. Add a
-            payment method any time to keep going after it ends.
+            {trialDays} day{trialDays === 1 ? "" : "s"} left. Everything in your{" "}
+            {sub?.plan.name ?? "plan"} is unlocked at no cost during the trial. Add a payment method
+            any time to keep going after it ends.
           </p>
         </div>
       )}
