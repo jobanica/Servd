@@ -76,74 +76,75 @@ export default async function MenuPage() {
             {category.menuItems.map((item) => (
               <li
                 key={item.id}
-                className="flex items-center gap-3 py-3"
+                className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:gap-3"
               >
-                {item.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={item.imageUrl}
-                    alt={item.name}
-                    className="h-12 w-12 rounded-lg object-cover"
-                  />
-                ) : (
-                  <div className="h-12 w-12 rounded-lg bg-cream" />
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{item.name}</span>
-                    {!item.isAvailable && (
-                      <span className="rounded-full bg-muted/20 px-2 py-0.5 text-xs text-muted">
-                        Out of stock
-                      </span>
-                    )}
-                    {(() => {
-                      const cap = servings.get(item.id);
-                      if (!cap || cap.remaining == null) return null;
-                      return cap.remaining <= 0 ? (
-                        <span className="rounded-full bg-guava/15 px-2 py-0.5 text-xs font-medium text-guava">
-                          Sold out today
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-brand-primary/10 px-2 py-0.5 text-xs font-medium text-brand-primary">
-                          {cap.remaining} / {cap.dailyLimit} left today
-                        </span>
-                      );
-                    })()}
-                  </div>
-                  {item.description && (
-                    <p className="truncate text-sm text-plum-ink/50">
-                      {item.description}
-                    </p>
+                {/* Image · name/price */}
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  {item.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={item.imageUrl}
+                      alt={item.name}
+                      className="h-12 w-12 shrink-0 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <div className="h-12 w-12 shrink-0 rounded-lg bg-cream" />
                   )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="font-medium">{item.name}</span>
+                      {!item.isAvailable && (
+                        <span className="rounded-full bg-muted/20 px-2 py-0.5 text-xs text-muted">
+                          Out of stock
+                        </span>
+                      )}
+                      {(() => {
+                        const cap = servings.get(item.id);
+                        if (!cap || cap.remaining == null) return null;
+                        return cap.remaining <= 0 ? (
+                          <span className="rounded-full bg-guava/15 px-2 py-0.5 text-xs font-medium text-guava">
+                            Sold out today
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-brand-primary/10 px-2 py-0.5 text-xs font-medium text-brand-primary">
+                            {cap.remaining} / {cap.dailyLimit} left today
+                          </span>
+                        );
+                      })()}
+                    </div>
+                    {item.description && (
+                      <p className="truncate text-sm text-plum-ink/50">
+                        {item.description}
+                      </p>
+                    )}
+                  </div>
+                  <span className="shrink-0 font-semibold">{formatPeso(item.price)}</span>
                 </div>
-                <span className="font-semibold">{formatPeso(item.price)}</span>
 
-                {/* Out-of-stock toggle */}
-                <form action={toggleItemAvailability}>
-                  <input type="hidden" name="id" value={item.id} />
-                  <input
-                    type="hidden"
-                    name="available"
-                    value={(!item.isAvailable).toString()}
-                  />
-                  <button className="rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold">
-                    {item.isAvailable ? "Mark out" : "Mark in"}
-                  </button>
-                </form>
+                {/* Actions — own row on phones, inline on larger screens */}
+                <div className="flex shrink-0 items-center gap-2 pl-[60px] sm:pl-0">
+                  <form action={toggleItemAvailability}>
+                    <input type="hidden" name="id" value={item.id} />
+                    <input type="hidden" name="available" value={(!item.isAvailable).toString()} />
+                    <button className="rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold">
+                      {item.isAvailable ? "Mark out" : "Mark in"}
+                    </button>
+                  </form>
 
-                <Link
-                  href={`/admin/menu/${item.id}`}
-                  className="rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold"
-                >
-                  Edit
-                </Link>
+                  <Link
+                    href={`/admin/menu/${item.id}`}
+                    className="rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold"
+                  >
+                    Edit
+                  </Link>
 
-                <form action={deleteItem}>
-                  <input type="hidden" name="id" value={item.id} />
-                  <button className="text-xs text-muted hover:text-guava">
-                    Delete
-                  </button>
-                </form>
+                  <form action={deleteItem} className="ml-auto sm:ml-0">
+                    <input type="hidden" name="id" value={item.id} />
+                    <button className="rounded-lg px-2 py-1.5 text-xs font-semibold text-muted hover:text-guava">
+                      Delete
+                    </button>
+                  </form>
+                </div>
               </li>
             ))}
           </ul>
