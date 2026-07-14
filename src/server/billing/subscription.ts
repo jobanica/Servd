@@ -17,13 +17,8 @@ export const PLAN_FIELDS = {
   createdAt: true,
 } satisfies Prisma.PlanSelect;
 
-/**
- * Free trial length for a PAID plan an existing owner chooses from the billing
- * page — no credit card required.
- */
-export const TRIAL_DAYS = 14;
-
-/** New-account trial length: every new restaurant starts on a Business trial. */
+/** New-account trial length: every new restaurant starts on a 30-day Business
+ * trial (full access). There is no separate per-plan trial. */
 export const SIGNUP_TRIAL_DAYS = 30;
 
 /** The lowest-priced active plan = the Free tier. */
@@ -147,8 +142,10 @@ export async function changePlan(restaurantId: string, planId: string) {
  * Owner picks a plan from the billing page:
  *   - Free            → lifetime free, active immediately (no trial, no expiry).
  *   - Paid + saved card → switch now; the next cycle bills the new price.
- *   - Paid, no card   → start a 14-day FREE TRIAL (no card). When it ends unpaid
- *                       the daily cron reverts them to the Free plan.
+ *   - Paid, no card   → NO new free trial. Keep the account's existing trial
+ *                       window (the 30-day signup trial) if any; otherwise the
+ *                       billing page prompts for a payment method. When an unpaid
+ *                       trial ends the daily cron reverts them to the Free plan.
  *
  * Schema-lag resilient: reads use explicit selects (only always-present columns),
  * and if the full write hits a newer column the live DB hasn't migrated yet, we
@@ -176,12 +173,12 @@ export async function startPlan(restaurantId: string, planId: string) {
       if (!minimal) {
         if (isFree) {
           data = { planId, status, trialEndsAt: null, cancelAtPeriodEnd: false };
-        } else if (hasCard) {
-          data = { planId, status, cancelAtPeriodEnd: false };
         } else {
-          const trialEndsAt = new Date();
-          trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_DAYS);
-          data = { planId, status, trialEndsAt, currentPeriodEnd: trialEndsAt, cancelAtPeriodEnd: false };
+          // Paid plan: no new free trial. Keep the existing trial window (the
+          // 30-day signup trial) untouched by not writing trialEndsAt — with a
+          // card they're active; without one they stay `trialing` and the billing
+          // page prompts to pay (cron reverts to Free when an unpaid trial ends).
+          data = { planId, status, cancelAtPeriodEnd: false };
         }
       }
 

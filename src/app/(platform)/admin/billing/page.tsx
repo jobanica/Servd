@@ -62,8 +62,8 @@ export default async function BillingPage({
       {/* Plan-switch result banners */}
       {plan === "changed" && (
         <div className="rounded-tile border border-brand-primary/30 bg-brand-primary/5 p-4 text-sm font-semibold text-brand-primary">
-          You&apos;re all set — your plan was updated. Paid plans start with a 14-day free trial; no
-          charge until it ends.
+          You&apos;re all set — your plan was updated. It takes effect when your free trial ends; add
+          a payment method any time to keep going.
         </div>
       )}
       {plan === "error" && (
@@ -139,8 +139,8 @@ export default async function BillingPage({
       <div>
         <h2 className="mb-1 font-heading text-lg font-bold">Choose your plan</h2>
         <p className="mb-2 text-sm text-plum-ink/55">
-          Free is yours for life. Try any paid plan free for 14 days — no credit card. If you
-          don&apos;t add payment, you simply roll back to Free.
+          Every new account gets 30 days of full access — no credit card. Pick the plan you want to
+          keep; add a payment method before the trial ends, or you simply roll back to Free.
         </p>
         <p className="mb-4 text-xs text-plum-ink/45">
           Prices may increase without prior notice.
