@@ -77,17 +77,21 @@ async function getPlanAccessByTier(restaurantId: string): Promise<PlanAccess> {
   }
 }
 
-/** Whether the restaurant's plan includes a feature (trial = everything). */
+/**
+ * Whether the restaurant's plan includes a feature. A trial unlocks the features
+ * of the plan being trialed (Growth trial → Growth features, not Business) — the
+ * `features` set is already resolved from that plan, so there's no blanket
+ * trial override.
+ */
 export async function hasFeature(restaurantId: string, feature: Feature): Promise<boolean> {
-  const { onTrial, features } = await getPlanAccess(restaurantId);
-  if (onTrial) return true; // free trial unlocks all features
+  const { features } = await getPlanAccess(restaurantId);
   return features.has(feature);
 }
 
 /** The full set of features the restaurant currently has access to. */
 export async function getEntitledFeatures(restaurantId: string): Promise<Set<Feature>> {
-  const { onTrial, features } = await getPlanAccess(restaurantId);
-  return onTrial ? new Set(ALL_FEATURES) : features;
+  const { features } = await getPlanAccess(restaurantId);
+  return features;
 }
 
 /** Page guard: redirect to the billing page (to upgrade) if the plan lacks it. */

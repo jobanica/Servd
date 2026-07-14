@@ -1,5 +1,7 @@
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import type { PlanModuleType } from "@prisma/client";
+import { getPlanAccess } from "@/server/billing/feature-gate";
+import type { Feature } from "@/lib/billing/features";
 
 export interface PlanLimits {
   maxTables?: number;
@@ -7,8 +9,14 @@ export interface PlanLimits {
   smsIncluded?: number;
 }
 
-/** Every add-on module — unlocked for all during the free trial. */
-const ALL_MODULES: PlanModuleType[] = ["hris", "inventory", "custom_domain"];
+// The premium add-on modules map 1:1 to gateable features, so module access is
+// resolved from the SAME plan feature set as everything else — a trial grants
+// the trialed plan's modules (Growth trial → custom domain only, not HR/inventory).
+const MODULE_FOR_FEATURE: Record<PlanModuleType, Feature> = {
+  hris: "hr",
+  inventory: "inventory",
+  custom_domain: "customDomain",
+};
 
 export interface Entitlements {
   planName: string | null;
@@ -18,56 +26,42 @@ export interface Entitlements {
 }
 
 /**
- * Resolves what a restaurant is entitled to: its plan limits + enabled add-on
- * modules. Plans/plan_modules are readable in any RLS context (policy = true);
- * the restaurant row is tenant-scoped.
+ * Resolves what a restaurant is entitled to: its plan's add-on modules + limits.
+ * Modules come from the plan's feature set (via getPlanAccess), so trials unlock
+ * only the trialed plan's modules — never everything. Limits stay relaxed during
+ * a trial so tiers can be tried without hitting caps.
  */
 export async function getEntitlements(restaurantId: string): Promise<Entitlements> {
-  return tenantDb(restaurantId, async (tx) => {
-    const restaurant = await tx.restaurant.findFirstOrThrow({
-      select: {
-        status: true,
-        plan: {
-          select: {
-            name: true,
-            limits: true,
-            modules: { where: { enabled: true }, select: { module: true } },
-          },
-        },
-      },
-    });
+  const access = await getPlanAccess(restaurantId);
 
-    // Paid-plan trial (14 days, no card) = full access: all modules, no limits.
-    let onTrial = false;
-    try {
-      const sub = await tx.subscription.findFirst({
-        orderBy: { createdAt: "desc" },
-        select: { status: true, trialEndsAt: true },
-      });
-      onTrial =
-        sub?.status === "trialing" &&
-        sub.trialEndsAt != null &&
-        sub.trialEndsAt.getTime() > Date.now();
-    } catch {
-      /* no subscription row — fall through to plan entitlements */
-    }
-    if (onTrial) {
-      return {
-        planName: restaurant.plan?.name ?? "Free trial",
-        limits: {}, // unlimited during the trial
-        modules: new Set(ALL_MODULES),
-        status: restaurant.status,
-      };
-    }
+  const modules = new Set<PlanModuleType>();
+  for (const [mod, feature] of Object.entries(MODULE_FOR_FEATURE) as [PlanModuleType, Feature][]) {
+    if (access.features.has(feature)) modules.add(mod);
+  }
 
-    const limits = (restaurant.plan?.limits as PlanLimits | null) ?? {};
-    return {
-      planName: restaurant.plan?.name ?? null,
-      limits,
-      modules: new Set((restaurant.plan?.modules ?? []).map((m) => m.module)),
-      status: restaurant.status,
-    };
-  });
+  // Status + plan limits from the restaurant row (best-effort).
+  let status = "active";
+  let planName: string | null = access.tier;
+  let planLimits: PlanLimits = {};
+  try {
+    const r = await tenantDb(restaurantId, (tx) =>
+      tx.restaurant.findFirstOrThrow({
+        select: { status: true, plan: { select: { name: true, limits: true } } },
+      }),
+    );
+    status = r.status;
+    planName = r.plan?.name ?? planName;
+    planLimits = (r.plan?.limits as PlanLimits | null) ?? {};
+  } catch {
+    /* no restaurant/plan row — fall back to feature-derived entitlements */
+  }
+
+  return {
+    planName,
+    limits: access.onTrial ? {} : planLimits, // trial: no caps; else the plan's limits
+    modules,
+    status,
+  };
 }
 
 /** True if the restaurant's plan unlocks a module (used by F/G/H gating). */
