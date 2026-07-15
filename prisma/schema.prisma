@@ -485,6 +485,7 @@ model StorefrontSetting {
   hours          Json? // [{open,close,closed}] index 0=Sun … 6=Sat
   deliveryZones  Json? // [{name, fee}] fee in centavos
   pauseWhenClosed Boolean @default(false) // block online orders outside hours
+  acceptsBookings Boolean @default(false) // show the "Book a table" flow on the website
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
@@ -1473,6 +1474,7 @@ model Reservation {
   status        String    @default("booked") // booked | seated | cancelled | no_show | waitlisted
   tableId       String? // soft link to a table (no FK — table may be removed)
   note          String?
+  source        String? // "online" = self-booked from the website; null = staff-entered
   createdAt     DateTime  @default(now())
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)

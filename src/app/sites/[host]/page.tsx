@@ -33,6 +33,8 @@ export default async function SiteHomePage({ params }: { params: Promise<{ host:
       zones={sf.zones}
       openNow={isOpenNow(sf.hours)}
       homeHref="/"
+      acceptsBookings={sf.acceptsBookings}
+      bookHref="/book"
     />
   );
 }

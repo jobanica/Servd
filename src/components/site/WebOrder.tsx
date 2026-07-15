@@ -43,6 +43,8 @@ export interface WebOrderProps {
   openNow?: boolean;
   pauseWhenClosed?: boolean;
   homeHref?: string;
+  acceptsBookings?: boolean;
+  bookHref?: string;
 }
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -215,8 +217,9 @@ function ProductCard({ item, onPick }: { item: DinerItem; onPick: (i: DinerItem)
 }
 
 export function WebOrder(props: WebOrderProps) {
-  const { slug, restaurantName, logoUrl, categories, contact, payOnline, loyalty, hours, zones = [], openNow, pauseWhenClosed } = props;
+  const { slug, restaurantName, logoUrl, categories, contact, payOnline, loyalty, hours, zones = [], openNow, pauseWhenClosed, acceptsBookings, bookHref } = props;
   const home = props.homeHref ?? `/r/${slug}`;
+  const book = bookHref ?? `/r/${slug}/book`;
   const paused = !!pauseWhenClosed && openNow === false;
 
   const [lines, setLines] = useState<CartLine[]>([]);
@@ -428,7 +431,17 @@ export function WebOrder(props: WebOrderProps) {
             <a href="#info" className="hover:text-white">DELIVERY</a>
             <a href="#info" className="hover:text-white">HOURS</a>
             <a href="#info" className="hover:text-white">CONTACT</a>
+            {acceptsBookings && (
+              <a href={book} className="rounded-full bg-white px-3.5 py-1.5 font-bold text-plum-ink hover:bg-white/90">
+                📅 Book a table
+              </a>
+            )}
           </nav>
+          {acceptsBookings && (
+            <a href={book} className="ml-auto rounded-full bg-white px-3 py-1.5 text-xs font-bold text-plum-ink md:hidden">
+              📅 Book
+            </a>
+          )}
         </div>
       </header>
 

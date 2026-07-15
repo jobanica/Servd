@@ -78,6 +78,7 @@ export default async function StorefrontPage() {
           hours: sf.hours,
           zones: sf.zones.map((z) => ({ name: z.name, feePesos: z.fee / 100 })),
           pauseWhenClosed: sf.pauseWhenClosed,
+          acceptsBookings: sf.acceptsBookings,
         }}
       />
     </div>

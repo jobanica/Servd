@@ -30,6 +30,7 @@ export async function updateStorefront(
     .filter((z) => z.name);
 
   const pauseWhenClosed = formData.get("pauseWhenClosed") === "on";
+  const acceptsBookings = formData.get("acceptsBookings") === "on";
   const hoursJson = hours as unknown as Prisma.InputJsonValue;
   const zonesJson = zones as unknown as Prisma.InputJsonValue;
   try {
@@ -48,6 +49,13 @@ export async function updateStorefront(
         : "Couldn't save.",
     };
   }
+  // `acceptsBookings` is a newer column — write it separately so an un-migrated
+  // DB still saves hours/zones (the toggle just won't stick until the migration).
+  try {
+    await tenantDb(restaurantId, (tx) =>
+      tx.storefrontSetting.update({ where: { restaurantId }, data: { acceptsBookings }, select: { id: true } }),
+    );
+  } catch { /* acceptsBookings column not migrated yet */ }
   revalidatePath("/admin/storefront");
   return { ok: true };
 }

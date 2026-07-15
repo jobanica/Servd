@@ -53,6 +53,8 @@ export default async function RestaurantSite({ params }: { params: Promise<{ slu
       zones={sf.zones}
       openNow={isOpenNow(sf.hours)}
       homeHref={`/r/${slug}`}
+      acceptsBookings={sf.acceptsBookings}
+      bookHref={`/r/${slug}/book`}
     />
   );
 }
