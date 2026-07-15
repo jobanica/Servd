@@ -23,6 +23,7 @@ export default async function SiteBookPage({ params }: { params: Promise<{ host:
       logoUrl={restaurant.logoUrl}
       hours={sf.hours}
       homeHref="/"
+      orderHref="/"
     />
   );
 }

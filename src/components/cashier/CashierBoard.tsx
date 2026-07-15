@@ -638,6 +638,12 @@ export function CashierBoard({
                     <span className="font-heading font-bold">{o.label}</span>
                     <span className="font-semibold">{formatPeso(o.total)}</span>
                   </div>
+                  {o.scheduledFor && (
+                    <p className="mt-1 rounded-md bg-mango/20 px-2 py-1 text-xs font-bold text-plum-ink">
+                      📅 Advance order — wanted for{" "}
+                      {new Date(o.scheduledFor).toLocaleString("en-PH", { timeZone: "Asia/Manila", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                    </p>
+                  )}
                   {o.channel !== "dine_in" && (
                     <p className="mt-0.5 text-xs text-plum-ink/55">
                       {o.channel === "delivery" ? "🛵 Delivery" : "🥡 Pickup"}

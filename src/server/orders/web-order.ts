@@ -24,6 +24,7 @@ const schema = z.object({
   deliveryZone: z.string().trim().max(80).optional(),
   lat: z.number().optional(),
   lng: z.number().optional(),
+  scheduledFor: z.string().datetime().optional(), // ISO; advance order (null = ASAP)
   lines: z
     .array(
       z.object({
@@ -64,9 +65,25 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
   );
   if (!restaurant) return { ok: false, error: "This restaurant is unavailable." };
 
+  // Validate an advance-order time, if one was chosen.
+  let scheduledFor: Date | null = null;
+  if (d.scheduledFor) {
+    const when = new Date(d.scheduledFor);
+    if (Number.isNaN(when.getTime())) return { ok: false, error: "That schedule time didn't look right." };
+    if (when.getTime() < Date.now() + 15 * 60 * 1000) {
+      return { ok: false, error: "Please schedule at least 15 minutes from now." };
+    }
+    if (when.getTime() > Date.now() + 90 * 24 * 60 * 60 * 1000) {
+      return { ok: false, error: "Orders can be scheduled up to 90 days ahead." };
+    }
+    scheduledFor = when;
+  }
+
   const storefront = await getPublicStorefront(restaurant.id);
-  if (storefront.pauseWhenClosed && !isOpenNow(storefront.hours)) {
-    return { ok: false, error: "We're currently closed. Please order during store hours." };
+  // A "closed now" store still takes ADVANCE orders (they're for later) — only
+  // block ASAP orders when the owner pauses ordering outside opening hours.
+  if (!scheduledFor && storefront.pauseWhenClosed && !isOpenNow(storefront.hours)) {
+    return { ok: false, error: "We're currently closed. Please order during store hours, or schedule your order for later." };
   }
 
   let built;
@@ -99,16 +116,20 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
     total: built.total + deliveryFee,
     items: { create: orderItemsCreate(built.items) },
   };
+  // Optional columns that a schema-lagged DB may not have yet (geo pin, advance
+  // schedule). Tried together first, then dropped on error so the order still lands.
   const geo = d.orderType === "delivery" && d.lat != null && d.lng != null ? { customerLat: d.lat, customerLng: d.lng } : null;
+  const sched = scheduledFor ? { scheduledFor } : null;
+  const extra = { ...(geo ?? {}), ...(sched ?? {}) };
 
   let order;
   try {
     order = await tenantDb(restaurant.id, (tx) =>
-      tx.order.create({ data: geo ? { ...base, ...geo } : base, select: { id: true } }),
+      tx.order.create({ data: Object.keys(extra).length ? { ...base, ...extra } : base, select: { id: true } }),
     );
   } catch (e) {
-    // customerLat/Lng columns may lag — retry without them.
-    if (geo) {
+    // customerLat/Lng/scheduledFor columns may lag — retry with the base fields only.
+    if (Object.keys(extra).length) {
       try {
         order = await tenantDb(restaurant.id, (tx) => tx.order.create({ data: base, select: { id: true } }));
       } catch (e2) {

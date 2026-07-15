@@ -1,7 +1,9 @@
--- Advance table booking from the online website. Customers pick a date/time on
--- the storefront and it lands in Reservations. Two small, idempotent additions:
+-- Booking ahead from the online website — table reservations AND advance food
+-- orders (order now, pick it up / get it delivered on a future date/time).
+-- Small, idempotent additions:
 --   1. storefront_settings.acceptsBookings — the admin's on/off switch.
 --   2. reservations.source — marks a booking as self-served from the website.
+--   3. orders.scheduledFor — an online order's requested future time (null = ASAP).
 -- The reservations table itself comes from add-reservations.sql — run that too
 -- if you haven't. Run in the Supabase SQL editor. Idempotent.
 
@@ -10,3 +12,6 @@ ALTER TABLE "storefront_settings"
 
 ALTER TABLE "reservations"
   ADD COLUMN IF NOT EXISTS "source" TEXT;
+
+ALTER TABLE "orders"
+  ADD COLUMN IF NOT EXISTS "scheduledFor" TIMESTAMP(3);

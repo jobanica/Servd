@@ -7,8 +7,15 @@ import { systemDb } from "@/server/tenancy/scoped-db";
 import { WebOrder } from "@/components/site/WebOrder";
 
 /** Branded host — the restaurant's white-label website + online ordering. */
-export default async function SiteHomePage({ params }: { params: Promise<{ host: string }> }) {
+export default async function SiteHomePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ host: string }>;
+  searchParams: Promise<{ for?: string }>;
+}) {
   const { host } = await params;
+  const { for: scheduleFor } = await searchParams;
   const restaurant = await getRestaurantByHost(decodeURIComponent(host));
   if (!restaurant) notFound();
 
@@ -35,6 +42,7 @@ export default async function SiteHomePage({ params }: { params: Promise<{ host:
       homeHref="/"
       acceptsBookings={sf.acceptsBookings}
       bookHref="/book"
+      scheduleFor={scheduleFor}
     />
   );
 }

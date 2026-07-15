@@ -45,9 +45,26 @@ export interface WebOrderProps {
   homeHref?: string;
   acceptsBookings?: boolean;
   bookHref?: string;
+  scheduleFor?: string; // ISO — preselect "schedule for later" (from the pre-order page)
 }
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** ISO instant → { date:"YYYY-MM-DD", time:"HH:MM" } in PH wall-clock (UTC+8). */
+function isoToPhParts(iso?: string): { date: string; time: string } {
+  if (!iso) return { date: "", time: "" };
+  const dt = new Date(iso);
+  if (Number.isNaN(dt.getTime())) return { date: "", time: "" };
+  const ph = new Date(dt.getTime() + 8 * 3600000).toISOString();
+  return { date: ph.slice(0, 10), time: ph.slice(11, 16) };
+}
+
+/** PH date+time inputs → the matching UTC ISO instant (PH is a fixed UTC+8). */
+function phPartsToIso(date: string, time: string): string | undefined {
+  if (!date || !time) return undefined;
+  const dt = new Date(`${date}T${time}:00+08:00`);
+  return Number.isNaN(dt.getTime()) ? undefined : dt.toISOString();
+}
 
 /** "09:00" → "9:00 AM" for a cleaner, customer-facing time. */
 function to12h(hhmm: string): string {
@@ -237,6 +254,14 @@ export function WebOrder(props: WebOrderProps) {
   const [cartOpen, setCartOpen] = useState(false); // mobile cart sheet
   const [checkout, setCheckout] = useState(false);
 
+  // Advance ordering ("order now for later"). Enabled alongside table bookings.
+  const canSchedule = !!acceptsBookings;
+  const initSched = useMemo(() => isoToPhParts(props.scheduleFor), [props.scheduleFor]);
+  const todayPh = useMemo(() => new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10), []);
+  const [schedMode, setSchedMode] = useState<"asap" | "later">(props.scheduleFor ? "later" : "asap");
+  const [schedDate, setSchedDate] = useState(initSched.date);
+  const [schedTime, setSchedTime] = useState(initSched.time);
+
   const count = cartCount(lines);
   const subtotal = cartTotal(lines);
   const deliveryFee = orderType === "delivery" ? zones.find((z) => z.name === zone)?.fee ?? 0 : 0;
@@ -263,6 +288,12 @@ export function WebOrder(props: WebOrderProps) {
     );
   }
 
+  // When closed + paused, an advance order is still allowed — force "later".
+  const forceLater = canSchedule && paused;
+  const effectiveSchedMode: "asap" | "later" = forceLater ? "later" : schedMode;
+  const schedulingLater = canSchedule && effectiveSchedMode === "later";
+  const scheduledIso = schedulingLater ? phPartsToIso(schedDate, schedTime) : undefined;
+
   async function submit() {
     setBusy(true);
     setError(null);
@@ -275,6 +306,7 @@ export function WebOrder(props: WebOrderProps) {
       deliveryZone: orderType === "delivery" ? zone || undefined : undefined,
       lat: orderType === "delivery" ? geo?.lat : undefined,
       lng: orderType === "delivery" ? geo?.lng : undefined,
+      scheduledFor: scheduledIso,
       lines: lines.map((l) => ({ itemId: l.itemId, quantity: l.quantity, note: l.note, modifierIds: l.modifiers.map((m) => m.modifierId), variantId: l.variantId })),
     });
     setBusy(false);
@@ -334,6 +366,29 @@ export function WebOrder(props: WebOrderProps) {
                 <button key={k} onClick={() => setOrderType(k)} className={`rounded-md py-2 text-sm font-semibold ${orderType === k ? "bg-white text-red-600 shadow-sm" : "text-plum-ink/60"}`}>{label}</button>
               ))}
             </div>
+
+            {/* When — order now, or schedule it for a future date/time. */}
+            {canSchedule && (
+              <div className="rounded-lg border border-plum-ink/10 p-2">
+                {forceLater ? (
+                  <p className="px-1 pb-1.5 text-xs font-semibold text-plum-ink/60">
+                    🔒 We&apos;re closed right now — schedule your order for later:
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-1 rounded-lg bg-gray-100 p-1">
+                    <button type="button" onClick={() => setSchedMode("asap")} className={`rounded-md py-1.5 text-xs font-semibold ${effectiveSchedMode === "asap" ? "bg-white text-red-600 shadow-sm" : "text-plum-ink/60"}`}>⏱ As soon as possible</button>
+                    <button type="button" onClick={() => setSchedMode("later")} className={`rounded-md py-1.5 text-xs font-semibold ${effectiveSchedMode === "later" ? "bg-white text-red-600 shadow-sm" : "text-plum-ink/60"}`}>📅 Schedule for later</button>
+                  </div>
+                )}
+                {effectiveSchedMode === "later" && (
+                  <div className="mt-2 flex gap-2">
+                    <input type="date" min={todayPh} value={schedDate} onChange={(e) => setSchedDate(e.target.value)} className="min-w-0 flex-1 rounded-lg border border-plum-ink/15 px-2 py-2 text-sm" />
+                    <input type="time" value={schedTime} onChange={(e) => setSchedTime(e.target.value)} className="min-w-0 flex-1 rounded-lg border border-plum-ink/15 px-2 py-2 text-sm" />
+                  </div>
+                )}
+              </div>
+            )}
+
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
             <input
               value={phone}
@@ -382,7 +437,7 @@ export function WebOrder(props: WebOrderProps) {
         </div>
         <p className="text-xs text-plum-ink/45">VAT (12%) included · {formatPeso(vat)}</p>
         {error && <p className="mt-2 text-sm text-guava">{error}</p>}
-        {paused ? (
+        {paused && !canSchedule ? (
           <div className="mt-3 rounded-lg bg-plum-ink/5 px-3 py-2 text-center text-sm font-semibold text-plum-ink/60">
             🔒 Online ordering is paused — we&apos;re closed right now.
           </div>
@@ -397,13 +452,23 @@ export function WebOrder(props: WebOrderProps) {
         ) : (
           <button
             onClick={submit}
-            disabled={busy || lines.length === 0 || !name.trim() || !phone.trim() || (orderType === "delivery" && (!address.trim() || !geo || (zones.length > 0 && !zone)))}
+            disabled={busy || lines.length === 0 || !name.trim() || !phone.trim() || (schedulingLater && !scheduledIso) || (orderType === "delivery" && (!address.trim() || !geo || (zones.length > 0 && !zone)))}
             className="mt-3 w-full rounded-lg bg-green-600 py-3 font-semibold text-white disabled:opacity-50"
           >
-            {busy ? "Placing…" : `Place ${orderType === "delivery" ? "delivery" : "pickup"} order`}
+            {busy
+              ? "Placing…"
+              : schedulingLater
+                ? `Schedule ${orderType === "delivery" ? "delivery" : "pickup"} order`
+                : `Place ${orderType === "delivery" ? "delivery" : "pickup"} order`}
           </button>
         )}
-        {checkout && <p className="mt-2 text-center text-xs text-plum-ink/40">Pay on {orderType === "delivery" ? "delivery" : "pickup"}.</p>}
+        {checkout && (
+          <p className="mt-2 text-center text-xs text-plum-ink/40">
+            {schedulingLater && scheduledIso
+              ? `For ${new Date(scheduledIso).toLocaleString("en-PH", { timeZone: "Asia/Manila", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} · Pay on ${orderType === "delivery" ? "delivery" : "pickup"}.`
+              : `Pay on ${orderType === "delivery" ? "delivery" : "pickup"}.`}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -433,7 +498,7 @@ export function WebOrder(props: WebOrderProps) {
             <a href="#info" className="hover:text-white">CONTACT</a>
             {acceptsBookings && (
               <a href={book} className="rounded-full bg-white px-3.5 py-1.5 font-bold text-plum-ink hover:bg-white/90">
-                📅 Book a table
+                📅 Book / Order ahead
               </a>
             )}
           </nav>

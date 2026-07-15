@@ -120,6 +120,21 @@ async function orderMetaMap(
   }
 }
 
+/** Best-effort advance-order times (the scheduledFor column may lag on prod). */
+async function scheduledForMap(restaurantId: string, ids: string[]): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (ids.length === 0) return map;
+  try {
+    const rows = await tenantDb(restaurantId, (tx) =>
+      tx.order.findMany({ where: { id: { in: ids } }, select: { id: true, scheduledFor: true } }),
+    );
+    for (const o of rows) if (o.scheduledFor) map.set(o.id, o.scheduledFor.toISOString());
+  } catch {
+    /* scheduledFor column not migrated yet */
+  }
+  return map;
+}
+
 /** A QR order awaiting the cashier's acceptance. */
 export interface IncomingOrder {
   id: string;
@@ -129,6 +144,7 @@ export interface IncomingOrder {
   customerPhone: string | null;
   customerAddress: string | null;
   mapUrl: string | null;
+  scheduledFor: string | null; // ISO — advance order requested time (null = ASAP)
   total: number;
   paymentStatus: string;
   createdAt: string;
@@ -265,7 +281,10 @@ export async function getIncomingOrders(): Promise<IncomingOrder[]> {
     }),
   );
 
-  const meta = await orderMetaMap(staff.restaurantId, orders.map((o) => o.id));
+  const [meta, sched] = await Promise.all([
+    orderMetaMap(staff.restaurantId, orders.map((o) => o.id)),
+    scheduledForMap(staff.restaurantId, orders.map((o) => o.id)),
+  ]);
   return orders.map((o) => {
     const m = meta.get(o.id);
     const kind = (m?.orderType ?? "dine_in") as string;
@@ -286,6 +305,7 @@ export async function getIncomingOrders(): Promise<IncomingOrder[]> {
       customerPhone: m?.customerPhone ?? null,
       customerAddress: m?.customerAddress ?? null,
       mapUrl: m?.mapUrl ?? null,
+      scheduledFor: sched.get(o.id) ?? null,
       total: o.total,
       paymentStatus: o.paymentStatus,
       createdAt: o.createdAt.toISOString(),
