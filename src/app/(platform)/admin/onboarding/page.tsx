@@ -55,9 +55,13 @@ export default async function OnboardingPage() {
       </ol>
 
       <div className="flex items-center justify-between">
-        <Link href="/admin" className="text-sm text-plum-ink/50">
-          Skip for now
-        </Link>
+        {/* Both exit the wizard by marking it dismissed — otherwise /admin
+            redirects straight back here (onboardingCompletedAt is still null). */}
+        <form action={finishOnboarding}>
+          <button className="text-sm text-plum-ink/50 hover:text-plum-ink/70">
+            Skip for now
+          </button>
+        </form>
         <form action={finishOnboarding}>
           <button className="rounded-full px-5 py-2 text-sm font-semibold btn-brand">
             {state.doneCount === state.total ? "Finish setup" : "Finish later"}
