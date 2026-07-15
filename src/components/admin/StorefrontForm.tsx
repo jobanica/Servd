@@ -114,17 +114,18 @@ export function StorefrontForm({
         </button>
       </div>
 
-      {/* Advance table booking */}
+      {/* Advance booking & ordering */}
       <div className="rounded-tile border border-plum-ink/10 bg-white p-5">
-        <h2 className="font-heading text-lg font-bold">Advance table booking</h2>
+        <h2 className="font-heading text-lg font-bold">Book &amp; order ahead</h2>
         <p className="mt-1 text-sm text-plum-ink/50">
-          Let customers reserve a table ahead of time from your website. Bookings show up under{" "}
-          <span className="font-semibold text-plum-ink/70">Reservations</span>, where you can assign a
-          table, seat, or cancel them.
+          Adds a <span className="font-semibold text-plum-ink/70">Book / Order ahead</span> button to
+          your website so customers can either reserve a table (shows under{" "}
+          <span className="font-semibold text-plum-ink/70">Reservations</span>) or place a food order
+          scheduled for a future date/time (shows in your orders with the requested time).
         </p>
         <label className="mt-4 flex items-center gap-2 text-sm font-semibold">
           <input type="checkbox" name="acceptsBookings" defaultChecked={initial.acceptsBookings} />
-          Accept advance bookings on my website
+          Accept table bookings &amp; advance orders on my website
         </label>
       </div>
 

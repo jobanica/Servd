@@ -47,6 +47,7 @@ export interface MerchantOrder {
   total: number; // centavos, server-authoritative
   prepMinutes: number | null;
   cancelReason: string | null;
+  scheduledFor: string | null; // ISO — advance order requested time (null = ASAP)
   createdAt: string; // ISO
   items: MerchantOrderItem[];
 }
@@ -94,7 +95,7 @@ type Row = {
   items: { nameAtTime: string; quantity: number; note: string | null; modifiers: { nameAtTime: string }[] }[];
 };
 
-function shape(o: Row, extra: { prepMinutes: number | null; cancelReason: string | null }): MerchantOrder {
+function shape(o: Row, extra: { prepMinutes: number | null; cancelReason: string | null; scheduledFor: string | null }): MerchantOrder {
   return {
     id: o.id,
     ref: `#${o.id.slice(0, 8).toUpperCase()}`,
@@ -109,6 +110,7 @@ function shape(o: Row, extra: { prepMinutes: number | null; cancelReason: string
     total: o.total,
     prepMinutes: extra.prepMinutes,
     cancelReason: extra.cancelReason,
+    scheduledFor: extra.scheduledFor,
     createdAt: o.createdAt.toISOString(),
     items: o.items.map((it) => ({
       name: it.nameAtTime,
@@ -152,7 +154,7 @@ async function loadMerchantData(restaurantId: string): Promise<MerchantData> {
   // screen still works before the migration runs.
   const allIds = [...incomingRows, ...activeRows, ...historyRows].map((o) => o.id);
   const extras = await loadExtras(restaurantId, allIds);
-  const get = (id: string) => extras.get(id) ?? { prepMinutes: null, cancelReason: null };
+  const get = (id: string) => extras.get(id) ?? { prepMinutes: null, cancelReason: null, scheduledFor: null };
 
   return {
     incoming: incomingRows.map((o) => shape(o as Row, get(o.id))),
@@ -161,12 +163,26 @@ async function loadMerchantData(restaurantId: string): Promise<MerchantData> {
   };
 }
 
-async function loadExtras(
-  restaurantId: string,
-  ids: string[],
-): Promise<Map<string, { prepMinutes: number | null; cancelReason: string | null }>> {
-  const map = new Map<string, { prepMinutes: number | null; cancelReason: string | null }>();
+type OrderExtra = { prepMinutes: number | null; cancelReason: string | null; scheduledFor: string | null };
+
+async function loadExtras(restaurantId: string, ids: string[]): Promise<Map<string, OrderExtra>> {
+  const map = new Map<string, OrderExtra>();
   if (ids.length === 0) return map;
+  // prepMinutes / cancelReason and (newer) scheduledFor may lag. Try the full set
+  // first, then fall back to just prepMinutes/cancelReason so a missing
+  // scheduledFor column doesn't drop the other extras.
+  try {
+    const rows = await tenantDb(restaurantId, (tx) =>
+      tx.order.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, prepMinutes: true, cancelReason: true, scheduledFor: true },
+      }),
+    );
+    for (const r of rows) map.set(r.id, { prepMinutes: r.prepMinutes ?? null, cancelReason: r.cancelReason ?? null, scheduledFor: r.scheduledFor ? r.scheduledFor.toISOString() : null });
+    return map;
+  } catch {
+    /* scheduledFor column not migrated yet — fall through */
+  }
   try {
     const rows = await tenantDb(restaurantId, (tx) =>
       tx.order.findMany({
@@ -174,9 +190,9 @@ async function loadExtras(
         select: { id: true, prepMinutes: true, cancelReason: true },
       }),
     );
-    for (const r of rows) map.set(r.id, { prepMinutes: r.prepMinutes ?? null, cancelReason: r.cancelReason ?? null });
+    for (const r of rows) map.set(r.id, { prepMinutes: r.prepMinutes ?? null, cancelReason: r.cancelReason ?? null, scheduledFor: null });
   } catch {
-    /* columns not migrated yet */
+    /* prepMinutes/cancelReason not migrated yet either */
   }
   return map;
 }

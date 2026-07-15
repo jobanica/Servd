@@ -1367,6 +1367,7 @@ model Order {
   voidedAt      DateTime? // set when a cashier voids the (unpaid) order
   prepMinutes   Int? // prep-time estimate (minutes) a merchant sets on accept
   cancelReason  String? // reason a merchant rejected the order
+  scheduledFor  DateTime? // advance order: requested pickup/delivery time (null = ASAP)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 

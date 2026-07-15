@@ -26,8 +26,15 @@ async function getContact(restaurantId: string) {
   }
 }
 
-export default async function RestaurantSite({ params }: { params: Promise<{ slug: string }> }) {
+export default async function RestaurantSite({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ for?: string }>;
+}) {
   const { slug } = await params;
+  const { for: scheduleFor } = await searchParams;
   const restaurant = await getPublicRestaurantBySlug(slug);
   if (!restaurant) notFound();
   // Online ordering is a Growth+ feature — Free doesn't get a public order site.
@@ -55,6 +62,7 @@ export default async function RestaurantSite({ params }: { params: Promise<{ slu
       homeHref={`/r/${slug}`}
       acceptsBookings={sf.acceptsBookings}
       bookHref={`/r/${slug}/book`}
+      scheduleFor={scheduleFor}
     />
   );
 }

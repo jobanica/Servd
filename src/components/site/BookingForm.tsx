@@ -33,13 +33,16 @@ export function BookingForm({
   logoUrl,
   hours,
   homeHref,
+  orderHref,
 }: {
   slug: string;
   restaurantName: string;
   logoUrl?: string | null;
   hours: DayHours[];
   homeHref: string;
+  orderHref: string; // the menu URL — advance orders deep-link here with ?for=ISO
 }) {
+  const [mode, setMode] = useState<"table" | "order">("table");
   const now = useMemo(() => new Date(), []);
   const todayKey = dayKey(now.getFullYear(), now.getMonth(), now.getDate());
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
@@ -160,9 +163,33 @@ export function BookingForm({
           </div>
         ) : (
           <div className="space-y-4">
+            {/* Mode: reserve a table, or order food ahead for a future time. */}
+            <div className="grid grid-cols-2 gap-1 rounded-xl bg-plum-ink/5 p-1">
+              <button
+                type="button"
+                onClick={() => { setMode("table"); setTime(null); setError(null); }}
+                className={`rounded-lg py-2.5 text-sm font-bold transition ${mode === "table" ? "bg-white text-brand-primary shadow-sm" : "text-plum-ink/60"}`}
+              >
+                🍽 Reserve a table
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMode("order"); setTime(null); setError(null); }}
+                className={`rounded-lg py-2.5 text-sm font-bold transition ${mode === "order" ? "bg-white text-brand-primary shadow-sm" : "text-plum-ink/60"}`}
+              >
+                🥡 Advance order
+              </button>
+            </div>
+
             <div>
-              <h1 className="font-heading text-2xl font-bold text-plum-ink">Book a table</h1>
-              <p className="text-sm text-plum-ink/55">Reserve ahead — pick a date and time and we&apos;ll hold your table.</p>
+              <h1 className="font-heading text-2xl font-bold text-plum-ink">
+                {mode === "table" ? "Book a table" : "Order ahead"}
+              </h1>
+              <p className="text-sm text-plum-ink/55">
+                {mode === "table"
+                  ? "Reserve ahead — pick a date and time and we'll hold your table."
+                  : "Order now for later — pick a date and time, then choose your food."}
+              </p>
             </div>
 
             {/* Calendar */}
@@ -238,8 +265,27 @@ export function BookingForm({
               </div>
             )}
 
-            {/* Details */}
-            {date && time && (
+            {/* Advance-order hand-off — pick the food on the menu, scheduled for
+                the chosen time (carried via ?for=ISO). */}
+            {mode === "order" && date && time && (
+              <div className="space-y-3 rounded-2xl bg-white p-4 text-center shadow-sm">
+                <p className="text-sm text-plum-ink/70">
+                  We&apos;ll have your order ready for{" "}
+                  <span className="font-semibold text-plum-ink">{date}</span> at{" "}
+                  <span className="font-semibold text-plum-ink">{to12h(time)}</span>.
+                </p>
+                <a
+                  href={`${orderHref}${orderHref.includes("?") ? "&" : "?"}for=${encodeURIComponent(`${date}T${time}:00+08:00`)}`}
+                  className="block w-full rounded-xl bg-brand-primary py-3 text-sm font-bold text-white"
+                >
+                  Choose your food →
+                </a>
+                <p className="text-xs text-plum-ink/45">You&apos;ll pick your items next; the time stays saved to your order.</p>
+              </div>
+            )}
+
+            {/* Table reservation details */}
+            {mode === "table" && date && time && (
               <div className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
                 <div>
                   <label className="mb-1 block text-sm font-semibold text-plum-ink/70">Party size</label>

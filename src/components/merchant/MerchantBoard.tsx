@@ -39,6 +39,18 @@ function minsAgo(iso: string): string {
   return m < 1 ? "just now" : `${m} min ago`;
 }
 
+/** "Mon, Jul 20 · 6:00 PM" (PH time) for an advance order's requested time. */
+function schedLabel(iso: string): string {
+  return new Date(iso).toLocaleString("en-PH", {
+    timeZone: "Asia/Manila",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 /** The next step a merchant can take on an accepted order, by its current state. */
 function nextAction(o: MerchantOrder): { to: MerchantAdvance; label: string } | null {
   if (o.status === "new") return { to: "preparing", label: "Start preparing" };
@@ -239,6 +251,13 @@ export function MerchantBoard({
                   <p className="text-xs text-plum-ink/40">{topIncoming.ref}</p>
                 </div>
               </div>
+
+              {topIncoming.scheduledFor && (
+                <div className="mt-3 rounded-xl bg-mango/15 px-4 py-3 text-center">
+                  <p className="font-heading text-lg font-extrabold text-mango">📅 Advance order</p>
+                  <p className="text-sm font-semibold text-plum-ink/70">Wanted for {schedLabel(topIncoming.scheduledFor)}</p>
+                </div>
+              )}
 
               <div className="mt-4 border-t border-plum-ink/10 pt-4">
                 <OrderLines o={topIncoming} />

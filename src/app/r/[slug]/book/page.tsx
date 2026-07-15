@@ -31,6 +31,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
       logoUrl={restaurant.logoUrl}
       hours={sf.hours}
       homeHref={`/r/${slug}`}
+      orderHref={`/r/${slug}`}
     />
   );
 }
