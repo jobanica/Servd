@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { updateStorefront, type StorefrontState } from "@/server/storefront/actions";
 import { SubmitButton } from "./SubmitButton";
 
@@ -18,6 +18,16 @@ export function StorefrontForm({
 }) {
   const [state, action] = useActionState<StorefrontState, FormData>(updateStorefront, null);
   const [zones, setZones] = useState(initial.zones.length ? initial.zones : [{ name: "", feePesos: 0 }]);
+
+  // Re-seed from the server whenever the saved zones change (e.g. after a save
+  // revalidates the page). Without this the fields are uncontrolled and React 19
+  // resets them to empty after the form action, hiding the zone you just saved.
+  const initialZonesKey = JSON.stringify(initial.zones);
+  useEffect(() => {
+    const next = initial.zones.length ? initial.zones : [{ name: "", feePesos: 0 }];
+    setZones(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialZonesKey]);
 
   return (
     <form action={action} className="space-y-6">
@@ -72,7 +82,10 @@ export function StorefrontForm({
             <div key={i} className="flex items-center gap-2">
               <input
                 name="zoneName"
-                defaultValue={z.name}
+                value={z.name}
+                onChange={(e) =>
+                  setZones((p) => p.map((zz, idx) => (idx === i ? { ...zz, name: e.target.value } : zz)))
+                }
                 placeholder="Zone (e.g. Poblacion)"
                 className="flex-1 rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
               />
@@ -83,7 +96,12 @@ export function StorefrontForm({
                   type="number"
                   step="0.01"
                   min={0}
-                  defaultValue={z.feePesos}
+                  value={z.feePesos}
+                  onChange={(e) =>
+                    setZones((p) =>
+                      p.map((zz, idx) => (idx === i ? { ...zz, feePesos: Number(e.target.value) } : zz)),
+                    )
+                  }
                   className="w-24 rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
                 />
               </div>
