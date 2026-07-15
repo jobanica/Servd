@@ -14,10 +14,23 @@ interface DayHours {
 export function StorefrontForm({
   initial,
 }: {
-  initial: { hours: DayHours[]; zones: { name: string; feePesos: number }[]; pauseWhenClosed: boolean; acceptsBookings: boolean };
+  initial: {
+    hours: DayHours[];
+    zones: { name: string; feePesos: number }[];
+    pauseWhenClosed: boolean;
+    acceptsBookings: boolean;
+    booking: {
+      requireDownpayment: boolean;
+      downpaymentType: "percent" | "fixed";
+      downpaymentValue: number; // percent, or PESOS (already converted from centavos)
+      downpaymentInstructions: string;
+    };
+  };
 }) {
   const [state, action] = useActionState<StorefrontState, FormData>(updateStorefront, null);
   const [zones, setZones] = useState(initial.zones.length ? initial.zones : [{ name: "", feePesos: 0 }]);
+  const [requireDp, setRequireDp] = useState(initial.booking.requireDownpayment);
+  const [dpType, setDpType] = useState<"percent" | "fixed">(initial.booking.downpaymentType);
 
   // Re-seed from the server whenever the saved zones change (e.g. after a save
   // revalidates the page). Without this the fields are uncontrolled and React 19
@@ -127,6 +140,70 @@ export function StorefrontForm({
           <input type="checkbox" name="acceptsBookings" defaultChecked={initial.acceptsBookings} />
           Accept table bookings &amp; advance orders on my website
         </label>
+
+        {/* Downpayment / approval */}
+        <div className="mt-4 rounded-lg border border-plum-ink/10 bg-cream/40 p-3">
+          <label className="flex items-center gap-2 text-sm font-semibold">
+            <input
+              type="checkbox"
+              name="requireDownpayment"
+              checked={requireDp}
+              onChange={(e) => setRequireDp(e.target.checked)}
+            />
+            Require a downpayment before an advance order is approved
+          </label>
+          <p className="mt-1 text-xs text-plum-ink/50">
+            Advance orders always land in <span className="font-semibold text-plum-ink/70">Advance orders</span> for
+            you to approve. With this on, customers are shown a downpayment amount and your payment
+            instructions, and enter a reference (e.g. GCash) you can verify before approving.
+          </p>
+          {requireDp && (
+            <div className="mt-3 space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  name="downpaymentType"
+                  value={dpType}
+                  onChange={(e) => setDpType(e.target.value as "percent" | "fixed")}
+                  className="rounded-lg border border-plum-ink/15 px-2 py-2 text-sm"
+                >
+                  <option value="percent">% of order total</option>
+                  <option value="fixed">Fixed amount (₱)</option>
+                </select>
+                <div className="flex items-center gap-1">
+                  {dpType === "fixed" && <span className="text-sm text-plum-ink/50">₱</span>}
+                  <input
+                    name="downpaymentValue"
+                    type="number"
+                    min={0}
+                    max={dpType === "percent" ? 100 : undefined}
+                    step={dpType === "percent" ? 1 : 0.01}
+                    defaultValue={initial.booking.downpaymentValue}
+                    className="w-28 rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+                  />
+                  {dpType === "percent" && <span className="text-sm text-plum-ink/50">%</span>}
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-plum-ink/60">Payment instructions (shown to the customer)</label>
+                <textarea
+                  name="downpaymentInstructions"
+                  rows={2}
+                  defaultValue={initial.booking.downpaymentInstructions}
+                  placeholder="e.g. Send the downpayment via GCash to 0917-123-4567 (Juan D.), then enter the reference number below."
+                  className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+          )}
+          {/* Keep the hidden fields submitting even when the panel is collapsed. */}
+          {!requireDp && (
+            <>
+              <input type="hidden" name="downpaymentType" value={dpType} />
+              <input type="hidden" name="downpaymentValue" value={initial.booking.downpaymentValue} />
+              <input type="hidden" name="downpaymentInstructions" value={initial.booking.downpaymentInstructions} />
+            </>
+          )}
+        </div>
       </div>
 
       {state?.error && <p className="text-sm text-guava">{state.error}</p>}

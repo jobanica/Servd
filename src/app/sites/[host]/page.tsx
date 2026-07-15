@@ -43,6 +43,7 @@ export default async function SiteHomePage({
       acceptsBookings={sf.acceptsBookings}
       bookHref="/book"
       scheduleFor={scheduleFor}
+      booking={sf.booking}
     />
   );
 }

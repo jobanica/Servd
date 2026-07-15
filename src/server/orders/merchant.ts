@@ -157,7 +157,9 @@ async function loadMerchantData(restaurantId: string): Promise<MerchantData> {
   const get = (id: string) => extras.get(id) ?? { prepMinutes: null, cancelReason: null, scheduledFor: null };
 
   return {
-    incoming: incomingRows.map((o) => shape(o as Row, get(o.id))),
+    // Advance orders (scheduled for later) are handled on the Advance orders page,
+    // so they're kept out of the live "incoming now" queue until sent to kitchen.
+    incoming: incomingRows.map((o) => shape(o as Row, get(o.id))).filter((o) => !o.scheduledFor),
     active: activeRows.map((o) => shape(o as Row, get(o.id))),
     history: historyRows.map((o) => shape(o as Row, get(o.id))),
   };

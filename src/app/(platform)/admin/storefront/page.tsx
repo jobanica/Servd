@@ -79,6 +79,13 @@ export default async function StorefrontPage() {
           zones: sf.zones.map((z) => ({ name: z.name, feePesos: z.fee / 100 })),
           pauseWhenClosed: sf.pauseWhenClosed,
           acceptsBookings: sf.acceptsBookings,
+          booking: {
+            requireDownpayment: sf.booking.requireDownpayment,
+            downpaymentType: sf.booking.downpaymentType,
+            // Fixed amounts are stored in centavos — show pesos in the input.
+            downpaymentValue: sf.booking.downpaymentType === "fixed" ? sf.booking.downpaymentValue / 100 : sf.booking.downpaymentValue,
+            downpaymentInstructions: sf.booking.downpaymentInstructions,
+          },
         }}
       />
     </div>

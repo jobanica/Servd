@@ -46,6 +46,12 @@ export interface WebOrderProps {
   acceptsBookings?: boolean;
   bookHref?: string;
   scheduleFor?: string; // ISO — preselect "schedule for later" (from the pre-order page)
+  booking?: {
+    requireDownpayment: boolean;
+    downpaymentType: "percent" | "fixed";
+    downpaymentValue: number; // percent (0–100) or centavos
+    downpaymentInstructions: string;
+  };
 }
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -261,6 +267,9 @@ export function WebOrder(props: WebOrderProps) {
   const [schedMode, setSchedMode] = useState<"asap" | "later">(props.scheduleFor ? "later" : "asap");
   const [schedDate, setSchedDate] = useState(initSched.date);
   const [schedTime, setSchedTime] = useState(initSched.time);
+  const [downpaymentRef, setDownpaymentRef] = useState("");
+  // Confirmation details for an advance order awaiting the owner's approval.
+  const [placedAdvance, setPlacedAdvance] = useState<{ downpayment: number } | null>(null);
 
   const count = cartCount(lines);
   const subtotal = cartTotal(lines);
@@ -293,6 +302,12 @@ export function WebOrder(props: WebOrderProps) {
   const effectiveSchedMode: "asap" | "later" = forceLater ? "later" : schedMode;
   const schedulingLater = canSchedule && effectiveSchedMode === "later";
   const scheduledIso = schedulingLater ? phPartsToIso(schedDate, schedTime) : undefined;
+  // Downpayment the customer will owe on this advance order (mirror of the server
+  // calc; the server recomputes authoritatively).
+  const bk = props.booking;
+  const downpaymentDue = schedulingLater && bk?.requireDownpayment
+    ? Math.max(0, Math.min(total, bk.downpaymentType === "percent" ? Math.round((total * bk.downpaymentValue) / 100) : bk.downpaymentValue))
+    : 0;
 
   async function submit() {
     setBusy(true);
@@ -307,11 +322,55 @@ export function WebOrder(props: WebOrderProps) {
       lat: orderType === "delivery" ? geo?.lat : undefined,
       lng: orderType === "delivery" ? geo?.lng : undefined,
       scheduledFor: scheduledIso,
+      downpaymentRef: schedulingLater && downpaymentDue > 0 ? downpaymentRef || undefined : undefined,
       lines: lines.map((l) => ({ itemId: l.itemId, quantity: l.quantity, note: l.note, modifierIds: l.modifiers.map((m) => m.modifierId), variantId: l.variantId })),
     });
     setBusy(false);
-    if (res.ok) setPlacedId(res.orderId);
-    else setError(res.error);
+    if (res.ok) {
+      if (res.awaitingApproval) setPlacedAdvance({ downpayment: res.downpaymentAmount });
+      setPlacedId(res.orderId);
+    } else setError(res.error);
+  }
+
+  // Advance orders don't have a live status yet — they wait for the owner to
+  // approve. Show a clear confirmation (with any downpayment steps) instead of
+  // the live order tracker.
+  if (placedId && placedAdvance) {
+    return (
+      <div className="min-h-screen bg-gray-100">
+        <header className="sticky top-0 z-30 bg-plum-ink text-white">
+          <div className="mx-auto flex h-16 max-w-3xl items-center gap-3 px-4">
+            <span className="font-heading text-lg font-extrabold">{restaurantName}</span>
+            <a href={home} className="ml-auto text-sm font-semibold text-white/80 hover:text-white">← Menu</a>
+          </div>
+        </header>
+        <div className="mx-auto max-w-lg p-4">
+          <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-3xl">✓</div>
+            <h1 className="font-heading text-2xl font-bold text-plum-ink">Advance order received!</h1>
+            <p className="mx-auto mt-2 max-w-md text-sm text-plum-ink/60">
+              Thanks, {name.trim() || "friend"}. Your order for{" "}
+              <span className="font-semibold text-plum-ink/80">
+                {scheduledIso ? new Date(scheduledIso).toLocaleString("en-PH", { timeZone: "Asia/Manila", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "your chosen time"}
+              </span>{" "}
+              is now pending the restaurant&apos;s approval. We&apos;ll contact you on {phone || "your number"} to confirm.
+            </p>
+            {placedAdvance.downpayment > 0 && (
+              <div className="mt-4 rounded-xl bg-mango/10 p-4 text-left">
+                <p className="font-heading font-bold text-plum-ink">Downpayment to confirm: {formatPeso(placedAdvance.downpayment)}</p>
+                {bk?.downpaymentInstructions ? (
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-plum-ink/70">{bk.downpaymentInstructions}</p>
+                ) : (
+                  <p className="mt-1 text-sm text-plum-ink/70">Please settle the downpayment to secure your order; the restaurant will confirm once received.</p>
+                )}
+                {downpaymentRef && <p className="mt-2 text-xs text-plum-ink/50">Your reference: <span className="font-semibold text-plum-ink/70">{downpaymentRef}</span></p>}
+              </div>
+            )}
+            <a href={home} className="mt-6 inline-block rounded-xl bg-brand-primary px-5 py-2.5 text-sm font-semibold text-white">Back to menu</a>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (placedId) {
@@ -384,6 +443,26 @@ export function WebOrder(props: WebOrderProps) {
                   <div className="mt-2 flex gap-2">
                     <input type="date" min={todayPh} value={schedDate} onChange={(e) => setSchedDate(e.target.value)} className="min-w-0 flex-1 rounded-lg border border-plum-ink/15 px-2 py-2 text-sm" />
                     <input type="time" value={schedTime} onChange={(e) => setSchedTime(e.target.value)} className="min-w-0 flex-1 rounded-lg border border-plum-ink/15 px-2 py-2 text-sm" />
+                  </div>
+                )}
+                {schedulingLater && (
+                  <p className="mt-2 px-1 text-xs text-plum-ink/50">📋 Advance orders are confirmed once the restaurant approves them.</p>
+                )}
+                {schedulingLater && downpaymentDue > 0 && (
+                  <div className="mt-2 rounded-lg bg-mango/10 p-2">
+                    <p className="text-xs font-bold text-plum-ink">
+                      Downpayment to confirm: {formatPeso(downpaymentDue)}
+                      {bk?.downpaymentType === "percent" ? ` (${bk.downpaymentValue}% of ${formatPeso(total)})` : ""}
+                    </p>
+                    {bk?.downpaymentInstructions && (
+                      <p className="mt-1 whitespace-pre-wrap text-xs text-plum-ink/65">{bk.downpaymentInstructions}</p>
+                    )}
+                    <input
+                      value={downpaymentRef}
+                      onChange={(e) => setDownpaymentRef(e.target.value)}
+                      placeholder="Payment reference (e.g. GCash ref no.)"
+                      className="mt-2 w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+                    />
                   </div>
                 )}
               </div>

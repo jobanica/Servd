@@ -15,3 +15,17 @@ ALTER TABLE "reservations"
 
 ALTER TABLE "orders"
   ADD COLUMN IF NOT EXISTS "scheduledFor" TIMESTAMP(3);
+
+-- Advance-order approval + downpayment.
+ALTER TABLE "orders"
+  ADD COLUMN IF NOT EXISTS "approvalStatus" TEXT;              -- awaiting | approved | declined
+ALTER TABLE "orders"
+  ADD COLUMN IF NOT EXISTS "downpaymentAmount" INTEGER;        -- centavos required up-front
+ALTER TABLE "orders"
+  ADD COLUMN IF NOT EXISTS "downpaymentRef" TEXT;              -- customer's payment reference
+ALTER TABLE "orders"
+  ADD COLUMN IF NOT EXISTS "downpaymentPaid" BOOLEAN NOT NULL DEFAULT false;
+
+-- Downpayment / approval config for the storefront ({ requireDownpayment, ... }).
+ALTER TABLE "storefront_settings"
+  ADD COLUMN IF NOT EXISTS "bookingConfig" JSONB;
