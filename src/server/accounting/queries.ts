@@ -123,7 +123,7 @@ export async function getCogs(restaurantId: string, from: Date, to: Date): Promi
         tx.menuItemCost.findMany({ select: { menuItemId: true, cost: true } }),
       ]);
       const costMap = new Map(costs.map((c) => [c.menuItemId, c.cost]));
-      return items.reduce((s, it) => s + (costMap.get(it.menuItemId) ?? 0) * it.quantity, 0);
+      return items.reduce((s, it) => s + (it.menuItemId ? costMap.get(it.menuItemId) ?? 0 : 0) * it.quantity, 0);
     });
   } catch {
     return 0;

@@ -26,7 +26,7 @@ export async function deductForOrder(restaurantId: string, orderId: string): Pro
       });
       alertPhone = restaurant.lowStockAlertPhone ?? null;
 
-      const menuItemIds = [...new Set(order.items.map((i) => i.menuItemId))];
+      const menuItemIds = [...new Set(order.items.map((i) => i.menuItemId).filter((id): id is string => id != null))];
       const recipes = await tx.recipeComponent.findMany({
         where: { menuItemId: { in: menuItemIds } },
       });

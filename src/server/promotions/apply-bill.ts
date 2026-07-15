@@ -119,6 +119,7 @@ export async function applyBillPromo(input: {
   const lineMap = new Map<string, { menuItemId: string; unitPrice: number; quantity: number }>();
   for (const o of orders) {
     for (const it of o.items) {
+      if (it.menuItemId == null) continue; // item was deleted — no promo targeting it
       const cur = lineMap.get(it.menuItemId);
       if (cur) cur.quantity += it.quantity;
       else lineMap.set(it.menuItemId, { menuItemId: it.menuItemId, unitPrice: it.unitPrice, quantity: it.quantity });
