@@ -211,7 +211,7 @@ export function AdminShell({
             {brand.name.charAt(0).toUpperCase()}
           </span>
         )}
-        <span className="truncate font-heading text-base font-bold text-plum-ink">{brand.name}</span>
+        <span className="min-w-0 truncate font-heading text-base font-bold text-plum-ink">{brand.name}</span>
       </Link>
       {nav}
       <div className="space-y-1 border-t border-plum-ink/10 p-3">
