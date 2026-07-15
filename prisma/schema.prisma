@@ -1581,14 +1581,15 @@ model Promotion {
 model OrderItem {
   id         String  @id @default(uuid())
   orderId    String
-  menuItemId String
+  menuItemId String? // nullable: kept as SetNull so deleting a menu item/category
+  //          preserves order history (name & price are snapshotted below).
   nameAtTime String // snapshot of item name
   quantity   Int     @default(1)
   unitPrice  Int // snapshot of base price (centavos)
   note       String?
 
   order     Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  menuItem  MenuItem            @relation(fields: [menuItemId], references: [id])
+  menuItem  MenuItem?           @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
   modifiers OrderItemModifier[]
 
   @@index([orderId])
