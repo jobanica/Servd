@@ -10,7 +10,7 @@ import {
 import { recordServingsSold } from "@/server/menu/servings";
 import { recordVariantsSold } from "@/server/menu/variants";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
-import { getPublicStorefront, isOpenNow } from "@/server/storefront/storefront";
+import { getPublicStorefront, isOpenNow, computeDownpayment } from "@/server/storefront/storefront";
 import { getLoyaltyConfig, enrollAccount } from "@/server/loyalty/loyalty";
 import { markCartConverted } from "@/server/marketing/cart-recovery";
 import { formatPeso } from "@/lib/money";
@@ -25,6 +25,7 @@ const schema = z.object({
   lat: z.number().optional(),
   lng: z.number().optional(),
   scheduledFor: z.string().datetime().optional(), // ISO; advance order (null = ASAP)
+  downpaymentRef: z.string().trim().max(120).optional(), // customer's payment reference
   lines: z
     .array(
       z.object({
@@ -40,7 +41,9 @@ const schema = z.object({
 });
 
 export type WebOrderInput = z.infer<typeof schema>;
-export type WebOrderResult = { ok: true; orderId: string } | { ok: false; error: string };
+export type WebOrderResult =
+  | { ok: true; orderId: string; awaitingApproval: boolean; downpaymentAmount: number }
+  | { ok: false; error: string };
 
 /**
  * Places an online (website) order for pickup or delivery — no table. Lands as
@@ -117,10 +120,20 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
     items: { create: orderItemsCreate(built.items) },
   };
   // Optional columns that a schema-lagged DB may not have yet (geo pin, advance
-  // schedule). Tried together first, then dropped on error so the order still lands.
+  // schedule, approval/downpayment). Tried together first, then dropped on error
+  // so the order still lands.
   const geo = d.orderType === "delivery" && d.lat != null && d.lng != null ? { customerLat: d.lat, customerLng: d.lng } : null;
   const sched = scheduledFor ? { scheduledFor } : null;
-  const extra = { ...(geo ?? {}), ...(sched ?? {}) };
+  // Every advance order needs the owner's approval; downpayment is recomputed
+  // server-side (never trust the client for money).
+  const advance = scheduledFor
+    ? {
+        approvalStatus: "awaiting",
+        downpaymentAmount: computeDownpayment(storefront.booking, base.total) || null,
+        downpaymentRef: d.downpaymentRef?.trim() || null,
+      }
+    : null;
+  const extra = { ...(geo ?? {}), ...(sched ?? {}), ...(advance ?? {}) };
 
   let order;
   try {
@@ -162,5 +175,10 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
     /* loyalty must never block the order */
   }
 
-  return { ok: true, orderId: order.id };
+  return {
+    ok: true,
+    orderId: order.id,
+    awaitingApproval: !!scheduledFor,
+    downpaymentAmount: advance?.downpaymentAmount ?? 0,
+  };
 }

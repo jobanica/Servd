@@ -63,6 +63,7 @@ export default async function RestaurantSite({
       acceptsBookings={sf.acceptsBookings}
       bookHref={`/r/${slug}/book`}
       scheduleFor={scheduleFor}
+      booking={sf.booking}
     />
   );
 }

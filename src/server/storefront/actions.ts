@@ -31,6 +31,16 @@ export async function updateStorefront(
 
   const pauseWhenClosed = formData.get("pauseWhenClosed") === "on";
   const acceptsBookings = formData.get("acceptsBookings") === "on";
+  // Advance-order downpayment config.
+  const dpType = formData.get("downpaymentType") === "fixed" ? "fixed" : "percent";
+  const dpRaw = Number(formData.get("downpaymentValue")) || 0;
+  const bookingConfig = {
+    requireDownpayment: formData.get("requireDownpayment") === "on",
+    downpaymentType: dpType,
+    // Percent stays a whole number; a fixed peso amount is stored in centavos.
+    downpaymentValue: dpType === "percent" ? Math.max(0, Math.min(100, Math.round(dpRaw))) : pesosToCentavos(Math.max(0, dpRaw)),
+    downpaymentInstructions: String(formData.get("downpaymentInstructions") ?? "").trim().slice(0, 500),
+  };
   const hoursJson = hours as unknown as Prisma.InputJsonValue;
   const zonesJson = zones as unknown as Prisma.InputJsonValue;
   try {
@@ -49,13 +59,24 @@ export async function updateStorefront(
         : "Couldn't save.",
     };
   }
-  // `acceptsBookings` is a newer column — write it separately so an un-migrated
-  // DB still saves hours/zones (the toggle just won't stick until the migration).
+  // `acceptsBookings` / `bookingConfig` are newer columns — write them separately
+  // so an un-migrated DB still saves hours/zones (they just won't stick yet).
   try {
     await tenantDb(restaurantId, (tx) =>
-      tx.storefrontSetting.update({ where: { restaurantId }, data: { acceptsBookings }, select: { id: true } }),
+      tx.storefrontSetting.update({
+        where: { restaurantId },
+        data: { acceptsBookings, bookingConfig: bookingConfig as unknown as Prisma.InputJsonValue },
+        select: { id: true },
+      }),
     );
-  } catch { /* acceptsBookings column not migrated yet */ }
+  } catch {
+    // bookingConfig may lag even if acceptsBookings exists — retry with just the toggle.
+    try {
+      await tenantDb(restaurantId, (tx) =>
+        tx.storefrontSetting.update({ where: { restaurantId }, data: { acceptsBookings }, select: { id: true } }),
+      );
+    } catch { /* neither column migrated yet */ }
+  }
   revalidatePath("/admin/storefront");
   return { ok: true };
 }

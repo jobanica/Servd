@@ -316,7 +316,10 @@ export async function getIncomingOrders(): Promise<IncomingOrder[]> {
         modifiers: it.modifiers.map((m) => m.nameAtTime),
       })),
     };
-  });
+  })
+    // Advance orders live on the Advance orders page until they're sent to the
+    // kitchen — keep them out of the cashier's "incoming now" popup.
+    .filter((o) => !o.scheduledFor);
 }
 
 export interface CashierState {

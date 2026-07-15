@@ -486,6 +486,7 @@ model StorefrontSetting {
   deliveryZones  Json? // [{name, fee}] fee in centavos
   pauseWhenClosed Boolean @default(false) // block online orders outside hours
   acceptsBookings Boolean @default(false) // show the "Book a table" flow on the website
+  bookingConfig  Json? // { requireDownpayment, downpaymentType, downpaymentValue, downpaymentInstructions }
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
@@ -1368,6 +1369,10 @@ model Order {
   prepMinutes   Int? // prep-time estimate (minutes) a merchant sets on accept
   cancelReason  String? // reason a merchant rejected the order
   scheduledFor  DateTime? // advance order: requested pickup/delivery time (null = ASAP)
+  approvalStatus String? // advance order: awaiting | approved | declined (null = not an advance order)
+  downpaymentAmount Int? // centavos owner requires up-front to confirm an advance order
+  downpaymentRef String? // customer's payment reference (e.g. GCash ref) for the downpayment
+  downpaymentPaid Boolean      @default(false) // owner confirmed the downpayment landed
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
