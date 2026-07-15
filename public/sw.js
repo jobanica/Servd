@@ -7,7 +7,7 @@
  *  - Everything else (POST / server actions / API): passthrough, never cached —
  *    the app's own offline queue handles writes.
  */
-const VERSION = "servd-v1";
+const VERSION = "servd-v2";
 const PAGES = `${VERSION}-pages`;
 const ASSETS = `${VERSION}-assets`;
 
