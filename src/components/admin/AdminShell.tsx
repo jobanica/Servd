@@ -202,7 +202,7 @@ export function AdminShell({
   const sidebar = (
     <div className="flex h-full flex-col">
       {/* The restaurant's own brand — their logo (or a monogram) + name. */}
-      <Link href="/admin" className="flex items-center gap-2.5 px-5 py-4">
+      <Link href="/admin" className="flex w-full items-center gap-2.5 overflow-hidden px-5 py-4">
         {brand.logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={brand.logoUrl} alt={brand.name} className="h-8 w-8 shrink-0 rounded-lg object-cover" />
@@ -211,7 +211,7 @@ export function AdminShell({
             {brand.name.charAt(0).toUpperCase()}
           </span>
         )}
-        <span className="min-w-0 truncate font-heading text-base font-bold text-plum-ink">{brand.name}</span>
+        <span className="min-w-0 flex-1 truncate font-heading text-base font-bold text-plum-ink">{brand.name}</span>
       </Link>
       {nav}
       <div className="space-y-1 border-t border-plum-ink/10 p-3">
