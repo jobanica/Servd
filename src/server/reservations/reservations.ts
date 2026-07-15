@@ -21,12 +21,13 @@ export interface ReservationRow {
   status: string;
   tableId: string | null;
   note: string | null;
+  source: string | null; // "online" = self-booked from the website
   createdAt: Date;
 }
 
 export async function listReservations(restaurantId: string): Promise<ReservationRow[]> {
   try {
-    return await tenantDb(restaurantId, (tx) =>
+    const rows = await tenantDb(restaurantId, (tx) =>
       tx.reservation.findMany({
         where: { status: { in: ["booked", "waitlisted", "seated"] } },
         orderBy: [{ reservedAt: "asc" }, { createdAt: "asc" }],
@@ -43,6 +44,16 @@ export async function listReservations(restaurantId: string): Promise<Reservatio
         },
       }),
     );
+    // `source` ships in a later migration — read it best-effort so the list never
+    // 500s on a DB that hasn't added the column yet.
+    const online = new Set<string>();
+    try {
+      const tagged = await tenantDb(restaurantId, (tx) =>
+        tx.reservation.findMany({ where: { source: "online" }, select: { id: true } }),
+      );
+      for (const t of tagged) online.add(t.id);
+    } catch { /* source column not migrated yet */ }
+    return rows.map((r) => ({ ...r, source: online.has(r.id) ? "online" : null }));
   } catch {
     return []; // not migrated yet
   }

@@ -15,6 +15,7 @@ export interface Storefront {
   hours: DayHours[]; // always length 7, index 0=Sun … 6=Sat
   zones: DeliveryZone[];
   pauseWhenClosed: boolean;
+  acceptsBookings: boolean; // website "Book a table" flow enabled
 }
 
 export const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -47,15 +48,24 @@ function normalizeZones(raw: unknown): DeliveryZone[] {
     .filter((z) => z.name);
 }
 
-/** Storefront settings (admin context). Resilient to a missing table. */
+/** Storefront settings (admin context). Resilient to a missing table.
+ * `acceptsBookings` ships in a later migration than hours/zones, so it's read in
+ * its own best-effort query — a missing column can never wipe the core settings. */
 export async function getStorefront(restaurantId: string): Promise<Storefront> {
   try {
     const s = await tenantDb(restaurantId, (tx) =>
       tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { hours: true, deliveryZones: true, pauseWhenClosed: true } }),
     );
-    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones), pauseWhenClosed: !!s?.pauseWhenClosed };
+    let acceptsBookings = false;
+    try {
+      const b = await tenantDb(restaurantId, (tx) =>
+        tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { acceptsBookings: true } }),
+      );
+      acceptsBookings = !!b?.acceptsBookings;
+    } catch { /* column not migrated yet */ }
+    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones), pauseWhenClosed: !!s?.pauseWhenClosed, acceptsBookings };
   } catch {
-    return { hours: defaultHours(), zones: [], pauseWhenClosed: false };
+    return { hours: defaultHours(), zones: [], pauseWhenClosed: false, acceptsBookings: false };
   }
 }
 
@@ -65,9 +75,16 @@ export async function getPublicStorefront(restaurantId: string): Promise<Storefr
     const s = await systemDb((tx) =>
       tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { hours: true, deliveryZones: true, pauseWhenClosed: true } }),
     );
-    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones), pauseWhenClosed: !!s?.pauseWhenClosed };
+    let acceptsBookings = false;
+    try {
+      const b = await systemDb((tx) =>
+        tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { acceptsBookings: true } }),
+      );
+      acceptsBookings = !!b?.acceptsBookings;
+    } catch { /* column not migrated yet */ }
+    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones), pauseWhenClosed: !!s?.pauseWhenClosed, acceptsBookings };
   } catch {
-    return { hours: defaultHours(), zones: [], pauseWhenClosed: false };
+    return { hours: defaultHours(), zones: [], pauseWhenClosed: false, acceptsBookings: false };
   }
 }
 

@@ -30,6 +30,9 @@ export default async function ReservationsPage() {
           <div className="flex items-center gap-2">
             <span className="font-heading font-bold">{r.customerName}</span>
             <span className="rounded-full bg-plum-ink/5 px-2 py-0.5 text-xs text-plum-ink/60">{r.partySize} pax</span>
+            {r.source === "online" && (
+              <span className="rounded-full bg-brand-primary/10 px-2 py-0.5 text-xs font-semibold text-brand-primary">🌐 Online</span>
+            )}
             {r.status === "seated" && (
               <span className="rounded-full bg-mango/15 px-2 py-0.5 text-xs font-semibold text-mango">Seated</span>
             )}

@@ -14,7 +14,7 @@ interface DayHours {
 export function StorefrontForm({
   initial,
 }: {
-  initial: { hours: DayHours[]; zones: { name: string; feePesos: number }[]; pauseWhenClosed: boolean };
+  initial: { hours: DayHours[]; zones: { name: string; feePesos: number }[]; pauseWhenClosed: boolean; acceptsBookings: boolean };
 }) {
   const [state, action] = useActionState<StorefrontState, FormData>(updateStorefront, null);
   const [zones, setZones] = useState(initial.zones.length ? initial.zones : [{ name: "", feePesos: 0 }]);
@@ -112,6 +112,20 @@ export function StorefrontForm({
         <button type="button" onClick={() => setZones((p) => [...p, { name: "", feePesos: 0 }])} className="mt-3 rounded-full border border-plum-ink/15 px-4 py-1.5 text-sm font-semibold">
           + Add zone
         </button>
+      </div>
+
+      {/* Advance table booking */}
+      <div className="rounded-tile border border-plum-ink/10 bg-white p-5">
+        <h2 className="font-heading text-lg font-bold">Advance table booking</h2>
+        <p className="mt-1 text-sm text-plum-ink/50">
+          Let customers reserve a table ahead of time from your website. Bookings show up under{" "}
+          <span className="font-semibold text-plum-ink/70">Reservations</span>, where you can assign a
+          table, seat, or cancel them.
+        </p>
+        <label className="mt-4 flex items-center gap-2 text-sm font-semibold">
+          <input type="checkbox" name="acceptsBookings" defaultChecked={initial.acceptsBookings} />
+          Accept advance bookings on my website
+        </label>
       </div>
 
       {state?.error && <p className="text-sm text-guava">{state.error}</p>}
