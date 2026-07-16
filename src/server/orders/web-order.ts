@@ -26,6 +26,8 @@ const schema = z.object({
   lng: z.number().optional(),
   scheduledFor: z.string().datetime().optional(), // ISO; advance order (null = ASAP)
   downpaymentRef: z.string().trim().max(120).optional(), // customer's payment reference
+  paymentChoice: z.enum(["cod", "gcash"]).optional(), // chosen payment method
+  paymentRef: z.string().trim().max(120).optional(), // GCash reference for the full payment
   lines: z
     .array(
       z.object({
@@ -133,7 +135,11 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
         downpaymentRef: d.downpaymentRef?.trim() || null,
       }
     : null;
-  const extra = { ...(geo ?? {}), ...(sched ?? {}), ...(advance ?? {}) };
+  // Payment method (cash / GCash). GCash must be enabled by the owner; unknown or
+  // disabled choices fall back to cash so an order never gets stuck.
+  const choice = d.paymentChoice === "gcash" && storefront.payment.gcashEnabled ? "gcash" : "cod";
+  const pay = { paymentChoice: choice, paymentRef: choice === "gcash" ? d.paymentRef?.trim() || null : null };
+  const extra = { ...(geo ?? {}), ...(sched ?? {}), ...(advance ?? {}), ...pay };
 
   let order;
   try {

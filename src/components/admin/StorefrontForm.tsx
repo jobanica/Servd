@@ -25,12 +25,20 @@ export function StorefrontForm({
       downpaymentValue: number; // percent, or PESOS (already converted from centavos)
       downpaymentInstructions: string;
     };
+    payment: {
+      codEnabled: boolean;
+      gcashEnabled: boolean;
+      gcashName: string;
+      gcashNumber: string;
+      gcashQrUrl: string;
+    };
   };
 }) {
   const [state, action] = useActionState<StorefrontState, FormData>(updateStorefront, null);
   const [zones, setZones] = useState(initial.zones.length ? initial.zones : [{ name: "", feePesos: 0 }]);
   const [requireDp, setRequireDp] = useState(initial.booking.requireDownpayment);
   const [dpType, setDpType] = useState<"percent" | "fixed">(initial.booking.downpaymentType);
+  const [gcashOn, setGcashOn] = useState(initial.payment.gcashEnabled);
 
   // Re-seed from the server whenever the saved zones change (e.g. after a save
   // revalidates the page). Without this the fields are uncontrolled and React 19
@@ -125,6 +133,55 @@ export function StorefrontForm({
         <button type="button" onClick={() => setZones((p) => [...p, { name: "", feePesos: 0 }])} className="mt-3 rounded-full border border-plum-ink/15 px-4 py-1.5 text-sm font-semibold">
           + Add zone
         </button>
+      </div>
+
+      {/* Payment methods */}
+      <div className="rounded-tile border border-plum-ink/10 bg-white p-5">
+        <h2 className="font-heading text-lg font-bold">Payment methods</h2>
+        <p className="mt-1 text-sm text-plum-ink/50">
+          How online customers can pay. Cash means they pay on pickup/delivery. GCash shows your QR
+          code at checkout for the customer to scan, then they enter their reference number.
+        </p>
+        <label className="mt-4 flex items-center gap-2 text-sm font-semibold">
+          <input type="checkbox" name="codEnabled" defaultChecked={initial.payment.codEnabled} />
+          Cash (on pickup / delivery)
+        </label>
+        <label className="mt-3 flex items-center gap-2 text-sm font-semibold">
+          <input type="checkbox" name="gcashEnabled" checked={gcashOn} onChange={(e) => setGcashOn(e.target.checked)} />
+          GCash
+        </label>
+        {gcashOn && (
+          <div className="mt-3 space-y-3 rounded-lg border border-plum-ink/10 bg-cream/40 p-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-plum-ink/60">GCash account name</label>
+                <input name="gcashName" defaultValue={initial.payment.gcashName} placeholder="e.g. Juan D." className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-plum-ink/60">GCash number</label>
+                <input name="gcashNumber" defaultValue={initial.payment.gcashNumber} inputMode="tel" placeholder="09XX XXX XXXX" className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-plum-ink/60">GCash QR code</label>
+              <div className="flex items-center gap-3">
+                {initial.payment.gcashQrUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={initial.payment.gcashQrUrl} alt="GCash QR" className="h-20 w-20 rounded-lg border border-plum-ink/10 object-cover" />
+                ) : (
+                  <div className="flex h-20 w-20 items-center justify-center rounded-lg border border-dashed border-plum-ink/20 text-2xl">📷</div>
+                )}
+                <div className="min-w-0">
+                  <input type="file" name="gcashQr" accept="image/png,image/jpeg,image/webp" className="text-xs" />
+                  <p className="mt-1 text-xs text-plum-ink/45">Upload a screenshot of your GCash “Receive money” QR. Max 5 MB.</p>
+                </div>
+              </div>
+              {/* Preserve the existing QR when no new file is chosen. */}
+              <input type="hidden" name="gcashQrUrl" value={initial.payment.gcashQrUrl} />
+            </div>
+          </div>
+        )}
+        {!gcashOn && <input type="hidden" name="gcashQrUrl" value={initial.payment.gcashQrUrl} />}
       </div>
 
       {/* Advance booking & ordering */}

@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { requireAdminAction } from "@/server/tenancy/require-admin";
 import { tenantDb } from "@/server/tenancy/scoped-db";
+import { uploadMenuImage } from "@/server/storage/menu-images";
 import { pesosToCentavos } from "@/lib/money";
 import type { DayHours, DeliveryZone } from "./storefront";
 
@@ -41,6 +42,24 @@ export async function updateStorefront(
     downpaymentValue: dpType === "percent" ? Math.max(0, Math.min(100, Math.round(dpRaw))) : pesosToCentavos(Math.max(0, dpRaw)),
     downpaymentInstructions: String(formData.get("downpaymentInstructions") ?? "").trim().slice(0, 500),
   };
+  // Payment methods (manual GCash QR + cash). The QR is either a freshly
+  // uploaded image or the previously-saved URL passed back via a hidden field.
+  let gcashQrUrl = String(formData.get("gcashQrUrl") ?? "").trim();
+  const qrFile = formData.get("gcashQr");
+  if (qrFile instanceof File && qrFile.size > 0) {
+    try {
+      gcashQrUrl = await uploadMenuImage(restaurantId, qrFile);
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "Couldn't upload the GCash QR image." };
+    }
+  }
+  const paymentConfig = {
+    codEnabled: formData.get("codEnabled") === "on",
+    gcashEnabled: formData.get("gcashEnabled") === "on",
+    gcashName: String(formData.get("gcashName") ?? "").trim().slice(0, 120),
+    gcashNumber: String(formData.get("gcashNumber") ?? "").trim().slice(0, 40),
+    gcashQrUrl: gcashQrUrl.slice(0, 500),
+  };
   const hoursJson = hours as unknown as Prisma.InputJsonValue;
   const zonesJson = zones as unknown as Prisma.InputJsonValue;
   try {
@@ -65,17 +84,21 @@ export async function updateStorefront(
     await tenantDb(restaurantId, (tx) =>
       tx.storefrontSetting.update({
         where: { restaurantId },
-        data: { acceptsBookings, bookingConfig: bookingConfig as unknown as Prisma.InputJsonValue },
+        data: {
+          acceptsBookings,
+          bookingConfig: bookingConfig as unknown as Prisma.InputJsonValue,
+          paymentConfig: paymentConfig as unknown as Prisma.InputJsonValue,
+        },
         select: { id: true },
       }),
     );
   } catch {
-    // bookingConfig may lag even if acceptsBookings exists — retry with just the toggle.
+    // Newer columns may lag — retry with just the toggle so the rest still saves.
     try {
       await tenantDb(restaurantId, (tx) =>
         tx.storefrontSetting.update({ where: { restaurantId }, data: { acceptsBookings }, select: { id: true } }),
       );
-    } catch { /* neither column migrated yet */ }
+    } catch { /* columns not migrated yet */ }
   }
   revalidatePath("/admin/storefront");
   return { ok: true };

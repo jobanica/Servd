@@ -64,6 +64,7 @@ export default async function RestaurantSite({
       bookHref={`/r/${slug}/book`}
       scheduleFor={scheduleFor}
       booking={sf.booking}
+      payment={sf.payment}
     />
   );
 }

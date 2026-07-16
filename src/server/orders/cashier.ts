@@ -135,6 +135,21 @@ async function scheduledForMap(restaurantId: string, ids: string[]): Promise<Map
   return map;
 }
 
+/** Best-effort payment method + GCash reference (paymentChoice/Ref may lag on prod). */
+async function paymentMap(restaurantId: string, ids: string[]): Promise<Map<string, { choice: string | null; ref: string | null }>> {
+  const map = new Map<string, { choice: string | null; ref: string | null }>();
+  if (ids.length === 0) return map;
+  try {
+    const rows = await tenantDb(restaurantId, (tx) =>
+      tx.order.findMany({ where: { id: { in: ids } }, select: { id: true, paymentChoice: true, paymentRef: true } }),
+    );
+    for (const o of rows) map.set(o.id, { choice: o.paymentChoice ?? null, ref: o.paymentRef ?? null });
+  } catch {
+    /* payment columns not migrated yet */
+  }
+  return map;
+}
+
 /** A QR order awaiting the cashier's acceptance. */
 export interface IncomingOrder {
   id: string;
@@ -145,6 +160,8 @@ export interface IncomingOrder {
   customerAddress: string | null;
   mapUrl: string | null;
   scheduledFor: string | null; // ISO — advance order requested time (null = ASAP)
+  paymentChoice: string | null; // "cod" | "gcash"
+  paymentRef: string | null; // customer's GCash reference
   total: number;
   paymentStatus: string;
   createdAt: string;
@@ -281,9 +298,10 @@ export async function getIncomingOrders(): Promise<IncomingOrder[]> {
     }),
   );
 
-  const [meta, sched] = await Promise.all([
+  const [meta, sched, payments] = await Promise.all([
     orderMetaMap(staff.restaurantId, orders.map((o) => o.id)),
     scheduledForMap(staff.restaurantId, orders.map((o) => o.id)),
+    paymentMap(staff.restaurantId, orders.map((o) => o.id)),
   ]);
   return orders.map((o) => {
     const m = meta.get(o.id);
@@ -306,6 +324,8 @@ export async function getIncomingOrders(): Promise<IncomingOrder[]> {
       customerAddress: m?.customerAddress ?? null,
       mapUrl: m?.mapUrl ?? null,
       scheduledFor: sched.get(o.id) ?? null,
+      paymentChoice: payments.get(o.id)?.choice ?? null,
+      paymentRef: payments.get(o.id)?.ref ?? null,
       total: o.total,
       paymentStatus: o.paymentStatus,
       createdAt: o.createdAt.toISOString(),

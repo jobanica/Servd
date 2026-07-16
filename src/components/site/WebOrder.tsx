@@ -52,6 +52,13 @@ export interface WebOrderProps {
     downpaymentValue: number; // percent (0–100) or centavos
     downpaymentInstructions: string;
   };
+  payment?: {
+    codEnabled: boolean;
+    gcashEnabled: boolean;
+    gcashName: string;
+    gcashNumber: string;
+    gcashQrUrl: string;
+  };
 }
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -270,6 +277,13 @@ export function WebOrder(props: WebOrderProps) {
   const [downpaymentRef, setDownpaymentRef] = useState("");
   // Confirmation details for an advance order awaiting the owner's approval.
   const [placedAdvance, setPlacedAdvance] = useState<{ downpayment: number } | null>(null);
+  // Payment method (cash / manual GCash). GCash only offered if the owner set it up.
+  const pay = props.payment;
+  const gcashAvailable = !!pay?.gcashEnabled && !!pay?.gcashQrUrl;
+  const [payMethod, setPayMethod] = useState<"cod" | "gcash">(
+    pay && pay.codEnabled === false && gcashAvailable ? "gcash" : "cod",
+  );
+  const [gcashRef, setGcashRef] = useState("");
 
   const count = cartCount(lines);
   const subtotal = cartTotal(lines);
@@ -323,6 +337,8 @@ export function WebOrder(props: WebOrderProps) {
       lng: orderType === "delivery" ? geo?.lng : undefined,
       scheduledFor: scheduledIso,
       downpaymentRef: schedulingLater && downpaymentDue > 0 ? downpaymentRef || undefined : undefined,
+      paymentChoice: gcashAvailable ? payMethod : undefined,
+      paymentRef: payMethod === "gcash" ? gcashRef || undefined : undefined,
       lines: lines.map((l) => ({ itemId: l.itemId, quantity: l.quantity, note: l.note, modifierIds: l.modifiers.map((m) => m.modifierId), variantId: l.variantId })),
     });
     setBusy(false);
@@ -500,6 +516,42 @@ export function WebOrder(props: WebOrderProps) {
                 </div>
               </>
             )}
+
+            {/* Payment method — only a choice when the owner offers GCash too. */}
+            {gcashAvailable && (
+              <div>
+                <p className="mb-1 text-xs font-semibold text-plum-ink/60">Payment</p>
+                <div className="grid grid-cols-2 gap-1 rounded-lg bg-gray-100 p-1">
+                  {pay?.codEnabled !== false && (
+                    <button type="button" onClick={() => setPayMethod("cod")} className={`rounded-md py-2 text-sm font-semibold ${payMethod === "cod" ? "bg-white text-red-600 shadow-sm" : "text-plum-ink/60"}`}>
+                      💵 {orderType === "delivery" ? "Cash on delivery" : "Cash on pickup"}
+                    </button>
+                  )}
+                  <button type="button" onClick={() => setPayMethod("gcash")} className={`rounded-md py-2 text-sm font-semibold ${payMethod === "gcash" ? "bg-white text-blue-600 shadow-sm" : "text-plum-ink/60"} ${pay?.codEnabled === false ? "col-span-2" : ""}`}>
+                    📱 GCash
+                  </button>
+                </div>
+                {payMethod === "gcash" && (
+                  <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50/60 p-3 text-center">
+                    <p className="text-xs font-semibold text-plum-ink/70">Scan to pay {formatPeso(total)}</p>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={pay!.gcashQrUrl} alt="GCash QR" className="mx-auto mt-2 h-44 w-44 rounded-lg border border-plum-ink/10 bg-white object-contain" />
+                    {(pay!.gcashName || pay!.gcashNumber) && (
+                      <p className="mt-2 text-xs text-plum-ink/60">
+                        {pay!.gcashName}{pay!.gcashName && pay!.gcashNumber ? " · " : ""}{pay!.gcashNumber}
+                      </p>
+                    )}
+                    <input
+                      value={gcashRef}
+                      onChange={(e) => setGcashRef(e.target.value)}
+                      placeholder="Enter your GCash reference no."
+                      className="mt-2 w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+                    />
+                    <p className="mt-1 text-[11px] text-plum-ink/45">Pay, then enter the reference so we can confirm your order.</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -531,7 +583,7 @@ export function WebOrder(props: WebOrderProps) {
         ) : (
           <button
             onClick={submit}
-            disabled={busy || lines.length === 0 || !name.trim() || !phone.trim() || (schedulingLater && !scheduledIso) || (orderType === "delivery" && (!address.trim() || !geo || (zones.length > 0 && !zone)))}
+            disabled={busy || lines.length === 0 || !name.trim() || !phone.trim() || (schedulingLater && !scheduledIso) || (gcashAvailable && payMethod === "gcash" && !gcashRef.trim()) || (orderType === "delivery" && (!address.trim() || !geo || (zones.length > 0 && !zone)))}
             className="mt-3 w-full rounded-lg bg-green-600 py-3 font-semibold text-white disabled:opacity-50"
           >
             {busy
@@ -544,7 +596,10 @@ export function WebOrder(props: WebOrderProps) {
         {checkout && (
           <p className="mt-2 text-center text-xs text-plum-ink/40">
             {schedulingLater && scheduledIso
-              ? `For ${new Date(scheduledIso).toLocaleString("en-PH", { timeZone: "Asia/Manila", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} · Pay on ${orderType === "delivery" ? "delivery" : "pickup"}.`
+              ? `For ${new Date(scheduledIso).toLocaleString("en-PH", { timeZone: "Asia/Manila", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} · `
+              : ""}
+            {payMethod === "gcash" && gcashAvailable
+              ? "Paying via GCash."
               : `Pay on ${orderType === "delivery" ? "delivery" : "pickup"}.`}
           </p>
         )}

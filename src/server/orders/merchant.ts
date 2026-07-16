@@ -48,6 +48,8 @@ export interface MerchantOrder {
   prepMinutes: number | null;
   cancelReason: string | null;
   scheduledFor: string | null; // ISO — advance order requested time (null = ASAP)
+  paymentChoice: string | null; // "cod" | "gcash"
+  paymentRef: string | null; // customer's GCash reference
   createdAt: string; // ISO
   items: MerchantOrderItem[];
 }
@@ -95,7 +97,7 @@ type Row = {
   items: { nameAtTime: string; quantity: number; note: string | null; modifiers: { nameAtTime: string }[] }[];
 };
 
-function shape(o: Row, extra: { prepMinutes: number | null; cancelReason: string | null; scheduledFor: string | null }): MerchantOrder {
+function shape(o: Row, extra: OrderExtra): MerchantOrder {
   return {
     id: o.id,
     ref: `#${o.id.slice(0, 8).toUpperCase()}`,
@@ -111,6 +113,8 @@ function shape(o: Row, extra: { prepMinutes: number | null; cancelReason: string
     prepMinutes: extra.prepMinutes,
     cancelReason: extra.cancelReason,
     scheduledFor: extra.scheduledFor,
+    paymentChoice: extra.paymentChoice,
+    paymentRef: extra.paymentRef,
     createdAt: o.createdAt.toISOString(),
     items: o.items.map((it) => ({
       name: it.nameAtTime,
@@ -154,7 +158,7 @@ async function loadMerchantData(restaurantId: string): Promise<MerchantData> {
   // screen still works before the migration runs.
   const allIds = [...incomingRows, ...activeRows, ...historyRows].map((o) => o.id);
   const extras = await loadExtras(restaurantId, allIds);
-  const get = (id: string) => extras.get(id) ?? { prepMinutes: null, cancelReason: null, scheduledFor: null };
+  const get = (id: string): OrderExtra => extras.get(id) ?? { prepMinutes: null, cancelReason: null, scheduledFor: null, paymentChoice: null, paymentRef: null };
 
   return {
     // Advance orders (scheduled for later) are handled on the Advance orders page,
@@ -165,37 +169,39 @@ async function loadMerchantData(restaurantId: string): Promise<MerchantData> {
   };
 }
 
-type OrderExtra = { prepMinutes: number | null; cancelReason: string | null; scheduledFor: string | null };
+type OrderExtra = {
+  prepMinutes: number | null;
+  cancelReason: string | null;
+  scheduledFor: string | null;
+  paymentChoice: string | null;
+  paymentRef: string | null;
+};
 
 async function loadExtras(restaurantId: string, ids: string[]): Promise<Map<string, OrderExtra>> {
   const map = new Map<string, OrderExtra>();
   if (ids.length === 0) return map;
-  // prepMinutes / cancelReason and (newer) scheduledFor may lag. Try the full set
-  // first, then fall back to just prepMinutes/cancelReason so a missing
-  // scheduledFor column doesn't drop the other extras.
+  const blank = (): OrderExtra => ({ prepMinutes: null, cancelReason: null, scheduledFor: null, paymentChoice: null, paymentRef: null });
+  for (const id of ids) map.set(id, blank());
+  // Each column group is read independently and best-effort, so one un-migrated
+  // group (scheduledFor, payment) never wipes the others.
   try {
     const rows = await tenantDb(restaurantId, (tx) =>
-      tx.order.findMany({
-        where: { id: { in: ids } },
-        select: { id: true, prepMinutes: true, cancelReason: true, scheduledFor: true },
-      }),
+      tx.order.findMany({ where: { id: { in: ids } }, select: { id: true, prepMinutes: true, cancelReason: true } }),
     );
-    for (const r of rows) map.set(r.id, { prepMinutes: r.prepMinutes ?? null, cancelReason: r.cancelReason ?? null, scheduledFor: r.scheduledFor ? r.scheduledFor.toISOString() : null });
-    return map;
-  } catch {
-    /* scheduledFor column not migrated yet — fall through */
-  }
+    for (const r of rows) { const e = map.get(r.id)!; e.prepMinutes = r.prepMinutes ?? null; e.cancelReason = r.cancelReason ?? null; }
+  } catch { /* prepMinutes/cancelReason not migrated yet */ }
   try {
     const rows = await tenantDb(restaurantId, (tx) =>
-      tx.order.findMany({
-        where: { id: { in: ids } },
-        select: { id: true, prepMinutes: true, cancelReason: true },
-      }),
+      tx.order.findMany({ where: { id: { in: ids } }, select: { id: true, scheduledFor: true } }),
     );
-    for (const r of rows) map.set(r.id, { prepMinutes: r.prepMinutes ?? null, cancelReason: r.cancelReason ?? null, scheduledFor: null });
-  } catch {
-    /* prepMinutes/cancelReason not migrated yet either */
-  }
+    for (const r of rows) map.get(r.id)!.scheduledFor = r.scheduledFor ? r.scheduledFor.toISOString() : null;
+  } catch { /* scheduledFor not migrated yet */ }
+  try {
+    const rows = await tenantDb(restaurantId, (tx) =>
+      tx.order.findMany({ where: { id: { in: ids } }, select: { id: true, paymentChoice: true, paymentRef: true } }),
+    );
+    for (const r of rows) { const e = map.get(r.id)!; e.paymentChoice = r.paymentChoice ?? null; e.paymentRef = r.paymentRef ?? null; }
+  } catch { /* payment columns not migrated yet */ }
   return map;
 }
 
