@@ -40,15 +40,18 @@ export async function getPlanAccess(restaurantId: string): Promise<PlanAccess> {
         orderBy: { createdAt: "desc" },
         select: { status: true, trialEndsAt: true, plan: { select: { name: true, features: true } } },
       });
-      const onTrial =
-        sub?.status === "trialing" && sub.trialEndsAt != null && sub.trialEndsAt.getTime() > Date.now();
-      const tier = asTier(sub?.plan?.name);
+      const isTrialing = sub?.status === "trialing";
+      const onTrial = isTrialing && sub?.trialEndsAt != null && sub.trialEndsAt.getTime() > Date.now();
+      // A "trialing" subscription past its window is an UNPAID selection (picking a
+      // paid plan without a card, or a lapsed signup trial). It must grant only
+      // Free-tier access until payment flips the status to "active" — otherwise a
+      // post-trial account could switch to Growth/Business and get it for free.
+      const lapsed = isTrialing && !onTrial;
+      const tier = lapsed ? "Free" : asTier(sub?.plan?.name);
       const tierDefaults = tier ? defaultFeaturesForTier(tier) : ALL_FEATURES;
-      const stored = sanitizeFeatures(sub?.plan?.features ?? []);
-      // Every new account gets one 30-day full-access trial (there is no separate
-      // per-plan trial), so a trial unlocks EVERY feature. Off-trial, the plan's
-      // stored features are authoritative (falling back to the tier defaults; an
-      // unknown plan name fails open to everything).
+      const stored = lapsed ? [] : sanitizeFeatures(sub?.plan?.features ?? []);
+      // A live trial unlocks EVERY feature. Off-trial, the plan's stored features
+      // are authoritative (falling back to tier defaults; unknown plan → open).
       const features = new Set<Feature>(
         onTrial ? ALL_FEATURES : stored.length ? stored : tierDefaults,
       );
@@ -69,9 +72,11 @@ async function getPlanAccessByTier(restaurantId: string): Promise<PlanAccess> {
         orderBy: { createdAt: "desc" },
         select: { status: true, trialEndsAt: true, plan: { select: { name: true } } },
       });
-      const onTrial =
-        sub?.status === "trialing" && sub.trialEndsAt != null && sub.trialEndsAt.getTime() > Date.now();
-      const tier = asTier(sub?.plan?.name);
+      const isTrialing = sub?.status === "trialing";
+      const onTrial = isTrialing && sub?.trialEndsAt != null && sub.trialEndsAt.getTime() > Date.now();
+      // Lapsed/unpaid trial → Free access until they pay (see getPlanAccess).
+      const lapsed = isTrialing && !onTrial;
+      const tier = lapsed ? "Free" : asTier(sub?.plan?.name);
       const features = new Set<Feature>(
         onTrial ? ALL_FEATURES : tier ? defaultFeaturesForTier(tier) : ALL_FEATURES,
       );

@@ -21,12 +21,16 @@ export function PlanCards({
   currentPlanName,
   planIdByName,
   priceByTier,
+  onTrial = false,
 }: {
   mode: "signup" | "switch";
   currentPlanName?: string | null;
   planIdByName?: Record<string, string>;
   // Live prices (pesos) per tier from the DB; falls back to catalog defaults.
   priceByTier?: Partial<Record<Tier, number>>;
+  // Whether the account is on its active free trial (switch mode) — drives the
+  // CTA copy (during the trial paid plans are included; after, they need paying).
+  onTrial?: boolean;
 }) {
   return (
     <div className="grid items-start gap-5 lg:grid-cols-3">
@@ -103,7 +107,11 @@ export function PlanCards({
                     featured ? "btn-brand text-white" : "border border-plum-ink/15"
                   }`}
                 >
-                  {price <= 0 ? "Switch to Free" : `Try ${info.name} free`}
+                  {price <= 0
+                    ? "Switch to Free"
+                    : onTrial
+                      ? `Choose ${info.name}`
+                      : `Upgrade to ${info.name} — ₱${price.toLocaleString()}/mo`}
                 </button>
               </form>
             ) : (

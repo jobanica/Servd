@@ -50,7 +50,8 @@ export default async function BillingPage({
   for (const p of plans) planIdByName[p.name] = p.id;
   const priceByTier = { Free: pricing.Free.pricePesos, Growth: pricing.Growth.pricePesos, Business: pricing.Business.pricePesos };
 
-  const trialDays = sub?.status === "trialing" ? daysLeft(sub.trialEndsAt) : null;
+  const onTrial = sub?.status === "trialing" && !!sub.trialEndsAt && new Date(sub.trialEndsAt).getTime() > Date.now();
+  const trialDays = onTrial ? daysLeft(sub!.trialEndsAt) : null;
   const needsPayment = sub?.status === "past_due" || (sub?.status === "trialing" && !sub.providerPaymentMethodId);
 
   return (
@@ -63,8 +64,9 @@ export default async function BillingPage({
       {/* Plan-switch result banners */}
       {plan === "changed" && (
         <div className="rounded-tile border border-brand-primary/30 bg-brand-primary/5 p-4 text-sm font-semibold text-brand-primary">
-          You&apos;re all set — your plan was updated. It takes effect when your free trial ends; add
-          a payment method any time to keep going.
+          {onTrial
+            ? "You're all set — your plan was updated. It's included during your free trial; add a payment method before it ends to keep going."
+            : "Plan selected. Add a payment method below to activate it — its features unlock once payment is confirmed."}
         </div>
       )}
       {plan === "error" && (
@@ -147,7 +149,7 @@ export default async function BillingPage({
         <p className="mb-4 text-xs text-plum-ink/45">
           Prices may increase without prior notice.
         </p>
-        <PlanCards mode="switch" currentPlanName={sub?.plan.name ?? null} planIdByName={planIdByName} priceByTier={priceByTier} />
+        <PlanCards mode="switch" currentPlanName={sub?.plan.name ?? null} planIdByName={planIdByName} priceByTier={priceByTier} onTrial={onTrial} />
       </div>
 
       {/* Full comparison */}
