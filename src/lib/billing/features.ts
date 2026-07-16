@@ -79,7 +79,7 @@ export function sanitizeFeatures(list: readonly string[]): Feature[] {
  * Once a plan is saved from the editor, its stored features are authoritative.
  */
 export const FEATURE_TIERS: Record<Feature, Tier[]> = {
-  onlineOrdering: ["Growth", "Business"],
+  onlineOrdering: ["Free", "Growth", "Business"],
   onlinePayments: ["Growth", "Business"],
   loyalty: ["Growth", "Business"],
   promotions: ["Growth", "Business"],

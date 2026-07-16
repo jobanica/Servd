@@ -27,6 +27,7 @@ export const TIER_INFO: Record<Tier, TierInfo> = {
     highlights: [
       "1 dine-in table QR & 3 staff",
       "QR dine-in + counter/takeout order numbers",
+      "Online ordering website — pickup & delivery",
       "Kitchen display & cashier POS",
       "Split payments, split bills & tips",
       "Void / edit with manager approval",
@@ -40,8 +41,7 @@ export const TIER_INFO: Record<Tier, TierInfo> = {
     highlights: [
       "Up to 20 tables & 15 staff",
       "Everything in Free, plus:",
-      "Your own website + custom domain",
-      "Online ordering, pickup & delivery",
+      "Your own custom domain",
       "Online payments (GCash / card)",
       "Floor plan, reservations & gift cards",
       "Loyalty, promotions & happy hours",
@@ -96,8 +96,8 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
       { label: "Order void / edit with manager approval", Free: true, Growth: true, Business: true },
       { label: "Visual floor plan & live table status", Free: false, Growth: true, Business: true },
       { label: "Reservations & waitlist", Free: false, Growth: true, Business: true },
-      { label: "Online ordering website", Free: false, Growth: true, Business: true },
-      { label: "Pickup & delivery orders", Free: false, Growth: true, Business: true },
+      { label: "Online ordering website", Free: true, Growth: true, Business: true },
+      { label: "Pickup & delivery orders", Free: true, Growth: true, Business: true },
       { label: "Tables included", Free: "1", Growth: "20", Business: "Unlimited" },
       { label: "Staff accounts", Free: "3", Growth: "15", Business: "Unlimited" },
     ],
