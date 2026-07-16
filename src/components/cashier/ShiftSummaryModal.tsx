@@ -6,7 +6,7 @@ import { formatPeso } from "@/lib/money";
 
 /**
  * End-of-shift review: today's sales (by method), expenses and net — with a
- * button to print the summary and a reminder to clock out.
+ * button to print the summary. (Clock in/out lives in HR, not here.)
  */
 export function ShiftSummaryModal({ onClose }: { onClose: () => void }) {
   const [s, setS] = useState<ShiftSummary | null | "loading">("loading");
@@ -90,12 +90,6 @@ export function ShiftSummaryModal({ onClose }: { onClose: () => void }) {
                 className="flex-1 rounded-full px-4 py-2.5 text-center text-sm font-semibold btn-brand"
               >
                 🖨 Print summary
-              </a>
-              <a
-                href="/clock/me"
-                className="flex-1 rounded-full border border-plum-ink/15 px-4 py-2.5 text-center text-sm font-semibold hover:bg-cream"
-              >
-                Clock out →
               </a>
             </div>
           </div>

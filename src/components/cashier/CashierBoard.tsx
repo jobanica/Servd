@@ -329,9 +329,6 @@ export function CashierBoard({
       <Link href="/cashier/delivery" className={`${sidebarBtn} text-center`}>
         🛵 Delivery orders
       </Link>
-      <Link href="/clock/me" className="w-full rounded-full px-4 py-2.5 text-center text-sm font-semibold btn-brand">
-        Clock in/out
-      </Link>
       {isAdmin && (
         <Link href="/admin/printing" className={`${sidebarBtn} text-center`}>
           Printer settings
