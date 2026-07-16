@@ -24,6 +24,17 @@ export interface PaymentConfig {
   gcashNumber: string; // GCash mobile number
   gcashQrUrl: string; // uploaded QR image URL
 }
+export interface DeliveryConfig {
+  mode: "zones" | "distance"; // how the delivery fee is worked out
+  baseFee: number; // centavos
+  perKm: number; // centavos per km
+  freeKm: number; // first N km included in base
+  minFee: number; // centavos minimum (0 = ignore)
+  maxKm: number; // don't deliver beyond this (0 = unlimited)
+  roadFactor: number; // straight-line × factor ≈ road distance (default 1.3)
+  originLat: number | null; // store location (pinned by the owner)
+  originLng: number | null;
+}
 export interface Storefront {
   hours: DayHours[]; // always length 7, index 0=Sun … 6=Sat
   zones: DeliveryZone[];
@@ -31,6 +42,35 @@ export interface Storefront {
   acceptsBookings: boolean; // website "Book a table" flow enabled
   booking: BookingConfig; // advance-order downpayment / approval settings
   payment: PaymentConfig; // manual GCash / cash settings
+  delivery: DeliveryConfig; // zones vs distance-based fee
+}
+
+export function defaultDeliveryConfig(): DeliveryConfig {
+  return { mode: "zones", baseFee: 0, perKm: 0, freeKm: 0, minFee: 0, maxKm: 0, roadFactor: 1.3, originLat: null, originLng: null };
+}
+
+function num(v: unknown, fallback = 0): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function normalizeDeliveryConfig(raw: unknown): DeliveryConfig {
+  const d = defaultDeliveryConfig();
+  if (raw && typeof raw === "object") {
+    const r = raw as Partial<DeliveryConfig>;
+    return {
+      mode: r.mode === "distance" ? "distance" : "zones",
+      baseFee: Math.max(0, Math.round(num(r.baseFee))),
+      perKm: Math.max(0, Math.round(num(r.perKm))),
+      freeKm: Math.max(0, num(r.freeKm)),
+      minFee: Math.max(0, Math.round(num(r.minFee))),
+      maxKm: Math.max(0, num(r.maxKm)),
+      roadFactor: num(r.roadFactor, 1.3) > 0 ? num(r.roadFactor, 1.3) : 1.3,
+      originLat: r.originLat == null ? null : num(r.originLat),
+      originLng: r.originLng == null ? null : num(r.originLng),
+    };
+  }
+  return d;
 }
 
 export function defaultPaymentConfig(): PaymentConfig {
@@ -121,17 +161,19 @@ export async function getStorefront(restaurantId: string): Promise<Storefront> {
     let acceptsBookings = false;
     let booking = defaultBookingConfig();
     let payment = defaultPaymentConfig();
+    let delivery = defaultDeliveryConfig();
     try {
       const b = await tenantDb(restaurantId, (tx) =>
-        tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { acceptsBookings: true, bookingConfig: true, paymentConfig: true } }),
+        tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { acceptsBookings: true, bookingConfig: true, paymentConfig: true, deliveryConfig: true } }),
       );
       acceptsBookings = !!b?.acceptsBookings;
       booking = normalizeBookingConfig(b?.bookingConfig);
       payment = normalizePaymentConfig(b?.paymentConfig);
+      delivery = normalizeDeliveryConfig(b?.deliveryConfig);
     } catch { /* columns not migrated yet */ }
-    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones), pauseWhenClosed: !!s?.pauseWhenClosed, acceptsBookings, booking, payment };
+    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones), pauseWhenClosed: !!s?.pauseWhenClosed, acceptsBookings, booking, payment, delivery };
   } catch {
-    return { hours: defaultHours(), zones: [], pauseWhenClosed: false, acceptsBookings: false, booking: defaultBookingConfig(), payment: defaultPaymentConfig() };
+    return { hours: defaultHours(), zones: [], pauseWhenClosed: false, acceptsBookings: false, booking: defaultBookingConfig(), payment: defaultPaymentConfig(), delivery: defaultDeliveryConfig() };
   }
 }
 
@@ -144,17 +186,19 @@ export async function getPublicStorefront(restaurantId: string): Promise<Storefr
     let acceptsBookings = false;
     let booking = defaultBookingConfig();
     let payment = defaultPaymentConfig();
+    let delivery = defaultDeliveryConfig();
     try {
       const b = await systemDb((tx) =>
-        tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { acceptsBookings: true, bookingConfig: true, paymentConfig: true } }),
+        tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { acceptsBookings: true, bookingConfig: true, paymentConfig: true, deliveryConfig: true } }),
       );
       acceptsBookings = !!b?.acceptsBookings;
       booking = normalizeBookingConfig(b?.bookingConfig);
       payment = normalizePaymentConfig(b?.paymentConfig);
+      delivery = normalizeDeliveryConfig(b?.deliveryConfig);
     } catch { /* columns not migrated yet */ }
-    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones), pauseWhenClosed: !!s?.pauseWhenClosed, acceptsBookings, booking, payment };
+    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones), pauseWhenClosed: !!s?.pauseWhenClosed, acceptsBookings, booking, payment, delivery };
   } catch {
-    return { hours: defaultHours(), zones: [], pauseWhenClosed: false, acceptsBookings: false, booking: defaultBookingConfig(), payment: defaultPaymentConfig() };
+    return { hours: defaultHours(), zones: [], pauseWhenClosed: false, acceptsBookings: false, booking: defaultBookingConfig(), payment: defaultPaymentConfig(), delivery: defaultDeliveryConfig() };
   }
 }
 

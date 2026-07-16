@@ -60,6 +60,22 @@ export async function updateStorefront(
     gcashNumber: String(formData.get("gcashNumber") ?? "").trim().slice(0, 40),
     gcashQrUrl: gcashQrUrl.slice(0, 500),
   };
+  // Delivery pricing: zones (fixed per area) or distance (base + per-km). Peso
+  // inputs → centavos; the store origin comes from a pinned lat/lng.
+  const dpNum = (k: string) => Number(formData.get(k)) || 0;
+  const originLat = formData.get("originLat") ? Number(formData.get("originLat")) : null;
+  const originLng = formData.get("originLng") ? Number(formData.get("originLng")) : null;
+  const deliveryConfig = {
+    mode: formData.get("deliveryMode") === "distance" ? "distance" : "zones",
+    baseFee: pesosToCentavos(Math.max(0, dpNum("baseFeePesos"))),
+    perKm: pesosToCentavos(Math.max(0, dpNum("perKmPesos"))),
+    freeKm: Math.max(0, dpNum("freeKm")),
+    minFee: pesosToCentavos(Math.max(0, dpNum("minFeePesos"))),
+    maxKm: Math.max(0, dpNum("maxKm")),
+    roadFactor: dpNum("roadFactor") > 0 ? dpNum("roadFactor") : 1.3,
+    originLat: originLat != null && Number.isFinite(originLat) ? originLat : null,
+    originLng: originLng != null && Number.isFinite(originLng) ? originLng : null,
+  };
   const hoursJson = hours as unknown as Prisma.InputJsonValue;
   const zonesJson = zones as unknown as Prisma.InputJsonValue;
   try {
@@ -88,6 +104,7 @@ export async function updateStorefront(
           acceptsBookings,
           bookingConfig: bookingConfig as unknown as Prisma.InputJsonValue,
           paymentConfig: paymentConfig as unknown as Prisma.InputJsonValue,
+          deliveryConfig: deliveryConfig as unknown as Prisma.InputJsonValue,
         },
         select: { id: true },
       }),

@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { updateStorefront, type StorefrontState } from "@/server/storefront/actions";
+import { LocationPicker } from "@/components/site/LocationPicker";
 import { SubmitButton } from "./SubmitButton";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -32,6 +33,17 @@ export function StorefrontForm({
       gcashNumber: string;
       gcashQrUrl: string;
     };
+    delivery: {
+      mode: "zones" | "distance";
+      baseFeePesos: number;
+      perKmPesos: number;
+      freeKm: number;
+      minFeePesos: number;
+      maxKm: number;
+      roadFactor: number;
+      originLat: number | null;
+      originLng: number | null;
+    };
   };
 }) {
   const [state, action] = useActionState<StorefrontState, FormData>(updateStorefront, null);
@@ -39,6 +51,12 @@ export function StorefrontForm({
   const [requireDp, setRequireDp] = useState(initial.booking.requireDownpayment);
   const [dpType, setDpType] = useState<"percent" | "fixed">(initial.booking.downpaymentType);
   const [gcashOn, setGcashOn] = useState(initial.payment.gcashEnabled);
+  const [deliveryMode, setDeliveryMode] = useState<"zones" | "distance">(initial.delivery.mode);
+  const [origin, setOrigin] = useState<{ lat: number; lng: number } | null>(
+    initial.delivery.originLat != null && initial.delivery.originLng != null
+      ? { lat: initial.delivery.originLat, lng: initial.delivery.originLng }
+      : null,
+  );
 
   // Re-seed from the server whenever the saved zones change (e.g. after a save
   // revalidates the page). Without this the fields are uncontrolled and React 19
@@ -94,45 +112,88 @@ export function StorefrontForm({
         </label>
       </div>
 
-      {/* Delivery zones */}
+      {/* Delivery pricing */}
       <div className="rounded-tile border border-plum-ink/10 bg-white p-5">
-        <h2 className="font-heading text-lg font-bold">Delivery zones &amp; fees</h2>
-        <p className="mt-1 text-sm text-plum-ink/50">Customers pick a zone at checkout; its fee is added to the total. Leave empty for pickup-only.</p>
-        <div className="mt-4 space-y-2">
-          {zones.map((z, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <input
-                name="zoneName"
-                value={z.name}
-                onChange={(e) =>
-                  setZones((p) => p.map((zz, idx) => (idx === i ? { ...zz, name: e.target.value } : zz)))
-                }
-                placeholder="Zone (e.g. Poblacion)"
-                className="flex-1 rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
-              />
-              <div className="flex items-center gap-1">
-                <span className="text-sm text-plum-ink/50">₱</span>
-                <input
-                  name="zoneFee"
-                  type="number"
-                  step="0.01"
-                  min={0}
-                  value={z.feePesos}
-                  onChange={(e) =>
-                    setZones((p) =>
-                      p.map((zz, idx) => (idx === i ? { ...zz, feePesos: Number(e.target.value) } : zz)),
-                    )
-                  }
-                  className="w-24 rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
-                />
-              </div>
-              <button type="button" onClick={() => setZones((p) => p.filter((_, idx) => idx !== i))} className="text-sm text-muted hover:text-guava">remove</button>
-            </div>
-          ))}
+        <h2 className="font-heading text-lg font-bold">Delivery fees</h2>
+        <p className="mt-1 text-sm text-plum-ink/50">Choose how the delivery fee is worked out. Leave zones empty (or fees at 0) for pickup-only.</p>
+
+        <input type="hidden" name="deliveryMode" value={deliveryMode} />
+        <input type="hidden" name="originLat" value={origin?.lat ?? ""} />
+        <input type="hidden" name="originLng" value={origin?.lng ?? ""} />
+
+        {/* Mode toggle */}
+        <div className="mt-3 grid grid-cols-2 gap-1 rounded-lg bg-plum-ink/5 p-1 sm:max-w-sm">
+          <button type="button" onClick={() => setDeliveryMode("zones")} className={`rounded-md py-2 text-sm font-semibold ${deliveryMode === "zones" ? "bg-white text-brand-primary shadow-sm" : "text-plum-ink/60"}`}>
+            📍 By zone
+          </button>
+          <button type="button" onClick={() => setDeliveryMode("distance")} className={`rounded-md py-2 text-sm font-semibold ${deliveryMode === "distance" ? "bg-white text-brand-primary shadow-sm" : "text-plum-ink/60"}`}>
+            📏 By distance
+          </button>
         </div>
-        <button type="button" onClick={() => setZones((p) => [...p, { name: "", feePesos: 0 }])} className="mt-3 rounded-full border border-plum-ink/15 px-4 py-1.5 text-sm font-semibold">
-          + Add zone
-        </button>
+
+        {/* Zones editor (kept mounted so values persist when switching modes). */}
+        <div className={deliveryMode === "zones" ? "mt-4" : "hidden"}>
+          <p className="mb-2 text-sm text-plum-ink/50">Customers pick a zone at checkout; its fee is added to the total.</p>
+          <div className="space-y-2">
+            {zones.map((z, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input
+                  name="zoneName"
+                  value={z.name}
+                  onChange={(e) => setZones((p) => p.map((zz, idx) => (idx === i ? { ...zz, name: e.target.value } : zz)))}
+                  placeholder="Zone (e.g. Poblacion)"
+                  className="flex-1 rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+                />
+                <div className="flex items-center gap-1">
+                  <span className="text-sm text-plum-ink/50">₱</span>
+                  <input
+                    name="zoneFee"
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={z.feePesos}
+                    onChange={(e) => setZones((p) => p.map((zz, idx) => (idx === i ? { ...zz, feePesos: Number(e.target.value) } : zz)))}
+                    className="w-24 rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+                  />
+                </div>
+                <button type="button" onClick={() => setZones((p) => p.filter((_, idx) => idx !== i))} className="text-sm text-muted hover:text-guava">remove</button>
+              </div>
+            ))}
+          </div>
+          <button type="button" onClick={() => setZones((p) => [...p, { name: "", feePesos: 0 }])} className="mt-3 rounded-full border border-plum-ink/15 px-4 py-1.5 text-sm font-semibold">
+            + Add zone
+          </button>
+        </div>
+
+        {/* Distance settings — numeric inputs stay mounted; only the map mounts
+            in distance mode (Leaflet needs a visible container). */}
+        <div className={deliveryMode === "distance" ? "mt-4 space-y-4" : "hidden"}>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="text-sm"><span className="mb-1 block font-semibold text-plum-ink/60">Base fee (₱)</span>
+              <input name="baseFeePesos" type="number" step="0.01" min={0} defaultValue={initial.delivery.baseFeePesos} className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" /></label>
+            <label className="text-sm"><span className="mb-1 block font-semibold text-plum-ink/60">Per km (₱)</span>
+              <input name="perKmPesos" type="number" step="0.01" min={0} defaultValue={initial.delivery.perKmPesos} className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" /></label>
+            <label className="text-sm"><span className="mb-1 block font-semibold text-plum-ink/60">Free within (km)</span>
+              <input name="freeKm" type="number" step="0.1" min={0} defaultValue={initial.delivery.freeKm} className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" /></label>
+            <label className="text-sm"><span className="mb-1 block font-semibold text-plum-ink/60">Minimum fee (₱)</span>
+              <input name="minFeePesos" type="number" step="0.01" min={0} defaultValue={initial.delivery.minFeePesos} className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" /></label>
+            <label className="text-sm"><span className="mb-1 block font-semibold text-plum-ink/60">Max distance (km, 0 = no limit)</span>
+              <input name="maxKm" type="number" step="0.1" min={0} defaultValue={initial.delivery.maxKm} className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" /></label>
+            <label className="text-sm"><span className="mb-1 block font-semibold text-plum-ink/60">Road factor (≈ road vs straight line)</span>
+              <input name="roadFactor" type="number" step="0.05" min={1} defaultValue={initial.delivery.roadFactor} className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" /></label>
+          </div>
+          <p className="text-xs text-plum-ink/45">
+            Fee = base + (distance − free km) × per-km, but never below the minimum. Distance is straight-line ×
+            road factor. e.g. base ₱30, ₱10/km, 1 km free → 4 km away ≈ ₱30 + 3×₱10 = ₱60.
+          </p>
+          <div>
+            <p className="mb-1 text-sm font-semibold text-plum-ink/60">Your store location (drop the pin on your store)</p>
+            {deliveryMode === "distance" && (
+              <LocationPicker initial={origin} onChange={(lat, lng) => setOrigin({ lat, lng })} />
+            )}
+            {!origin && <p className="mt-1 text-xs text-guava">Pin your store so we can measure distance to each customer.</p>}
+          </div>
+        </div>
       </div>
 
       {/* Payment methods */}

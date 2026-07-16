@@ -65,6 +65,7 @@ export default async function RestaurantSite({
       scheduleFor={scheduleFor}
       booking={sf.booking}
       payment={sf.payment}
+      delivery={sf.delivery}
     />
   );
 }

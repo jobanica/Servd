@@ -87,6 +87,17 @@ export default async function StorefrontPage() {
             downpaymentInstructions: sf.booking.downpaymentInstructions,
           },
           payment: sf.payment,
+          delivery: {
+            mode: sf.delivery.mode,
+            baseFeePesos: sf.delivery.baseFee / 100,
+            perKmPesos: sf.delivery.perKm / 100,
+            freeKm: sf.delivery.freeKm,
+            minFeePesos: sf.delivery.minFee / 100,
+            maxKm: sf.delivery.maxKm,
+            roadFactor: sf.delivery.roadFactor,
+            originLat: sf.delivery.originLat,
+            originLng: sf.delivery.originLng,
+          },
         }}
       />
     </div>

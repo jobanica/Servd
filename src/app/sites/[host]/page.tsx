@@ -45,6 +45,7 @@ export default async function SiteHomePage({
       scheduleFor={scheduleFor}
       booking={sf.booking}
       payment={sf.payment}
+      delivery={sf.delivery}
     />
   );
 }

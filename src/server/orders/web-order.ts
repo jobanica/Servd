@@ -11,6 +11,7 @@ import { recordServingsSold } from "@/server/menu/servings";
 import { recordVariantsSold } from "@/server/menu/variants";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
 import { getPublicStorefront, isOpenNow, computeDownpayment } from "@/server/storefront/storefront";
+import { haversineKm, computeDistanceFee } from "@/lib/geo/distance";
 import { getLoyaltyConfig, enrollAccount } from "@/server/loyalty/loyalty";
 import { markCartConverted } from "@/server/marketing/cart-recovery";
 import { formatPeso } from "@/lib/money";
@@ -99,15 +100,28 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
     return { ok: false, error: "We couldn't build your order. Please try again." };
   }
 
-  // Delivery fee — looked up server-side from the restaurant's zones (never
-  // trust the client for money). Encoded into the address so staff see it.
+  // Delivery fee — computed server-side (never trust the client for money) from
+  // either the chosen zone or the distance formula. Encoded into the address so
+  // staff see it.
   let deliveryFee = 0;
   let addressLine: string | null = null;
   if (d.orderType === "delivery") {
-    const zone = d.deliveryZone ? storefront.zones.find((z) => z.name === d.deliveryZone) : undefined;
-    deliveryFee = zone?.fee ?? 0;
-    const prefix = zone ? `[${zone.name}${deliveryFee > 0 ? ` · delivery ${formatPeso(deliveryFee)}` : ""}] ` : "";
-    addressLine = `${prefix}${d.customerAddress?.trim() ?? ""}`.trim() || null;
+    const dc = storefront.delivery;
+    if (dc.mode === "distance" && dc.originLat != null && dc.originLng != null && d.lat != null && d.lng != null) {
+      const r = computeDistanceFee(
+        { baseFee: dc.baseFee, perKm: dc.perKm, freeKm: dc.freeKm, minFee: dc.minFee, maxKm: dc.maxKm, roadFactor: dc.roadFactor },
+        haversineKm(dc.originLat, dc.originLng, d.lat, d.lng),
+      );
+      if (r.outOfRange) return { ok: false, error: "Sorry, your location is outside our delivery range." };
+      deliveryFee = r.fee;
+      const prefix = `[≈${r.billableKm.toFixed(1)}km · delivery ${formatPeso(deliveryFee)}] `;
+      addressLine = `${prefix}${d.customerAddress?.trim() ?? ""}`.trim() || null;
+    } else {
+      const zone = d.deliveryZone ? storefront.zones.find((z) => z.name === d.deliveryZone) : undefined;
+      deliveryFee = zone?.fee ?? 0;
+      const prefix = zone ? `[${zone.name}${deliveryFee > 0 ? ` · delivery ${formatPeso(deliveryFee)}` : ""}] ` : "";
+      addressLine = `${prefix}${d.customerAddress?.trim() ?? ""}`.trim() || null;
+    }
   }
 
   const base = {

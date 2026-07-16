@@ -14,6 +14,7 @@ import { placeWebOrder } from "@/server/orders/web-order";
 import { captureCartLead } from "@/server/marketing/cart-recovery";
 import { LocationPicker } from "./LocationPicker";
 import { WebOrderTracker } from "./WebOrderTracker";
+import { haversineKm, computeDistanceFee } from "@/lib/geo/distance";
 
 function lineId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -58,6 +59,17 @@ export interface WebOrderProps {
     gcashName: string;
     gcashNumber: string;
     gcashQrUrl: string;
+  };
+  delivery?: {
+    mode: "zones" | "distance";
+    baseFee: number;
+    perKm: number;
+    freeKm: number;
+    minFee: number;
+    maxKm: number;
+    roadFactor: number;
+    originLat: number | null;
+    originLng: number | null;
   };
 }
 
@@ -287,7 +299,22 @@ export function WebOrder(props: WebOrderProps) {
 
   const count = cartCount(lines);
   const subtotal = cartTotal(lines);
-  const deliveryFee = orderType === "delivery" ? zones.find((z) => z.name === zone)?.fee ?? 0 : 0;
+  // Distance-based delivery: live fee from the store origin to the pinned drop-off.
+  const dcfg = props.delivery;
+  const distanceMode = orderType === "delivery" && dcfg?.mode === "distance" && dcfg.originLat != null && dcfg.originLng != null;
+  const distance =
+    distanceMode && geo
+      ? computeDistanceFee(
+          { baseFee: dcfg!.baseFee, perKm: dcfg!.perKm, freeKm: dcfg!.freeKm, minFee: dcfg!.minFee, maxKm: dcfg!.maxKm, roadFactor: dcfg!.roadFactor },
+          haversineKm(dcfg!.originLat!, dcfg!.originLng!, geo.lat, geo.lng),
+        )
+      : null;
+  const deliveryFee =
+    orderType !== "delivery"
+      ? 0
+      : distanceMode
+        ? distance && !distance.outOfRange ? distance.fee : 0
+        : zones.find((z) => z.name === zone)?.fee ?? 0;
   const total = subtotal + deliveryFee;
   const vat = Math.round(total - total / (1 + VAT_RATE));
   const nonEmpty = categories.filter((c) => c.items.length > 0);
@@ -500,7 +527,7 @@ export function WebOrder(props: WebOrderProps) {
             />
             {orderType === "delivery" && (
               <>
-                {zones.length > 0 && (
+                {!distanceMode && zones.length > 0 && (
                   <select value={zone} onChange={(e) => setZone(e.target.value)} className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm">
                     <option value="">Select delivery zone…</option>
                     {zones.map((z) => (
@@ -513,6 +540,17 @@ export function WebOrder(props: WebOrderProps) {
                   <p className="mb-1 text-xs font-semibold text-plum-ink/60">Pin your location (required for delivery)</p>
                   <LocationPicker onChange={(lat, lng) => setGeo({ lat, lng })} />
                   {!geo && <p className="mt-1 text-xs text-guava">Please pin your location to place a delivery order.</p>}
+                  {distanceMode && geo && distance && (
+                    distance.outOfRange ? (
+                      <p className="mt-1 text-xs font-semibold text-guava">
+                        Sorry — that&apos;s about {distance.billableKm.toFixed(1)} km away, outside our delivery range.
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-xs font-semibold text-plum-ink/70">
+                        ≈ {distance.billableKm.toFixed(1)} km away · Delivery fee {formatPeso(distance.fee)}
+                      </p>
+                    )
+                  )}
                 </div>
               </>
             )}
@@ -583,7 +621,7 @@ export function WebOrder(props: WebOrderProps) {
         ) : (
           <button
             onClick={submit}
-            disabled={busy || lines.length === 0 || !name.trim() || !phone.trim() || (schedulingLater && !scheduledIso) || (gcashAvailable && payMethod === "gcash" && !gcashRef.trim()) || (orderType === "delivery" && (!address.trim() || !geo || (zones.length > 0 && !zone)))}
+            disabled={busy || lines.length === 0 || !name.trim() || !phone.trim() || (schedulingLater && !scheduledIso) || (gcashAvailable && payMethod === "gcash" && !gcashRef.trim()) || (orderType === "delivery" && (!address.trim() || !geo || (distanceMode ? !!distance?.outOfRange : (zones.length > 0 && !zone))))}
             className="mt-3 w-full rounded-lg bg-green-600 py-3 font-semibold text-white disabled:opacity-50"
           >
             {busy

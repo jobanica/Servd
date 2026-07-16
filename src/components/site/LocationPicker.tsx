@@ -8,12 +8,18 @@ import type * as LType from "leaflet";
  * OpenStreetMap tiles (no API key) and the browser Geolocation API. Leaflet is
  * dynamically imported so it never runs during SSR (it touches `window`).
  */
-export function LocationPicker({ onChange }: { onChange: (lat: number, lng: number) => void }) {
+export function LocationPicker({
+  onChange,
+  initial,
+}: {
+  onChange: (lat: number, lng: number) => void;
+  initial?: { lat: number; lng: number } | null;
+}) {
   const mapEl = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LType.Map | null>(null);
   const markerRef = useRef<LType.Marker | null>(null);
   const LRef = useRef<typeof LType | null>(null);
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(initial ?? null);
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,8 +38,8 @@ export function LocationPicker({ onChange }: { onChange: (lat: number, lng: numb
       }
       if (cancelled || !mapEl.current || mapRef.current) return;
 
-      const start = { lat: 7.0731, lng: 125.6128 }; // Davao default
-      const map = L.map(mapEl.current).setView([start.lat, start.lng], 13);
+      const start = initial ?? { lat: 7.0731, lng: 125.6128 }; // pinned origin, else Davao default
+      const map = L.map(mapEl.current).setView([start.lat, start.lng], initial ? 15 : 13);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: "© OpenStreetMap",
         maxZoom: 19,
