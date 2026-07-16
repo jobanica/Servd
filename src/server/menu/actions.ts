@@ -148,6 +148,75 @@ export async function createItem(
   return { ok: true };
 }
 
+const bundleSchema = z.object({
+  categoryId: z.string().min(1, "Pick a category"),
+  name: z.string().trim().min(1, "Name your bundle").max(120),
+  pricePesos: z.coerce.number().min(0, "Price?"),
+  chooseCount: z.coerce.number().int().min(1, "How many can they pick?").max(20),
+  description: z.string().trim().max(500).optional().or(z.literal("")),
+});
+
+/**
+ * Creates a "pick N for a fixed price" bundle (e.g. a bilao: 3 dishes for
+ * ₱3,499). Built entirely from existing primitives — a menu item at the bundle
+ * price plus a required "Choose N" modifier group whose options are the dishes
+ * at ₱0 — so it flows through the normal storefront + server-validated order
+ * pipeline with no special-casing.
+ */
+export async function createBundle(_prev: FormState, formData: FormData): Promise<FormState> {
+  const { restaurantId } = await requireAdminAction();
+  const parsed = bundleSchema.safeParse({
+    categoryId: formData.get("categoryId"),
+    name: formData.get("name"),
+    pricePesos: formData.get("pricePesos"),
+    chooseCount: formData.get("chooseCount"),
+    description: formData.get("description") ?? "",
+  });
+  if (!parsed.success) return { error: firstError(parsed.error) };
+  const v = parsed.data;
+
+  const dishes = formData.getAll("dishName").map((d) => String(d).trim()).filter(Boolean).slice(0, 80);
+  if (dishes.length < v.chooseCount) {
+    return { error: `Add at least ${v.chooseCount} dish choices for a "choose ${v.chooseCount}" bundle.` };
+  }
+
+  let imageUrl: string | undefined;
+  try {
+    imageUrl = await resolveImageUrl(restaurantId, formData);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Image upload failed" };
+  }
+
+  try {
+    await tenantDb(restaurantId, async (tx) => {
+      const item = await tx.menuItem.create({
+        data: {
+          restaurantId,
+          categoryId: v.categoryId,
+          name: v.name,
+          description: v.description || null,
+          price: pesosToCentavos(v.pricePesos),
+          isAvailable: true,
+          imageUrl,
+        },
+        select: { id: true },
+      });
+      const group = await tx.modifierGroup.create({
+        data: { restaurantId, name: `Choose ${v.chooseCount}`, required: true, minSelect: v.chooseCount, maxSelect: v.chooseCount },
+        select: { id: true },
+      });
+      await tx.modifier.createMany({
+        data: dishes.map((name, i) => ({ modifierGroupId: group.id, name, priceDelta: 0, sortOrder: i })),
+      });
+      await tx.menuItemModifierGroup.create({ data: { menuItemId: item.id, modifierGroupId: group.id }, select: { menuItemId: true } });
+    });
+  } catch {
+    return { error: "Couldn't create the bundle. Please try again." };
+  }
+  await refresh();
+  return { ok: true };
+}
+
 export async function updateItem(
   _prev: FormState,
   formData: FormData,
