@@ -55,6 +55,8 @@ export async function updateStorefront(
   }
   const paymentConfig = {
     codEnabled: formData.get("codEnabled") === "on",
+    codFeeEnabled: formData.get("codFeeEnabled") === "on",
+    codFee: pesosToCentavos(Math.max(0, Number(formData.get("codFeePesos")) || 0)),
     gcashEnabled: formData.get("gcashEnabled") === "on",
     gcashName: String(formData.get("gcashName") ?? "").trim().slice(0, 120),
     gcashNumber: String(formData.get("gcashNumber") ?? "").trim().slice(0, 40),

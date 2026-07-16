@@ -55,6 +55,8 @@ export interface WebOrderProps {
   };
   payment?: {
     codEnabled: boolean;
+    codFeeEnabled?: boolean;
+    codFee?: number; // centavos
     gcashEnabled: boolean;
     gcashName: string;
     gcashNumber: string;
@@ -315,7 +317,10 @@ export function WebOrder(props: WebOrderProps) {
       : distanceMode
         ? distance && !distance.outOfRange ? distance.fee : 0
         : zones.find((z) => z.name === zone)?.fee ?? 0;
-  const total = subtotal + deliveryFee;
+  // COD fee — an extra charge on cash-on-delivery orders (delivery paid by cash).
+  const isCod = orderType === "delivery" && payMethod === "cod";
+  const codFee = isCod && props.payment?.codFeeEnabled ? props.payment.codFee ?? 0 : 0;
+  const total = subtotal + deliveryFee + codFee;
   const vat = Math.round(total - total / (1 + VAT_RATE));
   const nonEmpty = categories.filter((c) => c.items.length > 0);
   const q = search.trim().toLowerCase();
@@ -599,6 +604,9 @@ export function WebOrder(props: WebOrderProps) {
           <div className="mb-1 space-y-0.5 text-sm text-plum-ink/60">
             <div className="flex justify-between"><span>Subtotal</span><span>{formatPeso(subtotal)}</span></div>
             <div className="flex justify-between"><span>Delivery fee</span><span>{deliveryFee > 0 ? formatPeso(deliveryFee) : "—"}</span></div>
+            {codFee > 0 && (
+              <div className="flex justify-between"><span>COD fee</span><span>{formatPeso(codFee)}</span></div>
+            )}
           </div>
         )}
         <div className="flex items-center justify-between font-heading text-xl font-extrabold text-plum-ink">

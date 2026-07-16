@@ -19,6 +19,8 @@ export interface BookingConfig {
 }
 export interface PaymentConfig {
   codEnabled: boolean; // cash on delivery / on pickup
+  codFeeEnabled: boolean; // charge an extra fee on cash-on-delivery orders
+  codFee: number; // centavos added to delivery orders paid by cash
   gcashEnabled: boolean;
   gcashName: string; // account name shown to the customer
   gcashNumber: string; // GCash mobile number
@@ -74,7 +76,7 @@ function normalizeDeliveryConfig(raw: unknown): DeliveryConfig {
 }
 
 export function defaultPaymentConfig(): PaymentConfig {
-  return { codEnabled: true, gcashEnabled: false, gcashName: "", gcashNumber: "", gcashQrUrl: "" };
+  return { codEnabled: true, codFeeEnabled: false, codFee: 0, gcashEnabled: false, gcashName: "", gcashNumber: "", gcashQrUrl: "" };
 }
 
 function normalizePaymentConfig(raw: unknown): PaymentConfig {
@@ -84,6 +86,8 @@ function normalizePaymentConfig(raw: unknown): PaymentConfig {
     return {
       // Cash defaults ON so every store always has at least one method.
       codEnabled: r.codEnabled === undefined ? true : !!r.codEnabled,
+      codFeeEnabled: !!r.codFeeEnabled,
+      codFee: Math.max(0, Math.round(Number(r.codFee) || 0)),
       gcashEnabled: !!r.gcashEnabled,
       gcashName: typeof r.gcashName === "string" ? r.gcashName.slice(0, 120) : "",
       gcashNumber: typeof r.gcashNumber === "string" ? r.gcashNumber.slice(0, 40) : "",

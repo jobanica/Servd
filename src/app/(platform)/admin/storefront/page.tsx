@@ -86,7 +86,15 @@ export default async function StorefrontPage() {
             downpaymentValue: sf.booking.downpaymentType === "fixed" ? sf.booking.downpaymentValue / 100 : sf.booking.downpaymentValue,
             downpaymentInstructions: sf.booking.downpaymentInstructions,
           },
-          payment: sf.payment,
+          payment: {
+            codEnabled: sf.payment.codEnabled,
+            codFeeEnabled: sf.payment.codFeeEnabled,
+            codFeePesos: sf.payment.codFee / 100,
+            gcashEnabled: sf.payment.gcashEnabled,
+            gcashName: sf.payment.gcashName,
+            gcashNumber: sf.payment.gcashNumber,
+            gcashQrUrl: sf.payment.gcashQrUrl,
+          },
           delivery: {
             mode: sf.delivery.mode,
             baseFeePesos: sf.delivery.baseFee / 100,

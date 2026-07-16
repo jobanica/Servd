@@ -124,6 +124,16 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
     }
   }
 
+  // Payment method (cash / GCash). GCash must be enabled by the owner; unknown or
+  // disabled choices fall back to cash so an order never gets stuck.
+  const choice = d.paymentChoice === "gcash" && storefront.payment.gcashEnabled ? "gcash" : "cod";
+  // COD fee — extra charge on cash-on-delivery orders (delivery paid by cash).
+  const codFee =
+    d.orderType === "delivery" && choice === "cod" && storefront.payment.codFeeEnabled
+      ? storefront.payment.codFee
+      : 0;
+  if (codFee > 0 && addressLine) addressLine = `[COD +${formatPeso(codFee)}] ${addressLine}`;
+
   const base = {
     restaurantId: restaurant.id,
     orderType: d.orderType,
@@ -132,7 +142,7 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
     customerAddress: addressLine,
     status: "pending" as const,
     paymentStatus: "unpaid" as const,
-    total: built.total + deliveryFee,
+    total: built.total + deliveryFee + codFee,
     items: { create: orderItemsCreate(built.items) },
   };
   // Optional columns that a schema-lagged DB may not have yet (geo pin, advance
@@ -149,9 +159,6 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
         downpaymentRef: d.downpaymentRef?.trim() || null,
       }
     : null;
-  // Payment method (cash / GCash). GCash must be enabled by the owner; unknown or
-  // disabled choices fall back to cash so an order never gets stuck.
-  const choice = d.paymentChoice === "gcash" && storefront.payment.gcashEnabled ? "gcash" : "cod";
   const pay = { paymentChoice: choice, paymentRef: choice === "gcash" ? d.paymentRef?.trim() || null : null };
   const extra = { ...(geo ?? {}), ...(sched ?? {}), ...(advance ?? {}), ...pay };
 

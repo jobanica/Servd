@@ -28,6 +28,8 @@ export function StorefrontForm({
     };
     payment: {
       codEnabled: boolean;
+      codFeeEnabled: boolean;
+      codFeePesos: number;
       gcashEnabled: boolean;
       gcashName: string;
       gcashNumber: string;
@@ -51,6 +53,7 @@ export function StorefrontForm({
   const [requireDp, setRequireDp] = useState(initial.booking.requireDownpayment);
   const [dpType, setDpType] = useState<"percent" | "fixed">(initial.booking.downpaymentType);
   const [gcashOn, setGcashOn] = useState(initial.payment.gcashEnabled);
+  const [codFeeOn, setCodFeeOn] = useState(initial.payment.codFeeEnabled);
   const [deliveryMode, setDeliveryMode] = useState<"zones" | "distance">(initial.delivery.mode);
   const [origin, setOrigin] = useState<{ lat: number; lng: number } | null>(
     initial.delivery.originLat != null && initial.delivery.originLng != null
@@ -207,6 +210,36 @@ export function StorefrontForm({
           <input type="checkbox" name="codEnabled" defaultChecked={initial.payment.codEnabled} />
           Cash (on pickup / delivery)
         </label>
+
+        {/* COD fee — an extra charge on cash-on-delivery orders. */}
+        <div className="mt-3 rounded-lg border border-plum-ink/10 bg-cream/40 p-3">
+          <label className="flex items-center gap-2 text-sm font-semibold">
+            <input type="checkbox" name="codFeeEnabled" checked={codFeeOn} onChange={(e) => setCodFeeOn(e.target.checked)} />
+            Charge a COD fee on cash-on-delivery orders
+          </label>
+          <p className="mt-1 text-xs text-plum-ink/50">
+            Added on top of the delivery fee when a <span className="font-semibold text-plum-ink/70">delivery</span> order
+            is paid by cash. Not charged on pickup or GCash-paid orders.
+          </p>
+          {codFeeOn ? (
+            <div className="mt-2 flex items-center gap-1">
+              <span className="text-sm text-plum-ink/50">₱</span>
+              <input
+                name="codFeePesos"
+                type="number"
+                step="0.01"
+                min={0}
+                defaultValue={initial.payment.codFeePesos}
+                placeholder="0.00"
+                className="w-32 rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+              />
+              <span className="text-sm text-plum-ink/50">COD fee</span>
+            </div>
+          ) : (
+            <input type="hidden" name="codFeePesos" value={initial.payment.codFeePesos} />
+          )}
+        </div>
+
         <label className="mt-3 flex items-center gap-2 text-sm font-semibold">
           <input type="checkbox" name="gcashEnabled" checked={gcashOn} onChange={(e) => setGcashOn(e.target.checked)} />
           GCash
