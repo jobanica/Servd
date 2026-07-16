@@ -109,3 +109,9 @@ export function defaultFeaturesForTier(tier: Tier | null): Feature[] {
   if (!tier) return [];
   return ALL_FEATURES.filter((f) => FEATURE_TIERS[f].includes(tier));
 }
+
+/** The lowest-priced plan tier that includes a feature (e.g. which plan to upgrade to). */
+export function planForFeature(feature: Feature): Tier | null {
+  const tiers = FEATURE_TIERS[feature] ?? [];
+  return TIERS.find((t) => tiers.includes(t)) ?? null;
+}

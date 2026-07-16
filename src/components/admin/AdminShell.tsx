@@ -7,7 +7,6 @@ import { Wordmark } from "@/components/Wordmark";
 import { brandStyle, type BrandInput } from "@/lib/theme/brand";
 import { signOut } from "@/app/(platform)/login/actions";
 import { PlatformFeedbackButton } from "./PlatformFeedbackButton";
-import { TrialBanner } from "./TrialBanner";
 
 function Icon({ d }: { d: string }) {
   return (
@@ -126,14 +125,12 @@ export function AdminShell({
   theme,
   fullWhiteLabel = false,
   features,
-  trial = null,
   children,
 }: {
   brand: { name: string; slug: string; status: string; logoUrl?: string | null };
   theme?: BrandInput;
   fullWhiteLabel?: boolean;
   features?: string[];
-  trial?: { endsAt: string; planName: string | null } | null;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -248,8 +245,9 @@ export function AdminShell({
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Trial countdown (new accounts start on a 30-day Business trial) */}
-        {trial && <TrialBanner endsAt={trial.endsAt} planName={trial.planName} />}
+        {/* No global trial banner — the trial countdown lives on the Billing page,
+            and locked features show a contextual "included in [plan]" upgrade
+            prompt instead of a persistent nag. */}
 
         {/* Top bar */}
         <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-plum-ink/10 bg-white/80 px-4 py-3 backdrop-blur print:hidden">

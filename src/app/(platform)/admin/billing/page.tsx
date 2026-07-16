@@ -7,6 +7,7 @@ import { PayNowButton } from "@/components/admin/PayNowButton";
 import { PlanCards } from "@/components/billing/PlanCards";
 import { PlanComparisonTable } from "@/components/billing/PlanComparisonTable";
 import { getPublicPricing } from "@/server/billing/public-catalog";
+import { planForFeature, type Feature } from "@/lib/billing/features";
 import { formatPeso } from "@/lib/money";
 
 function daysLeft(date: Date | null): number | null {
@@ -80,9 +81,10 @@ export default async function BillingPage({
 
       {/* Upgrade prompt (redirected here from a gated feature) */}
       {upgrade && UPGRADE_LABEL[upgrade] && (
-        <div className="rounded-tile border border-mango/40 bg-mango/10 p-4 text-sm">
-          <span className="font-semibold text-plum-ink">{UPGRADE_LABEL[upgrade]}</span> isn&apos;t
-          included in your current plan. Upgrade below to unlock it.
+        <div className="rounded-tile border border-mango/40 bg-mango/10 p-4 text-sm text-plum-ink">
+          🔒 <span className="font-semibold">{UPGRADE_LABEL[upgrade]}</span> is included in the{" "}
+          <span className="font-semibold">{planForFeature(upgrade as Feature) ?? "Growth"}</span> plan.
+          Pick that plan below to unlock it.
         </div>
       )}
 
