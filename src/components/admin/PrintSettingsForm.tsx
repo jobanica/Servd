@@ -30,6 +30,7 @@ export function PrintSettingsForm({
     receiptPhone: string;
     receiptWebsite: string;
     receiptFooter: string;
+    receiptShowVat: boolean;
   };
   cloudPollUrl: string | null;
 }) {
@@ -43,6 +44,7 @@ export function PrintSettingsForm({
   const [phone, setPhone] = useState(initial.receiptPhone);
   const [website, setWebsite] = useState(initial.receiptWebsite);
   const [footer, setFooter] = useState(initial.receiptFooter);
+  const [showVat, setShowVat] = useState(initial.receiptShowVat);
 
   return (
     <form
@@ -221,6 +223,16 @@ export function PrintSettingsForm({
             />
             <p className="mt-1 text-xs text-plum-ink/50">Tip: use a new line for a second footer line.</p>
           </div>
+
+          {/* VAT line toggle */}
+          <label className="flex items-center gap-2 text-sm font-semibold">
+            <input type="checkbox" name="receiptShowVat" checked={showVat} onChange={(e) => setShowVat(e.target.checked)} />
+            Show the “VAT (12% incl.)” line on receipts
+          </label>
+          <p className="-mt-2 text-xs text-plum-ink/50">
+            Turn off if you&apos;re non-VAT registered (e.g. a percentage-tax/BMBE seller). Prices are
+            unchanged — only the VAT breakdown line is hidden.
+          </p>
         </div>
 
         {/* Live preview */}
@@ -234,7 +246,7 @@ TABLE 12
 2x Caesar Salad           ₱24.00
 Grilled Salmon            ₱22.00
 --------------------------------
-TOTAL                     ₱46.00${footer ? `\n\n${footer}` : ""}`}
+${showVat ? "VAT (12% incl.)            ₱4.93\n" : ""}TOTAL                     ₱46.00${footer ? `\n\n${footer}` : ""}`}
           </pre>
         </div>
       </div>

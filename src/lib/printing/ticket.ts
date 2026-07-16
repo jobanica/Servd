@@ -31,6 +31,7 @@ export interface ReceiptBranding {
   phone?: string | null;
   website?: string | null;
   footer?: string | null;
+  showVat?: boolean; // print the "VAT (12% incl.)" line (default true)
 }
 
 const METHOD_LABEL: Record<string, string> = {
@@ -53,6 +54,7 @@ export interface Ticket {
   phone: string | null;
   website: string | null;
   footer: string | null;
+  showVat: boolean;
   tableNumber: string;
   orderType: "dine_in" | "takeout" | "delivery";
   customerName: string | null;
@@ -94,6 +96,7 @@ export function buildTicket(src: TicketSource): Ticket {
     phone: src.phone ?? null,
     website: src.website ?? null,
     footer: src.footer ?? null,
+    showVat: src.showVat !== false, // default to showing VAT
     tableNumber: src.tableNumber,
     orderType: src.orderType ?? "dine_in",
     customerName: src.customerName ?? null,
@@ -181,7 +184,7 @@ export function ticketBodyLines(t: Ticket): string[] {
     lines.push(pad("Subtotal", amt(t.total)));
     lines.push(pad(t.discountLabel ?? "Discount", `-${amt(t.discountAmount)}`));
   }
-  lines.push(pad("VAT (12% incl.)", amt(vat)));
+  if (t.showVat) lines.push(pad("VAT (12% incl.)", amt(vat)));
   // Bill = amount the customer must PAY; receipt = total they paid.
   lines.push(pad(t.kind === "bill" ? "AMOUNT DUE (PHP)" : "TOTAL (PHP)", amt(net)));
 

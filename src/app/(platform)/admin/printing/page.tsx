@@ -27,7 +27,7 @@ export default async function PrintingSettingsPage() {
     | {
         bridgeUrl?: string;
         pollToken?: string;
-        receipt?: { address?: string | null; phone?: string | null; website?: string | null; footer?: string | null };
+        receipt?: { address?: string | null; phone?: string | null; website?: string | null; footer?: string | null; showVat?: boolean };
       }
     | null) ?? {};
   const receipt = cfg.receipt ?? {};
@@ -59,6 +59,7 @@ export default async function PrintingSettingsPage() {
           receiptPhone: receipt.phone ?? "",
           receiptWebsite: receipt.website ?? "",
           receiptFooter: receipt.footer ?? "",
+          receiptShowVat: receipt.showVat !== false, // default on
         }}
         cloudPollUrl={cloudPollUrl}
       />

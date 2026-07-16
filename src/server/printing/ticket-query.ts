@@ -13,8 +13,9 @@ export async function getOrderTicket(
       select: { name: true, displayName: true, slug: true, printerConfig: true },
     });
     const receipt =
-      ((restaurant.printerConfig as { receipt?: Record<string, string | null> } | null)?.receipt) ??
-      {};
+      ((restaurant.printerConfig as {
+        receipt?: { address?: string | null; phone?: string | null; website?: string | null; footer?: string | null; showVat?: boolean };
+      } | null)?.receipt) ?? {};
     const order = await tx.order.findFirst({
       where: { id: orderId },
       // Explicit select (no SELECT *) so a lagging schema can't break printing.
@@ -89,6 +90,7 @@ export async function getOrderTicket(
       phone: receipt.phone,
       website: receipt.website,
       footer: receipt.footer,
+      showVat: receipt.showVat,
       tableNumber: order.table?.tableNumber ?? "—",
       orderType,
       customerName,

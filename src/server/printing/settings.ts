@@ -18,6 +18,7 @@ const schema = z.object({
   receiptPhone: z.string().max(60).optional(),
   receiptWebsite: z.string().max(120).optional(),
   receiptFooter: z.string().max(300).optional(),
+  receiptShowVat: z.coerce.boolean().default(true),
 });
 
 export async function updatePrintSettings(
@@ -34,6 +35,7 @@ export async function updatePrintSettings(
     receiptPhone: formData.get("receiptPhone") ?? "",
     receiptWebsite: formData.get("receiptWebsite") ?? "",
     receiptFooter: formData.get("receiptFooter") ?? "",
+    receiptShowVat: formData.get("receiptShowVat") === "on",
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid settings" };
@@ -61,6 +63,7 @@ export async function updatePrintSettings(
       phone: trimOrNull(parsed.data.receiptPhone),
       website: trimOrNull(parsed.data.receiptWebsite),
       footer: trimOrNull(parsed.data.receiptFooter),
+      showVat: parsed.data.receiptShowVat,
     };
 
     // Mark the printer method as deliberately chosen (drives onboarding).

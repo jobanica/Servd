@@ -38,6 +38,7 @@ type PrinterConfig = {
     phone?: string | null;
     website?: string | null;
     footer?: string | null;
+    showVat?: boolean;
   };
 };
 
@@ -142,6 +143,7 @@ async function ticketFor(
     phone: r.phone,
     website: r.website,
     footer: r.footer,
+    showVat: r.showVat,
     tableNumber: order.table?.tableNumber ?? "—",
     orderType: meta.orderType,
     customerName: meta.customerName,
