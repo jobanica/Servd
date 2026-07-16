@@ -86,6 +86,7 @@ export default async function StorefrontPage() {
             downpaymentValue: sf.booking.downpaymentType === "fixed" ? sf.booking.downpaymentValue / 100 : sf.booking.downpaymentValue,
             downpaymentInstructions: sf.booking.downpaymentInstructions,
           },
+          payment: sf.payment,
         }}
       />
     </div>

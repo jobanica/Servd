@@ -641,6 +641,11 @@ export function CashierBoard({
                       {new Date(o.scheduledFor).toLocaleString("en-PH", { timeZone: "Asia/Manila", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
                     </p>
                   )}
+                  {o.paymentChoice === "gcash" && (
+                    <p className="mt-1 rounded-md bg-blue-100 px-2 py-1 text-xs font-bold text-blue-700">
+                      📱 GCash{o.paymentRef ? ` — Ref: ${o.paymentRef}` : ""} (verify before accepting)
+                    </p>
+                  )}
                   {o.channel !== "dine_in" && (
                     <p className="mt-0.5 text-xs text-plum-ink/55">
                       {o.channel === "delivery" ? "🛵 Delivery" : "🥡 Pickup"}

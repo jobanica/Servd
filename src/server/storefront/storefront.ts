@@ -17,12 +17,40 @@ export interface BookingConfig {
   downpaymentValue: number; // percent (0–100) or centavos, per downpaymentType
   downpaymentInstructions: string; // e.g. "Send GCash to 0917… and enter the ref below"
 }
+export interface PaymentConfig {
+  codEnabled: boolean; // cash on delivery / on pickup
+  gcashEnabled: boolean;
+  gcashName: string; // account name shown to the customer
+  gcashNumber: string; // GCash mobile number
+  gcashQrUrl: string; // uploaded QR image URL
+}
 export interface Storefront {
   hours: DayHours[]; // always length 7, index 0=Sun … 6=Sat
   zones: DeliveryZone[];
   pauseWhenClosed: boolean;
   acceptsBookings: boolean; // website "Book a table" flow enabled
   booking: BookingConfig; // advance-order downpayment / approval settings
+  payment: PaymentConfig; // manual GCash / cash settings
+}
+
+export function defaultPaymentConfig(): PaymentConfig {
+  return { codEnabled: true, gcashEnabled: false, gcashName: "", gcashNumber: "", gcashQrUrl: "" };
+}
+
+function normalizePaymentConfig(raw: unknown): PaymentConfig {
+  const d = defaultPaymentConfig();
+  if (raw && typeof raw === "object") {
+    const r = raw as Partial<PaymentConfig>;
+    return {
+      // Cash defaults ON so every store always has at least one method.
+      codEnabled: r.codEnabled === undefined ? true : !!r.codEnabled,
+      gcashEnabled: !!r.gcashEnabled,
+      gcashName: typeof r.gcashName === "string" ? r.gcashName.slice(0, 120) : "",
+      gcashNumber: typeof r.gcashNumber === "string" ? r.gcashNumber.slice(0, 40) : "",
+      gcashQrUrl: typeof r.gcashQrUrl === "string" ? r.gcashQrUrl.slice(0, 500) : "",
+    };
+  }
+  return d;
 }
 
 export function defaultBookingConfig(): BookingConfig {
@@ -92,16 +120,18 @@ export async function getStorefront(restaurantId: string): Promise<Storefront> {
     );
     let acceptsBookings = false;
     let booking = defaultBookingConfig();
+    let payment = defaultPaymentConfig();
     try {
       const b = await tenantDb(restaurantId, (tx) =>
-        tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { acceptsBookings: true, bookingConfig: true } }),
+        tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { acceptsBookings: true, bookingConfig: true, paymentConfig: true } }),
       );
       acceptsBookings = !!b?.acceptsBookings;
       booking = normalizeBookingConfig(b?.bookingConfig);
+      payment = normalizePaymentConfig(b?.paymentConfig);
     } catch { /* columns not migrated yet */ }
-    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones), pauseWhenClosed: !!s?.pauseWhenClosed, acceptsBookings, booking };
+    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones), pauseWhenClosed: !!s?.pauseWhenClosed, acceptsBookings, booking, payment };
   } catch {
-    return { hours: defaultHours(), zones: [], pauseWhenClosed: false, acceptsBookings: false, booking: defaultBookingConfig() };
+    return { hours: defaultHours(), zones: [], pauseWhenClosed: false, acceptsBookings: false, booking: defaultBookingConfig(), payment: defaultPaymentConfig() };
   }
 }
 
@@ -113,16 +143,18 @@ export async function getPublicStorefront(restaurantId: string): Promise<Storefr
     );
     let acceptsBookings = false;
     let booking = defaultBookingConfig();
+    let payment = defaultPaymentConfig();
     try {
       const b = await systemDb((tx) =>
-        tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { acceptsBookings: true, bookingConfig: true } }),
+        tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { acceptsBookings: true, bookingConfig: true, paymentConfig: true } }),
       );
       acceptsBookings = !!b?.acceptsBookings;
       booking = normalizeBookingConfig(b?.bookingConfig);
+      payment = normalizePaymentConfig(b?.paymentConfig);
     } catch { /* columns not migrated yet */ }
-    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones), pauseWhenClosed: !!s?.pauseWhenClosed, acceptsBookings, booking };
+    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones), pauseWhenClosed: !!s?.pauseWhenClosed, acceptsBookings, booking, payment };
   } catch {
-    return { hours: defaultHours(), zones: [], pauseWhenClosed: false, acceptsBookings: false, booking: defaultBookingConfig() };
+    return { hours: defaultHours(), zones: [], pauseWhenClosed: false, acceptsBookings: false, booking: defaultBookingConfig(), payment: defaultPaymentConfig() };
   }
 }
 
