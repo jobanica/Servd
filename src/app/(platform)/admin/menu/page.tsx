@@ -5,6 +5,7 @@ import { getServingStates } from "@/server/menu/servings";
 import { formatPeso } from "@/lib/money";
 import { AddCategoryForm } from "@/components/admin/AddCategoryForm";
 import { AddItemForm } from "@/components/admin/AddItemForm";
+import { AddBundleForm } from "@/components/admin/AddBundleForm";
 import { ImportMenuButton } from "@/components/admin/ImportMenuButton";
 import { hasFeature } from "@/server/billing/feature-gate";
 import {
@@ -50,6 +51,10 @@ export default async function MenuPage() {
       <div className="rounded-tile border border-plum-ink/10 bg-white p-4">
         <AddCategoryForm />
       </div>
+
+      {categories.length > 0 && (
+        <AddBundleForm categories={categories.map((c) => ({ id: c.id, name: c.name }))} />
+      )}
 
       {categories.length === 0 && (
         <p className="text-sm text-plum-ink/50">
