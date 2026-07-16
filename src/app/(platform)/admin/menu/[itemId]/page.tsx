@@ -12,9 +12,6 @@ import { EditItemForm } from "@/components/admin/EditItemForm";
 import { ItemTranslationForm } from "@/components/admin/ItemTranslationForm";
 import { setItemModifierGroup } from "@/server/menu/actions";
 import { LOCALES, DEFAULT_LOCALE, LOCALE_LABELS } from "@/i18n/locales";
-import { hasModule } from "@/server/billing/entitlements";
-import { getRecipe, listInventory } from "@/server/inventory/queries";
-import { setRecipeComponent } from "@/server/inventory/actions";
 
 export default async function EditItemPage({
   params,
@@ -38,12 +35,6 @@ export default async function EditItemPage({
   const servingState = (await getServingStates(restaurantId, [itemId])).get(itemId);
   const variants = await getItemVariants(restaurantId, itemId);
   const translationByLocale = new Map(translations.map((tr) => [tr.locale, tr]));
-
-  // Recipe (inventory module).
-  const inventoryEnabled = await hasModule(restaurantId, "inventory");
-  const [recipe, inventoryItems] = inventoryEnabled
-    ? await Promise.all([getRecipe(restaurantId, itemId), listInventory(restaurantId)])
-    : [[], []];
 
   const attachedIds = new Set(item.modifierGroups.map((g) => g.modifierGroupId));
 
@@ -151,42 +142,6 @@ export default async function EditItemPage({
         </div>
       </section>
 
-      {inventoryEnabled && (
-        <section className="rounded-tile border border-plum-ink/10 bg-white p-5">
-          <h2 className="font-heading text-lg font-bold">Recipe (ingredients)</h2>
-          <p className="text-sm text-plum-ink/50">
-            Ingredients consumed per one of this item — deducted from stock when an
-            order is cooked.
-          </p>
-
-          <ul className="mt-3 space-y-1">
-            {recipe.map((rc) => (
-              <li key={rc.id} className="flex items-center justify-between rounded-lg bg-cream/60 px-3 py-1.5 text-sm">
-                <span>{rc.inventoryItem.name} · {rc.quantity} {rc.inventoryItem.unit}</span>
-                <form action={setRecipeComponent}>
-                  <input type="hidden" name="menuItemId" value={item.id} />
-                  <input type="hidden" name="inventoryItemId" value={rc.inventoryItemId} />
-                  <input type="hidden" name="quantity" value="0" />
-                  <button className="text-xs text-muted hover:text-guava">remove</button>
-                </form>
-              </li>
-            ))}
-            {recipe.length === 0 && <li className="text-sm text-plum-ink/40">No ingredients linked.</li>}
-          </ul>
-
-          <form action={setRecipeComponent} className="mt-3 flex flex-wrap items-end gap-2">
-            <input type="hidden" name="menuItemId" value={item.id} />
-            <select name="inventoryItemId" required className="flex-1 rounded-lg border border-plum-ink/15 px-3 py-2 text-sm">
-              <option value="">Ingredient…</option>
-              {inventoryItems.map((i) => (
-                <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>
-              ))}
-            </select>
-            <input name="quantity" type="number" step="0.001" min="0" placeholder="Qty per item" required className="w-32 rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
-            <button className="rounded-lg px-4 py-2 text-sm font-semibold btn-brand">Add</button>
-          </form>
-        </section>
-      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { updateEmail, updatePassword, updatePhone, type AccountState } from "@/server/account/actions";
+import { updateEmail, updatePassword, updatePhone, updateAddress, type AccountState } from "@/server/account/actions";
 import { SubmitButton } from "./SubmitButton";
 
 function Notice({ state }: { state: AccountState }) {
@@ -11,10 +11,11 @@ function Notice({ state }: { state: AccountState }) {
   return null;
 }
 
-export function AccountForms({ initial }: { initial: { email: string; phone: string } }) {
+export function AccountForms({ initial }: { initial: { email: string; phone: string; address: string } }) {
   const [emailState, emailAction] = useActionState<AccountState, FormData>(updateEmail, null);
   const [pwState, pwAction] = useActionState<AccountState, FormData>(updatePassword, null);
   const [phoneState, phoneAction] = useActionState<AccountState, FormData>(updatePhone, null);
+  const [addressState, addressAction] = useActionState<AccountState, FormData>(updateAddress, null);
 
   const input = "mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm";
   const card = "space-y-3 rounded-tile border border-plum-ink/10 bg-white p-5";
@@ -28,7 +29,7 @@ export function AccountForms({ initial }: { initial: { email: string; phone: str
           New email
           <input name="email" type="email" defaultValue={initial.email} required className={input} />
         </label>
-        <p className="text-xs text-plum-ink/50">We&apos;ll email the new address a confirmation link before the change takes effect.</p>
+        <p className="text-xs text-plum-ink/50">This becomes your login email right away — use it next time you sign in.</p>
         <Notice state={emailState} />
         <SubmitButton>Update email</SubmitButton>
       </form>
@@ -58,6 +59,18 @@ export function AccountForms({ initial }: { initial: { email: string; phone: str
         <p className="text-xs text-plum-ink/50">Shown on your receipts and your online ordering website.</p>
         <Notice state={phoneState} />
         <SubmitButton>Update phone</SubmitButton>
+      </form>
+
+      {/* Business address */}
+      <form action={addressAction} className={card}>
+        <h2 className="font-heading text-lg font-bold">Business address</h2>
+        <label className="block text-sm">
+          Address
+          <textarea name="address" rows={2} defaultValue={initial.address} placeholder="123 Rizal St, Poblacion, Davao City" className={input} />
+        </label>
+        <p className="text-xs text-plum-ink/50">Shown on your receipts and your online ordering website.</p>
+        <Notice state={addressState} />
+        <SubmitButton>Update address</SubmitButton>
       </form>
     </div>
   );
