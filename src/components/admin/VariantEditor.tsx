@@ -48,53 +48,63 @@ export function VariantEditor({
         blank for unlimited, or leave everything empty if this item has a single price.
       </p>
 
-      <div className="mt-3 space-y-2">
-        <div className="flex items-center gap-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-plum-ink/40">
+      <div className="mt-3 space-y-3 sm:space-y-2">
+        {/* Column labels only make sense on the desktop inline layout. */}
+        <div className="hidden items-center gap-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-plum-ink/40 sm:flex">
           <span className="flex-1">Size</span>
           <span className="w-[104px]">Price</span>
           <span className="w-20">Pcs left</span>
           <span className="w-6" />
         </div>
         {rows.map((row, i) => (
-          <div key={i} className="flex items-center gap-2">
+          <div
+            key={i}
+            className="space-y-2 rounded-lg border border-plum-ink/10 p-2 sm:flex sm:items-center sm:gap-2 sm:space-y-0 sm:border-0 sm:p-0"
+          >
             <input
               name="variantName"
               value={row.name}
               onChange={(e) => update(i, { name: e.target.value })}
               placeholder="e.g. Small, 1/2 kilo, Large"
-              className="flex-1 rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-plum-ink/15 px-3 py-2.5 text-sm sm:flex-1 sm:py-2"
             />
-            <div className="flex w-[104px] items-center rounded-lg border border-plum-ink/15 px-2">
-              <span className="text-sm text-plum-ink/40">₱</span>
+            {/* Price + pcs + remove share a row on phones (full width each) and
+                sit inline on desktop. */}
+            <div className="flex items-center gap-2">
+              <div className="flex flex-1 items-center rounded-lg border border-plum-ink/15 px-2 sm:w-[104px] sm:flex-none">
+                <span className="text-sm text-plum-ink/40">₱</span>
+                <input
+                  name="variantPrice"
+                  value={row.price}
+                  onChange={(e) => update(i, { price: e.target.value })}
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  className="w-full min-w-0 bg-transparent px-1 py-2.5 text-sm outline-none sm:py-2"
+                />
+              </div>
               <input
-                name="variantPrice"
-                value={row.price}
-                onChange={(e) => update(i, { price: e.target.value })}
+                name="variantStock"
+                value={row.stock}
+                onChange={(e) => update(i, { stock: e.target.value })}
                 type="number"
-                step="0.01"
+                inputMode="numeric"
+                step="1"
                 min="0"
-                placeholder="0.00"
-                className="w-full px-1 py-2 text-sm outline-none"
+                placeholder="∞ pcs"
+                className="w-24 rounded-lg border border-plum-ink/15 px-2 py-2.5 text-sm sm:w-20 sm:py-2"
               />
+              <button
+                type="button"
+                onClick={() => removeRow(i)}
+                className="shrink-0 rounded-lg px-2 py-2 text-sm text-muted hover:text-guava"
+                aria-label="Remove size"
+              >
+                ✕
+              </button>
             </div>
-            <input
-              name="variantStock"
-              value={row.stock}
-              onChange={(e) => update(i, { stock: e.target.value })}
-              type="number"
-              step="1"
-              min="0"
-              placeholder="∞"
-              className="w-20 rounded-lg border border-plum-ink/15 px-2 py-2 text-sm"
-            />
-            <button
-              type="button"
-              onClick={() => removeRow(i)}
-              className="w-6 rounded-lg py-2 text-sm text-muted hover:text-guava"
-              aria-label="Remove size"
-            >
-              ✕
-            </button>
           </div>
         ))}
       </div>
