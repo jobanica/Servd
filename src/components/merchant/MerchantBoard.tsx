@@ -187,7 +187,7 @@ export function MerchantBoard({
         </p>
         <button
           onClick={() => alarm.unlock()}
-          className="rounded-2xl bg-brand-gradient px-10 py-6 text-2xl font-extrabold shadow-lg"
+          className="rounded-2xl bg-red-600 px-10 py-6 text-2xl font-extrabold text-white shadow-lg"
         >
           🔔 Tap to start
         </button>
@@ -223,7 +223,7 @@ export function MerchantBoard({
       {topIncoming && (
         <div
           className="fixed inset-0 z-40 flex flex-col p-5 text-white"
-          style={{ background: "linear-gradient(160deg, #FF7A1A 0%, #FF4D6D 100%)" }}
+          style={{ background: "linear-gradient(160deg, #EF4444 0%, #B91C1C 100%)" }}
         >
           <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col">
             <div className="flex items-center justify-between">
@@ -302,7 +302,7 @@ export function MerchantBoard({
                       key={m}
                       disabled={busy === topIncoming.id}
                       onClick={() => accept(topIncoming.id, m)}
-                      className="rounded-2xl bg-white py-5 text-xl font-extrabold text-brand-primary shadow disabled:opacity-50"
+                      className="rounded-2xl bg-white py-5 text-xl font-extrabold text-red-600 shadow disabled:opacity-50"
                     >
                       {m}m
                     </button>
@@ -378,7 +378,7 @@ export function MerchantBoard({
                       <button
                         disabled={busy === o.id}
                         onClick={() => advance(o.id, action.to)}
-                        className="flex-1 rounded-xl bg-brand-gradient py-4 text-lg font-bold text-white disabled:opacity-50"
+                        className="flex-1 rounded-xl bg-red-600 py-4 text-lg font-bold text-white disabled:opacity-50"
                       >
                         {action.label}
                       </button>
@@ -405,7 +405,7 @@ export function MerchantBoard({
         <div className="mt-6 rounded-tile border border-dashed border-plum-ink/15 bg-white p-3 text-center">
           <button
             onClick={sendTest}
-            className="rounded-full border border-brand-primary px-4 py-2 text-sm font-semibold text-brand-primary"
+            className="rounded-full border border-red-600 px-4 py-2 text-sm font-semibold text-red-600"
           >
             🧪 Send test order
           </button>
