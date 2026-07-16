@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/server/tenancy/current-user";
 import { tenantDb } from "@/server/tenancy/scoped-db";
@@ -40,6 +41,11 @@ export default async function CashierHome() {
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
+      {user.role === "admin" && (
+        <Link href="/admin" className="mb-1 inline-flex items-center gap-1 text-sm font-semibold text-plum-ink/55 hover:text-plum-ink/80">
+          ← Dashboard
+        </Link>
+      )}
       <h1 className="font-heading text-2xl font-bold">Cashier</h1>
       <p className="mb-6 text-sm text-plum-ink/60">
         Open tables, payments, bill requests, and ticket printing.
