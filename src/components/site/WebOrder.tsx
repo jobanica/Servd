@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatPeso, formatDelta } from "@/lib/money";
 import {
   unitPrice,
@@ -284,6 +284,17 @@ export function WebOrder(props: WebOrderProps) {
   const [placedId, setPlacedId] = useState<string | null>(null);
   const [cartOpen, setCartOpen] = useState(false); // mobile cart sheet
   const [checkout, setCheckout] = useState(false);
+  // A recent order saved in this browser — lets the customer re-open its status
+  // even after closing the tab (shown as a banner above the menu).
+  const [recentOrderPath, setRecentOrderPath] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(`servd:lastOrder:${slug}`);
+      if (!raw) return;
+      const o = JSON.parse(raw);
+      if (o?.path && o?.at && Date.now() - o.at < 6 * 3600 * 1000) setRecentOrderPath(o.path);
+    } catch { /* storage unavailable */ }
+  }, [slug]);
 
   // Advance ordering ("order now for later"). Enabled alongside table bookings.
   const canSchedule = !!acceptsBookings;
@@ -718,6 +729,15 @@ export function WebOrder(props: WebOrderProps) {
           )}
         </div>
       </header>
+
+      {recentOrderPath && (
+        <a
+          href={recentOrderPath}
+          className="block bg-green-600 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-green-700"
+        >
+          🧾 You have a recent order — tap to track its status →
+        </a>
+      )}
 
       <div className="mx-auto grid max-w-7xl gap-4 p-4 lg:grid-cols-[230px_1fr_330px]">
         {/* Left sidebar — sticky so the categories stay visible while you scroll

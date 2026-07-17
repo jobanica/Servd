@@ -106,10 +106,34 @@ export function WebOrderTracker({
   orderId: string;
   orderType: "takeout" | "delivery";
   restaurantName: string;
-  phone: string;
+  phone?: string;
   homeHref: string;
 }) {
   const delivery = orderType === "delivery";
+  const [copied, setCopied] = useState(false);
+  // The permanent link to THIS order's status — safe to bookmark/share (the id
+  // is an unguessable UUID). Built from the home path so it works on custom
+  // domains too (homeHref is "/" there, "/r/<slug>" on the platform host).
+  const trackPath = `${homeHref === "/" ? "" : homeHref}/order/${orderId}`;
+
+  // Remember this order in the browser so returning to the site can offer a
+  // "track your recent order" shortcut even if they closed the tab.
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        `servd:lastOrder:${slug}`,
+        JSON.stringify({ orderId, path: trackPath, orderType, at: Date.now() }),
+      );
+    } catch { /* storage unavailable (private mode) — link + copy still work */ }
+  }, [slug, orderId, trackPath, orderType]);
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}${trackPath}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch { /* clipboard blocked — the field is selectable as a fallback */ }
+  }
   const [status, setStatus] = useState("pending");
   const [deliveryStatus, setDeliveryStatus] = useState<string | null>(null);
   const [orderNumber, setOrderNumber] = useState<number | null>(null);
@@ -229,9 +253,32 @@ export function WebOrderTracker({
         </div>
 
         {!terminal && (
-          <p className="mt-4 text-xs text-plum-ink/45">
-            This page updates automatically — keep it open. {restaurantName} may also call {phone} to
-            confirm.
+          <div className="mt-4 rounded-xl border border-plum-ink/10 bg-cream/50 p-3 text-left">
+            <p className="text-xs font-semibold text-plum-ink/70">📌 Save this link to check your order later</p>
+            <p className="mt-0.5 text-[11px] text-plum-ink/45">
+              If you close this tab, open this link anytime to see the latest status.
+            </p>
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                readOnly
+                value={typeof window !== "undefined" ? `${window.location.origin}${trackPath}` : trackPath}
+                onFocus={(e) => e.currentTarget.select()}
+                className="min-w-0 flex-1 rounded-lg border border-plum-ink/15 bg-white px-2 py-1.5 text-xs text-plum-ink/70"
+              />
+              <button
+                type="button"
+                onClick={copyLink}
+                className="shrink-0 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white"
+              >
+                {copied ? "Copied ✓" : "Copy"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!terminal && (
+          <p className="mt-3 text-xs text-plum-ink/45">
+            This page updates automatically.{phone ? ` ${restaurantName} may also call ${phone} to confirm.` : ""}
           </p>
         )}
 
