@@ -18,12 +18,12 @@ import {
 import { printKitchenTicket } from "@/server/printing/print";
 import { runPrintDispatch } from "@/lib/print/run-dispatch";
 
-function lineId(): string {
+export function lineId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 /** Inline modifier/quantity picker for one menu item (no i18n dependency). */
-function ItemConfig({
+export function ItemConfig({
   item,
   onAdd,
   onCancel,

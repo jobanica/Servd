@@ -1042,6 +1042,71 @@ export async function getPosTables(): Promise<{ id: string; tableNumber: string 
 }
 
 /**
+ * Add more items to an EXISTING open, unpaid order — the "customer ordered,
+ * then wants to add another item a few minutes later" case. Prices are built
+ * server-side (never trusted from the client) and appended; the order total is
+ * bumped by the added items' value. The kitchen display updates via realtime;
+ * print-mode kitchens get a fresh ticket so the added items reach the line.
+ */
+export async function addItemsToOrder(
+  orderId: string,
+  lines: OrderLineInput[],
+): Promise<{ ok: boolean; tables?: CashierTable[]; error?: string; printKitchen?: boolean; printOrderId?: string }> {
+  let staff;
+  try {
+    staff = await requireStaff(["cashier", "admin"]);
+  } catch {
+    return { ok: false, error: "Not allowed." };
+  }
+  if (!lines?.length) return { ok: false, error: "Add at least one item." };
+
+  let built;
+  try {
+    built = await buildValidatedOrder(staff.restaurantId, lines);
+  } catch (e) {
+    if (e instanceof OrderValidationError) return { ok: false, error: e.message };
+    return { ok: false, error: "Could not add the items." };
+  }
+
+  try {
+    await tenantDb(staff.restaurantId, async (tx) => {
+      // Only an OPEN (in-kitchen) order that isn't paid yet can take more items.
+      const order = await tx.order.findFirst({
+        where: { id: orderId, paymentStatus: { not: "paid" }, status: { in: [...OPEN] } },
+        select: { id: true, total: true },
+      });
+      if (!order) throw new Error("This order can no longer be edited.");
+      // Nested create appends the new lines; select keeps this safe on a lagging schema.
+      await tx.order.update({
+        where: { id: orderId },
+        data: { total: order.total + built.total, items: { create: orderItemsCreate(built.items) } },
+        select: { id: true },
+      });
+    });
+  } catch (e) {
+    console.error("addItemsToOrder failed", e);
+    return { ok: false, error: e instanceof Error ? e.message : "Could not add the items." };
+  }
+
+  // Count these servings toward each item's daily cap (best-effort, own tx).
+  await recordServingsSold(staff.restaurantId, built.items);
+  await recordVariantsSold(
+    staff.restaurantId,
+    built.items.filter((i) => i.variantId).map((i) => ({ variantId: i.variantId!, quantity: i.quantity })),
+  );
+
+  await notifyOrdersChanged(staff.restaurantId);
+  // No kitchen display → reprint so the kitchen sees the updated order.
+  const kitchen = await printKitchenIfNeeded(staff.restaurantId, orderId);
+  return {
+    ok: true,
+    tables: await getCashierTables(),
+    printKitchen: kitchen.clientPrintNeeded,
+    printOrderId: kitchen.clientPrintNeeded ? orderId : undefined,
+  };
+}
+
+/**
  * Create an order from the cashier POS. Cashier-created orders are already
  * accepted, so they go straight to the kitchen (status "new") and print.
  */

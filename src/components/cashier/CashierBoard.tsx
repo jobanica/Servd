@@ -27,6 +27,7 @@ import { ShiftSummaryModal } from "./ShiftSummaryModal";
 import { ShiftNotesModal } from "./ShiftNotesModal";
 import { VoidPinModal } from "./VoidPinModal";
 import { EditOrderModal } from "./EditOrderModal";
+import { AddItemsModal } from "./AddItemsModal";
 import { GiftCardModal } from "./GiftCardModal";
 import { SplitPaymentModal } from "./SplitPaymentModal";
 import { removeGiftCard } from "@/server/gift-cards/gift-cards";
@@ -64,6 +65,7 @@ export function CashierBoard({
   const [shiftNotesOpen, setShiftNotesOpen] = useState(false);
   const [voidOrderTarget, setVoidOrderTarget] = useState<{ id: string; label: string } | null>(null);
   const [editOrderTarget, setEditOrderTarget] = useState<{ id: string; label: string } | null>(null);
+  const [addItemsTarget, setAddItemsTarget] = useState<{ id: string; label: string } | null>(null);
   const [giftCardTarget, setGiftCardTarget] = useState<{ id: string; label: string } | null>(null);
   const [splitTarget, setSplitTarget] = useState<{ id: string; label: string; remaining: number } | null>(null);
   const [discountOrder, setDiscountOrder] = useState<CashierTable["orders"][number] | null>(null);
@@ -562,6 +564,13 @@ export function CashierBoard({
                           Split
                         </button>
                         <button
+                          onClick={() => setAddItemsTarget({ id: o.id, label: t.label })}
+                          disabled={busy === o.id}
+                          className="rounded-lg border border-brand-primary/40 px-3 py-1.5 text-xs font-semibold text-brand-primary disabled:opacity-60"
+                        >
+                          + Add items
+                        </button>
+                        <button
                           onClick={() => setEditOrderTarget({ id: o.id, label: t.label })}
                           disabled={busy === o.id}
                           className="rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
@@ -906,6 +915,15 @@ export function CashierBoard({
           orderId={editOrderTarget.id}
           label={editOrderTarget.label}
           onClose={() => setEditOrderTarget(null)}
+          onChanged={(t) => setTables(t)}
+        />
+      )}
+
+      {addItemsTarget && (
+        <AddItemsModal
+          orderId={addItemsTarget.id}
+          label={addItemsTarget.label}
+          onClose={() => setAddItemsTarget(null)}
           onChanged={(t) => setTables(t)}
         />
       )}
