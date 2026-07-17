@@ -11,6 +11,7 @@ import {
 } from "@/lib/cart/pricing";
 import type { CartLine, DinerCategory, DinerItem, Selection } from "@/lib/cart/types";
 import { placeWebOrder } from "@/server/orders/web-order";
+import { previewPromoCode } from "@/server/promotions/redeem";
 import { captureCartLead } from "@/server/marketing/cart-recovery";
 import { LocationPicker } from "./LocationPicker";
 import { WebOrderTracker } from "./WebOrderTracker";
@@ -304,6 +305,12 @@ export function WebOrder(props: WebOrderProps) {
   const [schedDate, setSchedDate] = useState(initSched.date);
   const [schedTime, setSchedTime] = useState(initSched.time);
   const [downpaymentRef, setDownpaymentRef] = useState("");
+  // Coupon code (promotions/discounts).
+  const [couponOpen, setCouponOpen] = useState(false);
+  const [coupon, setCoupon] = useState("");
+  const [couponBusy, setCouponBusy] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [appliedPromo, setAppliedPromo] = useState<{ code: string; amount: number; label: string } | null>(null);
   // Customer's agreement to pay the rider directly (required when the fee isn't
   // collected in-app).
   const [agreeRider, setAgreeRider] = useState(false);
@@ -341,7 +348,33 @@ export function WebOrder(props: WebOrderProps) {
   // COD fee — an extra charge on cash-on-delivery orders (delivery paid by cash).
   const isCod = orderType === "delivery" && payMethod === "cod";
   const codFee = isCod && props.payment?.codFeeEnabled ? props.payment.codFee ?? 0 : 0;
-  const total = subtotal + deliveryFee + codFee;
+  const discount = appliedPromo?.amount ?? 0;
+  const total = Math.max(0, subtotal + deliveryFee + codFee - discount);
+
+  // A coupon's value can depend on the cart, delivery fee and order type — clear
+  // it when any of those change so the customer re-applies (and the server stays
+  // authoritative at placement).
+  useEffect(() => {
+    setAppliedPromo(null);
+    setCouponError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subtotal, deliveryFee, orderType]);
+
+  async function applyCoupon() {
+    const code = coupon.trim();
+    if (!code) return;
+    setCouponBusy(true);
+    setCouponError(null);
+    const res = await previewPromoCode({
+      slug,
+      code,
+      lines: lines.map((l) => ({ itemId: l.itemId, quantity: l.quantity, modifierIds: l.modifiers.map((m) => m.modifierId), variantId: l.variantId })),
+      deliveryFee: orderType === "delivery" ? deliveryFee : 0,
+    });
+    setCouponBusy(false);
+    if (res.ok) setAppliedPromo({ code, amount: res.amount, label: res.label });
+    else { setAppliedPromo(null); setCouponError(res.error); }
+  }
   const vat = Math.round(total - total / (1 + VAT_RATE));
   const nonEmpty = categories.filter((c) => c.items.length > 0);
   const q = search.trim().toLowerCase();
@@ -392,6 +425,7 @@ export function WebOrder(props: WebOrderProps) {
       downpaymentRef: schedulingLater && downpaymentDue > 0 ? downpaymentRef || undefined : undefined,
       paymentChoice: gcashAvailable ? payMethod : undefined,
       paymentRef: payMethod === "gcash" ? gcashRef || undefined : undefined,
+      couponCode: appliedPromo?.code || undefined,
       lines: lines.map((l) => ({ itemId: l.itemId, quantity: l.quantity, note: l.note, modifierIds: l.modifiers.map((m) => m.modifierId), variantId: l.variantId })),
     });
     setBusy(false);
@@ -628,24 +662,56 @@ export function WebOrder(props: WebOrderProps) {
                 )}
               </div>
             )}
+
+            {/* Coupon code */}
+            <div className="border-t border-black/5 pt-2">
+              {appliedPromo ? (
+                <div className="flex items-center justify-between rounded-lg bg-green-50 px-3 py-2 text-sm">
+                  <span className="font-semibold text-green-700">🏷 {appliedPromo.label} applied ({appliedPromo.code.toUpperCase()})</span>
+                  <button type="button" onClick={() => { setAppliedPromo(null); setCoupon(""); setCouponOpen(false); }} className="text-xs font-semibold text-plum-ink/50 hover:text-guava">Remove</button>
+                </div>
+              ) : !couponOpen ? (
+                <button type="button" onClick={() => setCouponOpen(true)} className="text-sm font-semibold text-brand-primary">🏷 Have a coupon code?</button>
+              ) : (
+                <div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={coupon}
+                      onChange={(e) => setCoupon(e.target.value)}
+                      placeholder="Enter coupon code"
+                      className="min-w-0 flex-1 rounded-lg border border-plum-ink/15 px-3 py-2 text-sm uppercase placeholder:normal-case"
+                    />
+                    <button type="button" onClick={applyCoupon} disabled={couponBusy || !coupon.trim()} className="shrink-0 rounded-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                      {couponBusy ? "…" : "Apply"}
+                    </button>
+                  </div>
+                  {couponError && <p className="mt-1 text-xs text-guava">{couponError}</p>}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
 
       <div className="border-t border-black/5 px-4 py-3">
-        {checkout && orderType === "delivery" && (
+        {checkout && (orderType === "delivery" || discount > 0) && (
           <div className="mb-1 space-y-0.5 text-sm text-plum-ink/60">
             <div className="flex justify-between"><span>Subtotal</span><span>{formatPeso(subtotal)}</span></div>
-            {collectDeliveryFee ? (
+            {orderType === "delivery" && (collectDeliveryFee ? (
               <div className="flex justify-between"><span>Delivery fee</span><span>{deliveryFee > 0 ? formatPeso(deliveryFee) : "—"}</span></div>
             ) : (
               <div className="flex justify-between text-plum-ink/50">
                 <span>Delivery</span>
                 <span>Pay rider directly</span>
               </div>
-            )}
+            ))}
             {codFee > 0 && (
               <div className="flex justify-between"><span>COD fee</span><span>{formatPeso(codFee)}</span></div>
+            )}
+            {discount > 0 && (
+              <div className="flex justify-between font-semibold text-green-700">
+                <span>Discount{appliedPromo ? ` (${appliedPromo.label})` : ""}</span><span>−{formatPeso(discount)}</span>
+              </div>
             )}
           </div>
         )}

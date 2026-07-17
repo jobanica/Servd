@@ -13,6 +13,7 @@ import { notifyOrdersChanged } from "@/server/realtime/notify";
 import { sendOrderPush } from "@/server/push/send";
 import { getPublicStorefront, isOpenNow, computeDownpayment } from "@/server/storefront/storefront";
 import { haversineKm, computeDistanceFee } from "@/lib/geo/distance";
+import { resolvePromo } from "@/server/promotions/redeem";
 import { getLoyaltyConfig, enrollAccount } from "@/server/loyalty/loyalty";
 import { markCartConverted } from "@/server/marketing/cart-recovery";
 import { formatPeso } from "@/lib/money";
@@ -30,6 +31,7 @@ const schema = z.object({
   downpaymentRef: z.string().trim().max(120).optional(), // customer's payment reference
   paymentChoice: z.enum(["cod", "gcash"]).optional(), // chosen payment method
   paymentRef: z.string().trim().max(120).optional(), // GCash reference for the full payment
+  couponCode: z.string().trim().max(40).optional(), // promo/coupon code
   lines: z
     .array(
       z.object({
@@ -142,6 +144,21 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
       : 0;
   if (codFee > 0 && addressLine) addressLine = `[COD +${formatPeso(codFee)}] ${addressLine}`;
 
+  // Coupon — re-resolved server-side against the real prices (never trust the
+  // client for money). free_delivery waives the delivery fee; percent/amount cut
+  // the subtotal. Best-effort so a bad/expired code just yields no discount.
+  let discountAmount = 0;
+  let discountLabel: string | null = null;
+  if (d.couponCode) {
+    try {
+      const promo = await resolvePromo(restaurant.id, d.couponCode, built, deliveryFee);
+      if (promo && promo.amount > 0) {
+        discountAmount = Math.min(promo.amount, built.total + deliveryFee); // never below 0
+        discountLabel = promo.label;
+      }
+    } catch { /* promotions not migrated / code invalid — no discount */ }
+  }
+
   const base = {
     restaurantId: restaurant.id,
     orderType: d.orderType,
@@ -151,6 +168,8 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
     status: "pending" as const,
     paymentStatus: "unpaid" as const,
     total: built.total + deliveryFee + codFee,
+    discountAmount,
+    discountLabel,
     items: { create: orderItemsCreate(built.items) },
   };
   // Optional columns that a schema-lagged DB may not have yet (geo pin, advance

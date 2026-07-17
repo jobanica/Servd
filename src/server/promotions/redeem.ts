@@ -90,6 +90,7 @@ export async function previewPromoCode(input: {
   slug: string;
   code: string;
   lines: { itemId: string; quantity: number; modifierIds?: string[]; variantId?: string }[];
+  deliveryFee?: number; // centavos — so free-delivery codes can be previewed on a delivery order
 }): Promise<PreviewResult> {
   const code = (input.code ?? "").trim();
   if (!code) return { ok: false, error: "Enter a code." };
@@ -122,7 +123,7 @@ export async function previewPromoCode(input: {
     { type: promo.type, value: promo.value, freeItemId: promo.freeItemId, minSpend: promo.minSpend },
     {
       subtotal: built.total,
-      deliveryFee: 0, // dine-in preview has no delivery fee
+      deliveryFee: Math.max(0, Math.round(input.deliveryFee ?? 0)),
       lines: built.items.map((i) => ({
         menuItemId: i.menuItemId,
         unitPrice: i.unitPrice,

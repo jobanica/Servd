@@ -65,9 +65,11 @@ export async function getWebOrderStatus(
     // Core fields always exist; the order must belong to this restaurant.
     const order = await tx.order.findFirst({
       where: { id: orderId, restaurantId: restaurant.id },
-      select: { status: true, paymentStatus: true, total: true },
+      select: { status: true, paymentStatus: true, total: true, discountAmount: true },
     });
     if (!order) return null;
+    // Show the net amount the customer actually pays (after any coupon).
+    const netTotal = Math.max(0, order.total - (order.discountAmount ?? 0));
 
     // orderType / deliveryStatus / prepMinutes columns may lag on prod — read
     // them best-effort so the tracker never breaks before a migration runs.
@@ -106,7 +108,7 @@ export async function getWebOrderStatus(
       paymentStatus: order.paymentStatus,
       deliveryStatus,
       orderType,
-      total: order.total,
+      total: netTotal,
       orderNumber,
       prepMinutes,
     };
