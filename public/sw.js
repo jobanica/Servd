@@ -7,7 +7,7 @@
  *  - Everything else (POST / server actions / API): passthrough, never cached —
  *    the app's own offline queue handles writes.
  */
-const VERSION = "servd-v2";
+const VERSION = "servd-v3";
 const PAGES = `${VERSION}-pages`;
 const ASSETS = `${VERSION}-assets`;
 
@@ -25,6 +25,39 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("message", (event) => {
   if (event.data === "skipWaiting") self.skipWaiting();
+});
+
+// --- Web Push: alert merchants of new online orders even when the app is
+//     minimized or closed. Payload: { title, body, url }. ---
+self.addEventListener("push", (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch { data = {}; }
+  const title = data.title || "New online order 🛎️";
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: data.body || "You have a new order.",
+      icon: "/brand/icon-192.png",
+      badge: "/brand/icon-192.png",
+      tag: "servd-order", // collapse duplicates
+      renotify: true,
+      requireInteraction: true, // stays until tapped
+      vibrate: [200, 100, 200, 100, 200],
+      data: { url: data.url || "/merchant" },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || "/merchant";
+  event.waitUntil(
+    (async () => {
+      const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      const existing = all.find((c) => c.url.includes("/merchant"));
+      if (existing) return existing.focus();
+      return self.clients.openWindow(url);
+    })(),
+  );
 });
 
 function isAsset(url) {

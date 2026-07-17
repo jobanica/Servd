@@ -10,6 +10,7 @@ import {
 import { recordServingsSold } from "@/server/menu/servings";
 import { recordVariantsSold } from "@/server/menu/variants";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
+import { sendOrderPush } from "@/server/push/send";
 import { getPublicStorefront, isOpenNow, computeDownpayment } from "@/server/storefront/storefront";
 import { haversineKm, computeDistanceFee } from "@/lib/geo/distance";
 import { getLoyaltyConfig, enrollAccount } from "@/server/loyalty/loyalty";
@@ -197,6 +198,17 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
   );
 
   await notifyOrdersChanged(restaurant.id);
+
+  // Web Push the merchant devices so a new order alerts them even when the
+  // Incoming Orders app is minimized/closed. Best-effort — never blocks the order.
+  try {
+    await sendOrderPush(restaurant.id, {
+      ref: `#${order.id.slice(0, 8).toUpperCase()}`,
+      orderType: d.orderType,
+      total: base.total,
+      scheduled: !!scheduledFor,
+    });
+  } catch { /* push is best-effort */ }
 
   // The cart converted — close any open abandoned-cart lead for this phone.
   await markCartConverted(restaurant.id, d.customerPhone);

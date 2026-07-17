@@ -16,6 +16,7 @@ import {
   type MerchantAdvance,
   type RejectReason,
 } from "@/server/orders/merchant";
+import { savePushSubscription } from "@/server/push/actions";
 import { useOrderAlarm } from "./useOrderAlarm";
 import { useWakeLock } from "./useWakeLock";
 import { InstallButton } from "./InstallButton";
@@ -32,6 +33,45 @@ function typeBadge(o: MerchantOrder): string {
   if (o.orderType === "delivery") return "🛵 Delivery";
   if (o.orderType === "takeout") return "🥡 Pickup";
   return "🍽️ Dine-in";
+}
+
+/** VAPID key (URL-safe base64) → Uint8Array for pushManager.subscribe. */
+function urlBase64ToUint8Array(base64: string): Uint8Array {
+  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+  const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(b64);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+
+/**
+ * Subscribes this device to Web Push so new orders alert it in the background.
+ * Requests notification permission (needs a user gesture), then stores the
+ * subscription server-side. No-ops if push isn't configured/supported.
+ */
+async function enableBackgroundPush(): Promise<void> {
+  const vapid = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  if (!vapid) return; // push not configured on this deployment
+  if (typeof window === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
+  try {
+    if (Notification.permission === "denied") return;
+    if (Notification.permission !== "granted") {
+      const perm = await Notification.requestPermission();
+      if (perm !== "granted") return;
+    }
+    const reg = await navigator.serviceWorker.ready;
+    const existing = await reg.pushManager.getSubscription();
+    const sub =
+      existing ??
+      (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapid) as BufferSource }));
+    const json = sub.toJSON();
+    if (json.endpoint && json.keys?.p256dh && json.keys?.auth) {
+      await savePushSubscription({ endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth });
+    }
+  } catch {
+    /* push unavailable — the in-app alarm still works */
+  }
 }
 
 function minsAgo(iso: string): string {
@@ -139,10 +179,14 @@ export function MerchantBoard({
     };
   }, [refresh]);
 
-  // Register the service worker so the screen is installable as a PWA.
+  // Register the service worker so the screen is installable as a PWA, and keep
+  // this device's push subscription fresh if notifications were already allowed.
   useEffect(() => {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+      void enableBackgroundPush();
     }
   }, []);
 
@@ -197,11 +241,11 @@ export function MerchantBoard({
       <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-plum-ink px-6 text-center text-white">
         <h1 className="font-heading text-3xl font-extrabold">{restaurantName} — Incoming Orders</h1>
         <p className="max-w-md text-white/70">
-          Tap below to enable the new-order alarm. Keep this screen open and the tablet plugged in —
-          the alarm only rings while this page is open and awake.
+          Tap below to enable the new-order alarm and background alerts. Keep this app installed and
+          allow notifications so orders still ring even when it&apos;s minimized.
         </p>
         <button
-          onClick={() => alarm.unlock()}
+          onClick={() => { alarm.unlock(); void enableBackgroundPush(); }}
           className="rounded-2xl bg-red-600 px-10 py-6 text-2xl font-extrabold text-white shadow-lg"
         >
           🔔 Tap to start

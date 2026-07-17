@@ -473,9 +473,26 @@ model Restaurant {
   payrollSetting  PayrollSetting?
   menuItemCosts   MenuItemCost[]
   storefront      StorefrontSetting?
+  pushSubscriptions PushSubscription[]
 
   @@index([demoPartnerId])
   @@map("restaurants")
+}
+
+/// Web Push subscriptions for merchant devices — lets a new online order alert
+/// the phone even when the Incoming Orders app is minimized or closed.
+model PushSubscription {
+  id           String   @id @default(uuid())
+  restaurantId String
+  endpoint     String   @unique
+  p256dh       String // subscription public key
+  auth         String // subscription auth secret
+  createdAt    DateTime @default(now())
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@map("push_subscriptions")
 }
 
 /// Public website settings: store hours + delivery zones/fees.
