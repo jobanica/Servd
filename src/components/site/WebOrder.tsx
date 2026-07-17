@@ -290,6 +290,9 @@ export function WebOrder(props: WebOrderProps) {
   const [schedDate, setSchedDate] = useState(initSched.date);
   const [schedTime, setSchedTime] = useState(initSched.time);
   const [downpaymentRef, setDownpaymentRef] = useState("");
+  // Customer's agreement to pay the rider directly (required when the fee isn't
+  // collected in-app).
+  const [agreeRider, setAgreeRider] = useState(false);
   // Confirmation details for an advance order awaiting the owner's approval.
   const [placedAdvance, setPlacedAdvance] = useState<{ downpayment: number } | null>(null);
   // Payment method (cash / manual GCash). GCash only offered if the owner set it up.
@@ -556,16 +559,22 @@ export function WebOrder(props: WebOrderProps) {
                       </p>
                     ) : (
                       <p className="mt-1 text-xs font-semibold text-plum-ink/70">
-                        ≈ {distance.billableKm.toFixed(1)} km away · Delivery {formatPeso(distance.fee)}
-                        {collectDeliveryFee ? "" : " (paid to the rider directly)"}
+                        ≈ {distance.billableKm.toFixed(1)} km away
+                        {collectDeliveryFee ? ` · Delivery ${formatPeso(distance.fee)}` : ""}
                       </p>
                     )
                   )}
                 </div>
                 {!collectDeliveryFee && (
-                  <p className="rounded-lg bg-mango/10 px-3 py-2 text-xs font-semibold text-plum-ink/70">
-                    🛵 Only your food is charged here — the delivery fee is paid <span className="text-plum-ink">directly to the rider</span> on arrival.
-                  </p>
+                  <div className="rounded-lg bg-mango/10 p-3">
+                    <p className="text-xs text-plum-ink/70">
+                      🛵 Only your food is charged here. The delivery fee is <span className="font-semibold text-plum-ink">paid directly to the rider</span> — the exact amount is set by the courier on arrival.
+                    </p>
+                    <label className="mt-2 flex items-start gap-2 text-xs font-semibold text-plum-ink">
+                      <input type="checkbox" checked={agreeRider} onChange={(e) => setAgreeRider(e.target.checked)} className="mt-0.5" />
+                      <span>I agree to pay the delivery fee directly to the rider on arrival.</span>
+                    </label>
+                  </div>
                 )}
               </>
             )}
@@ -617,8 +626,8 @@ export function WebOrder(props: WebOrderProps) {
               <div className="flex justify-between"><span>Delivery fee</span><span>{deliveryFee > 0 ? formatPeso(deliveryFee) : "—"}</span></div>
             ) : (
               <div className="flex justify-between text-plum-ink/50">
-                <span>Delivery{deliveryFeeEstimate > 0 ? ` (~${formatPeso(deliveryFeeEstimate)})` : ""}</span>
-                <span>Pay rider</span>
+                <span>Delivery</span>
+                <span>Pay rider directly</span>
               </div>
             )}
             {codFee > 0 && (
@@ -646,7 +655,7 @@ export function WebOrder(props: WebOrderProps) {
         ) : (
           <button
             onClick={submit}
-            disabled={busy || lines.length === 0 || !name.trim() || !phone.trim() || (schedulingLater && !scheduledIso) || (gcashAvailable && payMethod === "gcash" && !gcashRef.trim()) || (orderType === "delivery" && (!address.trim() || !geo || (distanceMode ? !!distance?.outOfRange : (zones.length > 0 && !zone))))}
+            disabled={busy || lines.length === 0 || !name.trim() || !phone.trim() || (schedulingLater && !scheduledIso) || (gcashAvailable && payMethod === "gcash" && !gcashRef.trim()) || (orderType === "delivery" && (!address.trim() || !geo || !collectDeliveryFee && !agreeRider || (distanceMode ? !!distance?.outOfRange : (zones.length > 0 && !zone))))}
             className="mt-3 w-full rounded-lg bg-green-600 py-3 font-semibold text-white disabled:opacity-50"
           >
             {busy
