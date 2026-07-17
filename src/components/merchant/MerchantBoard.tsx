@@ -124,6 +124,21 @@ export function MerchantBoard({
     };
   }, [restaurantId, refresh]);
 
+  // Phones throttle background timers and drop the realtime socket while the app
+  // is minimized, so a poll can be missed. Refresh the moment it's foregrounded
+  // (and when regaining network) so a queued order shows — and alarms — instantly.
+  useEffect(() => {
+    const onWake = () => { if (document.visibilityState === "visible") refresh(); };
+    document.addEventListener("visibilitychange", onWake);
+    window.addEventListener("focus", onWake);
+    window.addEventListener("online", onWake);
+    return () => {
+      document.removeEventListener("visibilitychange", onWake);
+      window.removeEventListener("focus", onWake);
+      window.removeEventListener("online", onWake);
+    };
+  }, [refresh]);
+
   // Register the service worker so the screen is installable as a PWA.
   useEffect(() => {
     if ("serviceWorker" in navigator) {
