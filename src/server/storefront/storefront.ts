@@ -36,6 +36,8 @@ export interface DeliveryConfig {
   roadFactor: number; // straight-line × factor ≈ road distance (default 1.3)
   originLat: number | null; // store location (pinned by the owner)
   originLng: number | null;
+  feeInTotal: boolean; // true = add the fee to the order total (pay in-app);
+  //                      false = customer pays the rider directly (food only in-app)
 }
 export interface Storefront {
   hours: DayHours[]; // always length 7, index 0=Sun … 6=Sat
@@ -48,7 +50,7 @@ export interface Storefront {
 }
 
 export function defaultDeliveryConfig(): DeliveryConfig {
-  return { mode: "zones", baseFee: 0, perKm: 0, freeKm: 0, minFee: 0, maxKm: 0, roadFactor: 1.3, originLat: null, originLng: null };
+  return { mode: "zones", baseFee: 0, perKm: 0, freeKm: 0, minFee: 0, maxKm: 0, roadFactor: 1.3, originLat: null, originLng: null, feeInTotal: true };
 }
 
 function num(v: unknown, fallback = 0): number {
@@ -70,6 +72,8 @@ function normalizeDeliveryConfig(raw: unknown): DeliveryConfig {
       roadFactor: num(r.roadFactor, 1.3) > 0 ? num(r.roadFactor, 1.3) : 1.3,
       originLat: r.originLat == null ? null : num(r.originLat),
       originLng: r.originLng == null ? null : num(r.originLng),
+      // Default true (fee included) so existing stores are unchanged.
+      feeInTotal: r.feeInTotal === undefined ? true : !!r.feeInTotal,
     };
   }
   return d;

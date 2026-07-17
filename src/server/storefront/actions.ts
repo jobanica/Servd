@@ -77,6 +77,9 @@ export async function updateStorefront(
     roadFactor: dpNum("roadFactor") > 0 ? dpNum("roadFactor") : 1.3,
     originLat: originLat != null && Number.isFinite(originLat) ? originLat : null,
     originLng: originLng != null && Number.isFinite(originLng) ? originLng : null,
+    // Checkbox: when unchecked, the delivery fee is NOT added to the order total
+    // (the customer settles it with the rider directly).
+    feeInTotal: formData.get("deliveryFeeInTotal") === "on",
   };
   const hoursJson = hours as unknown as Prisma.InputJsonValue;
   const zonesJson = zones as unknown as Prisma.InputJsonValue;

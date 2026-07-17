@@ -72,6 +72,7 @@ export interface WebOrderProps {
     roadFactor: number;
     originLat: number | null;
     originLng: number | null;
+    feeInTotal?: boolean;
   };
 }
 
@@ -311,12 +312,15 @@ export function WebOrder(props: WebOrderProps) {
           haversineKm(dcfg!.originLat!, dcfg!.originLng!, geo.lat, geo.lng),
         )
       : null;
-  const deliveryFee =
+  const deliveryFeeEstimate =
     orderType !== "delivery"
       ? 0
       : distanceMode
         ? distance && !distance.outOfRange ? distance.fee : 0
         : zones.find((z) => z.name === zone)?.fee ?? 0;
+  // Whether the delivery fee is collected in-app or paid to the rider directly.
+  const collectDeliveryFee = dcfg?.feeInTotal !== false;
+  const deliveryFee = collectDeliveryFee ? deliveryFeeEstimate : 0; // added to the total
   // COD fee — an extra charge on cash-on-delivery orders (delivery paid by cash).
   const isCod = orderType === "delivery" && payMethod === "cod";
   const codFee = isCod && props.payment?.codFeeEnabled ? props.payment.codFee ?? 0 : 0;
@@ -552,11 +556,17 @@ export function WebOrder(props: WebOrderProps) {
                       </p>
                     ) : (
                       <p className="mt-1 text-xs font-semibold text-plum-ink/70">
-                        ≈ {distance.billableKm.toFixed(1)} km away · Delivery fee {formatPeso(distance.fee)}
+                        ≈ {distance.billableKm.toFixed(1)} km away · Delivery {formatPeso(distance.fee)}
+                        {collectDeliveryFee ? "" : " (paid to the rider directly)"}
                       </p>
                     )
                   )}
                 </div>
+                {!collectDeliveryFee && (
+                  <p className="rounded-lg bg-mango/10 px-3 py-2 text-xs font-semibold text-plum-ink/70">
+                    🛵 Only your food is charged here — the delivery fee is paid <span className="text-plum-ink">directly to the rider</span> on arrival.
+                  </p>
+                )}
               </>
             )}
 
@@ -603,7 +613,14 @@ export function WebOrder(props: WebOrderProps) {
         {checkout && orderType === "delivery" && (
           <div className="mb-1 space-y-0.5 text-sm text-plum-ink/60">
             <div className="flex justify-between"><span>Subtotal</span><span>{formatPeso(subtotal)}</span></div>
-            <div className="flex justify-between"><span>Delivery fee</span><span>{deliveryFee > 0 ? formatPeso(deliveryFee) : "—"}</span></div>
+            {collectDeliveryFee ? (
+              <div className="flex justify-between"><span>Delivery fee</span><span>{deliveryFee > 0 ? formatPeso(deliveryFee) : "—"}</span></div>
+            ) : (
+              <div className="flex justify-between text-plum-ink/50">
+                <span>Delivery{deliveryFeeEstimate > 0 ? ` (~${formatPeso(deliveryFeeEstimate)})` : ""}</span>
+                <span>Pay rider</span>
+              </div>
+            )}
             {codFee > 0 && (
               <div className="flex justify-between"><span>COD fee</span><span>{formatPeso(codFee)}</span></div>
             )}

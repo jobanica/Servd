@@ -105,6 +105,7 @@ export default async function StorefrontPage() {
             roadFactor: sf.delivery.roadFactor,
             originLat: sf.delivery.originLat,
             originLng: sf.delivery.originLng,
+            feeInTotal: sf.delivery.feeInTotal,
           },
         }}
       />

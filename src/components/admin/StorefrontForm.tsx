@@ -45,6 +45,7 @@ export function StorefrontForm({
       roadFactor: number;
       originLat: number | null;
       originLng: number | null;
+      feeInTotal: boolean;
     };
   };
 }) {
@@ -133,6 +134,19 @@ export function StorefrontForm({
             📏 By distance
           </button>
         </div>
+
+        {/* Who collects the delivery fee */}
+        <label className="mt-3 flex items-start gap-2 text-sm font-semibold">
+          <input type="checkbox" name="deliveryFeeInTotal" defaultChecked={initial.delivery.feeInTotal} className="mt-0.5" />
+          <span>
+            Include the delivery fee in the order total (customers pay it in-app)
+            <span className="mt-0.5 block text-xs font-normal text-plum-ink/50">
+              Uncheck if the <strong>customer pays the rider directly</strong> — then only the food is
+              charged/paid online (GCash QR or cash), and the fee shown is just an estimate settled
+              with the courier. Useful when courier rates differ from the app&apos;s estimate.
+            </span>
+          </span>
+        </label>
 
         {/* Zones editor (kept mounted so values persist when switching modes). */}
         <div className={deliveryMode === "zones" ? "mt-4" : "hidden"}>

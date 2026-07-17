@@ -101,27 +101,34 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
   }
 
   // Delivery fee — computed server-side (never trust the client for money) from
-  // either the chosen zone or the distance formula. Encoded into the address so
-  // staff see it.
+  // either the chosen zone or the distance formula. When feeInTotal is off the
+  // customer pays the rider directly, so it's NOT added to the order total (only
+  // recorded on the address for reference). Encoded into the address so staff see it.
   let deliveryFee = 0;
   let addressLine: string | null = null;
   if (d.orderType === "delivery") {
     const dc = storefront.delivery;
+    let estimate = 0;
+    let label = "";
     if (dc.mode === "distance" && dc.originLat != null && dc.originLng != null && d.lat != null && d.lng != null) {
       const r = computeDistanceFee(
         { baseFee: dc.baseFee, perKm: dc.perKm, freeKm: dc.freeKm, minFee: dc.minFee, maxKm: dc.maxKm, roadFactor: dc.roadFactor },
         haversineKm(dc.originLat, dc.originLng, d.lat, d.lng),
       );
       if (r.outOfRange) return { ok: false, error: "Sorry, your location is outside our delivery range." };
-      deliveryFee = r.fee;
-      const prefix = `[≈${r.billableKm.toFixed(1)}km · delivery ${formatPeso(deliveryFee)}] `;
-      addressLine = `${prefix}${d.customerAddress?.trim() ?? ""}`.trim() || null;
+      estimate = r.fee;
+      label = `≈${r.billableKm.toFixed(1)}km`;
     } else {
       const zone = d.deliveryZone ? storefront.zones.find((z) => z.name === d.deliveryZone) : undefined;
-      deliveryFee = zone?.fee ?? 0;
-      const prefix = zone ? `[${zone.name}${deliveryFee > 0 ? ` · delivery ${formatPeso(deliveryFee)}` : ""}] ` : "";
-      addressLine = `${prefix}${d.customerAddress?.trim() ?? ""}`.trim() || null;
+      estimate = zone?.fee ?? 0;
+      label = zone?.name ?? "";
     }
+    // Only charge it in the total when the owner collects it in-app.
+    deliveryFee = dc.feeInTotal ? estimate : 0;
+    const feeNote =
+      estimate > 0 ? ` · delivery ${formatPeso(estimate)}${dc.feeInTotal ? "" : " (rider-paid)"}` : "";
+    const prefix = label || feeNote ? `[${label}${feeNote}] ` : "";
+    addressLine = `${prefix}${d.customerAddress?.trim() ?? ""}`.trim() || null;
   }
 
   // Payment method (cash / GCash). GCash must be enabled by the owner; unknown or
