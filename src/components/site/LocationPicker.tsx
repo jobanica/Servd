@@ -11,9 +11,14 @@ import type * as LType from "leaflet";
 export function LocationPicker({
   onChange,
   initial,
+  defaultCenter,
 }: {
   onChange: (lat: number, lng: number) => void;
+  // Pre-selects a pin (admin store-location picker).
   initial?: { lat: number; lng: number } | null;
+  // Centers the map here without committing a pin (e.g. the store location, so
+  // diners near the store don't start on a far-away default view).
+  defaultCenter?: { lat: number; lng: number } | null;
 }) {
   const mapEl = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LType.Map | null>(null);
@@ -38,8 +43,10 @@ export function LocationPicker({
       }
       if (cancelled || !mapEl.current || mapRef.current) return;
 
-      const start = initial ?? { lat: 7.0731, lng: 125.6128 }; // pinned origin, else Davao default
-      const map = L.map(mapEl.current).setView([start.lat, start.lng], initial ? 15 : 13);
+      // Center priority: a pre-set pin → the store location → Davao fallback.
+      const start = initial ?? defaultCenter ?? { lat: 7.0731, lng: 125.6128 };
+      const zoom = initial ? 16 : defaultCenter ? 15 : 12;
+      const map = L.map(mapEl.current).setView([start.lat, start.lng], zoom);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: "© OpenStreetMap",
         maxZoom: 19,

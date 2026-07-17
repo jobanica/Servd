@@ -14,6 +14,8 @@ const PUBLIC_SELECT = {
   paymentOnlineEnabled: true,
   googleReviewUrl: true,
   feedbackMode: true,
+  latitude: true,
+  longitude: true,
 } as const;
 
 /**

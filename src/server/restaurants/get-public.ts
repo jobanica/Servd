@@ -23,6 +23,8 @@ export async function getPublicRestaurantBySlug(slug: string) {
         paymentOnlineEnabled: true,
         googleReviewUrl: true,
         feedbackMode: true,
+        latitude: true,
+        longitude: true,
       },
     }),
   );

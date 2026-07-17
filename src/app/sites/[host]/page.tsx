@@ -46,6 +46,13 @@ export default async function SiteHomePage({
       booking={sf.booking}
       payment={sf.payment}
       delivery={sf.delivery}
+      storeCenter={
+        sf.delivery.originLat != null && sf.delivery.originLng != null
+          ? { lat: sf.delivery.originLat, lng: sf.delivery.originLng }
+          : restaurant.latitude != null && restaurant.longitude != null
+            ? { lat: restaurant.latitude, lng: restaurant.longitude }
+            : null
+      }
     />
   );
 }

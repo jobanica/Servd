@@ -74,6 +74,9 @@ export interface WebOrderProps {
     originLng: number | null;
     feeInTotal?: boolean;
   };
+  // Where to center the delivery map by default (the store's location), so diners
+  // start near the store instead of a far-away default view.
+  storeCenter?: { lat: number; lng: number } | null;
 }
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -550,7 +553,7 @@ export function WebOrder(props: WebOrderProps) {
                 <textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={2} placeholder="Delivery address" className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
                 <div>
                   <p className="mb-1 text-xs font-semibold text-plum-ink/60">Pin your location (required for delivery)</p>
-                  <LocationPicker onChange={(lat, lng) => setGeo({ lat, lng })} />
+                  <LocationPicker defaultCenter={props.storeCenter ?? undefined} onChange={(lat, lng) => setGeo({ lat, lng })} />
                   {!geo && <p className="mt-1 text-xs text-guava">Please pin your location to place a delivery order.</p>}
                   {distanceMode && geo && distance && (
                     distance.outOfRange ? (
