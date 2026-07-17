@@ -928,10 +928,14 @@ export function WebOrder(props: WebOrderProps) {
         </div>
       )}
       {cartOpen && (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/40 lg:hidden" onClick={() => setCartOpen(false)}>
-          <div className="max-h-[88vh] w-full overflow-hidden rounded-t-2xl bg-white" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-end p-2"><button onClick={() => setCartOpen(false)} className="px-3 text-2xl leading-none text-plum-ink/40">×</button></div>
-            <div className="h-[70vh]">{cartPanel}</div>
+        <div className="fixed inset-0 z-50 bg-white lg:hidden">
+          {/* Full-screen on phones: a fixed close bar, then the cart panel fills
+              the rest (its own body scrolls, the Place-order footer stays put). */}
+          <div className="flex h-full w-full flex-col">
+            <div className="flex shrink-0 justify-end px-2 pt-1">
+              <button onClick={() => setCartOpen(false)} className="px-2 text-2xl leading-none text-plum-ink/40" aria-label="Close">×</button>
+            </div>
+            <div className="min-h-0 flex-1">{cartPanel}</div>
           </div>
         </div>
       )}
