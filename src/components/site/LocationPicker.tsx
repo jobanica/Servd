@@ -25,8 +25,6 @@ export function LocationPicker({
   const markerRef = useRef<LType.Marker | null>(null);
   const LRef = useRef<typeof LType | null>(null);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(initial ?? null);
-  const [locating, setLocating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,65 +77,9 @@ export function LocationPicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function locate(highAccuracy: boolean, isRetry: boolean) {
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLocating(false);
-        setError(null);
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        setCoords({ lat, lng });
-        onChange(lat, lng);
-        mapRef.current?.setView([lat, lng], 16);
-        markerRef.current?.setLatLng([lat, lng]);
-      },
-      (err) => {
-        // Permission denied is terminal — no retry will help.
-        if (err.code === err.PERMISSION_DENIED) {
-          setLocating(false);
-          setError(
-            "Location is blocked. Allow location for this site in your browser settings, or just drag the 📍 to your spot.",
-          );
-          return;
-        }
-        // First failure (timeout / position unavailable) on high accuracy:
-        // retry once with low accuracy, which is faster and works indoors.
-        if (!isRetry) {
-          locate(false, true);
-          return;
-        }
-        setLocating(false);
-        setError("Couldn't get your location. Tap the map or drag the 📍 to your spot instead.");
-      },
-      {
-        enableHighAccuracy: highAccuracy,
-        timeout: highAccuracy ? 12000 : 15000,
-        maximumAge: 60000,
-      },
-    );
-  }
-
-  function useMyLocation() {
-    if (!navigator.geolocation) {
-      setError("This browser can't share your location. Drag the 📍 to your spot instead.");
-      return;
-    }
-    setError(null);
-    setLocating(true);
-    locate(true, false);
-  }
-
   return (
     <div>
-      <button
-        type="button"
-        onClick={useMyLocation}
-        className="mb-2 w-full rounded-lg border border-plum-ink/15 py-2 text-sm font-semibold"
-      >
-        {locating ? "Locating…" : "📍 Use my current location"}
-      </button>
       <div ref={mapEl} className="h-44 w-full overflow-hidden rounded-lg border border-plum-ink/10" />
-      {error && <p className="mt-1 text-xs text-guava">{error}</p>}
       <p className="mt-1 text-xs text-plum-ink/50">
         {coords ? `Pinned: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}` : "Tap the map or drag the 📍 to your exact location."}
       </p>
