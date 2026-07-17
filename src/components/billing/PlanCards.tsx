@@ -22,6 +22,7 @@ export function PlanCards({
   planIdByName,
   priceByTier,
   onTrial = false,
+  inviteOnly = false,
 }: {
   mode: "signup" | "switch";
   currentPlanName?: string | null;
@@ -31,6 +32,8 @@ export function PlanCards({
   // Whether the account is on its active free trial (switch mode) — drives the
   // CTA copy (during the trial paid plans are included; after, they need paying).
   onTrial?: boolean;
+  // Invite-only: hide public self-signup CTAs (accounts are created by the owner).
+  inviteOnly?: boolean;
 }) {
   return (
     <div className="grid items-start gap-5 lg:grid-cols-3">
@@ -87,14 +90,25 @@ export function PlanCards({
             </ul>
 
             {mode === "signup" ? (
-              <Link
-                href="/signup"
-                className={`mt-6 block rounded-full py-3 text-center font-semibold ${
-                  featured ? "btn-brand text-white" : "border border-plum-ink/15"
-                }`}
-              >
-                {price <= 0 ? "Start free trial" : "Start 30-day free trial"}
-              </Link>
+              inviteOnly ? (
+                <Link
+                  href="/login"
+                  className={`mt-6 block rounded-full py-3 text-center font-semibold ${
+                    featured ? "btn-brand text-white" : "border border-plum-ink/15"
+                  }`}
+                >
+                  Log in
+                </Link>
+              ) : (
+                <Link
+                  href="/signup"
+                  className={`mt-6 block rounded-full py-3 text-center font-semibold ${
+                    featured ? "btn-brand text-white" : "border border-plum-ink/15"
+                  }`}
+                >
+                  {price <= 0 ? "Start free trial" : "Start 30-day free trial"}
+                </Link>
+              )
             ) : isCurrent ? (
               <p className="mt-6 rounded-full border border-brand-primary/30 bg-brand-primary/5 py-3 text-center text-sm font-semibold text-brand-primary">
                 Your current plan

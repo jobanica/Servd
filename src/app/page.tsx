@@ -52,11 +52,8 @@ function Nav() {
           ))}
         </nav>
         <div className="flex items-center gap-2">
-          <Link href="/login" className="rounded-full px-4 py-2 text-sm font-semibold text-plum-ink/80 hover:text-plum-ink">
-            Staff login
-          </Link>
-          <Link href="/signup" className="rounded-full px-5 py-2 text-sm font-semibold btn-brand shadow-sm">
-            Start free
+          <Link href="/login" className="rounded-full px-5 py-2 text-sm font-semibold btn-brand shadow-sm">
+            Log in
           </Link>
         </div>
       </div>
@@ -179,12 +176,12 @@ export default async function Home() {
               ))}
             </ul>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/signup" className="rounded-full px-7 py-3.5 font-semibold btn-brand shadow-lg">
-                Start free — 30 days
-              </Link>
-              <a href="#how" className="rounded-full border border-plum-ink/15 bg-white px-7 py-3.5 font-semibold">
+              <a href="#how" className="rounded-full px-7 py-3.5 font-semibold btn-brand shadow-lg text-white">
                 See how it works
               </a>
+              <Link href="/login" className="rounded-full border border-plum-ink/15 bg-white px-7 py-3.5 font-semibold">
+                Log in
+              </Link>
             </div>
             <div className="mt-5 flex flex-wrap gap-2">
               {["No setup fees", "No contracts", "No risk"].map((x) => (
@@ -370,9 +367,9 @@ export default async function Home() {
               that person leaves, chaos begins. Servd turns how you operate into repeatable
               processes that stay, no matter who is on shift.
             </p>
-            <Link href="/signup" className="mt-7 inline-block rounded-full px-7 py-3.5 font-semibold btn-brand shadow-lg">
-              Start free — 30 days
-            </Link>
+            <a href="#how" className="mt-7 inline-block rounded-full px-7 py-3.5 font-semibold btn-brand shadow-lg text-white">
+              See how it works
+            </a>
           </div>
         </div>
       </section>
@@ -478,12 +475,12 @@ export default async function Home() {
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="font-heading text-4xl font-extrabold tracking-tight">Simple, honest pricing</h2>
           <p className="mt-3 text-plum-ink/70">
-            Every new account starts with a <strong>30-day free trial of everything</strong> — no
-            card. After that, stay on the Free plan forever, or upgrade to Growth or Business.
+            Stay on the Free plan, or upgrade to Growth or Business for online ordering, payments and
+            marketing. <strong>We handle the setup for you</strong> — message us to get onboarded.
           </p>
         </div>
         <div className="mt-12">
-          <PlanCards mode="signup" priceByTier={priceByTier} />
+          <PlanCards mode="signup" priceByTier={priceByTier} inviteOnly />
         </div>
 
         {/* Full feature comparison */}
@@ -546,10 +543,11 @@ export default async function Home() {
         <div className="rounded-tile bg-plum-ink px-8 py-14 text-center text-cream">
           <h2 className="font-heading text-4xl font-extrabold tracking-tight">Ready to serve smarter?</h2>
           <p className="mx-auto mt-3 max-w-md text-cream/70">
-            Launch your QR ordering in minutes. 30 days free — no card required.
+            We set up your restaurant for you — menu, QR codes, and staff, ready to go. Message us to
+            get started.
           </p>
-          <Link href="/signup" className="mt-7 inline-block rounded-full px-8 py-3.5 font-semibold btn-brand shadow-lg">
-            Start your restaurant
+          <Link href="/login" className="mt-7 inline-block rounded-full px-8 py-3.5 font-semibold btn-brand shadow-lg">
+            Log in
           </Link>
         </div>
       </section>
