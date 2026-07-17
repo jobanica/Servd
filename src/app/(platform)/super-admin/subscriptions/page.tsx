@@ -1,4 +1,5 @@
-import { listSubscriptions, listAllPlans, type SubStatus } from "@/server/billing/super-admin";
+import Link from "next/link";
+import { listSubscriptions, listAllPlans, type SubStatus, type SubscriptionRow } from "@/server/billing/super-admin";
 import {
   assignPlan,
   setSubscriptionStatus,
@@ -31,9 +32,47 @@ function fmtDate(iso: string | null) {
   return iso ? new Date(iso).toLocaleDateString() : "—";
 }
 
-export default async function SubscriptionsPage() {
-  const [subs, plans] = await Promise.all([listSubscriptions(), listAllPlans()]);
+/**
+ * Applies the drill-down filter from the overview KPI tiles. Each tile links
+ * here with a query param so the super-admin sees exactly which accounts sit
+ * behind a headline number.
+ */
+function filterSubs(
+  subs: SubscriptionRow[],
+  q: { status?: string; access?: string; filter?: string },
+): { rows: SubscriptionRow[]; label: string | null } {
+  if (q.filter === "trials-ending") {
+    const soon = Date.now() + 7 * 24 * 60 * 60 * 1000;
+    return {
+      rows: subs.filter(
+        (s) => s.status === "trialing" && s.trialEndsAt != null && new Date(s.trialEndsAt).getTime() <= soon,
+      ),
+      label: "Trials ending within 7 days",
+    };
+  }
+  if (q.access === "suspended") {
+    return { rows: subs.filter((s) => s.restaurantStatus === "suspended"), label: "Suspended access" };
+  }
+  if (q.access === "active") {
+    return { rows: subs.filter((s) => s.restaurantStatus === "active"), label: "Active access" };
+  }
+  if (q.status) {
+    const wanted = q.status.split(",").map((x) => x.trim()).filter(Boolean);
+    const pretty = wanted.map((x) => x.replace("_", " ")).join(" or ");
+    return { rows: subs.filter((s) => s.status != null && wanted.includes(s.status)), label: pretty };
+  }
+  return { rows: subs, label: null };
+}
+
+export default async function SubscriptionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string; access?: string; filter?: string }>;
+}) {
+  const sp = await searchParams;
+  const [allSubs, plans] = await Promise.all([listSubscriptions(), listAllPlans()]);
   const activePlans = plans.filter((p) => p.isActive);
+  const { rows: subs, label: filterLabel } = filterSubs(allSubs, sp);
 
   const field = "rounded border border-plum-ink/15 px-2 py-1 text-xs";
   const btn = "rounded border border-plum-ink/15 px-2 py-1 text-xs font-semibold hover:bg-cream";
@@ -42,13 +81,32 @@ export default async function SubscriptionsPage() {
     <div className="space-y-4">
       <div>
         <h1 className="font-heading text-2xl font-bold">Subscriptions</h1>
-        <p className="text-sm text-plum-ink/50">
-          {subs.length} restaurants. Change plans, force status, extend trials, comp months or
-          suspend access.
-        </p>
+        {filterLabel ? (
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
+            <span className="rounded-full bg-brand-primary/10 px-2.5 py-0.5 font-semibold capitalize text-brand-primary">
+              {filterLabel}
+            </span>
+            <span className="text-plum-ink/50">
+              {subs.length} of {allSubs.length} restaurants
+            </span>
+            <Link href="/super-admin/subscriptions" className="font-semibold text-brand-primary underline">
+              Show all
+            </Link>
+          </div>
+        ) : (
+          <p className="text-sm text-plum-ink/50">
+            {subs.length} restaurants. Change plans, force status, extend trials, comp months or
+            suspend access.
+          </p>
+        )}
       </div>
 
       <div className="space-y-3">
+        {subs.length === 0 && (
+          <p className="rounded-tile border border-dashed border-plum-ink/15 bg-white px-4 py-8 text-center text-sm text-plum-ink/50">
+            No restaurants in this group.
+          </p>
+        )}
         {subs.map((s) => (
           <details key={s.restaurantId} className="rounded-tile border border-plum-ink/10 bg-white">
             <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-3 px-4 py-3">
