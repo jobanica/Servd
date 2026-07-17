@@ -493,6 +493,20 @@ export default async function Home() {
           </h3>
           <PlanComparisonTable limitsByTier={pricing} />
         </div>
+
+        {/* Refund policy */}
+        <div id="refund" className="mx-auto mt-12 max-w-2xl scroll-mt-24 rounded-tile border border-plum-ink/10 bg-white p-6 text-center">
+          <h3 className="font-heading text-xl font-extrabold tracking-tight">30-day refund policy</h3>
+          <p className="mt-2 text-sm text-plum-ink/70">
+            Not happy with a paid upgrade? We offer a <strong>30-day money-back guarantee</strong> on
+            plan/system upgrade payments — just reach out within 30 days of the charge and we&apos;ll
+            refund it.
+          </p>
+          <p className="mt-2 text-sm text-plum-ink/60">
+            Please note: one-time <strong>setup fees</strong> (the agent setup / onboarding done for
+            your restaurant) are <strong>non-refundable</strong>, since that work is completed up front.
+          </p>
+        </div>
       </section>
 
       {/* TESTIMONIAL */}
@@ -514,6 +528,7 @@ export default async function Home() {
             ["Can I use my own branding?", "Yes — your logo, colors, tagline, and even your own domain. Diners only ever see your brand."],
             ["Is there a free trial?", "Yes — every new account starts with a 30-day free trial of every feature, no card required. When the trial ends you're moved to the Free plan automatically (QR dine-in ordering, kitchen display and cashier POS) — keep using it for free forever, or upgrade to Growth or Business for online ordering, payments, marketing and the back office."],
             ["Does it work on iPad for the cashier?", "Yes. Printing supports cloud/poll printers and AirPrint so it works on any device."],
+            ["What's your refund policy?", "We offer a 30-day money-back guarantee on plan/system upgrade payments — reach out within 30 days of the charge and we'll refund it. One-time setup fees (the agent setup / onboarding done for your restaurant) are non-refundable, since that work is completed up front."],
           ].map(([q, a]) => (
             <details key={q} className="group rounded-tile border border-plum-ink/10 bg-white p-5">
               <summary className="flex cursor-pointer list-none items-center justify-between font-semibold">
@@ -554,7 +569,7 @@ export default async function Home() {
           {[
             ["Product", [["Features", "#features"], ["Pricing", "#pricing"], ["Staff login", "/login"]]],
             ["Company", [["Become a partner", "/partner/apply"], ["Contact", "#"], ["Blog", "#"]]],
-            ["Legal", [["Privacy", "#"], ["Terms", "#"], ["SMS consent", "#"]]],
+            ["Legal", [["Refund policy", "#refund"], ["Privacy", "#"], ["Terms", "#"], ["SMS consent", "#"]]],
           ].map(([title, rows]) => (
             <div key={title as string}>
               <p className="font-heading font-bold">{title as string}</p>
