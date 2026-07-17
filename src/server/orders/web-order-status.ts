@@ -1,6 +1,33 @@
 "use server";
 
 import { systemDb } from "@/server/tenancy/scoped-db";
+import { notifyOrdersChanged } from "@/server/realtime/notify";
+
+export type CancelResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Lets the customer cancel their OWN online order — but only while it's still
+ * pending (not yet accepted by the restaurant). Authorized by slug + orderId
+ * (the unguessable UUID). Once accepted, the update matches no rows and we tell
+ * them it can't be cancelled anymore.
+ */
+export async function cancelWebOrder(slug: string, orderId: string): Promise<CancelResult> {
+  if (!slug || !orderId) return { ok: false, error: "Order not found." };
+  const restaurant = await systemDb((tx) => tx.restaurant.findFirst({ where: { slug }, select: { id: true } }));
+  if (!restaurant) return { ok: false, error: "Order not found." };
+
+  const res = await systemDb((tx) =>
+    tx.order.updateMany({
+      where: { id: orderId, restaurantId: restaurant.id, status: "pending" },
+      data: { status: "cancelled", cancelReason: "Cancelled by customer" },
+    }),
+  );
+  if (res.count === 0) {
+    return { ok: false, error: "This order was already accepted and can no longer be cancelled." };
+  }
+  await notifyOrdersChanged(restaurant.id);
+  return { ok: true };
+}
 
 /**
  * Public order-status lookup for an ONLINE (web storefront) order. The customer

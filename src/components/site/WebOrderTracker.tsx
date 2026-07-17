@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { getWebOrderStatus } from "@/server/orders/web-order-status";
+import { getWebOrderStatus, cancelWebOrder } from "@/server/orders/web-order-status";
 import { chime } from "@/lib/sound";
 import { formatPeso } from "@/lib/money";
 import { formatOrderNumber } from "@/lib/orders/order-number";
@@ -111,6 +111,8 @@ export function WebOrderTracker({
 }) {
   const delivery = orderType === "delivery";
   const [copied, setCopied] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
   // The permanent link to THIS order's status — safe to bookmark/share (the id
   // is an unguessable UUID). Built from the home path so it works on custom
   // domains too (homeHref is "/" there, "/r/<slug>" on the platform host).
@@ -203,6 +205,17 @@ export function WebOrderTracker({
   const reached = reachedIndex(status, deliveryStatus, delivery);
   const terminal = status === "cancelled" || status === "closed" || deliveryStatus === "delivered";
 
+  // The customer can cancel only while the order is still pending (not accepted).
+  async function doCancel() {
+    if (!window.confirm("Cancel this order? This can't be undone.")) return;
+    setCancelling(true);
+    setCancelError(null);
+    const res = await cancelWebOrder(slug, orderId);
+    setCancelling(false);
+    if (res.ok) setStatus("cancelled");
+    else { setCancelError(res.error); refresh(); } // it was likely just accepted
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-100 px-5 py-16">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow">
@@ -280,6 +293,22 @@ export function WebOrderTracker({
           <p className="mt-3 text-xs text-plum-ink/45">
             This page updates automatically.{phone ? ` ${restaurantName} may also call ${phone} to confirm.` : ""}
           </p>
+        )}
+
+        {/* Cancel — only while the order is still pending (not yet accepted). */}
+        {status === "pending" && (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={doCancel}
+              disabled={cancelling}
+              className="rounded-full border border-guava/50 px-5 py-2.5 text-sm font-semibold text-guava disabled:opacity-50"
+            >
+              {cancelling ? "Cancelling…" : "Cancel order"}
+            </button>
+            <p className="mt-1 text-[11px] text-plum-ink/40">You can cancel until the restaurant accepts it.</p>
+            {cancelError && <p className="mt-1 text-xs text-guava">{cancelError}</p>}
+          </div>
         )}
 
         <Link
