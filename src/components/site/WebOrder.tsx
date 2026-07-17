@@ -739,6 +739,25 @@ export function WebOrder(props: WebOrderProps) {
         </a>
       )}
 
+      {/* Mobile category quick-nav — horizontally scrollable chips that jump to a
+          section. Hidden while searching (sections are filtered) and on desktop
+          (the sidebar handles it). */}
+      {!q && nonEmpty.length > 1 && (
+        <div className="sticky top-16 z-20 border-b border-plum-ink/10 bg-white/95 backdrop-blur lg:hidden">
+          <div className="flex gap-2 overflow-x-auto px-3 py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {nonEmpty.map((c) => (
+              <a
+                key={c.id}
+                href={`#cat-${c.id}`}
+                className="shrink-0 rounded-full border border-plum-ink/15 bg-white px-3.5 py-1.5 text-xs font-semibold text-plum-ink/75 hover:border-brand-primary hover:text-brand-primary"
+              >
+                {c.name}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="mx-auto grid max-w-7xl gap-4 p-4 lg:grid-cols-[230px_1fr_330px]">
         {/* Left sidebar — sticky so the categories stay visible while you scroll
             the menu (and after jumping to a category). */}
@@ -789,7 +808,7 @@ export function WebOrder(props: WebOrderProps) {
 
           {shownCats.length === 0 && <p className="rounded-xl bg-white p-6 text-center text-sm text-plum-ink/50">No items match your search.</p>}
           {shownCats.map((cat) => (
-            <section key={cat.id} id={`cat-${cat.id}`} className="mb-6 scroll-mt-20">
+            <section key={cat.id} id={`cat-${cat.id}`} className="mb-6 scroll-mt-28">
               <h2 className="mb-3 font-heading text-lg font-bold text-plum-ink">{cat.name}</h2>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {cat.items.map((item) => (
