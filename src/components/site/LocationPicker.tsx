@@ -12,6 +12,7 @@ export function LocationPicker({
   onChange,
   initial,
   defaultCenter,
+  enableSearch = false,
 }: {
   onChange: (lat: number, lng: number) => void;
   // Pre-selects a pin (admin store-location picker).
@@ -19,12 +20,51 @@ export function LocationPicker({
   // Centers the map here without committing a pin (e.g. the store location, so
   // diners near the store don't start on a far-away default view).
   defaultCenter?: { lat: number; lng: number } | null;
+  // Shows an address search box that recenters the map (admin store picker).
+  enableSearch?: boolean;
 }) {
   const mapEl = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LType.Map | null>(null);
   const markerRef = useRef<LType.Marker | null>(null);
   const LRef = useRef<typeof LType | null>(null);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(initial ?? null);
+  const [query, setQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+
+  // Geocode the typed address (free OpenStreetMap Nominatim, no API key) and
+  // recenter the map + marker on the first match, committing it as the pin.
+  async function runSearch() {
+    const q = query.trim();
+    if (!q || searching) return;
+    setSearching(true);
+    setSearchError(null);
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`,
+        { headers: { "Accept-Language": "en" } },
+      );
+      const data = (await res.json()) as { lat: string; lon: string }[];
+      if (!Array.isArray(data) || data.length === 0) {
+        setSearchError("No match found. Try a more specific address.");
+        return;
+      }
+      const lat = parseFloat(data[0].lat);
+      const lng = parseFloat(data[0].lon);
+      if (Number.isNaN(lat) || Number.isNaN(lng)) {
+        setSearchError("No match found. Try a more specific address.");
+        return;
+      }
+      mapRef.current?.setView([lat, lng], 16);
+      markerRef.current?.setLatLng([lat, lng]);
+      setCoords({ lat, lng });
+      onChange(lat, lng);
+    } catch {
+      setSearchError("Couldn't search right now. Please try again.");
+    } finally {
+      setSearching(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -79,6 +119,34 @@ export function LocationPicker({
 
   return (
     <div>
+      {enableSearch && (
+        <div className="mb-2">
+          <div className="flex gap-2">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                // Enter searches without submitting the surrounding form.
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  runSearch();
+                }
+              }}
+              placeholder="Search an address or place…"
+              className="min-w-0 flex-1 rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+            />
+            <button
+              type="button"
+              onClick={runSearch}
+              disabled={searching || !query.trim()}
+              className="shrink-0 rounded-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              {searching ? "…" : "Search"}
+            </button>
+          </div>
+          {searchError && <p className="mt-1 text-xs text-guava">{searchError}</p>}
+        </div>
+      )}
       <div ref={mapEl} className="h-44 w-full overflow-hidden rounded-lg border border-plum-ink/10" />
       <p className="mt-1 text-xs text-plum-ink/50">
         {coords ? `Pinned: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}` : "Tap the map or drag the 📍 to your exact location."}

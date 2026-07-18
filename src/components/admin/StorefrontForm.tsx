@@ -204,9 +204,9 @@ export function StorefrontForm({
             road factor. e.g. base ₱30, ₱10/km, 1 km free → 4 km away ≈ ₱30 + 3×₱10 = ₱60.
           </p>
           <div>
-            <p className="mb-1 text-sm font-semibold text-plum-ink/60">Your store location (drop the pin on your store)</p>
+            <p className="mb-1 text-sm font-semibold text-plum-ink/60">Your store location (search your address or drop the pin on your store)</p>
             {deliveryMode === "distance" && (
-              <LocationPicker initial={origin} onChange={(lat, lng) => setOrigin({ lat, lng })} />
+              <LocationPicker enableSearch initial={origin} onChange={(lat, lng) => setOrigin({ lat, lng })} />
             )}
             {!origin && <p className="mt-1 text-xs text-guava">Pin your store so we can measure distance to each customer.</p>}
           </div>
