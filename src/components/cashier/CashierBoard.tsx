@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { signOut } from "@/app/(platform)/login/actions";
@@ -38,6 +38,30 @@ import { BluetoothPrinterButton } from "./BluetoothPrinterButton";
 import { printPaidTicket, printKitchenTicket } from "@/server/printing/print";
 import { runPrintDispatch } from "@/lib/print/run-dispatch";
 
+/** One row inside an order card's "⋯ more" overflow menu. */
+function OverflowItem({
+  onClick,
+  danger,
+  accent,
+  children,
+}: {
+  onClick: () => void;
+  danger?: boolean;
+  accent?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`block w-full rounded-md px-3 py-2 text-left text-xs font-semibold hover:bg-cream ${
+        danger ? "text-guava" : accent ? "text-brand-primary" : "text-plum-ink"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
 export function CashierBoard({
   restaurantId,
   initialTables,
@@ -66,6 +90,7 @@ export function CashierBoard({
   const [voidOrderTarget, setVoidOrderTarget] = useState<{ id: string; label: string } | null>(null);
   const [editOrderTarget, setEditOrderTarget] = useState<{ id: string; label: string } | null>(null);
   const [addItemsTarget, setAddItemsTarget] = useState<{ id: string; label: string } | null>(null);
+  const [menuOrderId, setMenuOrderId] = useState<string | null>(null); // which order's "⋯ more" menu is open
   const [giftCardTarget, setGiftCardTarget] = useState<{ id: string; label: string } | null>(null);
   const [splitTarget, setSplitTarget] = useState<{ id: string; label: string; remaining: number } | null>(null);
   const [discountOrder, setDiscountOrder] = useState<CashierTable["orders"][number] | null>(null);
@@ -515,33 +540,13 @@ export function CashierBoard({
                     )}
                   </div>
 
+                  {/* Actions — keep the two most-used inline (Print bill, Paid
+                      cash); everything else lives in the "⋯ more" menu but stays
+                      one tap away. */}
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <PrintTicketButton orderId={o.id} paid={o.paymentStatus === "paid"} />
-                    {o.status === "done" && !o.served && (
-                      <button
-                        onClick={() => serve(o.id)}
-                        disabled={busy === o.id}
-                        className="rounded-lg bg-mango px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
-                      >
-                        Mark served
-                      </button>
-                    )}
                     {o.paymentStatus !== "paid" && (
                       <>
-                        <button
-                          onClick={() => setDiscountOrder(o)}
-                          disabled={busy === o.id}
-                          className="rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
-                        >
-                          {o.discountAmount > 0 ? "Edit discount" : "Discount"}
-                        </button>
-                        <button
-                          onClick={() => setLoyaltyOrderId(o.id)}
-                          disabled={busy === o.id}
-                          className="rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
-                        >
-                          ⭐ Points
-                        </button>
                         <button
                           onClick={() => pay(o.id, "cash")}
                           disabled={busy === o.id}
@@ -549,62 +554,78 @@ export function CashierBoard({
                         >
                           Paid (cash)
                         </button>
-                        <button
-                          onClick={() => pay(o.id, "card_terminal")}
-                          disabled={busy === o.id}
-                          className="rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
-                        >
-                          Paid (card)
-                        </button>
-                        <button
-                          onClick={() => setSplitTarget({ id: o.id, label: t.label, remaining: Math.max(0, o.net - o.paid) })}
-                          disabled={busy === o.id}
-                          className="rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
-                        >
-                          Split
-                        </button>
-                        <button
-                          onClick={() => setAddItemsTarget({ id: o.id, label: t.label })}
-                          disabled={busy === o.id}
-                          className="rounded-lg border border-brand-primary/40 px-3 py-1.5 text-xs font-semibold text-brand-primary disabled:opacity-60"
-                        >
-                          + Add items
-                        </button>
-                        <button
-                          onClick={() => setEditOrderTarget({ id: o.id, label: t.label })}
-                          disabled={busy === o.id}
-                          className="rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
-                        >
-                          Edit
-                        </button>
-                        {o.creditApplied === 0 && (
+                        <div className="relative">
                           <button
-                            onClick={() => setGiftCardTarget({ id: o.id, label: t.label })}
+                            onClick={() => setMenuOrderId(menuOrderId === o.id ? null : o.id)}
                             disabled={busy === o.id}
-                            className="rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
+                            aria-label="More actions"
+                            className="rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold leading-none disabled:opacity-60"
                           >
-                            🎁 Gift card
+                            ⋯ More
                           </button>
-                        )}
-                        <button
-                          onClick={() => setVoidOrderTarget({ id: o.id, label: t.label })}
-                          disabled={busy === o.id}
-                          className="rounded-lg border border-guava/40 px-3 py-1.5 text-xs font-semibold text-guava disabled:opacity-60"
-                        >
-                          Void
-                        </button>
+                          {menuOrderId === o.id && (
+                            <>
+                              {/* Click-away layer closes the menu. */}
+                              <div className="fixed inset-0 z-10" onClick={() => setMenuOrderId(null)} />
+                              <div className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-plum-ink/10 bg-white p-1 shadow-lg">
+                                {o.status === "done" && !o.served && (
+                                  <OverflowItem onClick={() => { setMenuOrderId(null); serve(o.id); }}>
+                                    🍽️ Mark served
+                                  </OverflowItem>
+                                )}
+                                <OverflowItem accent onClick={() => { setMenuOrderId(null); setAddItemsTarget({ id: o.id, label: t.label }); }}>
+                                  + Add items
+                                </OverflowItem>
+                                <OverflowItem onClick={() => { setMenuOrderId(null); pay(o.id, "card_terminal"); }}>
+                                  Paid (card)
+                                </OverflowItem>
+                                <OverflowItem onClick={() => { setMenuOrderId(null); setSplitTarget({ id: o.id, label: t.label, remaining: Math.max(0, o.net - o.paid) }); }}>
+                                  Split payment
+                                </OverflowItem>
+                                <OverflowItem onClick={() => { setMenuOrderId(null); setDiscountOrder(o); }}>
+                                  {o.discountAmount > 0 ? "Edit discount" : "Discount"}
+                                </OverflowItem>
+                                <OverflowItem onClick={() => { setMenuOrderId(null); setLoyaltyOrderId(o.id); }}>
+                                  ⭐ Points
+                                </OverflowItem>
+                                <OverflowItem onClick={() => { setMenuOrderId(null); setEditOrderTarget({ id: o.id, label: t.label }); }}>
+                                  Edit items
+                                </OverflowItem>
+                                {o.creditApplied === 0 && (
+                                  <OverflowItem onClick={() => { setMenuOrderId(null); setGiftCardTarget({ id: o.id, label: t.label }); }}>
+                                    🎁 Gift card
+                                  </OverflowItem>
+                                )}
+                                <OverflowItem danger onClick={() => { setMenuOrderId(null); setVoidOrderTarget({ id: o.id, label: t.label }); }}>
+                                  Void
+                                </OverflowItem>
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </>
                     )}
                     {/* Only paid orders can be closed/dismissed — an unpaid open
                         order stays on the board until the customer pays. */}
                     {o.paymentStatus === "paid" && (
-                      <button
-                        onClick={() => close(o.id)}
-                        disabled={busy === o.id}
-                        className="rounded-lg px-3 py-1.5 text-xs font-semibold btn-brand disabled:opacity-60"
-                      >
-                        Done
-                      </button>
+                      <>
+                        {o.status === "done" && !o.served && (
+                          <button
+                            onClick={() => serve(o.id)}
+                            disabled={busy === o.id}
+                            className="rounded-lg bg-mango px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                          >
+                            Mark served
+                          </button>
+                        )}
+                        <button
+                          onClick={() => close(o.id)}
+                          disabled={busy === o.id}
+                          className="rounded-lg px-3 py-1.5 text-xs font-semibold btn-brand disabled:opacity-60"
+                        >
+                          Done
+                        </button>
+                      </>
                     )}
                   </div>
                 </li>
