@@ -187,7 +187,22 @@ export async function buildValidatedOrder(
     });
   }
 
-  return { total, items };
+  // Merge truly-identical lines — same item, size, note AND modifiers — into one
+  // row with a summed quantity, so the order shows "4× Ube De Leche" instead of
+  // four separate "1×" rows on the merchant board, kitchen ticket and receipt.
+  const merged = new Map<string, BuiltOrderItem>();
+  for (const it of items) {
+    const modSig = it.modifiers
+      .map((m) => `${m.modifierId}:${m.priceDeltaAtTime}`)
+      .sort()
+      .join(",");
+    const key = `${it.menuItemId}|${it.variantId ?? ""}|${it.note ?? ""}|${modSig}`;
+    const existing = merged.get(key);
+    if (existing) existing.quantity += it.quantity;
+    else merged.set(key, { ...it, modifiers: [...it.modifiers] });
+  }
+
+  return { total, items: [...merged.values()] };
 }
 
 /** Prisma-shaped nested create for an order's items. */
