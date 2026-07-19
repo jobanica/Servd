@@ -94,6 +94,9 @@ export default async function StorefrontPage() {
             gcashName: sf.payment.gcashName,
             gcashNumber: sf.payment.gcashNumber,
             gcashQrUrl: sf.payment.gcashQrUrl,
+            packagingFeeEnabled: sf.payment.packagingFeeEnabled,
+            packagingFeePesos: sf.payment.packagingFee / 100,
+            packagingFeeScope: sf.payment.packagingFeeScope,
           },
           delivery: {
             mode: sf.delivery.mode,

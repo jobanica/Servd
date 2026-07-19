@@ -34,6 +34,9 @@ export function StorefrontForm({
       gcashName: string;
       gcashNumber: string;
       gcashQrUrl: string;
+      packagingFeeEnabled: boolean;
+      packagingFeePesos: number;
+      packagingFeeScope: "delivery" | "all";
     };
     delivery: {
       mode: "zones" | "distance";
@@ -55,6 +58,7 @@ export function StorefrontForm({
   const [dpType, setDpType] = useState<"percent" | "fixed">(initial.booking.downpaymentType);
   const [gcashOn, setGcashOn] = useState(initial.payment.gcashEnabled);
   const [codFeeOn, setCodFeeOn] = useState(initial.payment.codFeeEnabled);
+  const [packagingOn, setPackagingOn] = useState(initial.payment.packagingFeeEnabled);
   const [deliveryMode, setDeliveryMode] = useState<"zones" | "distance">(initial.delivery.mode);
   const [origin, setOrigin] = useState<{ lat: number; lng: number } | null>(
     initial.delivery.originLat != null && initial.delivery.originLng != null
@@ -251,6 +255,50 @@ export function StorefrontForm({
             </div>
           ) : (
             <input type="hidden" name="codFeePesos" value={initial.payment.codFeePesos} />
+          )}
+        </div>
+
+        {/* Packaging fee — a flat charge for food packaging (tubs/containers). */}
+        <div className="mt-3 rounded-lg border border-plum-ink/10 bg-cream/40 p-3">
+          <label className="flex items-center gap-2 text-sm font-semibold">
+            <input type="checkbox" name="packagingFeeEnabled" checked={packagingOn} onChange={(e) => setPackagingOn(e.target.checked)} />
+            Charge a food-packaging fee
+          </label>
+          <p className="mt-1 text-xs text-plum-ink/50">
+            A flat fee for tubs/containers on to-go orders, added to the order total.
+          </p>
+          {packagingOn ? (
+            <div className="mt-2 space-y-2">
+              <div className="flex items-center gap-1">
+                <span className="text-sm text-plum-ink/50">₱</span>
+                <input
+                  name="packagingFeePesos"
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  defaultValue={initial.payment.packagingFeePesos}
+                  placeholder="0.00"
+                  className="w-32 rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+                />
+                <span className="text-sm text-plum-ink/50">packaging fee</span>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-plum-ink/60">Apply to</label>
+                <select
+                  name="packagingFeeScope"
+                  defaultValue={initial.payment.packagingFeeScope}
+                  className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm sm:w-56"
+                >
+                  <option value="delivery">Delivery only</option>
+                  <option value="all">Pickup &amp; delivery</option>
+                </select>
+              </div>
+            </div>
+          ) : (
+            <>
+              <input type="hidden" name="packagingFeePesos" value={initial.payment.packagingFeePesos} />
+              <input type="hidden" name="packagingFeeScope" value={initial.payment.packagingFeeScope} />
+            </>
           )}
         </div>
 

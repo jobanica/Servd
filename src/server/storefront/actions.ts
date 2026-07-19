@@ -61,6 +61,9 @@ export async function updateStorefront(
     gcashName: String(formData.get("gcashName") ?? "").trim().slice(0, 120),
     gcashNumber: String(formData.get("gcashNumber") ?? "").trim().slice(0, 40),
     gcashQrUrl: gcashQrUrl.slice(0, 500),
+    packagingFeeEnabled: formData.get("packagingFeeEnabled") === "on",
+    packagingFee: pesosToCentavos(Math.max(0, Number(formData.get("packagingFeePesos")) || 0)),
+    packagingFeeScope: formData.get("packagingFeeScope") === "all" ? "all" : "delivery",
   };
   // Delivery pricing: zones (fixed per area) or distance (base + per-km). Peso
   // inputs → centavos; the store origin comes from a pinned lat/lng.

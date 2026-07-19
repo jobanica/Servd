@@ -11,7 +11,7 @@ import { recordServingsSold } from "@/server/menu/servings";
 import { recordVariantsSold } from "@/server/menu/variants";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
 import { sendOrderPush } from "@/server/push/send";
-import { getPublicStorefront, isOpenNow, computeDownpayment } from "@/server/storefront/storefront";
+import { getPublicStorefront, isOpenNow, computeDownpayment, computePackagingFee } from "@/server/storefront/storefront";
 import { haversineKm, computeDistanceFee } from "@/lib/geo/distance";
 import { resolvePromo } from "@/server/promotions/redeem";
 import { getLoyaltyConfig, enrollAccount } from "@/server/loyalty/loyalty";
@@ -144,6 +144,10 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
       : 0;
   if (codFee > 0 && addressLine) addressLine = `[COD +${formatPeso(codFee)}] ${addressLine}`;
 
+  // Packaging fee — flat charge for food packaging (tubs/containers) on to-go
+  // online orders. Applies to delivery only, or pickup + delivery, per config.
+  const packagingFee = computePackagingFee(storefront.payment, d.orderType);
+
   // Coupon — re-resolved server-side against the real prices (never trust the
   // client for money). free_delivery waives the delivery fee; percent/amount cut
   // the subtotal. Best-effort so a bad/expired code just yields no discount.
@@ -167,7 +171,7 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
     customerAddress: addressLine,
     status: "pending" as const,
     paymentStatus: "unpaid" as const,
-    total: built.total + deliveryFee + codFee,
+    total: built.total + deliveryFee + codFee + packagingFee,
     discountAmount,
     discountLabel,
     items: { create: orderItemsCreate(built.items) },

@@ -25,6 +25,9 @@ export interface PaymentConfig {
   gcashName: string; // account name shown to the customer
   gcashNumber: string; // GCash mobile number
   gcashQrUrl: string; // uploaded QR image URL
+  packagingFeeEnabled: boolean; // charge a food-packaging fee (tubs/containers)
+  packagingFee: number; // centavos added per online order
+  packagingFeeScope: "delivery" | "all"; // delivery only, or pickup & delivery
 }
 export interface DeliveryConfig {
   mode: "zones" | "distance"; // how the delivery fee is worked out
@@ -80,7 +83,7 @@ function normalizeDeliveryConfig(raw: unknown): DeliveryConfig {
 }
 
 export function defaultPaymentConfig(): PaymentConfig {
-  return { codEnabled: true, codFeeEnabled: false, codFee: 0, gcashEnabled: false, gcashName: "", gcashNumber: "", gcashQrUrl: "" };
+  return { codEnabled: true, codFeeEnabled: false, codFee: 0, gcashEnabled: false, gcashName: "", gcashNumber: "", gcashQrUrl: "", packagingFeeEnabled: false, packagingFee: 0, packagingFeeScope: "delivery" };
 }
 
 function normalizePaymentConfig(raw: unknown): PaymentConfig {
@@ -96,9 +99,19 @@ function normalizePaymentConfig(raw: unknown): PaymentConfig {
       gcashName: typeof r.gcashName === "string" ? r.gcashName.slice(0, 120) : "",
       gcashNumber: typeof r.gcashNumber === "string" ? r.gcashNumber.slice(0, 40) : "",
       gcashQrUrl: typeof r.gcashQrUrl === "string" ? r.gcashQrUrl.slice(0, 500) : "",
+      packagingFeeEnabled: !!r.packagingFeeEnabled,
+      packagingFee: Math.max(0, Math.round(Number(r.packagingFee) || 0)),
+      packagingFeeScope: r.packagingFeeScope === "all" ? "all" : "delivery",
     };
   }
   return d;
+}
+
+/** The packaging fee that applies to an online order of the given type (centavos). */
+export function computePackagingFee(cfg: PaymentConfig, orderType: "takeout" | "delivery"): number {
+  if (!cfg.packagingFeeEnabled || cfg.packagingFee <= 0) return 0;
+  if (cfg.packagingFeeScope === "delivery" && orderType !== "delivery") return 0;
+  return cfg.packagingFee;
 }
 
 export function defaultBookingConfig(): BookingConfig {
