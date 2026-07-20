@@ -7,7 +7,7 @@ import type { CartLine, DinerCategory, DinerItem } from "@/lib/cart/types";
 import { getPosMenu, addItemsToOrder, type CashierTable } from "@/server/orders/cashier";
 import { printKitchenTicket } from "@/server/printing/print";
 import { runPrintDispatch } from "@/lib/print/run-dispatch";
-import { ItemConfig, lineId } from "./NewOrderModal";
+import { ItemConfig, lineId, addCartLine, changeLineQty } from "./NewOrderModal";
 import { PosItemTile } from "./PosItemTile";
 
 /**
@@ -45,10 +45,9 @@ export function AddItemsModal({
   function pickItem(item: DinerItem) {
     if (!item.isAvailable) return;
     if (item.groups.length === 0 && !(item.variants && item.variants.length > 0)) {
-      setLines((prev) => [
-        ...prev,
-        { lineId: lineId(), itemId: item.id, name: item.name, basePrice: item.price, unitPrice: item.price, quantity: 1, modifiers: [] },
-      ]);
+      setLines((prev) =>
+        addCartLine(prev, { lineId: lineId(), itemId: item.id, name: item.name, basePrice: item.price, unitPrice: item.price, quantity: 1, modifiers: [] }),
+      );
     } else {
       setConfigItem(item);
     }
@@ -117,7 +116,7 @@ export function AddItemsModal({
                           <ItemConfig
                             item={item}
                             onAdd={(line) => {
-                              setLines((prev) => [...prev, line]);
+                              setLines((prev) => addCartLine(prev, line));
                               setConfigItem(null);
                             }}
                             onCancel={() => setConfigItem(null)}
@@ -145,23 +144,38 @@ export function AddItemsModal({
                     {lines.map((l) => (
                       <li key={l.lineId} className="flex items-start justify-between gap-2 text-sm">
                         <div className="min-w-0">
-                          <span className="font-medium">
-                            {l.quantity}× {l.name}
-                          </span>
+                          <span className="font-medium">{l.name}</span>
                           {l.modifiers.length > 0 && (
                             <p className="text-xs text-plum-ink/50">{l.modifiers.map((m) => m.name).join(", ")}</p>
                           )}
                           {l.note && <p className="text-xs italic text-plum-ink/50">“{l.note}”</p>}
+                          <div className="mt-1 flex items-center gap-2">
+                            <div className="flex items-center rounded-full border border-plum-ink/15">
+                              <button
+                                onClick={() => setLines((prev) => changeLineQty(prev, l.lineId, -1))}
+                                className="px-2 py-0.5 text-plum-ink/70"
+                                aria-label="Decrease quantity"
+                              >
+                                −
+                              </button>
+                              <span className="w-6 text-center text-xs font-semibold">{l.quantity}</span>
+                              <button
+                                onClick={() => setLines((prev) => changeLineQty(prev, l.lineId, 1))}
+                                className="px-2 py-0.5 text-plum-ink/70"
+                                aria-label="Increase quantity"
+                              >
+                                +
+                              </button>
+                            </div>
+                            <button
+                              onClick={() => setLines((prev) => prev.filter((x) => x.lineId !== l.lineId))}
+                              className="text-xs text-muted hover:text-guava"
+                            >
+                              remove
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 whitespace-nowrap">
-                          <span className="font-semibold">{formatPeso(l.unitPrice * l.quantity)}</span>
-                          <button
-                            onClick={() => setLines((prev) => prev.filter((x) => x.lineId !== l.lineId))}
-                            className="text-xs text-muted hover:text-guava"
-                          >
-                            remove
-                          </button>
-                        </div>
+                        <span className="whitespace-nowrap font-semibold">{formatPeso(l.unitPrice * l.quantity)}</span>
                       </li>
                     ))}
                   </ul>

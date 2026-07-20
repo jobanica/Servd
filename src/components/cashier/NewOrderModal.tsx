@@ -23,6 +23,37 @@ export function lineId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/** Signature that makes two cart lines "the same" (item + size + note + mods). */
+function lineSig(l: CartLine): string {
+  return `${l.itemId}|${l.variantId ?? ""}|${(l.note ?? "").trim()}|${l.modifiers
+    .map((m) => m.modifierId)
+    .sort()
+    .join(",")}`;
+}
+
+/**
+ * Add a line to the cart, merging into an identical existing line (same item,
+ * size, note and modifiers) by bumping its quantity — so tapping an item four
+ * times shows one "4×" row instead of four separate rows.
+ */
+export function addCartLine(prev: CartLine[], line: CartLine): CartLine[] {
+  const key = lineSig(line);
+  const idx = prev.findIndex((l) => lineSig(l) === key);
+  if (idx === -1) return [...prev, line];
+  const next = [...prev];
+  next[idx] = { ...next[idx], quantity: next[idx].quantity + line.quantity };
+  return next;
+}
+
+/** Change a cart line's quantity by delta; removes it when it drops to zero. */
+export function changeLineQty(prev: CartLine[], id: string, delta: number): CartLine[] {
+  return prev.flatMap((l) => {
+    if (l.lineId !== id) return [l];
+    const q = l.quantity + delta;
+    return q <= 0 ? [] : [{ ...l, quantity: q }];
+  });
+}
+
 /** Inline modifier/quantity picker for one menu item (no i18n dependency). */
 export function ItemConfig({
   item,
@@ -224,9 +255,8 @@ export function NewOrderModal({
     if (!item.isAvailable) return;
     // No modifiers AND no sizes → add straight away; otherwise open the panel.
     if (item.groups.length === 0 && !(item.variants && item.variants.length > 0)) {
-      setLines((prev) => [
-        ...prev,
-        {
+      setLines((prev) =>
+        addCartLine(prev, {
           lineId: lineId(),
           itemId: item.id,
           name: item.name,
@@ -234,8 +264,8 @@ export function NewOrderModal({
           unitPrice: item.price,
           quantity: 1,
           modifiers: [],
-        },
-      ]);
+        }),
+      );
     } else {
       setConfigItem(item);
     }
@@ -309,7 +339,7 @@ export function NewOrderModal({
                           <ItemConfig
                             item={item}
                             onAdd={(line) => {
-                              setLines((prev) => [...prev, line]);
+                              setLines((prev) => addCartLine(prev, line));
                               setConfigItem(null);
                             }}
                             onCancel={() => setConfigItem(null)}
@@ -394,25 +424,40 @@ export function NewOrderModal({
                     {lines.map((l) => (
                       <li key={l.lineId} className="flex items-start justify-between gap-2 text-sm">
                         <div className="min-w-0">
-                          <span className="font-medium">
-                            {l.quantity}× {l.name}
-                          </span>
+                          <span className="font-medium">{l.name}</span>
                           {l.modifiers.length > 0 && (
                             <p className="text-xs text-plum-ink/50">
                               {l.modifiers.map((m) => m.name).join(", ")}
                             </p>
                           )}
                           {l.note && <p className="text-xs italic text-plum-ink/50">“{l.note}”</p>}
+                          <div className="mt-1 flex items-center gap-2">
+                            <div className="flex items-center rounded-full border border-plum-ink/15">
+                              <button
+                                onClick={() => setLines((prev) => changeLineQty(prev, l.lineId, -1))}
+                                className="px-2 py-0.5 text-plum-ink/70"
+                                aria-label="Decrease quantity"
+                              >
+                                −
+                              </button>
+                              <span className="w-6 text-center text-xs font-semibold">{l.quantity}</span>
+                              <button
+                                onClick={() => setLines((prev) => changeLineQty(prev, l.lineId, 1))}
+                                className="px-2 py-0.5 text-plum-ink/70"
+                                aria-label="Increase quantity"
+                              >
+                                +
+                              </button>
+                            </div>
+                            <button
+                              onClick={() => setLines((prev) => prev.filter((x) => x.lineId !== l.lineId))}
+                              className="text-xs text-muted hover:text-guava"
+                            >
+                              remove
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 whitespace-nowrap">
-                          <span className="font-semibold">{formatPeso(l.unitPrice * l.quantity)}</span>
-                          <button
-                            onClick={() => setLines((prev) => prev.filter((x) => x.lineId !== l.lineId))}
-                            className="text-xs text-muted hover:text-guava"
-                          >
-                            remove
-                          </button>
-                        </div>
+                        <span className="whitespace-nowrap font-semibold">{formatPeso(l.unitPrice * l.quantity)}</span>
                       </li>
                     ))}
                   </ul>
