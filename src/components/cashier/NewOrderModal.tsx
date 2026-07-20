@@ -321,7 +321,7 @@ export function NewOrderModal({
         ) : !menu ? (
           <p className="p-6 text-sm text-plum-ink/50">Loading menu…</p>
         ) : (
-          <div className="grid flex-1 grid-cols-1 gap-0 overflow-hidden md:grid-cols-[1fr_320px]">
+          <div className={`grid flex-1 grid-cols-1 gap-0 overflow-hidden ${lines.length > 0 ? "md:grid-cols-[1fr_320px]" : ""}`}>
             {/* Menu */}
             <div className="overflow-y-auto p-4">
               {nonEmpty.length === 0 && (
@@ -332,10 +332,10 @@ export function NewOrderModal({
                   <h3 className="mb-2 font-heading text-sm font-bold uppercase tracking-wide text-plum-ink/55">
                     {cat.name}
                   </h3>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+                  <div className="grid grid-cols-3 gap-2">
                     {cat.items.map((item) =>
                       configItem?.id === item.id ? (
-                        <div key={item.id} className="col-span-2 sm:col-span-3 xl:col-span-4">
+                        <div key={item.id} className="col-span-3">
                           <ItemConfig
                             item={item}
                             onAdd={(line) => {
@@ -354,7 +354,9 @@ export function NewOrderModal({
               ))}
             </div>
 
-            {/* Order summary */}
+            {/* Order summary — hidden until the first item is added, so the
+                cashier browses the menu first. */}
+            {lines.length > 0 && (
             <div className="flex flex-col border-t border-plum-ink/10 md:border-l md:border-t-0">
               <div className="space-y-3 border-b border-plum-ink/10 p-4">
                 {/* Order type */}
@@ -485,6 +487,7 @@ export function NewOrderModal({
                 </button>
               </div>
             </div>
+            )}
           </div>
         )}
       </div>
