@@ -8,6 +8,7 @@ import { getPosMenu, addItemsToOrder, type CashierTable } from "@/server/orders/
 import { printKitchenTicket } from "@/server/printing/print";
 import { runPrintDispatch } from "@/lib/print/run-dispatch";
 import { ItemConfig, lineId } from "./NewOrderModal";
+import { PosItemTile } from "./PosItemTile";
 
 /**
  * Add more items to an existing open order — for when a customer orders, then
@@ -109,10 +110,10 @@ export function AddItemsModal({
                   <h3 className="mb-2 font-heading text-sm font-bold uppercase tracking-wide text-plum-ink/55">
                     {cat.name}
                   </h3>
-                  <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
                     {cat.items.map((item) =>
                       configItem?.id === item.id ? (
-                        <div key={item.id} className="col-span-2 lg:col-span-3">
+                        <div key={item.id} className="col-span-2 sm:col-span-3 xl:col-span-4">
                           <ItemConfig
                             item={item}
                             onAdd={(line) => {
@@ -123,16 +124,7 @@ export function AddItemsModal({
                           />
                         </div>
                       ) : (
-                        <button
-                          key={item.id}
-                          disabled={!item.isAvailable}
-                          onClick={() => pickItem(item)}
-                          className="rounded-lg border border-plum-ink/10 bg-white p-2 text-left text-sm hover:border-brand-primary disabled:opacity-40"
-                        >
-                          <span className="block font-medium text-plum-ink">{item.name}</span>
-                          <span className="text-plum-ink/55">{formatPeso(item.price)}</span>
-                          {!item.isAvailable && <span className="ml-1 text-xs text-muted">· sold out</span>}
-                        </button>
+                        <PosItemTile key={item.id} item={item} onPick={pickItem} />
                       ),
                     )}
                   </div>
