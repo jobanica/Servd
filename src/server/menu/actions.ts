@@ -400,6 +400,31 @@ export async function createModifier(
   return { ok: true };
 }
 
+export async function updateModifier(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const { restaurantId } = await requireAdminAction();
+  const id = String(formData.get("id"));
+  const parsed = modifierSchema.safeParse({
+    name: formData.get("name"),
+    priceDeltaPesos: formData.get("priceDeltaPesos") ?? 0,
+  });
+  if (!parsed.success) return { error: firstError(parsed.error) };
+
+  // updateMany (scoped by id) so RLS via modifiers->modifier_groups blocks any
+  // cross-tenant edit; a wrong id simply matches no rows.
+  const res = await tenantDb(restaurantId, (tx) =>
+    tx.modifier.updateMany({
+      where: { id },
+      data: { name: parsed.data.name, priceDelta: pesosToCentavos(parsed.data.priceDeltaPesos) },
+    }),
+  );
+  if (res.count === 0) return { error: "Modifier not found." };
+  await refresh();
+  return { ok: true };
+}
+
 export async function deleteModifier(formData: FormData): Promise<void> {
   const { restaurantId } = await requireAdminAction();
   const id = String(formData.get("id"));

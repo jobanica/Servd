@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
 import { getModifierGroups } from "@/server/menu/queries";
-import { formatDelta } from "@/lib/money";
 import { AddModifierGroupForm } from "@/components/admin/AddModifierGroupForm";
 import { AddModifierForm } from "@/components/admin/AddModifierForm";
-import { deleteModifier, deleteModifierGroup } from "@/server/menu/actions";
+import { ModifierRow } from "@/components/admin/ModifierRow";
+import { deleteModifierGroup } from "@/server/menu/actions";
 
 export default async function ModifiersPage() {
   const { restaurantId } = await requireAdminPage();
@@ -52,23 +52,7 @@ export default async function ModifiersPage() {
 
           <ul className="mt-3 space-y-1">
             {group.modifiers.map((m) => (
-              <li
-                key={m.id}
-                className="flex items-center justify-between rounded-lg bg-cream/60 px-3 py-1.5 text-sm"
-              >
-                <span>
-                  {m.name}{" "}
-                  <span className="text-brand-primary">
-                    {formatDelta(m.priceDelta)}
-                  </span>
-                </span>
-                <form action={deleteModifier}>
-                  <input type="hidden" name="id" value={m.id} />
-                  <button className="text-xs text-muted hover:text-guava">
-                    Remove
-                  </button>
-                </form>
-              </li>
+              <ModifierRow key={m.id} id={m.id} name={m.name} priceDelta={m.priceDelta} />
             ))}
           </ul>
 
