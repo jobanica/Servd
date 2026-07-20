@@ -25,10 +25,21 @@ export interface PaymentConfig {
   gcashName: string; // account name shown to the customer
   gcashNumber: string; // GCash mobile number
   gcashQrUrl: string; // uploaded QR image URL
+  mayaEnabled: boolean;
+  mayaName: string; // account name shown to the customer
+  mayaNumber: string; // Maya mobile number
+  mayaQrUrl: string; // uploaded QR image URL
+  bankEnabled: boolean;
+  bankName: string; // bank + account name (e.g. "BPI · Juan Dela Cruz")
+  bankNumber: string; // account number
+  bankQrUrl: string; // uploaded InstaPay/QRPH image URL
   packagingFeeEnabled: boolean; // charge a food-packaging fee (tubs/containers)
   packagingFee: number; // centavos added per online order
   packagingFeeScope: "delivery" | "all"; // delivery only, or pickup & delivery
 }
+
+/** The online (non-cash) payment methods a store can offer at web checkout. */
+export type OnlinePayMethod = "gcash" | "maya" | "bank";
 export interface DeliveryConfig {
   mode: "zones" | "distance"; // how the delivery fee is worked out
   baseFee: number; // centavos
@@ -83,22 +94,37 @@ function normalizeDeliveryConfig(raw: unknown): DeliveryConfig {
 }
 
 export function defaultPaymentConfig(): PaymentConfig {
-  return { codEnabled: true, codFeeEnabled: false, codFee: 0, gcashEnabled: false, gcashName: "", gcashNumber: "", gcashQrUrl: "", packagingFeeEnabled: false, packagingFee: 0, packagingFeeScope: "delivery" };
+  return {
+    codEnabled: true, codFeeEnabled: false, codFee: 0,
+    gcashEnabled: false, gcashName: "", gcashNumber: "", gcashQrUrl: "",
+    mayaEnabled: false, mayaName: "", mayaNumber: "", mayaQrUrl: "",
+    bankEnabled: false, bankName: "", bankNumber: "", bankQrUrl: "",
+    packagingFeeEnabled: false, packagingFee: 0, packagingFeeScope: "delivery",
+  };
 }
 
 function normalizePaymentConfig(raw: unknown): PaymentConfig {
   const d = defaultPaymentConfig();
   if (raw && typeof raw === "object") {
     const r = raw as Partial<PaymentConfig>;
+    const str = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "");
     return {
       // Cash defaults ON so every store always has at least one method.
       codEnabled: r.codEnabled === undefined ? true : !!r.codEnabled,
       codFeeEnabled: !!r.codFeeEnabled,
       codFee: Math.max(0, Math.round(Number(r.codFee) || 0)),
       gcashEnabled: !!r.gcashEnabled,
-      gcashName: typeof r.gcashName === "string" ? r.gcashName.slice(0, 120) : "",
-      gcashNumber: typeof r.gcashNumber === "string" ? r.gcashNumber.slice(0, 40) : "",
-      gcashQrUrl: typeof r.gcashQrUrl === "string" ? r.gcashQrUrl.slice(0, 500) : "",
+      gcashName: str(r.gcashName, 120),
+      gcashNumber: str(r.gcashNumber, 40),
+      gcashQrUrl: str(r.gcashQrUrl, 500),
+      mayaEnabled: !!r.mayaEnabled,
+      mayaName: str(r.mayaName, 120),
+      mayaNumber: str(r.mayaNumber, 40),
+      mayaQrUrl: str(r.mayaQrUrl, 500),
+      bankEnabled: !!r.bankEnabled,
+      bankName: str(r.bankName, 120),
+      bankNumber: str(r.bankNumber, 40),
+      bankQrUrl: str(r.bankQrUrl, 500),
       packagingFeeEnabled: !!r.packagingFeeEnabled,
       packagingFee: Math.max(0, Math.round(Number(r.packagingFee) || 0)),
       packagingFeeScope: r.packagingFeeScope === "all" ? "all" : "delivery",

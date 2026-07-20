@@ -42,25 +42,45 @@ export async function updateStorefront(
     downpaymentValue: dpType === "percent" ? Math.max(0, Math.min(100, Math.round(dpRaw))) : pesosToCentavos(Math.max(0, dpRaw)),
     downpaymentInstructions: String(formData.get("downpaymentInstructions") ?? "").trim().slice(0, 500),
   };
-  // Payment methods (manual GCash QR + cash). The QR is either a freshly
-  // uploaded image or the previously-saved URL passed back via a hidden field.
-  let gcashQrUrl = String(formData.get("gcashQrUrl") ?? "").trim();
-  const qrFile = formData.get("gcashQr");
-  if (qrFile instanceof File && qrFile.size > 0) {
-    try {
-      gcashQrUrl = await uploadMenuImage(restaurantId, qrFile);
-    } catch (e) {
-      return { error: e instanceof Error ? e.message : "Couldn't upload the GCash QR image." };
+  // Payment methods (manual e-wallet / bank QR + cash). Each QR is either a
+  // freshly uploaded image or the previously-saved URL passed back via a hidden
+  // field. Resolve all three (GCash / Maya / Bank) the same way.
+  async function resolveQr(prefix: string, label: string): Promise<string | { error: string }> {
+    let url = String(formData.get(`${prefix}QrUrl`) ?? "").trim();
+    const file = formData.get(`${prefix}Qr`);
+    if (file instanceof File && file.size > 0) {
+      try {
+        url = await uploadMenuImage(restaurantId, file);
+      } catch (e) {
+        return { error: e instanceof Error ? e.message : `Couldn't upload the ${label} QR image.` };
+      }
     }
+    return url.slice(0, 500);
   }
+  const gcashQrUrl = await resolveQr("gcash", "GCash");
+  if (typeof gcashQrUrl !== "string") return gcashQrUrl;
+  const mayaQrUrl = await resolveQr("maya", "Maya");
+  if (typeof mayaQrUrl !== "string") return mayaQrUrl;
+  const bankQrUrl = await resolveQr("bank", "bank");
+  if (typeof bankQrUrl !== "string") return bankQrUrl;
+
+  const str = (k: string, max: number) => String(formData.get(k) ?? "").trim().slice(0, max);
   const paymentConfig = {
     codEnabled: formData.get("codEnabled") === "on",
     codFeeEnabled: formData.get("codFeeEnabled") === "on",
     codFee: pesosToCentavos(Math.max(0, Number(formData.get("codFeePesos")) || 0)),
     gcashEnabled: formData.get("gcashEnabled") === "on",
-    gcashName: String(formData.get("gcashName") ?? "").trim().slice(0, 120),
-    gcashNumber: String(formData.get("gcashNumber") ?? "").trim().slice(0, 40),
-    gcashQrUrl: gcashQrUrl.slice(0, 500),
+    gcashName: str("gcashName", 120),
+    gcashNumber: str("gcashNumber", 40),
+    gcashQrUrl,
+    mayaEnabled: formData.get("mayaEnabled") === "on",
+    mayaName: str("mayaName", 120),
+    mayaNumber: str("mayaNumber", 40),
+    mayaQrUrl,
+    bankEnabled: formData.get("bankEnabled") === "on",
+    bankName: str("bankName", 120),
+    bankNumber: str("bankNumber", 40),
+    bankQrUrl,
     packagingFeeEnabled: formData.get("packagingFeeEnabled") === "on",
     packagingFee: pesosToCentavos(Math.max(0, Number(formData.get("packagingFeePesos")) || 0)),
     packagingFeeScope: formData.get("packagingFeeScope") === "all" ? "all" : "delivery",

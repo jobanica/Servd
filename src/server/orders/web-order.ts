@@ -29,8 +29,8 @@ const schema = z.object({
   lng: z.number().optional(),
   scheduledFor: z.string().datetime().optional(), // ISO; advance order (null = ASAP)
   downpaymentRef: z.string().trim().max(120).optional(), // customer's payment reference
-  paymentChoice: z.enum(["cod", "gcash"]).optional(), // chosen payment method
-  paymentRef: z.string().trim().max(120).optional(), // GCash reference for the full payment
+  paymentChoice: z.enum(["cod", "gcash", "maya", "bank"]).optional(), // chosen payment method
+  paymentRef: z.string().trim().max(120).optional(), // reference no. for an online payment
   couponCode: z.string().trim().max(40).optional(), // promo/coupon code
   lines: z
     .array(
@@ -134,9 +134,15 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
     addressLine = `${prefix}${d.customerAddress?.trim() ?? ""}`.trim() || null;
   }
 
-  // Payment method (cash / GCash). GCash must be enabled by the owner; unknown or
-  // disabled choices fall back to cash so an order never gets stuck.
-  const choice = d.paymentChoice === "gcash" && storefront.payment.gcashEnabled ? "gcash" : "cod";
+  // Payment method (cash / GCash / Maya / Bank). The chosen online method must be
+  // enabled by the owner; unknown or disabled choices fall back to cash so an
+  // order never gets stuck.
+  const p = storefront.payment;
+  const choice =
+    d.paymentChoice === "gcash" && p.gcashEnabled ? "gcash"
+    : d.paymentChoice === "maya" && p.mayaEnabled ? "maya"
+    : d.paymentChoice === "bank" && p.bankEnabled ? "bank"
+    : "cod";
   // COD fee — extra charge on cash-on-delivery orders (delivery paid by cash).
   const codFee =
     d.orderType === "delivery" && choice === "cod" && storefront.payment.codFeeEnabled
@@ -190,7 +196,7 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
         downpaymentRef: d.downpaymentRef?.trim() || null,
       }
     : null;
-  const pay = { paymentChoice: choice, paymentRef: choice === "gcash" ? d.paymentRef?.trim() || null : null };
+  const pay = { paymentChoice: choice, paymentRef: choice !== "cod" ? d.paymentRef?.trim() || null : null };
   const extra = { ...(geo ?? {}), ...(sched ?? {}), ...(advance ?? {}), ...pay };
 
   let order;

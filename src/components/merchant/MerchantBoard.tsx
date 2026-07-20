@@ -317,11 +317,15 @@ export function MerchantBoard({
                   <p className="text-sm font-semibold text-plum-ink/70">Wanted for {schedLabel(topIncoming.scheduledFor)}</p>
                 </div>
               )}
-              {topIncoming.paymentChoice === "gcash" && (
+              {topIncoming.paymentChoice && topIncoming.paymentChoice !== "cod" && (
                 <div className="mt-3 rounded-xl bg-blue-50 px-4 py-2.5 text-center">
-                  <p className="font-heading font-extrabold text-blue-600">📱 Paid via GCash</p>
+                  <p className="font-heading font-extrabold text-blue-600">
+                    {topIncoming.paymentChoice === "maya" ? "🟢 Paid via Maya"
+                      : topIncoming.paymentChoice === "bank" ? "🏦 Paid via bank"
+                      : "📱 Paid via GCash"}
+                  </p>
                   {topIncoming.paymentRef && <p className="text-sm font-semibold text-plum-ink/70">Ref: {topIncoming.paymentRef}</p>}
-                  <p className="text-[11px] text-plum-ink/50">Verify in your GCash before accepting.</p>
+                  <p className="text-[11px] text-plum-ink/50">Verify the payment before accepting.</p>
                 </div>
               )}
 

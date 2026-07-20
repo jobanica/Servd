@@ -12,6 +12,74 @@ interface DayHours {
   closed: boolean;
 }
 
+/**
+ * One manual online-payment method (GCash / Maya / Bank): a toggle plus account
+ * name, number and an uploadable QR. Field names are prefixed so the same card
+ * powers all three methods. A hidden field preserves the saved QR when no new
+ * file is chosen (and when the method is off).
+ */
+function WalletCard({
+  prefix,
+  label,
+  nameLabel,
+  numberLabel,
+  numberPlaceholder,
+  hint,
+  enabled,
+  setEnabled,
+  initial,
+}: {
+  prefix: "gcash" | "maya" | "bank";
+  label: string;
+  nameLabel: string;
+  numberLabel: string;
+  numberPlaceholder: string;
+  hint: string;
+  enabled: boolean;
+  setEnabled: (v: boolean) => void;
+  initial: { name: string; number: string; qrUrl: string };
+}) {
+  return (
+    <>
+      <label className="mt-3 flex items-center gap-2 text-sm font-semibold">
+        <input type="checkbox" name={`${prefix}Enabled`} checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+        {label}
+      </label>
+      {enabled && (
+        <div className="mt-3 space-y-3 rounded-lg border border-plum-ink/10 bg-cream/40 p-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-plum-ink/60">{nameLabel}</label>
+              <input name={`${prefix}Name`} defaultValue={initial.name} placeholder="e.g. Juan D." className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-plum-ink/60">{numberLabel}</label>
+              <input name={`${prefix}Number`} defaultValue={initial.number} inputMode="tel" placeholder={numberPlaceholder} className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-plum-ink/60">{label} QR code</label>
+            <div className="flex items-center gap-3">
+              {initial.qrUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={initial.qrUrl} alt={`${label} QR`} className="h-20 w-20 rounded-lg border border-plum-ink/10 object-cover" />
+              ) : (
+                <div className="flex h-20 w-20 items-center justify-center rounded-lg border border-dashed border-plum-ink/20 text-2xl">📷</div>
+              )}
+              <div className="min-w-0">
+                <input type="file" name={`${prefix}Qr`} accept="image/png,image/jpeg,image/webp" className="text-xs" />
+                <p className="mt-1 text-xs text-plum-ink/45">{hint}</p>
+              </div>
+            </div>
+            <input type="hidden" name={`${prefix}QrUrl`} value={initial.qrUrl} />
+          </div>
+        </div>
+      )}
+      {!enabled && <input type="hidden" name={`${prefix}QrUrl`} value={initial.qrUrl} />}
+    </>
+  );
+}
+
 export function StorefrontForm({
   initial,
 }: {
@@ -34,6 +102,14 @@ export function StorefrontForm({
       gcashName: string;
       gcashNumber: string;
       gcashQrUrl: string;
+      mayaEnabled: boolean;
+      mayaName: string;
+      mayaNumber: string;
+      mayaQrUrl: string;
+      bankEnabled: boolean;
+      bankName: string;
+      bankNumber: string;
+      bankQrUrl: string;
       packagingFeeEnabled: boolean;
       packagingFeePesos: number;
       packagingFeeScope: "delivery" | "all";
@@ -57,6 +133,8 @@ export function StorefrontForm({
   const [requireDp, setRequireDp] = useState(initial.booking.requireDownpayment);
   const [dpType, setDpType] = useState<"percent" | "fixed">(initial.booking.downpaymentType);
   const [gcashOn, setGcashOn] = useState(initial.payment.gcashEnabled);
+  const [mayaOn, setMayaOn] = useState(initial.payment.mayaEnabled);
+  const [bankOn, setBankOn] = useState(initial.payment.bankEnabled);
   const [codFeeOn, setCodFeeOn] = useState(initial.payment.codFeeEnabled);
   const [packagingOn, setPackagingOn] = useState(initial.payment.packagingFeeEnabled);
   const [deliveryMode, setDeliveryMode] = useState<"zones" | "distance">(initial.delivery.mode);
@@ -302,42 +380,39 @@ export function StorefrontForm({
           )}
         </div>
 
-        <label className="mt-3 flex items-center gap-2 text-sm font-semibold">
-          <input type="checkbox" name="gcashEnabled" checked={gcashOn} onChange={(e) => setGcashOn(e.target.checked)} />
-          GCash
-        </label>
-        {gcashOn && (
-          <div className="mt-3 space-y-3 rounded-lg border border-plum-ink/10 bg-cream/40 p-3">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-xs font-semibold text-plum-ink/60">GCash account name</label>
-                <input name="gcashName" defaultValue={initial.payment.gcashName} placeholder="e.g. Juan D." className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-semibold text-plum-ink/60">GCash number</label>
-                <input name="gcashNumber" defaultValue={initial.payment.gcashNumber} inputMode="tel" placeholder="09XX XXX XXXX" className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
-              </div>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-plum-ink/60">GCash QR code</label>
-              <div className="flex items-center gap-3">
-                {initial.payment.gcashQrUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={initial.payment.gcashQrUrl} alt="GCash QR" className="h-20 w-20 rounded-lg border border-plum-ink/10 object-cover" />
-                ) : (
-                  <div className="flex h-20 w-20 items-center justify-center rounded-lg border border-dashed border-plum-ink/20 text-2xl">📷</div>
-                )}
-                <div className="min-w-0">
-                  <input type="file" name="gcashQr" accept="image/png,image/jpeg,image/webp" className="text-xs" />
-                  <p className="mt-1 text-xs text-plum-ink/45">Upload a screenshot of your GCash “Receive money” QR. Max 5 MB.</p>
-                </div>
-              </div>
-              {/* Preserve the existing QR when no new file is chosen. */}
-              <input type="hidden" name="gcashQrUrl" value={initial.payment.gcashQrUrl} />
-            </div>
-          </div>
-        )}
-        {!gcashOn && <input type="hidden" name="gcashQrUrl" value={initial.payment.gcashQrUrl} />}
+        <WalletCard
+          prefix="gcash"
+          label="GCash"
+          nameLabel="GCash account name"
+          numberLabel="GCash number"
+          numberPlaceholder="09XX XXX XXXX"
+          hint="Upload a screenshot of your GCash “Receive money” QR. Max 5 MB."
+          enabled={gcashOn}
+          setEnabled={setGcashOn}
+          initial={{ name: initial.payment.gcashName, number: initial.payment.gcashNumber, qrUrl: initial.payment.gcashQrUrl }}
+        />
+        <WalletCard
+          prefix="maya"
+          label="Maya"
+          nameLabel="Maya account name"
+          numberLabel="Maya number"
+          numberPlaceholder="09XX XXX XXXX"
+          hint="Upload a screenshot of your Maya “Receive money” QR. Max 5 MB."
+          enabled={mayaOn}
+          setEnabled={setMayaOn}
+          initial={{ name: initial.payment.mayaName, number: initial.payment.mayaNumber, qrUrl: initial.payment.mayaQrUrl }}
+        />
+        <WalletCard
+          prefix="bank"
+          label="Bank transfer / QR"
+          nameLabel="Bank & account name"
+          numberLabel="Account number"
+          numberPlaceholder="e.g. BPI 1234-5678-90"
+          hint="Upload your bank / InstaPay / QR Ph code. Max 5 MB."
+          enabled={bankOn}
+          setEnabled={setBankOn}
+          initial={{ name: initial.payment.bankName, number: initial.payment.bankNumber, qrUrl: initial.payment.bankQrUrl }}
+        />
       </div>
 
       {/* Advance booking & ordering */}
