@@ -6,12 +6,13 @@ import { getPublicStorefront, isOpenNow } from "@/server/storefront/storefront";
 import { hasFeature } from "@/server/billing/feature-gate";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { WebOrder } from "@/components/site/WebOrder";
+import { storefrontMetadata } from "@/lib/site/metadata";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const r = await getPublicRestaurantBySlug(slug);
   const name = r ? r.displayName || r.name : "Restaurant";
-  return { title: `${name} — Order online`, description: r?.tagline ?? `Order from ${name}.` };
+  return storefrontMetadata({ name, tagline: r?.tagline, logoUrl: r?.logoUrl, coverImageUrl: r?.coverImageUrl });
 }
 
 async function getContact(restaurantId: string) {

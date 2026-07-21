@@ -5,6 +5,14 @@ import { getLoyaltyConfig } from "@/server/loyalty/loyalty";
 import { getPublicStorefront, isOpenNow } from "@/server/storefront/storefront";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { WebOrder } from "@/components/site/WebOrder";
+import { storefrontMetadata } from "@/lib/site/metadata";
+
+export async function generateMetadata({ params }: { params: Promise<{ host: string }> }) {
+  const { host } = await params;
+  const r = await getRestaurantByHost(decodeURIComponent(host));
+  const name = r ? r.displayName || r.name : "Order online";
+  return storefrontMetadata({ name, tagline: r?.tagline, logoUrl: r?.logoUrl, coverImageUrl: r?.coverImageUrl });
+}
 
 /** Branded host — the restaurant's white-label website + online ordering. */
 export default async function SiteHomePage({
