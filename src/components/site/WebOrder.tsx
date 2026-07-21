@@ -21,6 +21,28 @@ function lineId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/** Signature that makes two cart lines "the same" (item + size + note + mods). */
+function lineSig(l: CartLine): string {
+  return `${l.itemId}|${l.variantId ?? ""}|${(l.note ?? "").trim()}|${l.modifiers
+    .map((m) => m.modifierId)
+    .sort()
+    .join(",")}`;
+}
+
+/**
+ * Add a line to the cart, merging into an identical existing line (same item,
+ * size, note and modifiers) by bumping its quantity — so tapping "Add" four
+ * times shows one row of ×4 instead of four separate rows.
+ */
+function addCartLine(prev: CartLine[], line: CartLine): CartLine[] {
+  const key = lineSig(line);
+  const idx = prev.findIndex((l) => lineSig(l) === key);
+  if (idx === -1) return [...prev, line];
+  const next = [...prev];
+  next[idx] = { ...next[idx], quantity: next[idx].quantity + line.quantity };
+  return next;
+}
+
 const VAT_RATE = 0.12;
 
 interface LoyaltyInfo {
@@ -419,7 +441,7 @@ export function WebOrder(props: WebOrderProps) {
     if (!item.isAvailable) return;
     // Items with modifiers OR sizes need the picker; only plain items shortcut.
     if (item.groups.length === 0 && !(item.variants && item.variants.length > 0)) {
-      setLines((p) => [...p, { lineId: lineId(), itemId: item.id, name: item.name, basePrice: item.price, unitPrice: item.price, quantity: 1, modifiers: [] }]);
+      setLines((p) => addCartLine(p, { lineId: lineId(), itemId: item.id, name: item.name, basePrice: item.price, unitPrice: item.price, quantity: 1, modifiers: [] }));
     } else setConfigItem(item);
   }
   function setQty(id: string, delta: number) {
@@ -1043,7 +1065,7 @@ export function WebOrder(props: WebOrderProps) {
       </div>
 
       {/* Item config modal */}
-      {configItem && <ItemConfig item={configItem} onAdd={(l) => { setLines((p) => [...p, l]); setConfigItem(null); }} onCancel={() => setConfigItem(null)} />}
+      {configItem && <ItemConfig item={configItem} onAdd={(l) => { setLines((p) => addCartLine(p, l)); setConfigItem(null); }} onCancel={() => setConfigItem(null)} />}
 
       {/* Mobile cart bar + sheet */}
       {count > 0 && (
