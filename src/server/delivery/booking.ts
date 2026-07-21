@@ -5,6 +5,7 @@ import { tenantDb } from "@/server/tenancy/scoped-db";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
 import { writeAudit } from "@/server/audit/log";
 import { awardPointsForOrder } from "@/server/loyalty/loyalty";
+import { ensureSettlementPayment } from "@/server/orders/settle-payment";
 import { resolveProvider, type GeoPoint, type OrderDetails, type RiderStatus } from "@/server/delivery/provider";
 import type { Prisma } from "@prisma/client";
 
@@ -146,6 +147,8 @@ async function mirrorToOrder(tx: Prisma.TransactionClient, orderId: string, stat
         where: { id: orderId },
         data: { deliveryStatus: "delivered", status: "closed", paymentStatus: "paid", billRequested: false },
       });
+      // Book the settlement so the sale reaches accounting + the shift report.
+      await ensureSettlementPayment(tx, orderId);
       return true; // signal "delivered" so the caller can award points
     }
   } catch {

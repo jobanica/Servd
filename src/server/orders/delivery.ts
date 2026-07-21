@@ -4,6 +4,7 @@ import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireStaff } from "@/server/tenancy/current-user";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
 import { awardPointsForOrder } from "@/server/loyalty/loyalty";
+import { ensureSettlementPayment } from "@/server/orders/settle-payment";
 import { notifyCustomer, restaurantDisplayName } from "@/server/sms/notify";
 
 export interface DeliveryOrder {
@@ -147,10 +148,7 @@ export async function markDelivered(orderId: string): Promise<Result> {
         where: { id: orderId },
         data: { deliveryStatus: "delivered", status: "closed", paymentStatus: "paid", billRequested: false },
       });
-      const existing = await tx.payment.findFirst({ where: { orderId }, select: { id: true } });
-      if (!existing) {
-        await tx.payment.create({ data: { orderId, amount: o.total, method: "cash", gateway: "manual", status: "paid" } });
-      }
+      await ensureSettlementPayment(tx, orderId);
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Could not update.";

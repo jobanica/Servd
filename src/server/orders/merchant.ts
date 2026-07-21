@@ -4,6 +4,7 @@ import { requireStaff } from "@/server/tenancy/current-user";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
 import { deductForOrder } from "@/server/inventory/deduct";
+import { ensureSettlementPayment } from "@/server/orders/settle-payment";
 import { formatOrderNumber } from "@/lib/orders/order-number";
 import type { StaffRole } from "@prisma/client";
 
@@ -329,19 +330,25 @@ export async function advanceMerchantOrder(
       }),
     )).count;
   } else if (to === "delivered") {
-    changed = (await tenantDb(rid, (tx) =>
-      tx.order.updateMany({
+    changed = (await tenantDb(rid, async (tx) => {
+      const r = await tx.order.updateMany({
         where: { id: orderId, status: "done" },
         data: { status: "closed", paymentStatus: "paid", deliveryStatus: "delivered" },
-      }),
-    )).count;
+      });
+      // Record the settlement so this sale reaches accounting + the shift report,
+      // not just the dashboard (which keys on paymentStatus).
+      if (r.count > 0) await ensureSettlementPayment(tx, orderId);
+      return r;
+    })).count;
   } else if (to === "completed") {
-    changed = (await tenantDb(rid, (tx) =>
-      tx.order.updateMany({
+    changed = (await tenantDb(rid, async (tx) => {
+      const r = await tx.order.updateMany({
         where: { id: orderId, status: "done" },
         data: { status: "closed", paymentStatus: "paid" },
-      }),
-    )).count;
+      });
+      if (r.count > 0) await ensureSettlementPayment(tx, orderId);
+      return r;
+    })).count;
   }
 
   if (changed > 0) await notifyOrdersChanged(rid);
