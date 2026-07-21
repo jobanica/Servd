@@ -8,11 +8,14 @@ import { AddItemForm } from "@/components/admin/AddItemForm";
 import { AddBundleForm } from "@/components/admin/AddBundleForm";
 import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
 import { ImportMenuButton } from "@/components/admin/ImportMenuButton";
+import { SortableList } from "@/components/admin/SortableList";
 import { hasFeature } from "@/server/billing/feature-gate";
 import {
   deleteCategory,
   deleteItem,
   toggleItemAvailability,
+  reorderCategories,
+  reorderItems,
 } from "@/server/menu/actions";
 
 // AI menu import calls a vision model, which can take longer than the default
@@ -63,9 +66,13 @@ export default async function MenuPage() {
         </p>
       )}
 
-      {categories.map((category) => (
+      <SortableList
+        className="space-y-6"
+        onReorder={reorderCategories}
+        entries={categories.map((category) => ({
+          id: category.id,
+          node: (
         <section
-          key={category.id}
           className="rounded-tile border border-plum-ink/10 bg-white p-4"
         >
           <div className="flex items-center justify-between">
@@ -81,11 +88,14 @@ export default async function MenuPage() {
             </form>
           </div>
 
-          <ul className="mt-3 divide-y divide-plum-ink/5">
-            {category.menuItems.map((item) => (
-              <li
-                key={item.id}
-                className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:gap-3"
+          <SortableList
+            className="mt-3 space-y-1"
+            onReorder={reorderItems.bind(null, category.id)}
+            entries={category.menuItems.map((item) => ({
+              id: item.id,
+              node: (
+              <div
+                className="flex flex-col gap-2 border-b border-plum-ink/5 py-3 sm:flex-row sm:items-center sm:gap-3"
               >
                 {/* Image · name/price */}
                 <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -154,15 +164,18 @@ export default async function MenuPage() {
                     </button>
                   </form>
                 </div>
-              </li>
-            ))}
-          </ul>
+              </div>
+              ),
+            }))}
+          />
 
           <div className="mt-3">
             <AddItemForm categoryId={category.id} />
           </div>
         </section>
-      ))}
+        ),
+      }))}
+    />
     </div>
   );
 }

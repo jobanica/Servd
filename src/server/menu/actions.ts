@@ -341,6 +341,38 @@ export async function deleteItem(formData: FormData): Promise<void> {
   await refresh();
 }
 
+// --------------------------------------------------------- reordering
+
+const orderIds = z.array(z.string().uuid()).max(500);
+
+/** Persist a new category order (sortOrder = position). Tenant-scoped. */
+export async function reorderCategories(orderedIds: string[]): Promise<void> {
+  const { restaurantId } = await requireAdminAction();
+  const ids = orderIds.parse(orderedIds);
+  await tenantDb(restaurantId, async (tx) => {
+    // updateMany scoped by id + restaurantId so a foreign id just matches nothing.
+    await Promise.all(
+      ids.map((id, i) => tx.category.updateMany({ where: { id, restaurantId }, data: { sortOrder: i } })),
+    );
+  });
+  await refresh();
+}
+
+/** Persist a new item order within one category (sortOrder = position). */
+export async function reorderItems(categoryId: string, orderedIds: string[]): Promise<void> {
+  const { restaurantId } = await requireAdminAction();
+  const ids = orderIds.parse(orderedIds);
+  await tenantDb(restaurantId, async (tx) => {
+    const cat = await tx.category.findFirst({ where: { id: categoryId, restaurantId }, select: { id: true } });
+    if (!cat) throw new Error("Category not found");
+    // Scope to categoryId so items can only be reordered within their own category.
+    await Promise.all(
+      ids.map((id, i) => tx.menuItem.updateMany({ where: { id, categoryId }, data: { sortOrder: i } })),
+    );
+  });
+  await refresh();
+}
+
 // --------------------------------------------------------- modifier groups
 
 export async function createModifierGroup(
