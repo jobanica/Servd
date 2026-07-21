@@ -3,6 +3,17 @@ import { requireHrPage } from "@/server/hr/guard";
 import { listShifts, listEmployees, listOpenSwaps } from "@/server/hr/queries";
 import { createShift, deleteShift, resolveSwap } from "@/server/hr/actions";
 
+// Values are JS getDay() (0=Sun…6=Sat); shown Monday-first for PH work weeks.
+const WORK_DAYS = [
+  { value: 1, label: "Mon" },
+  { value: 2, label: "Tue" },
+  { value: 3, label: "Wed" },
+  { value: 4, label: "Thu" },
+  { value: 5, label: "Fri" },
+  { value: 6, label: "Sat" },
+  { value: 0, label: "Sun" },
+];
+
 export default async function SchedulePage() {
   const { restaurantId, eligible } = await requireHrPage();
   if (!eligible) return <p className="text-sm text-plum-ink/60">HRIS not enabled.</p>;
@@ -43,15 +54,38 @@ export default async function SchedulePage() {
         </div>
       )}
 
-      <form action={createShift} className="flex flex-wrap items-end gap-2 rounded-tile border border-plum-ink/10 bg-white p-4">
-        <select name="employeeId" className="rounded-lg border border-plum-ink/15 px-3 py-2 text-sm">
-          <option value="">Open shift</option>
-          {employees.map((e) => <option key={e.id} value={e.id}>{e.fullName}</option>)}
-        </select>
-        <input name="startsAt" type="datetime-local" required className="rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
-        <input name="endsAt" type="datetime-local" required className="rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
-        <input name="role" placeholder="Role (optional)" className="rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
-        <button className="rounded-lg px-4 py-2 text-sm font-semibold btn-brand">Add shift</button>
+      <form action={createShift} className="space-y-3 rounded-tile border border-plum-ink/10 bg-white p-4">
+        <div className="flex flex-wrap items-end gap-2">
+          <select name="employeeId" className="rounded-lg border border-plum-ink/15 px-3 py-2 text-sm">
+            <option value="">Open shift</option>
+            {employees.map((e) => <option key={e.id} value={e.id}>{e.fullName}</option>)}
+          </select>
+          <label className="text-sm text-plum-ink/60">
+            <span className="mb-0.5 block text-xs font-semibold">Start</span>
+            <input name="start" type="time" required className="rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
+          </label>
+          <label className="text-sm text-plum-ink/60">
+            <span className="mb-0.5 block text-xs font-semibold">End</span>
+            <input name="end" type="time" required className="rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
+          </label>
+          <label className="text-sm text-plum-ink/60">
+            <span className="mb-0.5 block text-xs font-semibold">Repeat for (weeks)</span>
+            <input name="weeks" type="number" min={1} max={8} defaultValue={2} className="w-24 rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
+          </label>
+          <input name="role" placeholder="Role (optional)" className="rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
+          <button className="rounded-lg px-4 py-2 text-sm font-semibold btn-brand">Add shift</button>
+        </div>
+        <div>
+          <p className="mb-1 text-xs font-semibold text-plum-ink/60">Working days <span className="font-normal text-plum-ink/40">(unpicked days are days off)</span></p>
+          <div className="flex flex-wrap gap-1.5">
+            {WORK_DAYS.map((d) => (
+              <label key={d.value} className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-plum-ink/15 px-3 py-1.5 text-sm has-[:checked]:border-brand-primary has-[:checked]:bg-brand-primary/10 has-[:checked]:font-semibold has-[:checked]:text-brand-primary">
+                <input type="checkbox" name="days" value={d.value} />
+                {d.label}
+              </label>
+            ))}
+          </div>
+        </div>
       </form>
 
       <ul className="space-y-2">
