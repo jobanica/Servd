@@ -115,7 +115,7 @@ export function StorefrontForm({
       packagingFeeScope: "delivery" | "all";
     };
     delivery: {
-      mode: "zones" | "distance";
+      mode: "zones" | "distance" | "shipping";
       baseFeePesos: number;
       perKmPesos: number;
       freeKm: number;
@@ -137,7 +137,7 @@ export function StorefrontForm({
   const [bankOn, setBankOn] = useState(initial.payment.bankEnabled);
   const [codFeeOn, setCodFeeOn] = useState(initial.payment.codFeeEnabled);
   const [packagingOn, setPackagingOn] = useState(initial.payment.packagingFeeEnabled);
-  const [deliveryMode, setDeliveryMode] = useState<"zones" | "distance">(initial.delivery.mode);
+  const [deliveryMode, setDeliveryMode] = useState<"zones" | "distance" | "shipping">(initial.delivery.mode);
   const [origin, setOrigin] = useState<{ lat: number; lng: number } | null>(
     initial.delivery.originLat != null && initial.delivery.originLng != null
       ? { lat: initial.delivery.originLat, lng: initial.delivery.originLng }
@@ -208,17 +208,27 @@ export function StorefrontForm({
         <input type="hidden" name="originLng" value={origin?.lng ?? ""} />
 
         {/* Mode toggle */}
-        <div className="mt-3 grid grid-cols-2 gap-1 rounded-lg bg-plum-ink/5 p-1 sm:max-w-sm">
-          <button type="button" onClick={() => setDeliveryMode("zones")} className={`rounded-md py-2 text-sm font-semibold ${deliveryMode === "zones" ? "bg-white text-brand-primary shadow-sm" : "text-plum-ink/60"}`}>
+        <div className="mt-3 grid grid-cols-3 gap-1 rounded-lg bg-plum-ink/5 p-1 sm:max-w-lg">
+          <button type="button" onClick={() => setDeliveryMode("zones")} className={`rounded-md py-2 text-xs font-semibold sm:text-sm ${deliveryMode === "zones" ? "bg-white text-brand-primary shadow-sm" : "text-plum-ink/60"}`}>
             📍 By zone
           </button>
-          <button type="button" onClick={() => setDeliveryMode("distance")} className={`rounded-md py-2 text-sm font-semibold ${deliveryMode === "distance" ? "bg-white text-brand-primary shadow-sm" : "text-plum-ink/60"}`}>
+          <button type="button" onClick={() => setDeliveryMode("distance")} className={`rounded-md py-2 text-xs font-semibold sm:text-sm ${deliveryMode === "distance" ? "bg-white text-brand-primary shadow-sm" : "text-plum-ink/60"}`}>
             📏 By distance
           </button>
+          <button type="button" onClick={() => setDeliveryMode("shipping")} className={`rounded-md py-2 text-xs font-semibold sm:text-sm ${deliveryMode === "shipping" ? "bg-white text-brand-primary shadow-sm" : "text-plum-ink/60"}`}>
+            🚚 Nationwide shipping
+          </button>
         </div>
+        {deliveryMode === "shipping" && (
+          <p className="mt-2 rounded-lg bg-brand-primary/5 px-3 py-2 text-xs text-plum-ink/60">
+            For e-commerce that ships by courier (J&amp;T, LBC, Flash…). Customers enter a full postal
+            address — <span className="font-semibold text-plum-ink/70">no map pin</span> — and pick a
+            shipping region below for the fee. The shipping fee is always added to the total (prepaid).
+          </p>
+        )}
 
-        {/* Who collects the delivery fee */}
-        <label className="mt-3 flex items-start gap-2 text-sm font-semibold">
+        {/* Who collects the delivery fee (not shown for shipping — always prepaid). */}
+        <label className={`mt-3 ${deliveryMode === "shipping" ? "hidden" : "flex"} items-start gap-2 text-sm font-semibold`}>
           <input type="checkbox" name="deliveryFeeInTotal" defaultChecked={initial.delivery.feeInTotal} className="mt-0.5" />
           <span>
             Include the delivery fee in the order total (customers pay it in-app)
@@ -230,9 +240,13 @@ export function StorefrontForm({
           </span>
         </label>
 
-        {/* Zones editor (kept mounted so values persist when switching modes). */}
-        <div className={deliveryMode === "zones" ? "mt-4" : "hidden"}>
-          <p className="mb-2 text-sm text-plum-ink/50">Customers pick a zone at checkout; its fee is added to the total.</p>
+        {/* Zones / shipping-regions editor (kept mounted so values persist across modes). */}
+        <div className={deliveryMode !== "distance" ? "mt-4" : "hidden"}>
+          <p className="mb-2 text-sm text-plum-ink/50">
+            {deliveryMode === "shipping"
+              ? "Customers pick a shipping region at checkout; its fee is added to the total. e.g. Metro Manila, Luzon, Visayas, Mindanao."
+              : "Customers pick a zone at checkout; its fee is added to the total."}
+          </p>
           <div className="space-y-2">
             {zones.map((z, i) => (
               <div key={i} className="flex items-center gap-2">
@@ -240,7 +254,7 @@ export function StorefrontForm({
                   name="zoneName"
                   value={z.name}
                   onChange={(e) => setZones((p) => p.map((zz, idx) => (idx === i ? { ...zz, name: e.target.value } : zz)))}
-                  placeholder="Zone (e.g. Poblacion)"
+                  placeholder={deliveryMode === "shipping" ? "Region (e.g. Metro Manila)" : "Zone (e.g. Poblacion)"}
                   className="flex-1 rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
                 />
                 <div className="flex items-center gap-1">
@@ -260,7 +274,7 @@ export function StorefrontForm({
             ))}
           </div>
           <button type="button" onClick={() => setZones((p) => [...p, { name: "", feePesos: 0 }])} className="mt-3 rounded-full border border-plum-ink/15 px-4 py-1.5 text-sm font-semibold">
-            + Add zone
+            {deliveryMode === "shipping" ? "+ Add region" : "+ Add zone"}
           </button>
         </div>
 

@@ -65,9 +65,6 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
   if (d.orderType === "delivery" && !d.customerAddress?.trim()) {
     return { ok: false, error: "A delivery address is required." };
   }
-  if (d.orderType === "delivery" && (d.lat == null || d.lng == null)) {
-    return { ok: false, error: "Please pin your delivery location on the map." };
-  }
 
   const restaurant = await systemDb((tx) =>
     tx.restaurant.findFirst({ where: { slug: d.slug, status: "active" }, select: { id: true } }),
@@ -89,6 +86,16 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
   }
 
   const storefront = await getPublicStorefront(restaurant.id);
+  // Nationwide-shipping orders capture a typed postal address (no map pin);
+  // every other delivery mode still needs the customer's pinned location.
+  if (
+    d.orderType === "delivery" &&
+    storefront.delivery.mode !== "shipping" &&
+    (d.lat == null || d.lng == null)
+  ) {
+    return { ok: false, error: "Please pin your delivery location on the map." };
+  }
+
   // A "closed now" store still takes ADVANCE orders (they're for later) — only
   // block ASAP orders when the owner pauses ordering outside opening hours.
   if (!scheduledFor && storefront.pauseWhenClosed && !isOpenNow(storefront.hours)) {
@@ -126,10 +133,13 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
       estimate = zone?.fee ?? 0;
       label = zone?.name ?? "";
     }
-    // Only charge it in the total when the owner collects it in-app.
-    deliveryFee = dc.feeInTotal ? estimate : 0;
+    // Shipping is always prepaid in-app; for local delivery, only charge it in
+    // the total when the owner collects it in-app (else the rider is paid direct).
+    const feeInTotal = dc.mode === "shipping" ? true : dc.feeInTotal;
+    deliveryFee = feeInTotal ? estimate : 0;
+    const kind = dc.mode === "shipping" ? "shipping" : "delivery";
     const feeNote =
-      estimate > 0 ? ` · delivery ${formatPeso(estimate)}${dc.feeInTotal ? "" : " (rider-paid)"}` : "";
+      estimate > 0 ? ` · ${kind} ${formatPeso(estimate)}${feeInTotal ? "" : " (rider-paid)"}` : "";
     const prefix = label || feeNote ? `[${label}${feeNote}] ` : "";
     addressLine = `${prefix}${d.customerAddress?.trim() ?? ""}`.trim() || null;
   }

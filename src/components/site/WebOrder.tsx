@@ -97,7 +97,7 @@ export interface WebOrderProps {
     packagingFeeScope?: "delivery" | "all";
   };
   delivery?: {
-    mode: "zones" | "distance";
+    mode: "zones" | "distance" | "shipping";
     baseFee: number;
     perKm: number;
     freeKm: number;
@@ -312,6 +312,9 @@ export function WebOrder(props: WebOrderProps) {
   const [address, setAddress] = useState("");
   const [zone, setZone] = useState("");
   const [geo, setGeo] = useState<{ lat: number; lng: number } | null>(null);
+  // Structured shipping address (nationwide-shipping mode; no map pin).
+  const [ship, setShip] = useState({ street: "", barangay: "", city: "", province: "", postal: "", landmark: "" });
+  const setShipField = (k: keyof typeof ship, v: string) => setShip((s) => ({ ...s, [k]: v }));
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -374,6 +377,18 @@ export function WebOrder(props: WebOrderProps) {
   const subtotal = cartTotal(lines);
   // Distance-based delivery: live fee from the store origin to the pinned drop-off.
   const dcfg = props.delivery;
+  // Nationwide shipping: typed postal address + region fee, no map pin.
+  const shippingMode = orderType === "delivery" && dcfg?.mode === "shipping";
+  // Assembled shipping address string sent to the merchant (kept human-readable).
+  const shippingAddress = [
+    ship.street.trim(),
+    ship.barangay.trim() && `Brgy. ${ship.barangay.trim()}`,
+    ship.city.trim(),
+    ship.province.trim(),
+    ship.postal.trim(),
+    ship.landmark.trim() && `(${ship.landmark.trim()})`,
+  ].filter(Boolean).join(", ");
+  const shippingReady = !!(ship.street.trim() && ship.barangay.trim() && ship.city.trim() && ship.province.trim() && zone);
   const distanceMode = orderType === "delivery" && dcfg?.mode === "distance" && dcfg.originLat != null && dcfg.originLng != null;
   const distance =
     distanceMode && geo
@@ -389,7 +404,8 @@ export function WebOrder(props: WebOrderProps) {
         ? distance && !distance.outOfRange ? distance.fee : 0
         : zones.find((z) => z.name === zone)?.fee ?? 0;
   // Whether the delivery fee is collected in-app or paid to the rider directly.
-  const collectDeliveryFee = dcfg?.feeInTotal !== false;
+  // Shipping is always prepaid in-app.
+  const collectDeliveryFee = shippingMode ? true : dcfg?.feeInTotal !== false;
   const deliveryFee = collectDeliveryFee ? deliveryFeeEstimate : 0; // added to the total
   // COD fee — an extra charge on cash-on-delivery orders (delivery paid by cash).
   const isCod = orderType === "delivery" && payMethod === "cod";
@@ -470,10 +486,10 @@ export function WebOrder(props: WebOrderProps) {
       orderType,
       customerName: name,
       customerPhone: phone,
-      customerAddress: orderType === "delivery" ? address : undefined,
+      customerAddress: orderType === "delivery" ? (shippingMode ? shippingAddress : address) : undefined,
       deliveryZone: orderType === "delivery" ? zone || undefined : undefined,
-      lat: orderType === "delivery" ? geo?.lat : undefined,
-      lng: orderType === "delivery" ? geo?.lng : undefined,
+      lat: orderType === "delivery" && !shippingMode ? geo?.lat : undefined,
+      lng: orderType === "delivery" && !shippingMode ? geo?.lng : undefined,
       scheduledFor: scheduledIso,
       downpaymentRef: schedulingLater && downpaymentDue > 0 ? downpaymentRef || undefined : undefined,
       paymentChoice: payMethod,
@@ -577,7 +593,7 @@ export function WebOrder(props: WebOrderProps) {
         {checkout && lines.length > 0 && (
           <div className="mt-4 space-y-2 border-t border-black/5 pt-4">
             <div className="grid grid-cols-2 gap-1 rounded-lg bg-gray-100 p-1">
-              {([["takeout", "🥡 Pickup"], ["delivery", "🛵 Delivery"]] as const).map(([k, label]) => (
+              {(([["takeout", "🥡 Pickup"], ["delivery", dcfg?.mode === "shipping" ? "🚚 Ship to me" : "🛵 Delivery"]]) as ["takeout" | "delivery", string][]).map(([k, label]) => (
                 <button key={k} onClick={() => setOrderType(k)} className={`rounded-md py-2 text-sm font-semibold ${orderType === k ? "bg-white text-red-600 shadow-sm" : "text-plum-ink/60"}`}>{label}</button>
               ))}
             </div>
@@ -639,6 +655,30 @@ export function WebOrder(props: WebOrderProps) {
               className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
             />
             {orderType === "delivery" && (
+              shippingMode ? (
+                /* Nationwide shipping — typed postal address, no map pin. */
+                <div className="space-y-2">
+                  {zones.length > 0 && (
+                    <select value={zone} onChange={(e) => setZone(e.target.value)} className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm">
+                      <option value="">Select shipping region…</option>
+                      {zones.map((z) => (
+                        <option key={z.name} value={z.name}>{z.name} — {formatPeso(z.fee)}</option>
+                      ))}
+                    </select>
+                  )}
+                  <input value={ship.street} onChange={(e) => setShipField("street", e.target.value)} placeholder="House no., street, subdivision" className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
+                  <input value={ship.barangay} onChange={(e) => setShipField("barangay", e.target.value)} placeholder="Barangay" className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input value={ship.city} onChange={(e) => setShipField("city", e.target.value)} placeholder="City / Municipality" className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
+                    <input value={ship.province} onChange={(e) => setShipField("province", e.target.value)} placeholder="Province" className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input value={ship.postal} onChange={(e) => setShipField("postal", e.target.value)} inputMode="numeric" placeholder="Postal code (optional)" className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
+                    <input value={ship.landmark} onChange={(e) => setShipField("landmark", e.target.value)} placeholder="Landmark (optional)" className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
+                  </div>
+                  <p className="text-[11px] text-plum-ink/45">📦 We&apos;ll ship this via courier and send you a tracking update once it&apos;s dispatched.</p>
+                </div>
+              ) : (
               <>
                 {!distanceMode && zones.length > 0 && (
                   <select value={zone} onChange={(e) => setZone(e.target.value)} className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm">
@@ -678,6 +718,7 @@ export function WebOrder(props: WebOrderProps) {
                   </div>
                 )}
               </>
+              )
             )}
 
             {/* Payment method — a choice whenever the owner offers any online
@@ -759,7 +800,7 @@ export function WebOrder(props: WebOrderProps) {
           <div className="mb-1 space-y-0.5 text-sm text-plum-ink/60">
             <div className="flex justify-between"><span>Subtotal</span><span>{formatPeso(subtotal)}</span></div>
             {orderType === "delivery" && (collectDeliveryFee ? (
-              <div className="flex justify-between"><span>Delivery fee</span><span>{deliveryFee > 0 ? formatPeso(deliveryFee) : "—"}</span></div>
+              <div className="flex justify-between"><span>{shippingMode ? "Shipping fee" : "Delivery fee"}</span><span>{deliveryFee > 0 ? formatPeso(deliveryFee) : "—"}</span></div>
             ) : (
               <div className="flex justify-between text-plum-ink/50">
                 <span>Delivery</span>
@@ -799,14 +840,14 @@ export function WebOrder(props: WebOrderProps) {
         ) : (
           <button
             onClick={submit}
-            disabled={busy || lines.length === 0 || !name.trim() || !phone.trim() || (schedulingLater && !scheduledIso) || (payMethod !== "cod" && !gcashRef.trim()) || (orderType === "delivery" && (!address.trim() || !geo || !collectDeliveryFee && !agreeRider || (distanceMode ? !!distance?.outOfRange : (zones.length > 0 && !zone))))}
+            disabled={busy || lines.length === 0 || !name.trim() || !phone.trim() || (schedulingLater && !scheduledIso) || (payMethod !== "cod" && !gcashRef.trim()) || (orderType === "delivery" && (shippingMode ? !shippingReady : (!address.trim() || !geo || !collectDeliveryFee && !agreeRider || (distanceMode ? !!distance?.outOfRange : (zones.length > 0 && !zone)))))}
             className="mt-3 w-full rounded-lg bg-green-600 py-3 font-semibold text-white disabled:opacity-50"
           >
             {busy
               ? "Placing…"
               : schedulingLater
-                ? `Schedule ${orderType === "delivery" ? "delivery" : "pickup"} order`
-                : `Place ${orderType === "delivery" ? "delivery" : "pickup"} order`}
+                ? `Schedule ${orderType === "delivery" ? (shippingMode ? "" : "delivery ") : "pickup "}order`
+                : `Place ${orderType === "delivery" ? (shippingMode ? "" : "delivery ") : "pickup "}order`}
           </button>
         )}
         {checkout && (

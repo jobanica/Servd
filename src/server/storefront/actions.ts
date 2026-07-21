@@ -90,8 +90,9 @@ export async function updateStorefront(
   const dpNum = (k: string) => Number(formData.get(k)) || 0;
   const originLat = formData.get("originLat") ? Number(formData.get("originLat")) : null;
   const originLng = formData.get("originLng") ? Number(formData.get("originLng")) : null;
+  const deliveryModeRaw = formData.get("deliveryMode");
   const deliveryConfig = {
-    mode: formData.get("deliveryMode") === "distance" ? "distance" : "zones",
+    mode: deliveryModeRaw === "distance" ? "distance" : deliveryModeRaw === "shipping" ? "shipping" : "zones",
     baseFee: pesosToCentavos(Math.max(0, dpNum("baseFeePesos"))),
     perKm: pesosToCentavos(Math.max(0, dpNum("perKmPesos"))),
     freeKm: Math.max(0, dpNum("freeKm")),

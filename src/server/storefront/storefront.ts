@@ -41,7 +41,7 @@ export interface PaymentConfig {
 /** The online (non-cash) payment methods a store can offer at web checkout. */
 export type OnlinePayMethod = "gcash" | "maya" | "bank";
 export interface DeliveryConfig {
-  mode: "zones" | "distance"; // how the delivery fee is worked out
+  mode: "zones" | "distance" | "shipping"; // zones/distance = local rider; shipping = nationwide courier (region fee, no map pin)
   baseFee: number; // centavos
   perKm: number; // centavos per km
   freeKm: number; // first N km included in base
@@ -77,7 +77,7 @@ function normalizeDeliveryConfig(raw: unknown): DeliveryConfig {
   if (raw && typeof raw === "object") {
     const r = raw as Partial<DeliveryConfig>;
     return {
-      mode: r.mode === "distance" ? "distance" : "zones",
+      mode: r.mode === "distance" ? "distance" : r.mode === "shipping" ? "shipping" : "zones",
       baseFee: Math.max(0, Math.round(num(r.baseFee))),
       perKm: Math.max(0, Math.round(num(r.perKm))),
       freeKm: Math.max(0, num(r.freeKm)),
