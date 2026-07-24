@@ -334,7 +334,18 @@ export function MerchantBoard({
                       : "📱 Paid via GCash"}
                   </p>
                   {topIncoming.paymentRef && <p className="text-sm font-semibold text-plum-ink/70">Ref: {topIncoming.paymentRef}</p>}
+                  {topIncoming.paymentReceiptUrl && (
+                    <a href={topIncoming.paymentReceiptUrl} target="_blank" rel="noopener" className="mt-1 inline-block text-sm font-semibold text-blue-600 underline">
+                      🧾 View payment receipt
+                    </a>
+                  )}
                   <p className="text-[11px] text-plum-ink/50">Verify the payment before accepting.</p>
+                </div>
+              )}
+              {topIncoming.customerNote && (
+                <div className="mt-3 rounded-xl bg-mango/10 px-4 py-2.5">
+                  <p className="text-xs font-bold uppercase tracking-wide text-plum-ink/50">📝 Note to rider</p>
+                  <p className="text-sm font-semibold text-plum-ink/80">{topIncoming.customerNote}</p>
                 </div>
               )}
 
@@ -442,6 +453,19 @@ export function MerchantBoard({
                       </p>
                     </div>
                   </div>
+                  {o.orderType === "delivery" && o.customerAddress && (
+                    <p className="mt-1 text-sm text-plum-ink/60">📍 {o.customerAddress}</p>
+                  )}
+                  {o.customerNote && (
+                    <p className="mt-1 rounded-lg bg-mango/10 px-2 py-1 text-sm font-semibold text-plum-ink/80">
+                      📝 {o.customerNote}
+                    </p>
+                  )}
+                  {o.paymentReceiptUrl && (
+                    <a href={o.paymentReceiptUrl} target="_blank" rel="noopener" className="mt-1 inline-block text-xs font-semibold text-blue-600 underline">
+                      🧾 View payment receipt
+                    </a>
+                  )}
                   <div className="mt-3 border-t border-plum-ink/5 pt-3">
                     <OrderLines o={o} />
                   </div>

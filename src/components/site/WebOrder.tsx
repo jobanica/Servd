@@ -371,7 +371,31 @@ export function WebOrder(props: WebOrderProps) {
     pay && pay.codEnabled === false && hasOnline ? onlineMethods[0].key : "cod",
   );
   const [gcashRef, setGcashRef] = useState(""); // reference no. for the chosen online method
+  const [receipt, setReceipt] = useState<string | null>(null); // uploaded payment screenshot (data URL)
+  const [receiptBusy, setReceiptBusy] = useState(false);
+  const [riderNote, setRiderNote] = useState(""); // customer's note to the rider
   const selectedOnline = onlineMethods.find((m) => m.key === payMethod) ?? null;
+
+  // Compress the chosen receipt image in the browser so the upload stays small.
+  async function pickReceipt(file: File | undefined) {
+    if (!file) return;
+    setReceiptBusy(true);
+    try {
+      const bitmap = await createImageBitmap(file);
+      const scale = Math.min(1, 1200 / Math.max(bitmap.width, bitmap.height));
+      const w = Math.round(bitmap.width * scale);
+      const h = Math.round(bitmap.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext("2d")?.drawImage(bitmap, 0, 0, w, h);
+      setReceipt(canvas.toDataURL("image/jpeg", 0.7));
+    } catch {
+      setReceipt(null);
+    } finally {
+      setReceiptBusy(false);
+    }
+  }
 
   const count = cartCount(lines);
   const subtotal = cartTotal(lines);
@@ -494,6 +518,8 @@ export function WebOrder(props: WebOrderProps) {
       downpaymentRef: schedulingLater && downpaymentDue > 0 ? downpaymentRef || undefined : undefined,
       paymentChoice: payMethod,
       paymentRef: payMethod !== "cod" ? gcashRef || undefined : undefined,
+      paymentReceipt: payMethod !== "cod" ? receipt || undefined : undefined,
+      customerNote: orderType === "delivery" ? riderNote.trim() || undefined : undefined,
       couponCode: appliedPromo?.code || undefined,
       lines: lines.map((l) => ({ itemId: l.itemId, quantity: l.quantity, note: l.note, modifierIds: l.modifiers.map((m) => m.modifierId), variantId: l.variantId })),
     });
@@ -721,6 +747,20 @@ export function WebOrder(props: WebOrderProps) {
               )
             )}
 
+            {orderType === "delivery" && (
+              <div>
+                <p className="mb-1 text-xs font-semibold text-plum-ink/60">Note to the rider (optional)</p>
+                <textarea
+                  value={riderNote}
+                  onChange={(e) => setRiderNote(e.target.value)}
+                  rows={2}
+                  maxLength={500}
+                  placeholder="e.g. Gate is blue, call when near, leave with guard…"
+                  className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+                />
+              </div>
+            )}
+
             {/* Payment method — a choice whenever the owner offers any online
                 method (GCash / Maya / Bank) alongside cash. */}
             {hasOnline && (
@@ -759,7 +799,26 @@ export function WebOrder(props: WebOrderProps) {
                       placeholder="Enter your payment reference no."
                       className="mt-2 w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
                     />
-                    <p className="mt-1 text-[11px] text-plum-ink/45">Pay, then enter the reference so we can confirm your order.</p>
+                    {/* Optional: upload a screenshot of the payment receipt. */}
+                    {receipt ? (
+                      <div className="mt-2 flex items-center gap-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={receipt} alt="Payment receipt" className="h-14 w-14 rounded-lg border border-plum-ink/10 object-cover" />
+                        <span className="text-xs font-semibold text-green-700">Receipt attached ✓</span>
+                        <button type="button" onClick={() => setReceipt(null)} className="text-xs text-plum-ink/50 underline">remove</button>
+                      </div>
+                    ) : (
+                      <label className="mt-2 block cursor-pointer rounded-lg border border-dashed border-plum-ink/25 px-3 py-2 text-xs font-semibold text-plum-ink/60">
+                        {receiptBusy ? "Processing…" : "📎 Upload payment receipt (optional)"}
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          className="hidden"
+                          onChange={(e) => pickReceipt(e.target.files?.[0])}
+                        />
+                      </label>
+                    )}
+                    <p className="mt-1 text-[11px] text-plum-ink/45">Pay, then enter the reference and/or upload the receipt so we can confirm your order.</p>
                   </div>
                 )}
               </div>

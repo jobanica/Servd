@@ -12,6 +12,7 @@ import { recordVariantsSold } from "@/server/menu/variants";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
 import { sendOrderPush } from "@/server/push/send";
 import { getPublicStorefront, isOpenNow, computeDownpayment, computePackagingFee } from "@/server/storefront/storefront";
+import { uploadMenuImageBytes } from "@/server/storage/menu-images";
 import { haversineKm, computeDistanceFee } from "@/lib/geo/distance";
 import { resolvePromo } from "@/server/promotions/redeem";
 import { getWebOrderCapStatus } from "@/server/billing/order-cap";
@@ -32,6 +33,8 @@ const schema = z.object({
   downpaymentRef: z.string().trim().max(120).optional(), // customer's payment reference
   paymentChoice: z.enum(["cod", "gcash", "maya", "bank"]).optional(), // chosen payment method
   paymentRef: z.string().trim().max(120).optional(), // reference no. for an online payment
+  paymentReceipt: z.string().max(8_000_000).optional(), // data-URL screenshot of the payment
+  customerNote: z.string().trim().max(500).optional(), // note to the rider / kitchen
   couponCode: z.string().trim().max(40).optional(), // promo/coupon code
   lines: z
     .array(
@@ -215,10 +218,29 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
       }
     : null;
   const pay = { paymentChoice: choice, paymentRef: choice !== "cod" ? d.paymentRef?.trim() || null : null };
+
+  // Online-payment receipt screenshot (best-effort). The customer sends a
+  // data-URL; we upload the bytes to storage and keep the public URL. Never
+  // blocks the order — a failed/oversized upload just yields no receipt.
+  let paymentReceiptUrl: string | null = null;
+  if (choice !== "cod" && d.paymentReceipt) {
+    try {
+      const m = /^data:(image\/(png|jpe?g|webp));base64,([A-Za-z0-9+/=]+)$/.exec(d.paymentReceipt);
+      if (m) {
+        const bytes = Buffer.from(m[3], "base64");
+        if (bytes.length > 0 && bytes.length <= 5 * 1024 * 1024) {
+          const ext = m[1] === "image/png" ? "png" : m[1] === "image/webp" ? "webp" : "jpg";
+          paymentReceiptUrl = await uploadMenuImageBytes(restaurant.id, bytes, ext, m[1]);
+        }
+      }
+    } catch { /* receipt upload is best-effort */ }
+  }
+
+  const note = d.customerNote?.trim() || null;
   // `source: "web"` tags this as an online-website order (Free-tier monthly
   // meter). It rides in `extra` so a schema-lagged DB just drops it and the
   // order still lands (uncounted until the migration runs).
-  const extra = { ...(geo ?? {}), ...(sched ?? {}), ...(advance ?? {}), ...pay, source: "web" };
+  const extra = { ...(geo ?? {}), ...(sched ?? {}), ...(advance ?? {}), ...pay, source: "web", customerNote: note, paymentReceiptUrl };
 
   let order;
   try {

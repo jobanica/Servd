@@ -51,6 +51,8 @@ export interface MerchantOrder {
   scheduledFor: string | null; // ISO — advance order requested time (null = ASAP)
   paymentChoice: string | null; // "cod" | "gcash"
   paymentRef: string | null; // customer's GCash reference
+  paymentReceiptUrl: string | null; // uploaded payment screenshot
+  customerNote: string | null; // customer's note to the rider
   createdAt: string; // ISO
   items: MerchantOrderItem[];
 }
@@ -116,6 +118,8 @@ function shape(o: Row, extra: OrderExtra): MerchantOrder {
     scheduledFor: extra.scheduledFor,
     paymentChoice: extra.paymentChoice,
     paymentRef: extra.paymentRef,
+    paymentReceiptUrl: extra.paymentReceiptUrl,
+    customerNote: extra.customerNote,
     createdAt: o.createdAt.toISOString(),
     items: o.items.map((it) => ({
       name: it.nameAtTime,
@@ -159,7 +163,7 @@ async function loadMerchantData(restaurantId: string): Promise<MerchantData> {
   // screen still works before the migration runs.
   const allIds = [...incomingRows, ...activeRows, ...historyRows].map((o) => o.id);
   const extras = await loadExtras(restaurantId, allIds);
-  const get = (id: string): OrderExtra => extras.get(id) ?? { prepMinutes: null, cancelReason: null, scheduledFor: null, paymentChoice: null, paymentRef: null };
+  const get = (id: string): OrderExtra => extras.get(id) ?? { prepMinutes: null, cancelReason: null, scheduledFor: null, paymentChoice: null, paymentRef: null, paymentReceiptUrl: null, customerNote: null };
 
   return {
     // Advance orders (scheduled for later) are handled on the Advance orders page,
@@ -176,12 +180,14 @@ type OrderExtra = {
   scheduledFor: string | null;
   paymentChoice: string | null;
   paymentRef: string | null;
+  paymentReceiptUrl: string | null;
+  customerNote: string | null;
 };
 
 async function loadExtras(restaurantId: string, ids: string[]): Promise<Map<string, OrderExtra>> {
   const map = new Map<string, OrderExtra>();
   if (ids.length === 0) return map;
-  const blank = (): OrderExtra => ({ prepMinutes: null, cancelReason: null, scheduledFor: null, paymentChoice: null, paymentRef: null });
+  const blank = (): OrderExtra => ({ prepMinutes: null, cancelReason: null, scheduledFor: null, paymentChoice: null, paymentRef: null, paymentReceiptUrl: null, customerNote: null });
   for (const id of ids) map.set(id, blank());
   // Each column group is read independently and best-effort, so one un-migrated
   // group (scheduledFor, payment) never wipes the others.
@@ -203,6 +209,12 @@ async function loadExtras(restaurantId: string, ids: string[]): Promise<Map<stri
     );
     for (const r of rows) { const e = map.get(r.id)!; e.paymentChoice = r.paymentChoice ?? null; e.paymentRef = r.paymentRef ?? null; }
   } catch { /* payment columns not migrated yet */ }
+  try {
+    const rows = await tenantDb(restaurantId, (tx) =>
+      tx.order.findMany({ where: { id: { in: ids } }, select: { id: true, paymentReceiptUrl: true, customerNote: true } }),
+    );
+    for (const r of rows) { const e = map.get(r.id)!; e.paymentReceiptUrl = r.paymentReceiptUrl ?? null; e.customerNote = r.customerNote ?? null; }
+  } catch { /* receipt/note columns not migrated yet */ }
   return map;
 }
 
