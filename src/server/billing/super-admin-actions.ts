@@ -209,6 +209,40 @@ export async function assignPlan(formData: FormData): Promise<void> {
   refresh();
 }
 
+export type TempPasswordResult =
+  | { ok: true; login: string; password: string }
+  | { ok: false; error: string };
+
+/**
+ * Generate a fresh temporary password for a restaurant's OWNER (admin) login —
+ * for when they forgot it (and never switched their username login to a real
+ * email, so self-serve reset isn't possible). Returns the login handle + the
+ * new password to hand over; the owner should change it after signing in.
+ */
+export async function resetOwnerPassword(restaurantId: string): Promise<TempPasswordResult> {
+  await requireSuperAdmin();
+  if (!restaurantId) return { ok: false, error: "Missing restaurant." };
+  const owner = await systemDb((tx) =>
+    tx.staffUser.findFirst({
+      where: { restaurantId, role: "admin" },
+      orderBy: { createdAt: "asc" },
+      select: { authUserId: true, email: true, username: true },
+    }),
+  );
+  if (!owner) return { ok: false, error: "No owner account found for this restaurant." };
+
+  const password = tempPassword();
+  try {
+    const admin = createSupabaseAdminClient();
+    const { error } = await admin.auth.admin.updateUserById(owner.authUserId, { password });
+    if (error) return { ok: false, error: error.message };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Couldn't reset the password." };
+  }
+  const login = owner.username || owner.email;
+  return { ok: true, login, password };
+}
+
 /** Features the hidden Lite save plan grants (online ordering + payments). */
 const LITE_FEATURES: Feature[] = ["onlineOrdering", "onlinePayments"];
 

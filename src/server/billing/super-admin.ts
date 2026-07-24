@@ -91,7 +91,13 @@ export interface SubscriptionRow {
   hasSavedCard: boolean;
   smsCreditBalance: number;
   smsSenderName: string | null;
+  ownerEmail: string | null; // owner's login email (synthetic for username logins)
+  ownerUsername: string | null; // login handle, if username-based
+  ownerPhone: string | null; // business contact phone (from signup / receipt)
 }
+
+/** The @ synthetic-login domain — an owner's "email" on that domain isn't real. */
+const SYNTHETIC_LOGIN_DOMAIN = process.env.INTERNAL_LOGIN_DOMAIN || "staff.servdph.com";
 
 /** Every restaurant with its current (latest) subscription + plan. */
 export async function listSubscriptions(): Promise<SubscriptionRow[]> {
@@ -106,6 +112,13 @@ export async function listSubscriptions(): Promise<SubscriptionRow[]> {
         createdAt: true,
         smsCreditBalance: true,
         smsSenderName: true,
+        printerConfig: true,
+        staff: {
+          where: { role: "admin" },
+          orderBy: { createdAt: "asc" },
+          take: 1,
+          select: { email: true, username: true },
+        },
         subscriptions: {
           orderBy: { createdAt: "desc" },
           take: 1,
@@ -127,7 +140,14 @@ export async function listSubscriptions(): Promise<SubscriptionRow[]> {
 
   return restaurants.map((r) => {
     const sub = r.subscriptions[0];
+    const owner = r.staff[0];
+    // Synthetic-domain emails are username placeholders, not a real inbox.
+    const realEmail = owner?.email && !owner.email.endsWith(`@${SYNTHETIC_LOGIN_DOMAIN}`) ? owner.email : null;
+    const phone = (r.printerConfig as { receipt?: { phone?: string } } | null)?.receipt?.phone ?? null;
     return {
+      ownerEmail: realEmail,
+      ownerUsername: owner?.username ?? null,
+      ownerPhone: phone,
       restaurantId: r.id,
       restaurantName: r.name,
       slug: r.slug,

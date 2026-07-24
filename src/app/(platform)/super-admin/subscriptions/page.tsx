@@ -11,6 +11,7 @@ import {
 import { isComplimentary } from "@/lib/billing/comp";
 import { GrantAccessControl } from "@/components/super-admin/GrantAccessControl";
 import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
+import { TempPasswordButton } from "@/components/super-admin/TempPasswordButton";
 import { addSmsCredits, setSenderName } from "@/server/sms/admin";
 import { formatPeso } from "@/lib/money";
 
@@ -183,6 +184,15 @@ export default async function SubscriptionsPage({
               </div>
               <HealthStrip h={health.get(s.restaurantId)} planName={s.planName} />
             </summary>
+
+            {/* Owner contact + login recovery */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-plum-ink/10 px-4 py-2.5 text-xs">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-plum-ink/70">
+                <span>✉️ {s.ownerEmail ?? (s.ownerUsername ? `@${s.ownerUsername} · username login` : "no email set")}</span>
+                <span>📞 {s.ownerPhone ?? "—"}</span>
+              </div>
+              <TempPasswordButton restaurantId={s.restaurantId} className={btn} />
+            </div>
 
             {/* Manual upgrade — full access, no payment */}
             <div className="flex flex-wrap items-end justify-between gap-3 border-t border-plum-ink/10 bg-brand-primary/5 px-4 py-3">
