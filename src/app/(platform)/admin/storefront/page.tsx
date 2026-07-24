@@ -117,6 +117,7 @@ export default async function StorefrontPage() {
             originLat: sf.delivery.originLat,
             originLng: sf.delivery.originLng,
             feeInTotal: sf.delivery.feeInTotal,
+            mapEnabled: sf.delivery.mapEnabled,
           },
         }}
       />

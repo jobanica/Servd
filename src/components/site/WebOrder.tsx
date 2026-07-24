@@ -107,6 +107,7 @@ export interface WebOrderProps {
     originLat: number | null;
     originLng: number | null;
     feeInTotal?: boolean;
+    mapEnabled?: boolean;
   };
   // Where to center the delivery map by default (the store's location), so diners
   // start near the store instead of a far-away default view.
@@ -414,6 +415,9 @@ export function WebOrder(props: WebOrderProps) {
   ].filter(Boolean).join(", ");
   const shippingReady = !!(ship.street.trim() && ship.barangay.trim() && ship.city.trim() && ship.province.trim() && zone);
   const distanceMode = orderType === "delivery" && dcfg?.mode === "distance" && dcfg.originLat != null && dcfg.originLng != null;
+  // Whether to show the map pin. Distance mode always needs it; other modes only
+  // when the owner keeps it on. Shipping never uses it.
+  const showMap = orderType === "delivery" && !shippingMode && (distanceMode || dcfg?.mapEnabled !== false);
   const distance =
     distanceMode && geo
       ? computeDistanceFee(
@@ -715,23 +719,25 @@ export function WebOrder(props: WebOrderProps) {
                   </select>
                 )}
                 <textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={2} placeholder="Delivery address" className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
-                <div>
-                  <p className="mb-1 text-xs font-semibold text-plum-ink/60">Pin your location (required for delivery)</p>
-                  <LocationPicker defaultCenter={props.storeCenter ?? undefined} onChange={(lat, lng) => setGeo({ lat, lng })} />
-                  {!geo && <p className="mt-1 text-xs text-guava">Please pin your location to place a delivery order.</p>}
-                  {distanceMode && geo && distance && (
-                    distance.outOfRange ? (
-                      <p className="mt-1 text-xs font-semibold text-guava">
-                        Sorry — that&apos;s about {distance.billableKm.toFixed(1)} km away, outside our delivery range.
-                      </p>
-                    ) : (
-                      <p className="mt-1 text-xs font-semibold text-plum-ink/70">
-                        ≈ {distance.billableKm.toFixed(1)} km away
-                        {collectDeliveryFee ? ` · Delivery ${formatPeso(distance.fee)}` : ""}
-                      </p>
-                    )
-                  )}
-                </div>
+                {showMap && (
+                  <div>
+                    <p className="mb-1 text-xs font-semibold text-plum-ink/60">Pin your location (required for delivery)</p>
+                    <LocationPicker defaultCenter={props.storeCenter ?? undefined} onChange={(lat, lng) => setGeo({ lat, lng })} />
+                    {!geo && <p className="mt-1 text-xs text-guava">Please pin your location to place a delivery order.</p>}
+                    {distanceMode && geo && distance && (
+                      distance.outOfRange ? (
+                        <p className="mt-1 text-xs font-semibold text-guava">
+                          Sorry — that&apos;s about {distance.billableKm.toFixed(1)} km away, outside our delivery range.
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-xs font-semibold text-plum-ink/70">
+                          ≈ {distance.billableKm.toFixed(1)} km away
+                          {collectDeliveryFee ? ` · Delivery ${formatPeso(distance.fee)}` : ""}
+                        </p>
+                      )
+                    )}
+                  </div>
+                )}
                 {!collectDeliveryFee && (
                   <div className="rounded-lg bg-mango/10 p-3">
                     <p className="text-xs text-plum-ink/70">
@@ -899,7 +905,7 @@ export function WebOrder(props: WebOrderProps) {
         ) : (
           <button
             onClick={submit}
-            disabled={busy || lines.length === 0 || !name.trim() || !phone.trim() || (schedulingLater && !scheduledIso) || (payMethod !== "cod" && !gcashRef.trim()) || (orderType === "delivery" && (shippingMode ? !shippingReady : (!address.trim() || !geo || !collectDeliveryFee && !agreeRider || (distanceMode ? !!distance?.outOfRange : (zones.length > 0 && !zone)))))}
+            disabled={busy || lines.length === 0 || !name.trim() || !phone.trim() || (schedulingLater && !scheduledIso) || (payMethod !== "cod" && !gcashRef.trim()) || (orderType === "delivery" && (shippingMode ? !shippingReady : (!address.trim() || (showMap && !geo) || !collectDeliveryFee && !agreeRider || (distanceMode ? !!distance?.outOfRange : (zones.length > 0 && !zone)))))}
             className="mt-3 w-full rounded-lg bg-green-600 py-3 font-semibold text-white disabled:opacity-50"
           >
             {busy

@@ -104,6 +104,8 @@ export async function updateStorefront(
     // Checkbox: when unchecked, the delivery fee is NOT added to the order total
     // (the customer settles it with the rider directly).
     feeInTotal: formData.get("deliveryFeeInTotal") === "on",
+    // Checkbox: when unchecked, the checkout map pin is hidden (typed address only).
+    mapEnabled: formData.get("mapEnabled") === "on",
   };
   const hoursJson = hours as unknown as Prisma.InputJsonValue;
   const zonesJson = zones as unknown as Prisma.InputJsonValue;

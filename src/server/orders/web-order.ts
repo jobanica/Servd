@@ -97,13 +97,14 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
   }
 
   const storefront = await getPublicStorefront(restaurant.id);
-  // Nationwide-shipping orders capture a typed postal address (no map pin);
-  // every other delivery mode still needs the customer's pinned location.
-  if (
+  // A map pin is needed for distance-based fees, and for zone/flat delivery when
+  // the owner keeps the map on. Shipping (typed address) and a map-off store skip
+  // it. When not required, a typed address is enough.
+  const pinRequired =
     d.orderType === "delivery" &&
     storefront.delivery.mode !== "shipping" &&
-    (d.lat == null || d.lng == null)
-  ) {
+    (storefront.delivery.mode === "distance" || storefront.delivery.mapEnabled !== false);
+  if (pinRequired && (d.lat == null || d.lng == null)) {
     return { ok: false, error: "Please pin your delivery location on the map." };
   }
 

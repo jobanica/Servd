@@ -52,6 +52,8 @@ export interface DeliveryConfig {
   originLng: number | null;
   feeInTotal: boolean; // true = add the fee to the order total (pay in-app);
   //                      false = customer pays the rider directly (food only in-app)
+  mapEnabled: boolean; // ask the customer to pin their location on a map at checkout
+  //                      (distance mode always needs it; ignored there)
 }
 export interface Storefront {
   hours: DayHours[]; // always length 7, index 0=Sun … 6=Sat
@@ -64,7 +66,7 @@ export interface Storefront {
 }
 
 export function defaultDeliveryConfig(): DeliveryConfig {
-  return { mode: "zones", baseFee: 0, perKm: 0, freeKm: 0, minFee: 0, maxKm: 0, roadFactor: 1.3, originLat: null, originLng: null, feeInTotal: true };
+  return { mode: "zones", baseFee: 0, perKm: 0, freeKm: 0, minFee: 0, maxKm: 0, roadFactor: 1.3, originLat: null, originLng: null, feeInTotal: true, mapEnabled: true };
 }
 
 function num(v: unknown, fallback = 0): number {
@@ -88,6 +90,8 @@ function normalizeDeliveryConfig(raw: unknown): DeliveryConfig {
       originLng: r.originLng == null ? null : num(r.originLng),
       // Default true (fee included) so existing stores are unchanged.
       feeInTotal: r.feeInTotal === undefined ? true : !!r.feeInTotal,
+      // Default true (map shown) so existing stores keep the pin.
+      mapEnabled: r.mapEnabled === undefined ? true : !!r.mapEnabled,
     };
   }
   return d;

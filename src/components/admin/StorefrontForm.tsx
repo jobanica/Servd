@@ -125,6 +125,7 @@ export function StorefrontForm({
       originLat: number | null;
       originLng: number | null;
       feeInTotal: boolean;
+      mapEnabled: boolean;
     };
   };
 }) {
@@ -236,6 +237,20 @@ export function StorefrontForm({
               Uncheck if the <strong>customer pays the rider directly</strong> — then only the food is
               charged/paid online (GCash QR or cash), and the fee shown is just an estimate settled
               with the courier. Useful when courier rates differ from the app&apos;s estimate.
+            </span>
+          </span>
+        </label>
+
+        {/* Map pin toggle — not relevant to shipping (typed address, no pin). */}
+        <label className={`mt-3 ${deliveryMode === "shipping" ? "hidden" : "flex"} items-start gap-2 text-sm font-semibold`}>
+          <input type="checkbox" name="mapEnabled" defaultChecked={initial.delivery.mapEnabled} className="mt-0.5" />
+          <span>
+            Ask customers to pin their location on a map at checkout
+            <span className="mt-0.5 block text-xs font-normal text-plum-ink/50">
+              Uncheck to <strong>hide the map</strong> — customers just type their delivery address.
+              {deliveryMode === "distance" && (
+                <span className="text-guava"> Distance-based fees need the pin, so the map stays on in this mode.</span>
+              )}
             </span>
           </span>
         </label>
