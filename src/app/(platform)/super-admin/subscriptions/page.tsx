@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { listSubscriptions, listAllPlans, type SubStatus, type SubscriptionRow } from "@/server/billing/super-admin";
+import { listSubscriptions, listAllPlans, listCustomerHealth, type SubStatus, type SubscriptionRow, type CustomerHealth } from "@/server/billing/super-admin";
 import {
   assignPlan,
   setSubscriptionStatus,
@@ -32,6 +32,54 @@ function StatusBadge({ status }: { status: SubStatus | null }) {
 
 function fmtDate(iso: string | null) {
   return iso ? new Date(iso).toLocaleDateString() : "—";
+}
+
+/** Monthly online-order cap implied by the plan name (null = unlimited). */
+function capForPlan(planName: string | null): number | null {
+  if (!planName) return 100;
+  if (/lite/i.test(planName)) return 300;
+  if (/free/i.test(planName)) return 100;
+  return null; // Growth / Business / custom paid plans → unlimited
+}
+
+function Chip({ children, tone = "neutral" }: { children: React.ReactNode; tone?: "neutral" | "green" | "amber" | "red" }) {
+  const cls = {
+    neutral: "bg-plum-ink/5 text-plum-ink/70",
+    green: "bg-mango/15 text-mango",
+    amber: "bg-amber-500/15 text-amber-700",
+    red: "bg-guava/15 text-guava",
+  }[tone];
+  return <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${cls}`}>{children}</span>;
+}
+
+/** Glanceable per-customer health: churn signal + this month + upsell trigger. */
+function HealthStrip({ h, planName }: { h: CustomerHealth | undefined; planName: string | null }) {
+  if (!h) return null;
+  // Days since last order (the key churn signal).
+  const days = h.lastOrderAt ? Math.floor((Date.now() - new Date(h.lastOrderAt).getTime()) / 86_400_000) : null;
+  const lastTone = days == null ? "amber" : days <= 3 ? "green" : days <= 7 ? "amber" : "red";
+  const lastLabel = days == null ? "🕒 no orders yet" : `🕒 last order ${days === 0 ? "today" : `${days}d ago`}`;
+
+  // 30-day momentum vs the previous 30 days.
+  let trend: React.ReactNode = null;
+  if (h.ordersPrev30 > 0) {
+    const pct = Math.round(((h.orders30 - h.ordersPrev30) / h.ordersPrev30) * 100);
+    if (pct !== 0) trend = <Chip tone={pct > 0 ? "green" : "red"}>{pct > 0 ? "▲" : "▼"} {Math.abs(pct)}%</Chip>;
+  }
+
+  const cap = capForPlan(planName);
+  const onlineTone = cap ? (h.onlineMtd >= cap * 0.9 ? "red" : h.onlineMtd >= cap * 0.7 ? "amber" : "neutral") : "neutral";
+
+  return (
+    <div className="flex w-full flex-wrap items-center gap-1.5">
+      <Chip tone={lastTone}>{lastLabel}</Chip>
+      <Chip>📦 {h.ordersMtd} orders MTD</Chip>
+      {trend}
+      <Chip>💰 {formatPeso(h.gmvMtd)} MTD</Chip>
+      <Chip tone={onlineTone}>🌐 {h.onlineMtd}{cap ? ` / ${cap}` : ""} online</Chip>
+      {h.ratingCount > 0 && <Chip>⭐ {h.ratingAvg?.toFixed(1)} ({h.ratingCount})</Chip>}
+    </div>
+  );
 }
 
 /**
@@ -72,7 +120,7 @@ export default async function SubscriptionsPage({
   searchParams: Promise<{ status?: string; access?: string; filter?: string }>;
 }) {
   const sp = await searchParams;
-  const [allSubs, plans] = await Promise.all([listSubscriptions(), listAllPlans()]);
+  const [allSubs, plans, health] = await Promise.all([listSubscriptions(), listAllPlans(), listCustomerHealth()]);
   const activePlans = plans.filter((p) => p.isActive);
   const { rows: subs, label: filterLabel } = filterSubs(allSubs, sp);
 
@@ -133,6 +181,7 @@ export default async function SubscriptionsPage({
                     : `trial ends ${fmtDate(s.trialEndsAt)}`
                   : `renews ${fmtDate(s.currentPeriodEnd)}`}
               </div>
+              <HealthStrip h={health.get(s.restaurantId)} planName={s.planName} />
             </summary>
 
             {/* Manual upgrade — full access, no payment */}

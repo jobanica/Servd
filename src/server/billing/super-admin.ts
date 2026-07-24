@@ -149,6 +149,73 @@ export async function listSubscriptions(): Promise<SubscriptionRow[]> {
   });
 }
 
+export interface CustomerHealth {
+  gmvMtd: number; // centavos collected this calendar month (paid payments)
+  ordersMtd: number; // orders this calendar month (non-cancelled)
+  orders30: number; // orders in the last 30 days
+  ordersPrev30: number; // orders in the 30 days before that (for the trend)
+  lastOrderAt: string | null; // ISO of the most recent order, ever
+  onlineMtd: number; // online-website orders this month
+  ratingAvg: number | null; // all-time avg star rating
+  ratingCount: number;
+}
+
+/**
+ * Per-restaurant health metrics for the super-admin subscriptions view —
+ * computed with a handful of grouped queries (no N+1). systemDb bypasses RLS
+ * because the platform owner sees every tenant.
+ */
+export async function listCustomerHealth(): Promise<Map<string, CustomerHealth>> {
+  const now = new Date();
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const d30 = new Date(now.getTime() - 30 * 86_400_000);
+  const d60 = new Date(now.getTime() - 60 * 86_400_000);
+  const map = new Map<string, CustomerHealth>();
+  const ensure = (rid: string): CustomerHealth => {
+    let h = map.get(rid);
+    if (!h) {
+      h = { gmvMtd: 0, ordersMtd: 0, orders30: 0, ordersPrev30: 0, lastOrderAt: null, onlineMtd: 0, ratingAvg: null, ratingCount: 0 };
+      map.set(rid, h);
+    }
+    return h;
+  };
+
+  return systemDb(async (tx) => {
+    // GMV this month (paid payments → grouped by the order's restaurant).
+    const payments = await tx.payment.findMany({
+      where: { status: "paid", createdAt: { gte: monthStart } },
+      select: { amount: true, order: { select: { restaurantId: true } } },
+    });
+    for (const p of payments) if (p.order) ensure(p.order.restaurantId).gmvMtd += p.amount;
+
+    const notCancelled = { status: { not: "cancelled" as const } };
+    const [mtd, o30, oPrev30, last] = await Promise.all([
+      tx.order.groupBy({ by: ["restaurantId"], where: { ...notCancelled, createdAt: { gte: monthStart } }, _count: { _all: true } }),
+      tx.order.groupBy({ by: ["restaurantId"], where: { ...notCancelled, createdAt: { gte: d30 } }, _count: { _all: true } }),
+      tx.order.groupBy({ by: ["restaurantId"], where: { ...notCancelled, createdAt: { gte: d60, lt: d30 } }, _count: { _all: true } }),
+      tx.order.groupBy({ by: ["restaurantId"], _max: { createdAt: true } }),
+    ]);
+    for (const r of mtd) ensure(r.restaurantId).ordersMtd = r._count._all;
+    for (const r of o30) ensure(r.restaurantId).orders30 = r._count._all;
+    for (const r of oPrev30) ensure(r.restaurantId).ordersPrev30 = r._count._all;
+    for (const r of last) ensure(r.restaurantId).lastOrderAt = r._max.createdAt ? r._max.createdAt.toISOString() : null;
+
+    // Online orders this month (best-effort — the `source` column may lag).
+    try {
+      const web = await tx.order.groupBy({ by: ["restaurantId"], where: { source: "web", createdAt: { gte: monthStart } }, _count: { _all: true } });
+      for (const r of web) ensure(r.restaurantId).onlineMtd = r._count._all;
+    } catch { /* source not migrated yet */ }
+
+    // All-time rating.
+    try {
+      const fb = await tx.feedback.groupBy({ by: ["restaurantId"], _avg: { rating: true }, _count: { _all: true } });
+      for (const r of fb) { const h = ensure(r.restaurantId); h.ratingAvg = r._avg.rating != null ? Number(r._avg.rating) : null; h.ratingCount = r._count._all; }
+    } catch { /* feedback table absent */ }
+
+    return map;
+  });
+}
+
 export interface SubscriptionMetrics {
   mrr: number; // centavos — active subs only
   mrrWithTrials: number; // centavos — active + trialing
