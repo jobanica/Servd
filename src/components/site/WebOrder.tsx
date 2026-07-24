@@ -761,7 +761,7 @@ export function WebOrder(props: WebOrderProps) {
                   onChange={(e) => setRiderNote(e.target.value)}
                   rows={2}
                   maxLength={500}
-                  placeholder="please bring ng panukli po. thank you"
+                  placeholder="e.g. Gate is blue, call when near, leave with guard, bring panukli. thank you"
                   className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
                 />
               </div>
