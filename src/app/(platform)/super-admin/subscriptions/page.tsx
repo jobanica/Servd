@@ -6,9 +6,11 @@ import {
   extendTrial,
   compMonth,
   setRestaurantAccess,
+  setToLite,
 } from "@/server/billing/super-admin-actions";
 import { isComplimentary } from "@/lib/billing/comp";
 import { GrantAccessControl } from "@/components/super-admin/GrantAccessControl";
+import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
 import { addSmsCredits, setSenderName } from "@/server/sms/admin";
 import { formatPeso } from "@/lib/money";
 
@@ -212,6 +214,16 @@ export default async function SubscriptionsPage({
                     <button className={btn}>
                       {s.restaurantStatus === "suspended" ? "Restore access" : "Suspend access"}
                     </button>
+                  </form>
+                  {/* Hidden save offer — one tap assigns Lite (₱299 / 300 orders) + activates. */}
+                  <form action={setToLite}>
+                    <input type="hidden" name="restaurantId" value={s.restaurantId} />
+                    <ConfirmSubmitButton
+                      confirmText={`Put "${s.restaurantName}" on the Lite save plan (₱299 · 300 orders/mo, online payments) and activate it now?`}
+                      className={`${btn} border-brand-primary/40 text-brand-primary`}
+                    >
+                      Set to Lite
+                    </ConfirmSubmitButton>
                   </form>
                 </div>
                 {s.failedCharges > 0 && (

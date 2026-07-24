@@ -209,6 +209,44 @@ export async function assignPlan(formData: FormData): Promise<void> {
   refresh();
 }
 
+/** Features the hidden Lite save plan grants (online ordering + payments). */
+const LITE_FEATURES: Feature[] = ["onlineOrdering", "onlinePayments"];
+
+/**
+ * One-click "Set to Lite": put a restaurant on the hidden ₱299 / 300-order save
+ * plan and activate it. Creates the Lite plan the first time (so the founder
+ * doesn't have to set it up), then assigns + activates. Existing Lite plan's
+ * config is respected (features only seeded on first creation).
+ */
+export async function setToLite(formData: FormData): Promise<void> {
+  await requireSuperAdmin();
+  const restaurantId = String(formData.get("restaurantId"));
+  if (!restaurantId) return;
+  let createdPlanId: string | null = null;
+  await systemDb(async (tx) => {
+    let plan = await tx.plan.findFirst({
+      where: { name: { equals: "Lite", mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (!plan) {
+      plan = await tx.plan.create({
+        data: { name: "Lite", priceMonthly: 29900, trialDays: 0, isActive: true, limits: {} },
+        select: { id: true },
+      });
+      createdPlanId = plan.id;
+    }
+    const sub = await ensureSubscription(tx, restaurantId, plan.id);
+    await tx.subscription.update({
+      where: { id: sub.id },
+      data: { planId: plan.id, status: "active", failedCharges: 0, cancelAtPeriodEnd: false },
+      select: { id: true },
+    });
+    await tx.restaurant.update({ where: { id: restaurantId }, data: { planId: plan.id, status: "active" }, select: { id: true } });
+  });
+  if (createdPlanId) await setPlanFeatures(createdPlanId, LITE_FEATURES);
+  refresh();
+}
+
 const STATUSES = ["trialing", "active", "past_due", "cancelled"] as const;
 
 /** Force a subscription status (and keep the restaurant access in sync). */
