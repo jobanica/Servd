@@ -7,7 +7,8 @@ import { getFeedbackList } from "@/server/feedback/queries";
 import { listInventory } from "@/server/inventory/queries";
 import { hasModule } from "@/server/billing/entitlements";
 import { getPlanAccess } from "@/server/billing/feature-gate";
-import { getWebOrderCapStatus } from "@/server/billing/order-cap";
+import { getPlanBannerData } from "@/server/billing/plan-status";
+import { PlanStatusBanner } from "@/components/billing/PlanStatusBanner";
 import { formatPeso } from "@/lib/money";
 import { RevenueChart } from "@/components/analytics/Charts";
 import { getAiInsights, aiInsightsEnabled } from "@/server/ai/insights";
@@ -146,8 +147,8 @@ export default async function AdminHome() {
   const insights = aiInsights && aiInsights.length ? aiInsights : ruleInsights;
   const insightsAreAi = !!(aiInsights && aiInsights.length);
 
-  // Free-tier online-order meter (100/month). Uncapped plans return capped=false.
-  const orderCap = await safe(getWebOrderCapStatus(rid), null);
+  // Unified plan-status banner (trial countdown + Free-tier order cap).
+  const bannerData = await safe(getPlanBannerData(rid), null);
 
   return (
     <div className="space-y-5">
@@ -156,30 +157,7 @@ export default async function AdminHome() {
         <p className="text-sm text-plum-ink/55">Here&apos;s how today is going.</p>
       </div>
 
-      {orderCap?.capped && (
-        <div className={`flex flex-wrap items-center justify-between gap-3 rounded-tile border p-4 ${orderCap.reached ? "border-guava/40 bg-guava/5" : "border-plum-ink/10 bg-white"}`}>
-          <div className="min-w-[220px] flex-1">
-            <p className="text-sm font-semibold text-plum-ink">
-              Online orders this month: {orderCap.used} / {orderCap.cap}
-              {orderCap.reached && <span className="ml-2 font-bold text-guava">Limit reached</span>}
-            </p>
-            <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-plum-ink/10">
-              <div
-                className={`h-full rounded-full ${orderCap.reached ? "bg-guava" : "bg-brand-primary"}`}
-                style={{ width: `${Math.min(100, Math.round((orderCap.used / orderCap.cap) * 100))}%` }}
-              />
-            </div>
-            <p className="mt-1 text-xs text-plum-ink/55">
-              {orderCap.reached
-                ? "Your website has stopped taking new online orders for this month. Upgrade for unlimited orders."
-                : `Free plan includes ${orderCap.cap} online orders/month. Upgrade any time for unlimited.`}
-            </p>
-          </div>
-          <Link href="/admin/billing" className="rounded-full px-4 py-2 text-sm font-semibold btn-brand">
-            Upgrade →
-          </Link>
-        </div>
-      )}
+      {bannerData && <PlanStatusBanner surface="dashboard" data={bannerData} />}
 
       {/* Top row — KPIs */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">

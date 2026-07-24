@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/server/tenancy/current-user";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { hasFeature } from "@/server/billing/feature-gate";
 import { getMerchantOrders } from "@/server/orders/merchant";
+import { getPlanBannerData } from "@/server/billing/plan-status";
 import { MerchantBoard } from "@/components/merchant/MerchantBoard";
 
 // The realtime alarm screen must never be statically cached.
@@ -32,9 +33,10 @@ export default async function MerchantPage() {
     );
   }
 
-  const [restaurant, initial] = await Promise.all([
+  const [restaurant, initial, bannerData] = await Promise.all([
     tenantDb(user.restaurantId, (tx) => tx.restaurant.findFirst({ select: { name: true } })),
     getMerchantOrders(),
+    getPlanBannerData(user.restaurantId).catch(() => null),
   ]);
 
   return (
@@ -42,6 +44,7 @@ export default async function MerchantPage() {
       restaurantId={user.restaurantId}
       restaurantName={restaurant?.name ?? "Your restaurant"}
       initial={initial}
+      bannerData={bannerData}
     />
   );
 }

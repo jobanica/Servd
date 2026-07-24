@@ -1,13 +1,14 @@
 import "server-only";
 
 import { systemDb } from "@/server/tenancy/scoped-db";
-import { getPlanAccess } from "@/server/billing/feature-gate";
+import { resolveBannerPlan } from "@/server/billing/plan-status";
+import { capFor } from "@/lib/billing/planLimits";
 
 /** Free tier's monthly online-ordering-website order allowance. */
-export const FREE_WEB_ORDER_CAP = 100;
+export const FREE_WEB_ORDER_CAP = capFor("starter");
 
 export interface WebOrderCapStatus {
-  capped: boolean; // true = this restaurant is subject to the Free cap
+  capped: boolean; // true = this restaurant is subject to a monthly cap
   cap: number; // the monthly cap
   used: number; // web orders placed this calendar month
   remaining: number; // max(0, cap − used)
@@ -30,15 +31,15 @@ async function webOrdersThisMonth(restaurantId: string): Promise<number> {
 }
 
 /**
- * The Free plan allows up to FREE_WEB_ORDER_CAP online orders per calendar
- * month; paid plans and active trials are uncapped. Returns current usage and
- * whether the cap has been reached.
+ * The monthly online-order cap resolved from the restaurant's plan (starter=100,
+ * lite=300, everything else unlimited). Returns current usage and whether the
+ * cap has been reached.
  */
 export async function getWebOrderCapStatus(restaurantId: string): Promise<WebOrderCapStatus> {
-  const cap = FREE_WEB_ORDER_CAP;
-  const { tier, onTrial } = await getPlanAccess(restaurantId);
-  // Only the Free tier (and not during an active trial) is capped.
-  if (tier !== "Free" || onTrial) {
+  const { plan } = await resolveBannerPlan(restaurantId);
+  const cap = capFor(plan ?? "starter");
+  // Unlimited plans (Infinity) are never capped.
+  if (!Number.isFinite(cap)) {
     return { capped: false, cap, used: 0, remaining: cap, reached: false };
   }
   const used = await webOrdersThisMonth(restaurantId);

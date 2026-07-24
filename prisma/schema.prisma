@@ -382,6 +382,9 @@ model Restaurant {
   brandAccentColor  String?
   coverImageUrl     String?
   tagline           String?
+  // Plan-banner override (super-admin): "legacy" hides the banner entirely,
+  // "lite" marks the hidden 300-order save offer. null → derive from the plan.
+  bannerPlan        String?
 
   // --- Business location (set by super-admin at creation; shown on the
   // super-admin map so they can visit the business) ---

@@ -20,6 +20,8 @@ import { savePushSubscription } from "@/server/push/actions";
 import { useOrderAlarm } from "./useOrderAlarm";
 import { useWakeLock } from "./useWakeLock";
 import { InstallButton } from "./InstallButton";
+import { PlanStatusBanner } from "@/components/billing/PlanStatusBanner";
+import type { PlanBannerData } from "@/lib/billing/planBanner";
 import { DeliveryRiderPanel } from "@/components/delivery/DeliveryRiderPanel";
 
 const PREP_CHOICES = [10, 15, 20, 30, 45];
@@ -125,10 +127,12 @@ export function MerchantBoard({
   restaurantId,
   restaurantName,
   initial,
+  bannerData,
 }: {
   restaurantId: string;
   restaurantName: string;
   initial: MerchantData;
+  bannerData?: PlanBannerData | null;
 }) {
   const [data, setData] = useState<MerchantData>(initial);
   const [busy, setBusy] = useState<string | null>(null);
@@ -239,6 +243,11 @@ export function MerchantBoard({
   if (!alarm.unlocked) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-plum-ink px-6 text-center text-white">
+        {bannerData && (
+          <div className="w-full max-w-md text-left">
+            <PlanStatusBanner surface="start" data={bannerData} />
+          </div>
+        )}
         <h1 className="font-heading text-3xl font-extrabold">{restaurantName} — Incoming Orders</h1>
         <p className="max-w-md text-white/70">
           Tap below to enable the new-order alarm and background alerts. Keep this app installed and
