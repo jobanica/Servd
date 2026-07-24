@@ -1394,6 +1394,7 @@ model Order {
   downpaymentPaid Boolean      @default(false) // owner confirmed the downpayment landed
   paymentChoice String? // website order's chosen method: "cod" | "gcash" (null = not set)
   paymentRef    String? // customer's GCash reference for the full payment
+  source        String? // where the order came from: "web" (online site) | null (dine-in/POS)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 

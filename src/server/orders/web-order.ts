@@ -14,6 +14,7 @@ import { sendOrderPush } from "@/server/push/send";
 import { getPublicStorefront, isOpenNow, computeDownpayment, computePackagingFee } from "@/server/storefront/storefront";
 import { haversineKm, computeDistanceFee } from "@/lib/geo/distance";
 import { resolvePromo } from "@/server/promotions/redeem";
+import { getWebOrderCapStatus } from "@/server/billing/order-cap";
 import { getLoyaltyConfig, enrollAccount } from "@/server/loyalty/loyalty";
 import { markCartConverted } from "@/server/marketing/cart-recovery";
 import { formatPeso } from "@/lib/money";
@@ -70,6 +71,13 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
     tx.restaurant.findFirst({ where: { slug: d.slug, status: "active" }, select: { id: true } }),
   );
   if (!restaurant) return { ok: false, error: "This restaurant is unavailable." };
+
+  // Free plan is capped at 100 online orders/month — block new ones past that
+  // (the owner upgrades for unlimited). Paid plans + trials are uncapped.
+  const cap = await getWebOrderCapStatus(restaurant.id);
+  if (cap.reached) {
+    return { ok: false, error: "Sorry, online ordering is temporarily unavailable for this store. Please contact them directly to place your order." };
+  }
 
   // Validate an advance-order time, if one was chosen.
   let scheduledFor: Date | null = null;
@@ -207,7 +215,10 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
       }
     : null;
   const pay = { paymentChoice: choice, paymentRef: choice !== "cod" ? d.paymentRef?.trim() || null : null };
-  const extra = { ...(geo ?? {}), ...(sched ?? {}), ...(advance ?? {}), ...pay };
+  // `source: "web"` tags this as an online-website order (Free-tier monthly
+  // meter). It rides in `extra` so a schema-lagged DB just drops it and the
+  // order still lands (uncounted until the migration runs).
+  const extra = { ...(geo ?? {}), ...(sched ?? {}), ...(advance ?? {}), ...pay, source: "web" };
 
   let order;
   try {
