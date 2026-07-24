@@ -802,7 +802,7 @@ export function WebOrder(props: WebOrderProps) {
                     <input
                       value={gcashRef}
                       onChange={(e) => setGcashRef(e.target.value)}
-                      placeholder="Enter your payment reference no."
+                      placeholder="Payment reference no. (optional)"
                       className="mt-2 w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
                     />
                     {/* Optional: upload a screenshot of the payment receipt. */}
@@ -824,7 +824,7 @@ export function WebOrder(props: WebOrderProps) {
                         />
                       </label>
                     )}
-                    <p className="mt-1 text-[11px] text-plum-ink/45">Pay, then enter the reference and/or upload the receipt so we can confirm your order.</p>
+                    <p className="mt-1 text-[11px] text-plum-ink/45">Optional — add the reference or receipt to help us confirm, or just show your payment to the rider on arrival.</p>
                   </div>
                 )}
               </div>
@@ -905,7 +905,7 @@ export function WebOrder(props: WebOrderProps) {
         ) : (
           <button
             onClick={submit}
-            disabled={busy || lines.length === 0 || !name.trim() || !phone.trim() || (schedulingLater && !scheduledIso) || (payMethod !== "cod" && !gcashRef.trim()) || (orderType === "delivery" && (shippingMode ? !shippingReady : (!address.trim() || (showMap && !geo) || !collectDeliveryFee && !agreeRider || (distanceMode ? !!distance?.outOfRange : (zones.length > 0 && !zone)))))}
+            disabled={busy || lines.length === 0 || !name.trim() || !phone.trim() || (schedulingLater && !scheduledIso) || (orderType === "delivery" && (shippingMode ? !shippingReady : (!address.trim() || (showMap && !geo) || !collectDeliveryFee && !agreeRider || (distanceMode ? !!distance?.outOfRange : (zones.length > 0 && !zone)))))}
             className="mt-3 w-full rounded-lg bg-green-600 py-3 font-semibold text-white disabled:opacity-50"
           >
             {busy
