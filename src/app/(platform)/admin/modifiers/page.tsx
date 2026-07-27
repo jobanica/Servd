@@ -4,7 +4,7 @@ import { getModifierGroups } from "@/server/menu/queries";
 import { AddModifierGroupForm } from "@/components/admin/AddModifierGroupForm";
 import { AddModifierForm } from "@/components/admin/AddModifierForm";
 import { ModifierRow } from "@/components/admin/ModifierRow";
-import { deleteModifierGroup } from "@/server/menu/actions";
+import { ModifierGroupHeader } from "@/components/admin/ModifierGroupHeader";
 
 export default async function ModifiersPage() {
   const { restaurantId } = await requireAdminPage();
@@ -33,22 +33,9 @@ export default async function ModifiersPage() {
           key={group.id}
           className="rounded-tile border border-plum-ink/10 bg-white p-4"
         >
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="font-heading text-lg font-bold">{group.name}</h2>
-              <p className="text-xs text-plum-ink/50">
-                {group.required ? "Required" : "Optional"} · select{" "}
-                {group.minSelect}–{group.maxSelect}{" "}
-                {group.maxSelect === 1 ? "(single)" : "(multi)"}
-              </p>
-            </div>
-            <form action={deleteModifierGroup}>
-              <input type="hidden" name="id" value={group.id} />
-              <button className="text-xs text-muted hover:text-guava">
-                Delete group
-              </button>
-            </form>
-          </div>
+          <ModifierGroupHeader
+            group={{ id: group.id, name: group.name, required: group.required, minSelect: group.minSelect, maxSelect: group.maxSelect }}
+          />
 
           <ul className="mt-3 space-y-1">
             {group.modifiers.map((m) => (

@@ -395,6 +395,28 @@ export async function createModifierGroup(
   return { ok: true };
 }
 
+export async function updateModifierGroup(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const { restaurantId } = await requireAdminAction();
+  const id = String(formData.get("id"));
+  const parsed = modifierGroupSchema.safeParse({
+    name: formData.get("name"),
+    required: formData.get("required") === "on",
+    minSelect: formData.get("minSelect") ?? 0,
+    maxSelect: formData.get("maxSelect") ?? 1,
+  });
+  if (!parsed.success) return { error: firstError(parsed.error) };
+
+  const res = await tenantDb(restaurantId, (tx) =>
+    tx.modifierGroup.updateMany({ where: { id }, data: parsed.data }),
+  );
+  if (res.count === 0) return { error: "Modifier group not found." };
+  await refresh();
+  return { ok: true };
+}
+
 export async function deleteModifierGroup(formData: FormData): Promise<void> {
   const { restaurantId } = await requireAdminAction();
   const id = String(formData.get("id"));
