@@ -375,6 +375,7 @@ export function WebOrder(props: WebOrderProps) {
   const [receipt, setReceipt] = useState<string | null>(null); // uploaded payment screenshot (data URL)
   const [receiptBusy, setReceiptBusy] = useState(false);
   const [riderNote, setRiderNote] = useState(""); // customer's note to the rider
+  const [cutlery, setCutlery] = useState(true); // include cutlery/utensils (default yes)
   const selectedOnline = onlineMethods.find((m) => m.key === payMethod) ?? null;
 
   // Compress the chosen receipt image in the browser so the upload stays small.
@@ -523,7 +524,10 @@ export function WebOrder(props: WebOrderProps) {
       paymentChoice: payMethod,
       paymentRef: payMethod !== "cod" ? gcashRef || undefined : undefined,
       paymentReceipt: payMethod !== "cod" ? receipt || undefined : undefined,
-      customerNote: orderType === "delivery" ? riderNote.trim() || undefined : undefined,
+      customerNote: [
+        cutlery ? null : "🚫 No cutlery",
+        orderType === "delivery" && riderNote.trim() ? riderNote.trim() : null,
+      ].filter(Boolean).join(" · ") || undefined,
       couponCode: appliedPromo?.code || undefined,
       lines: lines.map((l) => ({ itemId: l.itemId, quantity: l.quantity, note: l.note, modifierIds: l.modifiers.map((m) => m.modifierId), variantId: l.variantId })),
     });
@@ -766,6 +770,11 @@ export function WebOrder(props: WebOrderProps) {
                 />
               </div>
             )}
+
+            <label className="flex items-center gap-2 text-sm text-plum-ink/70">
+              <input type="checkbox" checked={cutlery} onChange={(e) => setCutlery(e.target.checked)} className="h-4 w-4" />
+              🍴 Include cutlery / utensils
+            </label>
 
             {/* Payment method — a choice whenever the owner offers any online
                 method (GCash / Maya / Bank) alongside cash. */}
