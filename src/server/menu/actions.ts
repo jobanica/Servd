@@ -152,9 +152,24 @@ const bundleSchema = z.object({
   categoryId: z.string().min(1, "Pick a category"),
   name: z.string().trim().min(1, "Name your bundle").max(120),
   pricePesos: z.coerce.number().min(0, "Price?"),
-  chooseCount: z.coerce.number().int().min(1, "How many can they pick?").max(20),
   description: z.string().trim().max(500).optional().or(z.literal("")),
 });
+
+/**
+ * A bundle's selection sections — e.g. "Main dishes: pick 4" and
+ * "Side dishes / Desserts: pick 2". Each becomes a required modifier group, so
+ * the storefront enforces every group's count independently.
+ */
+const bundleSectionsSchema = z
+  .array(
+    z.object({
+      label: z.string().trim().min(1).max(60),
+      choose: z.coerce.number().int().min(1).max(20),
+      dishes: z.array(z.string().trim().min(1).max(120)).max(80),
+    }),
+  )
+  .min(1)
+  .max(6);
 
 /**
  * Creates a "pick N for a fixed price" bundle (e.g. a bilao: 3 dishes for
@@ -169,15 +184,36 @@ export async function createBundle(_prev: FormState, formData: FormData): Promis
     categoryId: formData.get("categoryId"),
     name: formData.get("name"),
     pricePesos: formData.get("pricePesos"),
-    chooseCount: formData.get("chooseCount"),
     description: formData.get("description") ?? "",
   });
   if (!parsed.success) return { error: firstError(parsed.error) };
   const v = parsed.data;
 
-  const dishes = formData.getAll("dishName").map((d) => String(d).trim()).filter(Boolean).slice(0, 80);
-  if (dishes.length < v.chooseCount) {
-    return { error: `Add at least ${v.chooseCount} dish choices for a "choose ${v.chooseCount}" bundle.` };
+  // Sections arrive as JSON (each: label + choose + dishes). Backward-compatible
+  // fallback: the old single "Choose N" shape (chooseCount + dishName[]).
+  let sections: { label: string; choose: number; dishes: string[] }[];
+  const rawSections = formData.get("sections");
+  if (typeof rawSections === "string" && rawSections.trim()) {
+    let json: unknown;
+    try {
+      json = JSON.parse(rawSections);
+    } catch {
+      return { error: "Couldn't read the bundle sections." };
+    }
+    const p = bundleSectionsSchema.safeParse(json);
+    if (!p.success) return { error: "Please complete each bundle section (a name and how many to pick)." };
+    sections = p.data.map((s) => ({ ...s, dishes: s.dishes.map((d) => d.trim()).filter(Boolean) }));
+  } else {
+    const choose = Math.max(1, Math.min(20, Math.round(Number(formData.get("chooseCount")) || 3)));
+    const dishes = formData.getAll("dishName").map((d) => String(d).trim()).filter(Boolean).slice(0, 80);
+    sections = [{ label: `Choose ${choose}`, choose, dishes }];
+  }
+
+  // Every section needs at least as many choices as it asks the customer to pick.
+  for (const s of sections) {
+    if (s.dishes.length < s.choose) {
+      return { error: `"${s.label}" needs at least ${s.choose} choice(s).` };
+    }
   }
 
   let imageUrl: string | undefined;
@@ -201,14 +237,22 @@ export async function createBundle(_prev: FormState, formData: FormData): Promis
         },
         select: { id: true },
       });
-      const group = await tx.modifierGroup.create({
-        data: { restaurantId, name: `Choose ${v.chooseCount}`, required: true, minSelect: v.chooseCount, maxSelect: v.chooseCount },
-        select: { id: true },
-      });
-      await tx.modifier.createMany({
-        data: dishes.map((name, i) => ({ modifierGroupId: group.id, name, priceDelta: 0, sortOrder: i })),
-      });
-      await tx.menuItemModifierGroup.create({ data: { menuItemId: item.id, modifierGroupId: group.id }, select: { menuItemId: true } });
+      // One required modifier group per section (e.g. "Main dishes — choose 4",
+      // "Side dishes / Desserts — choose 2"). The storefront enforces each count.
+      for (let gi = 0; gi < sections.length; gi++) {
+        const s = sections[gi];
+        const group = await tx.modifierGroup.create({
+          data: { restaurantId, name: `${s.label} — choose ${s.choose}`, required: true, minSelect: s.choose, maxSelect: s.choose },
+          select: { id: true },
+        });
+        await tx.modifier.createMany({
+          data: s.dishes.map((name, i) => ({ modifierGroupId: group.id, name, priceDelta: 0, sortOrder: i })),
+        });
+        await tx.menuItemModifierGroup.create({
+          data: { menuItemId: item.id, modifierGroupId: group.id, sortOrder: gi },
+          select: { menuItemId: true },
+        });
+      }
     });
   } catch {
     return { error: "Couldn't create the bundle. Please try again." };
