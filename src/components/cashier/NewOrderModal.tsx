@@ -332,10 +332,10 @@ export function NewOrderModal({
                   <h3 className="mb-2 font-heading text-sm font-bold uppercase tracking-wide text-plum-ink/55">
                     {cat.name}
                   </h3>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-3 gap-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                     {cat.items.map((item) =>
                       configItem?.id === item.id ? (
-                        <div key={item.id} className="col-span-3">
+                        <div key={item.id} className="col-span-full">
                           <ItemConfig
                             item={item}
                             onAdd={(line) => {
