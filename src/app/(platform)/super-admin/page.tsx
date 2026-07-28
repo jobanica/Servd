@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { getSubscriptionMetrics } from "@/server/billing/super-admin";
 import { getPlatformMetrics } from "@/server/analytics/platform";
+import { getOrderCapEnabled } from "@/server/billing/platform-settings";
+import { setGlobalOrderCap } from "@/server/billing/super-admin-actions";
+import { FREE_WEB_ORDER_CAP } from "@/server/billing/order-cap";
+import { capFor } from "@/lib/billing/planLimits";
 import { formatPeso } from "@/lib/money";
 import { BillingRunButton } from "@/components/super-admin/BillingRunButton";
 
@@ -36,7 +40,11 @@ function Stat({
 }
 
 export default async function SuperAdminHome() {
-  const [m, platform] = await Promise.all([getSubscriptionMetrics(), getPlatformMetrics()]);
+  const [m, platform, capEnabled] = await Promise.all([
+    getSubscriptionMetrics(),
+    getPlatformMetrics(),
+    getOrderCapEnabled(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -51,6 +59,29 @@ export default async function SuperAdminHome() {
         >
           Manage subscriptions →
         </Link>
+      </div>
+
+      {/* Global order-cap master switch */}
+      <div className={`flex flex-wrap items-center justify-between gap-3 rounded-tile border p-4 ${capEnabled ? "border-amber-500/40 bg-amber-500/5" : "border-mango/40 bg-mango/10"}`}>
+        <div className="min-w-[240px] flex-1">
+          <p className="font-heading text-base font-bold">
+            Monthly order cap: {capEnabled ? "ON" : "OFF"}
+            <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-semibold ${capEnabled ? "bg-amber-500/20 text-amber-700" : "bg-mango/20 text-mango"}`}>
+              {capEnabled ? "capping active" : "everyone unlimited"}
+            </span>
+          </p>
+          <p className="mt-1 text-sm text-plum-ink/60">
+            {capEnabled
+              ? `Free is capped at ${capFor("starter")} and Lite at ${capFor("lite")} orders/month (QR + online, counted together). Paid plans stay unlimited.`
+              : `All restaurants have unlimited orders. Turn this on later (e.g. once you have enough subscribers) to enforce ${FREE_WEB_ORDER_CAP}/mo on Free.`}
+          </p>
+        </div>
+        <form action={setGlobalOrderCap}>
+          <input type="hidden" name="enabled" value={(!capEnabled).toString()} />
+          <button className={`rounded-full px-4 py-2 text-sm font-semibold ${capEnabled ? "border border-plum-ink/20 text-plum-ink" : "btn-brand"}`}>
+            {capEnabled ? "Turn OFF — make unlimited" : "Turn ON order caps"}
+          </button>
+        </form>
       </div>
 
       {/* Revenue */}

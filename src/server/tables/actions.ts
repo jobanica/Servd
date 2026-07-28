@@ -5,7 +5,6 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireAdminAction } from "@/server/tenancy/require-admin";
-import { assertWithinLimit } from "@/server/billing/entitlements";
 
 export type FormState = { ok?: boolean; error?: string } | null;
 
@@ -30,13 +29,8 @@ export async function createTable(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  // Enforce the plan's table limit.
-  try {
-    const count = await tenantDb(restaurantId, (tx) => tx.table.count());
-    await assertWithinLimit(restaurantId, "maxTables", count);
-  } catch {
-    return { error: "You've reached your plan's table limit. Upgrade to add more." };
-  }
+  // Tables / QR codes are unlimited on every plan (including Free) — the goal is
+  // for every restaurant to run entirely on QR, so we don't cap table count.
 
   try {
     await tenantDb(restaurantId, (tx) =>

@@ -8,7 +8,7 @@ import { systemDb } from "@/server/tenancy/scoped-db";
 import { requireSuperAdmin } from "@/server/tenancy/current-user";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { runBillingCron, type CronSummary } from "@/server/billing/run-cron";
-import { saveXenditCreds } from "@/server/billing/platform-settings";
+import { saveXenditCreds, setOrderCapEnabled } from "@/server/billing/platform-settings";
 import { provisionTrial, getFreePlan } from "@/server/billing/subscription";
 import { COMP_FOREVER } from "@/lib/billing/comp";
 import { uniqueSlug } from "@/lib/slug";
@@ -206,6 +206,13 @@ export async function assignPlan(formData: FormData): Promise<void> {
     await tx.subscription.update({ where: { id: sub.id }, data: { planId }, select: { id: true } });
     await tx.restaurant.update({ where: { id: restaurantId }, data: { planId }, select: { id: true } });
   });
+  refresh();
+}
+
+/** Master switch: turn the monthly order cap on/off for ALL restaurants. */
+export async function setGlobalOrderCap(formData: FormData): Promise<void> {
+  await requireSuperAdmin();
+  await setOrderCapEnabled(formData.get("enabled") === "true");
   refresh();
 }
 

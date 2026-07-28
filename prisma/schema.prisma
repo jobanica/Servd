@@ -116,6 +116,7 @@ model PlatformSetting {
   billingProvider String? // "xendit" | "paymongo" | null
   xenditCredsEnc  String? // encrypted JSON { secretKey, callbackToken }
   crmSequence     Json? // owner-edited CRM follow-up messages (overrides defaults)
+  orderCapEnabled Boolean  @default(false) // master switch for monthly order caps across all restaurants
   updatedAt       DateTime @updatedAt
 
   @@map("platform_settings")

@@ -33,7 +33,8 @@ export async function getPublicPricing(): Promise<Record<Tier, TierPricing>> {
       const lim = (p.limits as { maxTables?: number; maxStaff?: number; smsIncluded?: number } | null) ?? {};
       out[t] = {
         pricePesos: Math.round(p.priceMonthly / 100),
-        maxTables: lim.maxTables,
+        // Tables / QR codes are unlimited on every plan now — never surface a cap.
+        maxTables: undefined,
         maxStaff: lim.maxStaff,
         smsIncluded: lim.smsIncluded,
       };

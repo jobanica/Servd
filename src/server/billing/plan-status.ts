@@ -2,6 +2,7 @@ import "server-only";
 
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { getPlanAccess } from "@/server/billing/feature-gate";
+import { getOrderCapEnabled } from "@/server/billing/platform-settings";
 import { capFor } from "@/lib/billing/planLimits";
 import type { BannerPlan, PlanBannerData } from "@/lib/billing/planBanner";
 
@@ -64,13 +65,15 @@ export async function resolveBannerPlan(
 export async function getPlanBannerData(restaurantId: string): Promise<PlanBannerData> {
   const { plan, trialEndsAt } = await resolveBannerPlan(restaurantId);
   const cap = capFor(plan ?? "starter");
+  const capEnabled = await getOrderCapEnabled();
 
   let ordersThisMonth = 0;
   let monthValue = 0;
   try {
+    // Capped orders = QR dine-in + online, counted together.
     const agg = await systemDb((tx) =>
       tx.order.aggregate({
-        where: { restaurantId, source: "web", createdAt: { gte: monthStartUtc() } },
+        where: { restaurantId, source: { in: ["qr", "web"] }, createdAt: { gte: monthStartUtc() } },
         _count: true,
         _sum: { total: true },
       }),
@@ -81,8 +84,9 @@ export async function getPlanBannerData(restaurantId: string): Promise<PlanBanne
     /* `source` column not migrated yet → 0 (banner degrades gracefully) */
   }
 
-  const finiteCap = Number.isFinite(cap) ? cap : null;
+  // With the master switch off, nobody is capped — no cap number, never paused.
+  const finiteCap = capEnabled && Number.isFinite(cap) ? cap : null;
   const orderingPaused = finiteCap != null && ordersThisMonth >= finiteCap;
 
-  return { plan, trialEndsAt, ordersThisMonth, monthValue, cap: finiteCap, orderingPaused };
+  return { plan, trialEndsAt, ordersThisMonth, monthValue, cap: finiteCap, orderingPaused, capEnabled };
 }

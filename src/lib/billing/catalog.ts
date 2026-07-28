@@ -25,7 +25,7 @@ export const TIER_INFO: Record<Tier, TierInfo> = {
     pricePesos: 0,
     tagline: "Everything to take orders and run service — free for life.",
     highlights: [
-      "1 dine-in table QR & 3 staff",
+      "Unlimited dine-in table QR codes & 3 staff",
       "QR dine-in + counter/takeout order numbers",
       "Online ordering website — pickup & delivery",
       "Kitchen display & cashier POS",
@@ -39,7 +39,7 @@ export const TIER_INFO: Record<Tier, TierInfo> = {
     pricePesos: 899,
     tagline: "Your brand online — ordering, payments & marketing.",
     highlights: [
-      "Up to 20 tables & 15 staff",
+      "Unlimited tables & 15 staff",
       "Everything in Free, plus:",
       "Your own custom domain",
       "Online payments (GCash / card)",

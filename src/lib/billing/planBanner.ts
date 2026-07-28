@@ -27,6 +27,7 @@ export interface PlanBannerData {
   monthValue: number; // centavos of online orders this month
   cap: number | null; // null = unlimited
   orderingPaused: boolean; // cap hit → website paused
+  capEnabled?: boolean; // global master switch — when false, no cap states show
   justDowngraded?: boolean; // set right after a downgrade (drives the confirm banner)
 }
 
@@ -83,6 +84,9 @@ export function getBannerState(data: PlanBannerData, now: Date = new Date()): Ba
 
   // Paid & unlimited → nothing to nag about.
   if (plan === "growth") return "hidden";
+
+  // Global order cap turned off → no cap strip for anyone.
+  if (data.capEnabled === false) return "hidden";
 
   // starter / lite / (null → degrade to cap-strip using default cap 100).
   const cap = data.cap ?? capFor(plan ?? "starter");

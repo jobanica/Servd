@@ -104,6 +104,10 @@ export async function placeOrder(
       return tx.order.create({
         data: {
           ...baseData,
+          // QR dine-in/counter order — counts toward the monthly cap (with
+          // online). In `data` (not baseData) so the lagging-schema fallback
+          // below retries without it.
+          source: "qr",
           ...(phone ? { customerPhone: phone } : {}),
           ...(orderNumber != null ? { orderNumber } : {}),
         },
