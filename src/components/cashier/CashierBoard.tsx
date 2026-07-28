@@ -492,6 +492,17 @@ export function CashierBoard({
                       <span className="font-semibold">{formatPeso(o.total)}</span>
                     )}
                   </div>
+                  {o.items.length > 0 && (
+                    <ul className="mt-1 space-y-0.5 text-xs text-plum-ink/70">
+                      {o.items.map((it, idx) => (
+                        <li key={idx}>
+                          <span className="font-semibold">{it.quantity}×</span> {it.name}
+                          {it.modifiers.length > 0 && <span className="text-plum-ink/45"> · {it.modifiers.join(", ")}</span>}
+                          {it.note && <span className="italic text-plum-ink/45"> · “{it.note}”</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   {o.discountAmount > 0 && (
                     <p className="mt-0.5 text-xs font-semibold text-guava">
                       {o.discountLabel ?? "Discount"} · −{formatPeso(o.discountAmount)}

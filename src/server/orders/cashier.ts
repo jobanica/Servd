@@ -37,6 +37,7 @@ export interface CashierOrder {
   served: boolean; // cashier confirmed the food was served
   createdAt: string;
   itemCount: number;
+  items: { name: string; quantity: number; note: string | null; modifiers: string[] }[];
 }
 
 /**
@@ -187,6 +188,14 @@ export async function getCashierTables(): Promise<CashierTable[]> {
         createdAt: true,
         table: { select: { id: true, tableNumber: true } },
         _count: { select: { items: true } },
+        items: {
+          select: {
+            nameAtTime: true,
+            quantity: true,
+            note: true,
+            modifiers: { select: { nameAtTime: true } },
+          },
+        },
         payments: { where: { status: "paid" }, select: { gateway: true, amount: true } },
       },
     }),
@@ -265,6 +274,12 @@ export async function getCashierTables(): Promise<CashierTable[]> {
       served: servedIds.has(o.id),
       createdAt: o.createdAt.toISOString(),
       itemCount: o._count.items,
+      items: o.items.map((it) => ({
+        name: it.nameAtTime,
+        quantity: it.quantity,
+        note: it.note,
+        modifiers: it.modifiers.map((m) => m.nameAtTime),
+      })),
     });
     if (o.paymentStatus !== "paid") t.outstanding += Math.max(0, net - paid);
     if (o.billRequested) t.billRequested = true;
