@@ -13,7 +13,9 @@ import {
   getPosMenu,
   getPosTables,
   createCashierOrder,
+  searchPosCustomers,
   type CashierTable,
+  type PosCustomer,
 } from "@/server/orders/cashier";
 import { printKitchenTicket } from "@/server/printing/print";
 import { runPrintDispatch } from "@/lib/print/run-dispatch";
@@ -229,6 +231,10 @@ export function NewOrderModal({
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
+  // Saved-customer search (auto-fills name/phone/address from past orders).
+  const [custQuery, setCustQuery] = useState("");
+  const [custResults, setCustResults] = useState<PosCustomer[]>([]);
+  const [custOpen, setCustOpen] = useState(false);
   const [lines, setLines] = useState<CartLine[]>([]);
   const [configItem, setConfigItem] = useState<DinerItem | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -247,6 +253,28 @@ export function NewOrderModal({
       }
     })();
   }, []);
+
+  // Debounced saved-customer search.
+  useEffect(() => {
+    const q = custQuery.trim();
+    if (q.length < 2) {
+      setCustResults([]);
+      return;
+    }
+    const id = setTimeout(() => {
+      searchPosCustomers(q).then(setCustResults).catch(() => setCustResults([]));
+    }, 300);
+    return () => clearTimeout(id);
+  }, [custQuery]);
+
+  function pickCustomer(c: PosCustomer) {
+    setCustomerName(c.name);
+    setCustomerPhone(c.phone);
+    if (c.address) setCustomerAddress(c.address);
+    setCustQuery("");
+    setCustResults([]);
+    setCustOpen(false);
+  }
 
   const total = cartTotal(lines);
   const nonEmpty = (menu ?? []).filter((c) => c.items.length > 0);
@@ -393,6 +421,36 @@ export function NewOrderModal({
                   </select>
                 ) : (
                   <div className="space-y-2">
+                    {/* Search a saved customer → auto-fills the details below. */}
+                    <div className="relative">
+                      <input
+                        value={custQuery}
+                        onChange={(e) => { setCustQuery(e.target.value); setCustOpen(true); }}
+                        onFocus={() => setCustOpen(true)}
+                        placeholder="🔍 Search saved customer (name or phone)"
+                        className="w-full rounded-lg border border-plum-ink/15 bg-cream/40 px-3 py-2 text-sm"
+                      />
+                      {custOpen && custResults.length > 0 && (
+                        <>
+                          <div className="fixed inset-0 z-10" onClick={() => setCustOpen(false)} />
+                          <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-plum-ink/15 bg-white shadow-lg">
+                            {custResults.map((c) => (
+                              <li key={c.phone}>
+                                <button
+                                  type="button"
+                                  onClick={() => pickCustomer(c)}
+                                  className="block w-full px-3 py-2 text-left text-sm hover:bg-cream"
+                                >
+                                  <span className="font-semibold text-plum-ink">{c.name || "(no name)"}</span>
+                                  <span className="text-plum-ink/50"> · {c.phone}</span>
+                                  {c.address && <span className="block truncate text-xs text-plum-ink/45">📍 {c.address}</span>}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
+                    </div>
                     <input
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}

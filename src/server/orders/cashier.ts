@@ -1048,6 +1048,51 @@ export async function getPosMenu(): Promise<DinerCategory[]> {
   return getPublicMenu(staff.restaurantId);
 }
 
+export interface PosCustomer {
+  name: string;
+  phone: string;
+  address: string | null;
+}
+
+/**
+ * Search saved customers for the POS by name or phone. Built from past
+ * pickup/delivery orders (which store name/phone/address), so any customer the
+ * cashier punched in before — even one who never used the website — comes back
+ * with their last-known details to auto-fill. Deduped by phone, most recent first.
+ */
+export async function searchPosCustomers(query: string): Promise<PosCustomer[]> {
+  const staff = await requireStaff(["cashier", "admin"]);
+  const q = query.trim();
+  if (q.length < 2) return [];
+  let rows: { customerName: string | null; customerPhone: string | null; customerAddress: string | null }[] = [];
+  try {
+    rows = await tenantDb(staff.restaurantId, (tx) =>
+      tx.order.findMany({
+        where: {
+          customerPhone: { not: null },
+          OR: [
+            { customerName: { contains: q, mode: "insensitive" } },
+            { customerPhone: { contains: q } },
+          ],
+        },
+        orderBy: { createdAt: "desc" },
+        take: 60,
+        select: { customerName: true, customerPhone: true, customerAddress: true },
+      }),
+    );
+  } catch {
+    return []; // columns not migrated yet
+  }
+  const seen = new Map<string, PosCustomer>();
+  for (const r of rows) {
+    const phone = (r.customerPhone ?? "").trim();
+    if (!phone || seen.has(phone)) continue;
+    seen.set(phone, { name: r.customerName ?? "", phone, address: r.customerAddress?.trim() || null });
+    if (seen.size >= 8) break;
+  }
+  return [...seen.values()];
+}
+
 /** Tables for the cashier's restaurant (for picking where an order belongs). */
 export async function getPosTables(): Promise<{ id: string; tableNumber: string }[]> {
   const staff = await requireStaff(["cashier", "admin"]);
