@@ -152,8 +152,8 @@ export default async function AdminHome() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="font-heading text-2xl font-bold">{restaurant.displayName || restaurant.name}</h1>
+      <div className="min-w-0">
+        <h1 className="font-heading text-2xl font-bold break-words">{restaurant.displayName || restaurant.name}</h1>
         <p className="text-sm text-plum-ink/55">Here&apos;s how today is going.</p>
       </div>
 

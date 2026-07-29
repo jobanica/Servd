@@ -208,7 +208,10 @@ export function AdminShell({
             {brand.name.charAt(0).toUpperCase()}
           </span>
         )}
-        <span className="min-w-0 flex-1 truncate font-heading text-base font-bold text-plum-ink">{brand.name}</span>
+        {/* Wrap a long business name to 2 lines instead of overflowing the sidebar. */}
+        <span className="line-clamp-2 min-w-0 flex-1 break-words font-heading text-base font-bold leading-tight text-plum-ink">
+          {brand.name}
+        </span>
       </Link>
       {nav}
       <div className="space-y-1 border-t border-plum-ink/10 p-3">
