@@ -69,6 +69,10 @@ export function getBannerState(data: PlanBannerData, now: Date = new Date()): Ba
   // Grandfathered / legacy accounts never see a banner.
   if (plan === "legacy") return "hidden";
 
+  // Master order-cap switch OFF → hide the WHOLE plan banner (trial countdown +
+  // cap strips) until the platform owner turns capping on.
+  if (data.capEnabled === false) return "hidden";
+
   // Just downgraded → reassure first (what they still have), regardless of usage.
   if (data.justDowngraded) return "downgrade_confirm";
 
@@ -84,9 +88,6 @@ export function getBannerState(data: PlanBannerData, now: Date = new Date()): Ba
 
   // Paid & unlimited → nothing to nag about.
   if (plan === "growth") return "hidden";
-
-  // Global order cap turned off → no cap strip for anyone.
-  if (data.capEnabled === false) return "hidden";
 
   // starter / lite / (null → degrade to cap-strip using default cap 100).
   const cap = data.cap ?? capFor(plan ?? "starter");
