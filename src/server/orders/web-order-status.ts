@@ -2,6 +2,7 @@
 
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
+import { ensureSettlementPayment } from "@/server/orders/settle-payment";
 
 export type CancelResult = { ok: true } | { ok: false; error: string };
 
@@ -25,6 +26,35 @@ export async function cancelWebOrder(slug: string, orderId: string): Promise<Can
   if (res.count === 0) {
     return { ok: false, error: "This order was already accepted and can no longer be cancelled." };
   }
+  await notifyOrdersChanged(restaurant.id);
+  return { ok: true };
+}
+
+/**
+ * Lets the customer confirm their delivery ARRIVED — only valid while the order
+ * is out for delivery. Authorized by slug + orderId (unguessable UUID). Closes
+ * the order as delivered + paid and records the settlement, so the merchant app
+ * marks it delivered automatically (via the realtime refresh).
+ */
+export async function customerMarkDelivered(slug: string, orderId: string): Promise<CancelResult> {
+  if (!slug || !orderId) return { ok: false, error: "Order not found." };
+  const restaurant = await systemDb((tx) => tx.restaurant.findFirst({ where: { slug }, select: { id: true } }));
+  if (!restaurant) return { ok: false, error: "Order not found." };
+
+  let count = 0;
+  try {
+    count = await systemDb(async (tx) => {
+      const res = await tx.order.updateMany({
+        where: { id: orderId, restaurantId: restaurant.id, deliveryStatus: "out_for_delivery" },
+        data: { deliveryStatus: "delivered", status: "closed", paymentStatus: "paid", billRequested: false },
+      });
+      if (res.count > 0) await ensureSettlementPayment(tx, orderId);
+      return res.count;
+    });
+  } catch {
+    return { ok: false, error: "We couldn't update your order. Please try again." };
+  }
+  if (count === 0) return { ok: false, error: "This order isn't out for delivery yet." };
   await notifyOrdersChanged(restaurant.id);
   return { ok: true };
 }

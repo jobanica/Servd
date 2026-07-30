@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { getWebOrderStatus, cancelWebOrder } from "@/server/orders/web-order-status";
+import { getWebOrderStatus, cancelWebOrder, customerMarkDelivered } from "@/server/orders/web-order-status";
 import { chime } from "@/lib/sound";
 import { formatPeso } from "@/lib/money";
 import { formatOrderNumber } from "@/lib/orders/order-number";
@@ -112,6 +112,8 @@ export function WebOrderTracker({
   const [copied, setCopied] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [markingDelivered, setMarkingDelivered] = useState(false);
+  const [deliverError, setDeliverError] = useState<string | null>(null);
   // The permanent link to THIS order's status — safe to bookmark/share (the id
   // is an unguessable UUID). Built from the home path so it works on custom
   // domains too (homeHref is "/" there, "/r/<slug>" on the platform host).
@@ -215,6 +217,16 @@ export function WebOrderTracker({
     else { setCancelError(res.error); refresh(); } // it was likely just accepted
   }
 
+  async function doMarkDelivered() {
+    if (!window.confirm("Confirm you've received your order?")) return;
+    setMarkingDelivered(true);
+    setDeliverError(null);
+    const res = await customerMarkDelivered(slug, orderId);
+    setMarkingDelivered(false);
+    if (res.ok) { setStatus("closed"); setDeliveryStatus("delivered"); }
+    else { setDeliverError(res.error); refresh(); }
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-100 px-5 py-16">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow">
@@ -292,6 +304,22 @@ export function WebOrderTracker({
           <p className="mt-3 text-xs text-plum-ink/45">
             This page updates automatically.{phone ? ` ${restaurantName} may also call ${phone} to confirm.` : ""}
           </p>
+        )}
+
+        {/* Confirm arrival — only while the order is out for delivery. */}
+        {delivery && deliveryStatus === "out_for_delivery" && !terminal && (
+          <div className="mt-5">
+            <button
+              type="button"
+              onClick={doMarkDelivered}
+              disabled={markingDelivered}
+              className="rounded-full bg-green-600 px-6 py-3 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              {markingDelivered ? "Confirming…" : "✅ I received my order"}
+            </button>
+            <p className="mt-1 text-[11px] text-plum-ink/40">Tap once your order arrives — this tells the restaurant it&apos;s delivered.</p>
+            {deliverError && <p className="mt-1 text-xs text-guava">{deliverError}</p>}
+          </div>
         )}
 
         {/* Cancel — only while the order is still pending (not yet accepted). */}
