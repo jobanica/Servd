@@ -44,3 +44,15 @@ export async function requireSuperAdminPage() {
   }
   return user;
 }
+
+/**
+ * Action guard: returns the super-admin, or throws. Server actions catch this
+ * and surface a friendly error rather than redirecting mid-submit.
+ */
+export async function requireSuperAdminAction() {
+  const user = await getCurrentUser();
+  if (!user || user.kind !== "super") {
+    throw new Error("UNAUTHORIZED");
+  }
+  return user;
+}

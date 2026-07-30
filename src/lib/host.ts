@@ -25,7 +25,7 @@ export function parseHost(rawHost: string, rootDomain: string | undefined): Host
     if (host.endsWith(`.${root}`)) {
       const subdomain = host.slice(0, -(root.length + 1));
       // Reserved labels stay on the platform.
-      if (["www", "app", "admin", "api"].includes(subdomain)) return { kind: "platform" };
+      if (["www", "app", "admin", "api", "tutorials"].includes(subdomain)) return { kind: "platform" };
       if (subdomain) return { kind: "subdomain", subdomain, host };
     } else {
       return { kind: "custom", host };

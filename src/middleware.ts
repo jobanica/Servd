@@ -35,8 +35,18 @@ function captureRef(req: NextRequest, res: NextResponse): NextResponse {
 
 export function middleware(req: NextRequest) {
   const host = (req.headers.get("host") ?? "").split(":")[0].toLowerCase();
-  const info = parseHost(host, process.env.NEXT_PUBLIC_ROOT_DOMAIN);
+  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN;
   const { pathname, search } = req.nextUrl;
+
+  // Public tutorials hub on its own subdomain (tutorials.<root>) → serve the
+  // /tutorials route. Also reachable at <root>/tutorials directly.
+  if (rootDomain && host === `tutorials.${rootDomain.toLowerCase()}`) {
+    const rest = pathname === "/" ? "" : pathname;
+    const url = new URL(`/tutorials${rest}${search}`, req.url);
+    return captureRef(req, NextResponse.rewrite(url));
+  }
+
+  const info = parseHost(host, rootDomain);
 
   if (info.kind === "platform") {
     if (pathname.startsWith("/sites")) {
