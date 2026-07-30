@@ -24,6 +24,17 @@ export const metadata: Metadata = {
   description:
     "Scan, order, pay. A QR-based ordering platform for restaurants.",
   manifest: "/manifest.webmanifest",
+  // iOS home-screen (PWA) support — makes "Add to Home Screen" launch full-screen
+  // (standalone) and gives it an app icon, matching the Android install. Web Push
+  // on iOS 16.4+ also requires the app to be added to the home screen this way.
+  appleWebApp: {
+    capable: true,
+    title: "Servd Orders",
+    statusBarStyle: "default",
+  },
+  icons: {
+    apple: "/brand/icon-apple-180.png",
+  },
 };
 
 export default async function RootLayout({

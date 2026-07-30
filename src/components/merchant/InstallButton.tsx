@@ -43,7 +43,11 @@ export function InstallButton({ subtle = false }: { subtle?: boolean }) {
 
   if (installed) return null;
 
-  const isIos = typeof navigator !== "undefined" && /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+  const isIos = /iphone|ipad|ipod/i.test(ua);
+  // iOS can only "install" a PWA from Safari — Chrome/Edge/Firefox on iOS (CriOS/
+  // FxiOS/EdgiOS) can't add a working home-screen app.
+  const iosNotSafari = isIos && /crios|fxios|edgios|opt\//i.test(ua);
 
   async function onClick() {
     if (deferred) {
@@ -70,11 +74,18 @@ export function InstallButton({ subtle = false }: { subtle?: boolean }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={() => setShowIosHelp(false)}>
           <div className="max-w-sm rounded-2xl bg-white p-6 text-center text-plum-ink" onClick={(e) => e.stopPropagation()}>
             <p className="font-heading text-lg font-bold">Add to your home screen</p>
-            {isIos ? (
+            {iosNotSafari ? (
               <p className="mt-2 text-sm text-plum-ink/70">
-                In Safari, tap the <strong>Share</strong> button{" "}
-                <span aria-hidden>⬆️</span>, then choose <strong>“Add to Home Screen”</strong>. Open it
-                from that icon to run full-screen.
+                On iPhone/iPad you must use <strong>Safari</strong> to install the app.
+                Open this same link in <strong>Safari</strong>, tap the <strong>Share</strong>{" "}
+                <span aria-hidden>⬆️</span> button, then <strong>“Add to Home Screen.”</strong>
+              </p>
+            ) : isIos ? (
+              <p className="mt-2 text-sm text-plum-ink/70">
+                In <strong>Safari</strong>, tap the <strong>Share</strong> button{" "}
+                <span aria-hidden>⬆️</span>, then choose <strong>“Add to Home Screen.”</strong> Open the
+                app from that icon to run full-screen — and to get order notifications, allow them the
+                first time you open it (needs iOS 16.4+).
               </p>
             ) : (
               <p className="mt-2 text-sm text-plum-ink/70">
