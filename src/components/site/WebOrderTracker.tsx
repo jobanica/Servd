@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getWebOrderStatus, cancelWebOrder } from "@/server/orders/web-order-status";
 import { chime } from "@/lib/sound";
@@ -311,12 +310,15 @@ export function WebOrderTracker({
           </div>
         )}
 
-        <Link
-          href={homeHref}
+        {/* Plain anchor (hard navigation) — a full reload back to the menu is
+            reliable even from this terminal screen, where the client router can
+            otherwise stall while the tracker's poll/subscription tears down. */}
+        <a
+          href={homeHref || "/"}
           className="mt-6 inline-block rounded-full bg-red-600 px-6 py-3 font-semibold text-white"
         >
           Back to menu
-        </Link>
+        </a>
       </div>
     </div>
   );
