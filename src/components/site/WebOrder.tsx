@@ -95,6 +95,7 @@ export interface WebOrderProps {
     packagingFeeEnabled?: boolean;
     packagingFee?: number; // centavos
     packagingFeeScope?: "delivery" | "all";
+    showVat?: boolean;
   };
   delivery?: {
     mode: "zones" | "distance" | "shipping";
@@ -897,7 +898,9 @@ export function WebOrder(props: WebOrderProps) {
         <div className="flex items-center justify-between font-heading text-xl font-extrabold text-plum-ink">
           <span>TOTAL</span><span>{formatPeso(total)}</span>
         </div>
-        <p className="text-xs text-plum-ink/45">VAT (12%) included · {formatPeso(vat)}</p>
+        {props.payment?.showVat !== false && (
+          <p className="text-xs text-plum-ink/45">VAT (12%) included · {formatPeso(vat)}</p>
+        )}
         {error && <p className="mt-2 text-sm text-guava">{error}</p>}
         {paused && !canSchedule ? (
           <div className="mt-3 rounded-lg bg-plum-ink/5 px-3 py-2 text-center text-sm font-semibold text-plum-ink/60">

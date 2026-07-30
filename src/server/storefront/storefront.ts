@@ -36,6 +36,8 @@ export interface PaymentConfig {
   packagingFeeEnabled: boolean; // charge a food-packaging fee (tubs/containers)
   packagingFee: number; // centavos added per online order
   packagingFeeScope: "delivery" | "all"; // delivery only, or pickup & delivery
+  showVat: boolean; // show the "VAT (12%) included" line at web checkout
+  //                    (off for non-VAT / percentage-tax businesses)
 }
 
 /** The online (non-cash) payment methods a store can offer at web checkout. */
@@ -104,6 +106,7 @@ export function defaultPaymentConfig(): PaymentConfig {
     mayaEnabled: false, mayaName: "", mayaNumber: "", mayaQrUrl: "",
     bankEnabled: false, bankName: "", bankNumber: "", bankQrUrl: "",
     packagingFeeEnabled: false, packagingFee: 0, packagingFeeScope: "delivery",
+    showVat: true,
   };
 }
 
@@ -132,6 +135,8 @@ function normalizePaymentConfig(raw: unknown): PaymentConfig {
       packagingFeeEnabled: !!r.packagingFeeEnabled,
       packagingFee: Math.max(0, Math.round(Number(r.packagingFee) || 0)),
       packagingFeeScope: r.packagingFeeScope === "all" ? "all" : "delivery",
+      // Default true so existing stores keep showing "VAT (12%) included".
+      showVat: r.showVat === undefined ? true : !!r.showVat,
     };
   }
   return d;

@@ -113,6 +113,7 @@ export function StorefrontForm({
       packagingFeeEnabled: boolean;
       packagingFeePesos: number;
       packagingFeeScope: "delivery" | "all";
+      showVat: boolean;
     };
     delivery: {
       mode: "zones" | "distance" | "shipping";
@@ -331,6 +332,20 @@ export function StorefrontForm({
           How online customers can pay. Cash means they pay on pickup/delivery. GCash shows your QR
           code at checkout for the customer to scan, then they enter their reference number.
         </p>
+
+        {/* VAT display — many PH stores are non-VAT (percentage tax) and
+            shouldn't show "VAT (12%) included". Prices are unchanged either way. */}
+        <div className="mt-4 rounded-lg border border-plum-ink/10 bg-cream/40 p-3">
+          <label className="flex items-center gap-2 text-sm font-semibold">
+            <input type="checkbox" name="showVat" defaultChecked={initial.payment.showVat} />
+            Show “VAT (12%) included” at checkout
+          </label>
+          <p className="mt-1 text-xs text-plum-ink/50">
+            Turn this off if your business is non-VAT (percentage tax). Prices don’t change — only the
+            “VAT (12%) included” line on the online website is hidden.
+          </p>
+        </div>
+
         <label className="mt-4 flex items-center gap-2 text-sm font-semibold">
           <input type="checkbox" name="codEnabled" defaultChecked={initial.payment.codEnabled} />
           Cash (on pickup / delivery)
