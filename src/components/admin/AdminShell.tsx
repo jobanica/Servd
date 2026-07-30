@@ -27,6 +27,7 @@ const I = {
   chart: "M4 20V10M10 20V4M16 20v-7M22 20H2",
   star: "M12 3l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.8 6.8 19l1-5.8L3.6 9.1l5.8-.8z",
   chat: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z",
+  bell: "M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0",
   box: "M21 8l-9-5-9 5 9 5 9-5zM3 8v8l9 5 9-5V8M12 13v8",
   users: "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8M23 21v-2a4 4 0 00-3-3.9",
   brush: "M9 11l6-6 4 4-6 6M9 11l-3 7 7-3M9 11l3 3",
@@ -53,6 +54,7 @@ const ITEM_FEATURE: Record<string, string> = {
   "/admin/floor": "floorPlan",
   "/admin/reservations": "reservations",
   "/admin/advance-orders": "onlineOrdering",
+  "/merchant": "onlineOrdering",
   "/admin/export": "dataExport",
   "/admin/audit": "auditLog",
 };
@@ -76,6 +78,7 @@ const NAV: { group: string; items: Item[] }[] = [
     items: [
       { label: "Kitchen", href: "/kitchen", d: I.fire },
       { label: "Cashier", href: "/cashier", d: I.cash },
+      { label: "Merchant app", href: "/merchant", d: I.bell },
       { label: "My time clock", href: "/clock/me", d: I.receipt },
     ],
   },
