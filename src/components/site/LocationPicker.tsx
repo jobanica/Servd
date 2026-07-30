@@ -31,6 +31,39 @@ export function LocationPicker({
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [locateError, setLocateError] = useState<string | null>(null);
+
+  // Ask the browser for the device's GPS/network location and drop the pin
+  // there, so the customer doesn't have to hunt for their spot on the map.
+  // Triggers the native "use your location" permission prompt on first use.
+  function locateMe() {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setLocateError("This device can't share its location. Tap the map instead.");
+      return;
+    }
+    setLocating(true);
+    setLocateError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocating(false);
+        const { latitude: lat, longitude: lng } = pos.coords;
+        mapRef.current?.setView([lat, lng], 17);
+        markerRef.current?.setLatLng([lat, lng]);
+        setCoords({ lat, lng });
+        onChange(lat, lng);
+      },
+      (err) => {
+        setLocating(false);
+        setLocateError(
+          err.code === err.PERMISSION_DENIED
+            ? "Location access was blocked. Allow it in your browser, or tap the map to pin your spot."
+            : "Couldn't get your location. Please tap the map to pin your spot.",
+        );
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    );
+  }
 
   // Geocode the typed address (free OpenStreetMap Nominatim, no API key) and
   // recenter the map + marker on the first match, committing it as the pin.
@@ -147,9 +180,18 @@ export function LocationPicker({
           {searchError && <p className="mt-1 text-xs text-guava">{searchError}</p>}
         </div>
       )}
+      <button
+        type="button"
+        onClick={locateMe}
+        disabled={locating}
+        className="mb-2 flex w-full items-center justify-center gap-2 rounded-lg border border-brand-primary px-3 py-2 text-sm font-semibold text-brand-primary disabled:opacity-50"
+      >
+        {locating ? "Finding you…" : "📍 Use my current location"}
+      </button>
+      {locateError && <p className="mb-2 text-xs text-guava">{locateError}</p>}
       <div ref={mapEl} className="h-44 w-full overflow-hidden rounded-lg border border-plum-ink/10" />
       <p className="mt-1 text-xs text-plum-ink/50">
-        {coords ? `Pinned: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}` : "Tap the map or drag the 📍 to your exact location."}
+        {coords ? `Pinned: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}` : "Use your location above, or tap the map / drag the 📍 to your exact spot."}
       </p>
     </div>
   );
