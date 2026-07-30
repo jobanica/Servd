@@ -6,12 +6,11 @@ import { formatPeso } from "@/lib/money";
 import { AddCategoryForm } from "@/components/admin/AddCategoryForm";
 import { AddItemForm } from "@/components/admin/AddItemForm";
 import { AddBundleForm } from "@/components/admin/AddBundleForm";
-import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
+import { CategoryHeader } from "@/components/admin/CategoryHeader";
 import { ImportMenuButton } from "@/components/admin/ImportMenuButton";
 import { SortableList } from "@/components/admin/SortableList";
 import { hasFeature } from "@/server/billing/feature-gate";
 import {
-  deleteCategory,
   deleteItem,
   toggleItemAvailability,
   reorderCategories,
@@ -76,16 +75,7 @@ export default async function MenuPage() {
           className="rounded-tile border border-plum-ink/10 bg-white p-4"
         >
           <div className="flex items-center justify-between">
-            <h2 className="font-heading text-lg font-bold">{category.name}</h2>
-            <form action={deleteCategory}>
-              <input type="hidden" name="id" value={category.id} />
-              <ConfirmSubmitButton
-                confirmText={`Delete the "${category.name}" category and ALL its items? This can't be undone.`}
-                className="text-xs text-muted hover:text-guava"
-              >
-                Delete category
-              </ConfirmSubmitButton>
-            </form>
+            <CategoryHeader id={category.id} name={category.name} />
           </div>
 
           <SortableList
