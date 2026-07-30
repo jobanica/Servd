@@ -41,6 +41,11 @@ export default async function KitchenHome() {
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-2xl font-bold">Kitchen display</h1>
         <div className="flex items-center gap-3">
+          {user.role === "admin" && (
+            <a href="/admin" className="rounded-full border border-plum-ink/15 px-4 py-2 text-sm font-semibold">
+              ← Dashboard
+            </a>
+          )}
           <a href="/clock/me" className="rounded-full px-4 py-2 text-sm font-semibold btn-brand">
             Clock in/out
           </a>
