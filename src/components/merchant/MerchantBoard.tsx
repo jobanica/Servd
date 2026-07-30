@@ -94,6 +94,31 @@ function schedLabel(iso: string): string {
 }
 
 /** The next step a merchant can take on an accepted order, by its current state. */
+/** Apply a status advance to local state instantly (mirrors the server rules). */
+function optimisticAdvance(d: MerchantData, id: string, to: MerchantAdvance): MerchantData {
+  const idx = d.active.findIndex((o) => o.id === id);
+  if (idx === -1) return d;
+  const o = d.active[idx];
+  // Delivered / completed → order closes and leaves the active list.
+  if (to === "delivered" || to === "completed") {
+    const moved: MerchantOrder = {
+      ...o,
+      status: "closed",
+      paymentStatus: "paid",
+      deliveryStatus: to === "delivered" ? "delivered" : o.deliveryStatus,
+    };
+    return { ...d, active: d.active.filter((x) => x.id !== id), history: [moved, ...d.history] };
+  }
+  const patch: Partial<MerchantOrder> =
+    to === "preparing" ? { status: "preparing" }
+    : to === "ready" ? { status: "done" }
+    : to === "out_for_delivery" ? { deliveryStatus: "out_for_delivery" }
+    : {};
+  const active = [...d.active];
+  active[idx] = { ...o, ...patch };
+  return { ...d, active };
+}
+
 function nextAction(o: MerchantOrder): { to: MerchantAdvance; label: string } | null {
   if (o.status === "new") return { to: "preparing", label: "Start preparing" };
   if (o.status === "preparing") return { to: "ready", label: "Mark ready" };
@@ -226,10 +251,13 @@ export function MerchantBoard({
   }
 
   async function advance(orderId: string, to: MerchantAdvance) {
-    setBusy(orderId);
-    const res = await advanceMerchantOrder(orderId, to);
-    if (res.data) setData(res.data);
-    setBusy(null);
+    // Optimistic: reflect the new status immediately so the button feels instant
+    // even with many orders, then reconcile with the server in the background
+    // (the full reload no longer blocks the tap).
+    setData((d) => optimisticAdvance(d, orderId, to));
+    advanceMerchantOrder(orderId, to)
+      .then((res) => { if (res.data) setData(res.data); })
+      .catch(() => refresh());
   }
 
   async function sendTest() {

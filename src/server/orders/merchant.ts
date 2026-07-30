@@ -189,8 +189,31 @@ async function loadExtras(restaurantId: string, ids: string[]): Promise<Map<stri
   if (ids.length === 0) return map;
   const blank = (): OrderExtra => ({ prepMinutes: null, cancelReason: null, scheduledFor: null, paymentChoice: null, paymentRef: null, paymentReceiptUrl: null, customerNote: null });
   for (const id of ids) map.set(id, blank());
-  // Each column group is read independently and best-effort, so one un-migrated
-  // group (scheduledFor, payment) never wipes the others.
+
+  // Fast path: read every optional column in ONE query (all migrations run on
+  // real deployments). If the schema lags, fall back to reading each column
+  // group independently so one un-migrated column can't wipe the others.
+  try {
+    const rows = await tenantDb(restaurantId, (tx) =>
+      tx.order.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, prepMinutes: true, cancelReason: true, scheduledFor: true, paymentChoice: true, paymentRef: true, paymentReceiptUrl: true, customerNote: true },
+      }),
+    );
+    for (const r of rows) {
+      const e = map.get(r.id)!;
+      e.prepMinutes = r.prepMinutes ?? null;
+      e.cancelReason = r.cancelReason ?? null;
+      e.scheduledFor = r.scheduledFor ? r.scheduledFor.toISOString() : null;
+      e.paymentChoice = r.paymentChoice ?? null;
+      e.paymentRef = r.paymentRef ?? null;
+      e.paymentReceiptUrl = r.paymentReceiptUrl ?? null;
+      e.customerNote = r.customerNote ?? null;
+    }
+    return map;
+  } catch {
+    /* a column lags — fall through to per-group best-effort reads */
+  }
   try {
     const rows = await tenantDb(restaurantId, (tx) =>
       tx.order.findMany({ where: { id: { in: ids } }, select: { id: true, prepMinutes: true, cancelReason: true } }),
