@@ -942,7 +942,7 @@ export function WebOrder(props: WebOrderProps) {
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
       <header className="sticky top-0 z-30 bg-plum-ink text-white">
-        <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4">
+        <div className="mx-auto flex h-16 max-w-md items-center gap-3 px-4">
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={logoUrl} alt={restaurantName} className="h-10 w-10 rounded-lg object-cover" />
@@ -955,20 +955,8 @@ export function WebOrder(props: WebOrderProps) {
               {openNow ? "● Open now" : "Closed"}
             </span>
           )}
-          <nav className="ml-auto hidden items-center gap-5 text-sm font-semibold text-white/80 md:flex">
-            <a href="#menu" className="hover:text-white">MENU</a>
-            <a href="#info" className="hover:text-white">PAYMENT</a>
-            <a href="#info" className="hover:text-white">DELIVERY</a>
-            <a href="#info" className="hover:text-white">HOURS</a>
-            <a href="#info" className="hover:text-white">CONTACT</a>
-            {acceptsBookings && (
-              <a href={book} className="rounded-full bg-white px-3.5 py-1.5 font-bold text-plum-ink hover:bg-white/90">
-                📅 Book / Order ahead
-              </a>
-            )}
-          </nav>
           {acceptsBookings && (
-            <a href={book} className="ml-auto rounded-full bg-white px-3 py-1.5 text-xs font-bold text-plum-ink md:hidden">
+            <a href={book} className="ml-auto rounded-full bg-white px-3 py-1.5 text-xs font-bold text-plum-ink">
               📅 Book
             </a>
           )}
@@ -988,7 +976,7 @@ export function WebOrder(props: WebOrderProps) {
           section. Hidden while searching (sections are filtered) and on desktop
           (the sidebar handles it). */}
       {!q && nonEmpty.length > 1 && (
-        <div className="sticky top-16 z-20 border-b border-plum-ink/10 bg-white/95 backdrop-blur lg:hidden">
+        <div className="sticky top-16 z-20 mx-auto max-w-md border-b border-plum-ink/10 bg-white/95 backdrop-blur">
           <div className="flex gap-2 overflow-x-auto px-3 py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {nonEmpty.map((c) => (
               <a
@@ -1003,10 +991,10 @@ export function WebOrder(props: WebOrderProps) {
         </div>
       )}
 
-      <div className="mx-auto grid max-w-7xl gap-4 p-4 lg:grid-cols-[230px_1fr_330px]">
-        {/* Left sidebar — sticky so the categories stay visible while you scroll
-            the menu (and after jumping to a category). */}
-        <aside className="hidden lg:block">
+      <div className="mx-auto max-w-md gap-4 p-4">
+        {/* Left sidebar — hidden in the phone-style layout (the top quick-nav
+            handles category jumps). */}
+        <aside className="hidden">
           <div className="sticky top-20 max-h-[calc(100vh-6rem)] space-y-3 overflow-y-auto pb-4">
             <div className="rounded-xl bg-white p-3 shadow-sm">
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" className="w-full rounded-lg border border-plum-ink/10 px-3 py-2 text-sm" />
@@ -1171,31 +1159,26 @@ export function WebOrder(props: WebOrderProps) {
           </section>
         </main>
 
-        {/* Right cart (desktop) */}
-        <aside className="hidden lg:block">
-          <div className="sticky top-20 h-[calc(100vh-6rem)] overflow-hidden rounded-xl bg-white shadow-sm">
-            {cartPanel}
-          </div>
-        </aside>
+        {/* Right cart panel hidden — phone-style uses the bottom bar + sheet. */}
       </div>
 
       {/* Item config modal */}
       {configItem && <ItemConfig item={configItem} onAdd={(l) => { setLines((p) => addCartLine(p, l)); setConfigItem(null); }} onCancel={() => setConfigItem(null)} />}
 
-      {/* Mobile cart bar + sheet */}
+      {/* Cart bar + sheet (phone-style at every screen size). */}
       {count > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-20 p-3 lg:hidden">
-          <button onClick={() => setCartOpen(true)} className="flex w-full items-center justify-between rounded-full bg-green-600 px-5 py-3.5 font-semibold text-white shadow-lg">
+        <div className="fixed inset-x-0 bottom-0 z-20 p-3">
+          <button onClick={() => setCartOpen(true)} className="mx-auto flex w-full max-w-md items-center justify-between rounded-full bg-green-600 px-5 py-3.5 font-semibold text-white shadow-lg">
             <span>{count} item{count > 1 ? "s" : ""}</span>
             <span>My order · {formatPeso(total)}</span>
           </button>
         </div>
       )}
       {cartOpen && (
-        <div className="fixed inset-0 z-50 bg-white lg:hidden">
-          {/* Full-screen on phones: a fixed close bar, then the cart panel fills
-              the rest (its own body scrolls, the Place-order footer stays put). */}
-          <div className="flex h-full w-full flex-col">
+        <div className="fixed inset-0 z-50 flex justify-center bg-black/40">
+          {/* Centered phone-width sheet: a fixed close bar, then the cart panel
+              fills the rest (its own body scrolls, the footer stays put). */}
+          <div className="flex h-full w-full max-w-md flex-col bg-white">
             <div className="flex shrink-0 justify-end px-2 pt-1">
               <button onClick={() => setCartOpen(false)} className="px-2 text-2xl leading-none text-plum-ink/40" aria-label="Close">×</button>
             </div>
