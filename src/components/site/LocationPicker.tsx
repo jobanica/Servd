@@ -3,6 +3,21 @@
 import { useEffect, useRef, useState } from "react";
 import type * as LType from "leaflet";
 
+// In-app browsers (Messenger, Facebook, Instagram, etc.) usually BLOCK the
+// Geolocation prompt, so "use my current location" silently fails there. Detect
+// them so we can nudge the customer to open the page in a real browser, where
+// location works. Returns the platform so we can hand off correctly.
+type InAppEnv = "android" | "ios" | "other";
+function detectInAppBrowser(): InAppEnv | null {
+  if (typeof navigator === "undefined") return null;
+  const ua = navigator.userAgent || "";
+  const inApp = /FBAN|FBAV|FB_IAB|FBIOS|Messenger|Instagram|Line\/|Twitter|GSA\/|; wv\)|WebView/i.test(ua);
+  if (!inApp) return null;
+  if (/Android/i.test(ua)) return "android";
+  if (/iPhone|iPad|iPod/i.test(ua)) return "ios";
+  return "other";
+}
+
 /**
  * Lets a delivery customer pin their exact location. Uses Leaflet +
  * OpenStreetMap tiles (no API key) and the browser Geolocation API. Leaflet is
@@ -33,6 +48,17 @@ export function LocationPicker({
   const [searchError, setSearchError] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
   const [locateError, setLocateError] = useState<string | null>(null);
+  // Detected after mount (client-only) to avoid an SSR/hydration mismatch.
+  const [inApp, setInApp] = useState<InAppEnv | null>(null);
+  useEffect(() => setInApp(detectInAppBrowser()), []);
+
+  // Android in-app browsers can hand off to Chrome via an intent URL, which
+  // reloads this exact page in Chrome where location works. iOS webviews can't
+  // be forced open, so there we show manual "open in browser" steps instead.
+  function openInChrome() {
+    const noScheme = window.location.href.replace(/^https?:\/\//, "");
+    window.location.href = `intent://${noScheme}#Intent;scheme=https;package=com.android.chrome;end`;
+  }
 
   // Ask the browser for the device's GPS/network location and drop the pin
   // there, so the customer doesn't have to hunt for their spot on the map.
@@ -189,6 +215,27 @@ export function LocationPicker({
         {locating ? "Finding you…" : "📍 Use my current location"}
       </button>
       {locateError && <p className="mb-2 text-xs text-guava">{locateError}</p>}
+      {/* Messenger/Facebook/IG in-app browsers block location — help the
+          customer reopen the page in a real browser where it works. */}
+      {inApp && (
+        <div className="mb-2 rounded-lg bg-amber-50 p-2 text-xs text-plum-ink/70">
+          <p className="font-semibold text-plum-ink/80">📱 Opened from Messenger/Facebook?</p>
+          {inApp === "android" ? (
+            <p className="mt-0.5">
+              Location is blocked in the in-app browser.{" "}
+              <button type="button" onClick={openInChrome} className="font-semibold text-brand-primary underline">
+                Open in Chrome
+              </button>{" "}
+              to use it — or just tap the map to pin your spot.
+            </p>
+          ) : (
+            <p className="mt-0.5">
+              Location is blocked here. Tap the <strong>⋯</strong> menu and choose{" "}
+              <strong>“Open in browser”</strong> (Safari) to use it — or just tap the map to pin your spot.
+            </p>
+          )}
+        </div>
+      )}
       <div ref={mapEl} className="h-44 w-full overflow-hidden rounded-lg border border-plum-ink/10" />
       <p className="mt-1 text-xs text-plum-ink/50">
         {coords ? `Pinned: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}` : "Use your location above, or tap the map / drag the 📍 to your exact spot."}
