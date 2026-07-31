@@ -8,6 +8,7 @@ import { getPublicMenu } from "@/server/menu/public-menu";
 import { getActivePromotions } from "@/server/promotions/queries";
 import { getLoyaltyConfig } from "@/server/loyalty/loyalty";
 import { hasFeature } from "@/server/billing/feature-gate";
+import { getPublicRatingStats } from "@/server/feedback/queries";
 import { DinerMenu } from "@/components/diner/DinerMenu";
 
 /**
@@ -33,13 +34,14 @@ export default async function DinerOrderPage({
   if (!table) notFound();
 
   const locale = await getLocale();
-  const [categories, promotions, loyalty, loyaltyOk, promoOk, payOk] = await Promise.all([
+  const [categories, promotions, loyalty, loyaltyOk, promoOk, payOk, rating] = await Promise.all([
     getPublicMenu(restaurant.id, locale),
     getActivePromotions(restaurant.id),
     getLoyaltyConfig(restaurant.id),
     hasFeature(restaurant.id, "loyalty"),
     hasFeature(restaurant.id, "promotions"),
     hasFeature(restaurant.id, "onlinePayments"),
+    getPublicRatingStats(restaurant.id),
   ]);
 
   return (
@@ -52,6 +54,7 @@ export default async function DinerOrderPage({
       brand={{
         name: restaurant.displayName || restaurant.name,
         logoUrl: restaurant.logoUrl,
+        coverImageUrl: restaurant.coverImageUrl,
         tagline: restaurant.tagline,
       }}
       categories={categories}
@@ -60,6 +63,7 @@ export default async function DinerOrderPage({
       googleReviewUrl={restaurant.googleReviewUrl}
       promotions={promoOk ? promotions : []}
       loyaltyEnabled={loyaltyOk && loyalty.enabled}
+      rating={rating}
     />
   );
 }

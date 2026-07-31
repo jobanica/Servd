@@ -5,6 +5,7 @@ import { getTableByToken } from "@/server/restaurants/get-public";
 import { getPublicMenu } from "@/server/menu/public-menu";
 import { getActivePromotions } from "@/server/promotions/queries";
 import { getLoyaltyConfig } from "@/server/loyalty/loyalty";
+import { getPublicRatingStats } from "@/server/feedback/queries";
 import { DinerMenu } from "@/components/diner/DinerMenu";
 
 /**
@@ -25,10 +26,11 @@ export default async function SiteTablePage({
   if (!table) notFound();
 
   const locale = await getLocale();
-  const [categories, promotions, loyalty] = await Promise.all([
+  const [categories, promotions, loyalty, rating] = await Promise.all([
     getPublicMenu(restaurant.id, locale),
     getActivePromotions(restaurant.id),
     getLoyaltyConfig(restaurant.id),
+    getPublicRatingStats(restaurant.id),
   ]);
 
   return (
@@ -40,6 +42,7 @@ export default async function SiteTablePage({
       brand={{
         name: restaurant.displayName || restaurant.name,
         logoUrl: restaurant.logoUrl,
+        coverImageUrl: restaurant.coverImageUrl,
         tagline: restaurant.tagline,
       }}
       categories={categories}
@@ -47,6 +50,7 @@ export default async function SiteTablePage({
       googleReviewUrl={restaurant.googleReviewUrl}
       promotions={promotions}
       loyaltyEnabled={loyalty.enabled}
+      rating={rating}
     />
   );
 }

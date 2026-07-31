@@ -22,6 +22,7 @@ import { BrandSplash } from "./BrandSplash";
 interface RestaurantBrand {
   name: string;
   logoUrl: string | null;
+  coverImageUrl?: string | null;
   tagline: string | null;
 }
 
@@ -166,6 +167,7 @@ export function DinerMenu({
   googleReviewUrl = null,
   promotions = [],
   loyaltyEnabled = false,
+  rating = null,
 }: {
   restaurantId: string;
   slug: string;
@@ -179,6 +181,7 @@ export function DinerMenu({
   googleReviewUrl?: string | null;
   promotions?: PromoItem[];
   loyaltyEnabled?: boolean;
+  rating?: { count: number; average: number | null } | null;
 }) {
   const cart = useCart(restaurantId, tableToken);
   const t = useTranslations("diner");
@@ -356,37 +359,63 @@ export function DinerMenu({
       {/* "Powered by Servd" welcome splash — shown first, before the menu */}
       {!splashDone && <BrandSplash onDone={() => setSplashDone(true)} />}
 
-      {/* App bar */}
-      <header className="sticky top-0 z-20 border-b border-brand-ink/10 bg-brand-surface/95 backdrop-blur">
-        <div className="flex items-center gap-3 px-4 py-3">
-          {brand.logoUrl ? (
+      {/* Hero cover + centered logo + name + rating (scrolls away) */}
+      <div className="relative">
+        <div className="relative h-40 w-full overflow-hidden bg-brand-ink">
+          {brand.coverImageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={brand.logoUrl} alt={brand.name} className="h-9 w-9 rounded-lg object-cover" />
+            <img src={brand.coverImageUrl} alt={brand.name} className="h-full w-full object-cover" />
           ) : (
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-gradient text-sm font-bold text-white">
-              {brand.name.charAt(0)}
+            <div className="flex h-full w-full items-center justify-center bg-brand-gradient text-white/30">
+              <span className="font-heading text-5xl font-extrabold">{brand.name.charAt(0)}</span>
             </div>
           )}
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate font-heading text-base font-bold text-brand-ink">{brand.name}</h1>
-            <p className="truncate text-xs text-brand-ink/55">
-              {isCounter ? "🧾 Order at the counter" : `${t("table")} ${tableNumber}`}
-            </p>
+          {/* Overlaid actions */}
+          <div className="absolute inset-x-0 top-0 flex items-center justify-end gap-2 p-3">
+            <div className="rounded-full bg-white/90 shadow"><LanguageSwitcher /></div>
+            <button
+              onClick={() => setSheetOpen(true)}
+              aria-label="More"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-brand-ink shadow"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
           </div>
-          <LanguageSwitcher />
-          <button
-            onClick={() => setSheetOpen(true)}
-            aria-label="More"
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-brand-ink"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
         </div>
+        {/* Logo tile */}
+        <div className="-mt-9 flex justify-center">
+          <div className="flex h-[70px] w-[70px] items-center justify-center overflow-hidden rounded-2xl bg-white shadow-md ring-1 ring-black/5">
+            {brand.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={brand.logoUrl} alt={brand.name} className="h-full w-full object-cover" />
+            ) : (
+              <span className="font-heading text-xl font-extrabold text-brand-primary">{brand.name.charAt(0)}</span>
+            )}
+          </div>
+        </div>
+        <div className="px-5 pt-2 text-center">
+          <h1 className="font-heading text-xl font-extrabold text-brand-ink">{brand.name}</h1>
+          <div className="mt-0.5 flex items-center justify-center gap-2 text-sm">
+            {rating?.average != null && (
+              <span className="inline-flex items-center gap-1 font-semibold text-brand-ink">
+                <span className="text-mango">★</span>
+                {rating.average.toFixed(1)}
+                <span className="font-normal text-brand-ink/50">({rating.count})</span>
+              </span>
+            )}
+            <span className="rounded-full bg-brand-primary/10 px-2.5 py-0.5 text-xs font-bold text-brand-primary">
+              {isCounter ? "🧾 Counter" : `${t("table")} ${tableNumber}`}
+            </span>
+          </div>
+        </div>
+      </div>
 
+      {/* Sticky search + tabs */}
+      <header className="sticky top-0 z-20 mt-3 border-b border-brand-ink/10 bg-brand-surface/95 backdrop-blur">
         {/* Search */}
-        <div className="px-4 pb-3">
+        <div className="px-4 pb-3 pt-3">
           <div className="flex items-center gap-2 rounded-full border border-brand-ink/10 bg-white px-3 py-2">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-brand-ink/40">
               <circle cx="11" cy="11" r="7" />
