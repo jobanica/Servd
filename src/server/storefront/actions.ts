@@ -112,6 +112,10 @@ export async function updateStorefront(
     // no delivery fleet) + optional instructions on how.
     selfBookRider: formData.get("selfBookRider") === "on",
     selfBookRiderNote: String(formData.get("selfBookRiderNote") ?? "").trim().slice(0, 500),
+    fulfillment: (() => {
+      const f = String(formData.get("fulfillment") ?? "both");
+      return f === "pickup" ? "pickup" : f === "delivery" ? "delivery" : "both";
+    })(),
   };
   const hoursJson = hours as unknown as Prisma.InputJsonValue;
   const zonesJson = zones as unknown as Prisma.InputJsonValue;

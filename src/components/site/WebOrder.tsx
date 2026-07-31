@@ -115,6 +115,7 @@ export interface WebOrderProps {
     mapEnabled?: boolean;
     selfBookRider?: boolean;
     selfBookRiderNote?: string;
+    fulfillment?: "both" | "pickup" | "delivery";
   };
   // Where to center the delivery map by default (the store's location), so diners
   // start near the store instead of a far-away default view.
@@ -312,7 +313,11 @@ export function WebOrder(props: WebOrderProps) {
 
   const [lines, setLines] = useState<CartLine[]>([]);
   const [configItem, setConfigItem] = useState<DinerItem | null>(null);
-  const [orderType, setOrderType] = useState<"takeout" | "delivery">("takeout");
+  // What the online store offers (pick-up only / delivery only / both).
+  const fulfillment = props.delivery?.fulfillment ?? "both";
+  const [orderType, setOrderType] = useState<"takeout" | "delivery">(
+    fulfillment === "delivery" ? "delivery" : "takeout",
+  );
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
@@ -1059,24 +1064,31 @@ export function WebOrder(props: WebOrderProps) {
           </div>
         </div>
 
-        {/* Delivery / Pick-up toggle */}
+        {/* Delivery / Pick-up toggle — only when the store offers both;
+            otherwise a static label of the one mode it offers. */}
         <div className="px-5 pt-4">
-          <div className="mx-auto flex w-full max-w-[280px] rounded-full bg-gray-100 p-1 text-sm font-bold">
-            <button
-              type="button"
-              onClick={() => setOrderType("delivery")}
-              className={`flex-1 rounded-full py-2 transition ${orderType === "delivery" ? "bg-white text-plum-ink shadow" : "text-plum-ink/50"}`}
-            >
-              🛵 Delivery
-            </button>
-            <button
-              type="button"
-              onClick={() => setOrderType("takeout")}
-              className={`flex-1 rounded-full py-2 transition ${orderType === "takeout" ? "bg-white text-plum-ink shadow" : "text-plum-ink/50"}`}
-            >
-              🥡 Pick-up
-            </button>
-          </div>
+          {fulfillment === "both" ? (
+            <div className="mx-auto flex w-full max-w-[280px] rounded-full bg-gray-100 p-1 text-sm font-bold">
+              <button
+                type="button"
+                onClick={() => setOrderType("delivery")}
+                className={`flex-1 rounded-full py-2 transition ${orderType === "delivery" ? "bg-white text-plum-ink shadow" : "text-plum-ink/50"}`}
+              >
+                🛵 Delivery
+              </button>
+              <button
+                type="button"
+                onClick={() => setOrderType("takeout")}
+                className={`flex-1 rounded-full py-2 transition ${orderType === "takeout" ? "bg-white text-plum-ink shadow" : "text-plum-ink/50"}`}
+              >
+                🥡 Pick-up
+              </button>
+            </div>
+          ) : (
+            <div className="mx-auto w-fit rounded-full bg-gray-100 px-5 py-2 text-center text-sm font-bold text-plum-ink">
+              {fulfillment === "delivery" ? "🛵 Delivery only" : "🥡 Pick-up only"}
+            </div>
+          )}
         </div>
 
         {/* Delivery / open info card */}

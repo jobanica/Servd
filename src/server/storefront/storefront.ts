@@ -59,6 +59,7 @@ export interface DeliveryConfig {
   //                      (distance mode always needs it; ignored there)
   selfBookRider: boolean; // after placing, ask the customer to book their OWN rider
   selfBookRiderNote: string; // instructions shown to the customer (e.g. app/link to use)
+  fulfillment: "both" | "pickup" | "delivery"; // which order types the online store offers
 }
 export interface Storefront {
   hours: DayHours[]; // always length 7, index 0=Sun … 6=Sat
@@ -71,7 +72,7 @@ export interface Storefront {
 }
 
 export function defaultDeliveryConfig(): DeliveryConfig {
-  return { mode: "zones", baseFee: 0, perKm: 0, freeKm: 0, minFee: 0, maxKm: 0, roadFactor: 1.3, originLat: null, originLng: null, feeInTotal: true, mapEnabled: true, selfBookRider: false, selfBookRiderNote: "" };
+  return { mode: "zones", baseFee: 0, perKm: 0, freeKm: 0, minFee: 0, maxKm: 0, roadFactor: 1.3, originLat: null, originLng: null, feeInTotal: true, mapEnabled: true, selfBookRider: false, selfBookRiderNote: "", fulfillment: "both" };
 }
 
 function num(v: unknown, fallback = 0): number {
@@ -99,6 +100,7 @@ function normalizeDeliveryConfig(raw: unknown): DeliveryConfig {
       mapEnabled: r.mapEnabled === undefined ? true : !!r.mapEnabled,
       selfBookRider: !!r.selfBookRider,
       selfBookRiderNote: typeof r.selfBookRiderNote === "string" ? r.selfBookRiderNote.slice(0, 500) : "",
+      fulfillment: r.fulfillment === "pickup" ? "pickup" : r.fulfillment === "delivery" ? "delivery" : "both",
     };
   }
   return d;

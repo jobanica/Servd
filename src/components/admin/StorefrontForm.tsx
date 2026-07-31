@@ -130,6 +130,7 @@ export function StorefrontForm({
       mapEnabled: boolean;
       selfBookRider: boolean;
       selfBookRiderNote: string;
+      fulfillment: "both" | "pickup" | "delivery";
     };
   };
 }) {
@@ -144,6 +145,7 @@ export function StorefrontForm({
   const [selfRiderOn, setSelfRiderOn] = useState(initial.delivery.selfBookRider);
   const [packagingOn, setPackagingOn] = useState(initial.payment.packagingFeeEnabled);
   const [deliveryMode, setDeliveryMode] = useState<"zones" | "distance" | "shipping">(initial.delivery.mode);
+  const [fulfillment, setFulfillment] = useState<"both" | "pickup" | "delivery">(initial.delivery.fulfillment);
   const [origin, setOrigin] = useState<{ lat: number; lng: number } | null>(
     initial.delivery.originLat != null && initial.delivery.originLng != null
       ? { lat: initial.delivery.originLat, lng: initial.delivery.originLng }
@@ -206,12 +208,32 @@ export function StorefrontForm({
 
       {/* Delivery pricing */}
       <div className="rounded-tile border border-plum-ink/10 bg-white p-5">
-        <h2 className="font-heading text-lg font-bold">Delivery fees</h2>
-        <p className="mt-1 text-sm text-plum-ink/50">Choose how the delivery fee is worked out. Leave zones empty (or fees at 0) for pickup-only.</p>
+        <h2 className="font-heading text-lg font-bold">Delivery &amp; pick-up</h2>
+        <p className="mt-1 text-sm text-plum-ink/50">Choose what the online store offers, and how the delivery fee is worked out.</p>
+
+        {/* Fulfillment — which order types the online store accepts. */}
+        <div className="mt-3">
+          <label className="mb-1 block text-sm font-semibold text-plum-ink/70">Online orders accept</label>
+          <select
+            name="fulfillment"
+            value={fulfillment}
+            onChange={(e) => setFulfillment(e.target.value as "both" | "pickup" | "delivery")}
+            className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm sm:w-72"
+          >
+            <option value="both">Pick-up &amp; delivery</option>
+            <option value="pickup">Pick-up only (no delivery)</option>
+            <option value="delivery">Delivery only (no pick-up)</option>
+          </select>
+          {fulfillment === "pickup" && (
+            <p className="mt-1 text-xs text-plum-ink/50">Customers can only order for pick-up — delivery settings below are hidden.</p>
+          )}
+        </div>
 
         <input type="hidden" name="deliveryMode" value={deliveryMode} />
         <input type="hidden" name="originLat" value={origin?.lat ?? ""} />
         <input type="hidden" name="originLng" value={origin?.lng ?? ""} />
+
+        <div className={fulfillment === "pickup" ? "hidden" : ""}>
 
         {/* Mode toggle */}
         <div className="mt-3 grid grid-cols-3 gap-1 rounded-lg bg-plum-ink/5 p-1 sm:max-w-lg">
@@ -359,6 +381,7 @@ export function StorefrontForm({
             )}
             {!origin && <p className="mt-1 text-xs text-guava">Pin your store so we can measure distance to each customer.</p>}
           </div>
+        </div>
         </div>
       </div>
 

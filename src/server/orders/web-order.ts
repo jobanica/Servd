@@ -97,6 +97,15 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
   }
 
   const storefront = await getPublicStorefront(restaurant.id);
+  // Enforce the store's fulfillment mode server-side (the client hides the
+  // other option, but never trust the client).
+  const fulfillment = storefront.delivery.fulfillment;
+  if (fulfillment === "pickup" && d.orderType === "delivery") {
+    return { ok: false, error: "This store is pick-up only right now." };
+  }
+  if (fulfillment === "delivery" && d.orderType !== "delivery") {
+    return { ok: false, error: "This store is delivery only right now." };
+  }
   // A map pin is needed for distance-based fees, and for zone/flat delivery when
   // the owner keeps the map on. Shipping (typed address) and a map-off store skip
   // it. When not required, a typed address is enough.
