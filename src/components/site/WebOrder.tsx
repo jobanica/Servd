@@ -11,6 +11,7 @@ import {
 } from "@/lib/cart/pricing";
 import type { CartLine, DinerCategory, DinerItem, Selection } from "@/lib/cart/types";
 import { placeWebOrder } from "@/server/orders/web-order";
+import { getWebOrderStatus } from "@/server/orders/web-order-status";
 import { previewPromoCode } from "@/server/promotions/redeem";
 import { captureCartLead } from "@/server/marketing/cart-recovery";
 import { LocationPicker } from "./LocationPicker";
@@ -328,12 +329,31 @@ export function WebOrder(props: WebOrderProps) {
   // even after closing the tab (shown as a banner above the menu).
   const [recentOrderPath, setRecentOrderPath] = useState<string | null>(null);
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(`servd:lastOrder:${slug}`);
-      if (!raw) return;
-      const o = JSON.parse(raw);
-      if (o?.path && o?.at && Date.now() - o.at < 6 * 3600 * 1000) setRecentOrderPath(o.path);
-    } catch { /* storage unavailable */ }
+    const key = `servd:lastOrder:${slug}`;
+    let cancelled = false;
+    (async () => {
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return;
+        const o = JSON.parse(raw);
+        // Drop stale (>6h) or malformed entries.
+        if (!o?.path || !o?.orderId || !o?.at || Date.now() - o.at >= 6 * 3600 * 1000) {
+          localStorage.removeItem(key);
+          return;
+        }
+        // Only offer the shortcut while the order is still in progress — once it's
+        // completed / delivered / cancelled, forget it so the banner disappears.
+        const st = await getWebOrderStatus(slug, o.orderId);
+        if (cancelled) return;
+        const done = !st || st.status === "closed" || st.status === "cancelled" || st.deliveryStatus === "delivered";
+        if (done) {
+          localStorage.removeItem(key);
+          return;
+        }
+        setRecentOrderPath(o.path);
+      } catch { /* storage unavailable */ }
+    })();
+    return () => { cancelled = true; };
   }, [slug]);
 
   // Advance ordering ("order now for later"). Enabled alongside table bookings.

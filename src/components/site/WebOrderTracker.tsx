@@ -146,6 +146,17 @@ export function WebOrderTracker({
   const prevStatus = useRef<string>("pending");
   const prevDelivery = useRef<string | null>(null);
 
+  // Once this order is finished (completed / delivered / cancelled), forget it so
+  // the site stops showing the "you have a recent order" banner for it.
+  useEffect(() => {
+    const finished = status === "closed" || status === "cancelled" || deliveryStatus === "delivered";
+    if (!finished) return;
+    try {
+      const raw = localStorage.getItem(`servd:lastOrder:${slug}`);
+      if (raw && JSON.parse(raw)?.orderId === orderId) localStorage.removeItem(`servd:lastOrder:${slug}`);
+    } catch { /* storage unavailable */ }
+  }, [status, deliveryStatus, slug, orderId]);
+
   const refresh = useCallback(async () => {
     const res = await getWebOrderStatus(slug, orderId);
     if (!res) return;
