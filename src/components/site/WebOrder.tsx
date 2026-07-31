@@ -1032,9 +1032,9 @@ export function WebOrder(props: WebOrderProps) {
             )}
           </div>
 
-          {/* Centered logo tile overlapping the cover */}
-          <div className="-mt-10 flex justify-center">
-            <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-md ring-1 ring-black/5">
+          {/* Centered logo tile sitting IN FRONT of the cover (overlapping it) */}
+          <div className="relative z-10 -mt-12 flex justify-center">
+            <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-black/5">
               {logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={logoUrl} alt={restaurantName} className="h-full w-full object-cover" />

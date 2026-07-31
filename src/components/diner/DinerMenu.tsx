@@ -384,9 +384,9 @@ export function DinerMenu({
             </button>
           </div>
         </div>
-        {/* Logo tile */}
-        <div className="-mt-9 flex justify-center">
-          <div className="flex h-[70px] w-[70px] items-center justify-center overflow-hidden rounded-2xl bg-white shadow-md ring-1 ring-black/5">
+        {/* Logo tile — sits in front of the cover (overlapping it) */}
+        <div className="relative z-10 -mt-11 flex justify-center">
+          <div className="flex h-[70px] w-[70px] items-center justify-center overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-black/5">
             {brand.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={brand.logoUrl} alt={brand.name} className="h-full w-full object-cover" />
