@@ -113,6 +113,7 @@ export function StorefrontForm({
       packagingFeeEnabled: boolean;
       packagingFeePesos: number;
       packagingFeeScope: "delivery" | "all";
+      packagingFeeMode: "order" | "item";
       showVat: boolean;
     };
     delivery: {
@@ -387,7 +388,8 @@ export function StorefrontForm({
             Charge a food-packaging fee
           </label>
           <p className="mt-1 text-xs text-plum-ink/50">
-            A flat fee for tubs/containers on to-go orders, added to the order total.
+            A fee for tubs/containers on to-go orders, added to the order total — charged once per
+            order, or per item (× quantity).
           </p>
           {packagingOn ? (
             <div className="mt-2 space-y-2">
@@ -405,6 +407,17 @@ export function StorefrontForm({
                 <span className="text-sm text-plum-ink/50">packaging fee</span>
               </div>
               <div>
+                <label className="mb-1 block text-xs font-semibold text-plum-ink/60">Charge</label>
+                <select
+                  name="packagingFeeMode"
+                  defaultValue={initial.payment.packagingFeeMode}
+                  className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm sm:w-56"
+                >
+                  <option value="order">Once per order</option>
+                  <option value="item">Per item (× quantity)</option>
+                </select>
+              </div>
+              <div>
                 <label className="mb-1 block text-xs font-semibold text-plum-ink/60">Apply to</label>
                 <select
                   name="packagingFeeScope"
@@ -420,6 +433,7 @@ export function StorefrontForm({
             <>
               <input type="hidden" name="packagingFeePesos" value={initial.payment.packagingFeePesos} />
               <input type="hidden" name="packagingFeeScope" value={initial.payment.packagingFeeScope} />
+              <input type="hidden" name="packagingFeeMode" value={initial.payment.packagingFeeMode} />
             </>
           )}
         </div>

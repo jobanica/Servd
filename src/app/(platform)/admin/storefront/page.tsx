@@ -105,6 +105,7 @@ export default async function StorefrontPage() {
             packagingFeeEnabled: sf.payment.packagingFeeEnabled,
             packagingFeePesos: sf.payment.packagingFee / 100,
             packagingFeeScope: sf.payment.packagingFeeScope,
+            packagingFeeMode: sf.payment.packagingFeeMode,
             showVat: sf.payment.showVat,
           },
           delivery: {

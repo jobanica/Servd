@@ -84,6 +84,7 @@ export async function updateStorefront(
     packagingFeeEnabled: formData.get("packagingFeeEnabled") === "on",
     packagingFee: pesosToCentavos(Math.max(0, Number(formData.get("packagingFeePesos")) || 0)),
     packagingFeeScope: formData.get("packagingFeeScope") === "all" ? "all" : "delivery",
+    packagingFeeMode: formData.get("packagingFeeMode") === "item" ? "item" : "order",
     showVat: formData.get("showVat") === "on",
   };
   // Delivery pricing: zones (fixed per area) or distance (base + per-km). Peso

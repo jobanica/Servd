@@ -172,9 +172,11 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
       : 0;
   if (codFee > 0 && addressLine) addressLine = `[COD +${formatPeso(codFee)}] ${addressLine}`;
 
-  // Packaging fee — flat charge for food packaging (tubs/containers) on to-go
-  // online orders. Applies to delivery only, or pickup + delivery, per config.
-  const packagingFee = computePackagingFee(storefront.payment, d.orderType);
+  // Packaging fee for food packaging (tubs/containers) on to-go online orders.
+  // Applies to delivery only, or pickup + delivery, per config — and either a
+  // flat charge per order or per item (× total quantity), per packagingFeeMode.
+  const packagedUnits = built.items.reduce((n, i) => n + i.quantity, 0);
+  const packagingFee = computePackagingFee(storefront.payment, d.orderType, packagedUnits);
 
   // Coupon — re-resolved server-side against the real prices (never trust the
   // client for money). free_delivery waives the delivery fee; percent/amount cut

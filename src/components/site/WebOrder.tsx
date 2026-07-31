@@ -95,6 +95,7 @@ export interface WebOrderProps {
     packagingFeeEnabled?: boolean;
     packagingFee?: number; // centavos
     packagingFeeScope?: "delivery" | "all";
+    packagingFeeMode?: "order" | "item";
     showVat?: boolean;
   };
   delivery?: {
@@ -440,12 +441,13 @@ export function WebOrder(props: WebOrderProps) {
   // COD fee — an extra charge on cash-on-delivery orders (delivery paid by cash).
   const isCod = orderType === "delivery" && payMethod === "cod";
   const codFee = isCod && props.payment?.codFeeEnabled ? props.payment.codFee ?? 0 : 0;
-  // Packaging fee — flat charge for food packaging (tubs/containers) on to-go
-  // orders. Delivery only, or pickup + delivery, per the store's config.
+  // Packaging fee for food packaging (tubs/containers) on to-go orders. Delivery
+  // only, or pickup + delivery, per config — charged once per order, or per item
+  // (× total quantity) when packagingFeeMode is "item".
   const packagingFee =
     props.payment?.packagingFeeEnabled &&
     (props.payment.packagingFeeScope === "all" || orderType === "delivery")
-      ? props.payment.packagingFee ?? 0
+      ? (props.payment.packagingFee ?? 0) * (props.payment.packagingFeeMode === "item" ? count : 1)
       : 0;
   const discount = appliedPromo?.amount ?? 0;
   const total = Math.max(0, subtotal + deliveryFee + codFee + packagingFee - discount);
@@ -883,7 +885,10 @@ export function WebOrder(props: WebOrderProps) {
               </div>
             ))}
             {packagingFee > 0 && (
-              <div className="flex justify-between"><span>Packaging fee</span><span>{formatPeso(packagingFee)}</span></div>
+              <div className="flex justify-between">
+                <span>Packaging fee{props.payment?.packagingFeeMode === "item" ? ` (×${count})` : ""}</span>
+                <span>{formatPeso(packagingFee)}</span>
+              </div>
             )}
             {codFee > 0 && (
               <div className="flex justify-between"><span>COD fee</span><span>{formatPeso(codFee)}</span></div>

@@ -34,8 +34,9 @@ export interface PaymentConfig {
   bankNumber: string; // account number
   bankQrUrl: string; // uploaded InstaPay/QRPH image URL
   packagingFeeEnabled: boolean; // charge a food-packaging fee (tubs/containers)
-  packagingFee: number; // centavos added per online order
+  packagingFee: number; // centavos (per order, or per item — see packagingFeeMode)
   packagingFeeScope: "delivery" | "all"; // delivery only, or pickup & delivery
+  packagingFeeMode: "order" | "item"; // flat once per order, or charged per item (× quantity)
   showVat: boolean; // show the "VAT (12%) included" line at web checkout
   //                    (off for non-VAT / percentage-tax businesses)
 }
@@ -105,7 +106,7 @@ export function defaultPaymentConfig(): PaymentConfig {
     gcashEnabled: false, gcashName: "", gcashNumber: "", gcashQrUrl: "",
     mayaEnabled: false, mayaName: "", mayaNumber: "", mayaQrUrl: "",
     bankEnabled: false, bankName: "", bankNumber: "", bankQrUrl: "",
-    packagingFeeEnabled: false, packagingFee: 0, packagingFeeScope: "delivery",
+    packagingFeeEnabled: false, packagingFee: 0, packagingFeeScope: "delivery", packagingFeeMode: "order",
     showVat: true,
   };
 }
@@ -135,6 +136,8 @@ function normalizePaymentConfig(raw: unknown): PaymentConfig {
       packagingFeeEnabled: !!r.packagingFeeEnabled,
       packagingFee: Math.max(0, Math.round(Number(r.packagingFee) || 0)),
       packagingFeeScope: r.packagingFeeScope === "all" ? "all" : "delivery",
+      // Default "order" (flat) so existing stores' totals are unchanged.
+      packagingFeeMode: r.packagingFeeMode === "item" ? "item" : "order",
       // Default true so existing stores keep showing "VAT (12%) included".
       showVat: r.showVat === undefined ? true : !!r.showVat,
     };
@@ -142,11 +145,20 @@ function normalizePaymentConfig(raw: unknown): PaymentConfig {
   return d;
 }
 
-/** The packaging fee that applies to an online order of the given type (centavos). */
-export function computePackagingFee(cfg: PaymentConfig, orderType: "takeout" | "delivery"): number {
+/**
+ * The packaging fee that applies to an online order of the given type (centavos).
+ * "order" mode charges the flat fee once; "item" mode charges it per item unit,
+ * so it scales with the total quantity in the cart.
+ */
+export function computePackagingFee(
+  cfg: PaymentConfig,
+  orderType: "takeout" | "delivery",
+  itemCount = 1,
+): number {
   if (!cfg.packagingFeeEnabled || cfg.packagingFee <= 0) return 0;
   if (cfg.packagingFeeScope === "delivery" && orderType !== "delivery") return 0;
-  return cfg.packagingFee;
+  const units = cfg.packagingFeeMode === "item" ? Math.max(1, Math.round(itemCount)) : 1;
+  return cfg.packagingFee * units;
 }
 
 export function defaultBookingConfig(): BookingConfig {
