@@ -193,11 +193,17 @@ export function MerchantBoard({
     };
   }, [restaurantId, refresh]);
 
-  // Phones throttle background timers and drop the realtime socket while the app
-  // is minimized, so a poll can be missed. Refresh the moment it's foregrounded
-  // (and when regaining network) so a queued order shows — and alarms — instantly.
+  // Phones throttle background timers, drop the realtime socket, AND suspend the
+  // audio context while the app is minimized — so a queued order can arrive
+  // silently. The moment it's foregrounded (or the network returns), refresh so
+  // a queued order shows, and resume the audio context so it actually alarms.
   useEffect(() => {
-    const onWake = () => { if (document.visibilityState === "visible") refresh(); };
+    const onWake = () => {
+      if (document.visibilityState === "visible") {
+        refresh();
+        void alarm.resume();
+      }
+    };
     document.addEventListener("visibilitychange", onWake);
     window.addEventListener("focus", onWake);
     window.addEventListener("online", onWake);
@@ -206,7 +212,19 @@ export function MerchantBoard({
       window.removeEventListener("focus", onWake);
       window.removeEventListener("online", onWake);
     };
-  }, [refresh]);
+  }, [refresh, alarm]);
+
+  // After an app kill + reload we restore the "started" state (so staff keep
+  // their place), but the browser still needs a gesture before it will play
+  // sound. Re-arm the alarm on the very first tap anywhere, so they don't have
+  // to hunt for the start button.
+  const { unlocked: alarmUnlocked, soundOn: alarmSoundOn, unlock: alarmUnlock } = alarm;
+  useEffect(() => {
+    if (!alarmUnlocked || alarmSoundOn) return;
+    const rearm = () => { void alarmUnlock(); };
+    window.addEventListener("pointerdown", rearm, { once: true });
+    return () => window.removeEventListener("pointerdown", rearm);
+  }, [alarmUnlocked, alarmSoundOn, alarmUnlock]);
 
   // Register the service worker so the screen is installable as a PWA, and keep
   // this device's push subscription fresh if notifications were already allowed.
@@ -278,8 +296,9 @@ export function MerchantBoard({
         )}
         <h1 className="font-heading text-3xl font-extrabold">{restaurantName} — Incoming Orders</h1>
         <p className="max-w-md text-white/70">
-          Tap below to enable the new-order alarm and background alerts. Keep this app installed and
-          allow notifications so orders still ring even when it&apos;s minimized.
+          Tap below to turn on the new-order alarm. When you tap, <strong>allow notifications</strong> —
+          that&apos;s what alerts you if the app is minimized or closed. For the loud in-app alarm, keep
+          this screen open (install it and leave it running on an always-on, plugged-in device).
         </p>
         <button
           onClick={() => { alarm.unlock(); void enableBackgroundPush(); }}
@@ -314,6 +333,18 @@ export function MerchantBoard({
           </span>
         </div>
       </header>
+
+      {/* Audio got suspended (app was minimized/closed and reopened). Sound
+          needs a fresh tap to come back — make that obvious and one-tap. */}
+      {!alarm.soundOn && (
+        <button
+          type="button"
+          onClick={() => { void alarm.unlock(); }}
+          className="flex w-full items-center justify-center gap-2 bg-red-600 px-4 py-2.5 text-sm font-bold text-white"
+        >
+          🔔 Alarm sound is OFF — tap to turn it back on
+        </button>
+      )}
 
       {/* FULL-SCREEN incoming-order alert (the loud one) */}
       {topIncoming && (
