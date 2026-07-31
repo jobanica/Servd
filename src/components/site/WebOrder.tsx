@@ -59,6 +59,8 @@ export interface WebOrderProps {
   slug: string;
   restaurantName: string;
   logoUrl?: string | null;
+  coverImageUrl?: string | null;
+  rating?: { count: number; average: number | null } | null;
   categories: DinerCategory[];
   contact?: { address: string | null; phone: string | null };
   payOnline?: boolean;
@@ -269,11 +271,11 @@ function ItemConfig({ item, onAdd, onCancel }: { item: DinerItem; onAdd: (l: Car
   );
 }
 
-/** Product card. */
+/** Product card — image-forward tile with a floating add button (delivery-app style). */
 function ProductCard({ item, onPick }: { item: DinerItem; onPick: (i: DinerItem) => void }) {
   return (
-    <div className="flex flex-col rounded-xl border border-black/5 bg-white p-3 shadow-sm">
-      <div className="relative mb-2 aspect-[4/3] overflow-hidden rounded-lg bg-gray-100">
+    <div className="flex flex-col">
+      <div className="relative aspect-square overflow-hidden rounded-2xl bg-gray-100">
         {item.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
@@ -281,23 +283,21 @@ function ProductCard({ item, onPick }: { item: DinerItem; onPick: (i: DinerItem)
           <div className="flex h-full w-full items-center justify-center bg-gray-200 text-3xl font-bold text-gray-400">{item.name.charAt(0)}</div>
         )}
         {!item.isAvailable && <span className="absolute inset-0 flex items-center justify-center bg-white/70 text-sm font-bold text-plum-ink">Sold out</span>}
-      </div>
-      <p className="font-semibold text-plum-ink">{item.name}</p>
-      {item.description && <p className="mt-0.5 line-clamp-2 text-xs text-plum-ink/50">{item.description}</p>}
-      <div className="mt-2 flex items-center justify-between">
-        <span className="font-bold text-plum-ink">
-          {item.variants && item.variants.length > 0 && <span className="text-xs font-medium text-plum-ink/50">from </span>}
-          {formatPeso(item.price)}
-        </span>
         <button
           onClick={() => onPick(item)}
           disabled={!item.isAvailable}
           aria-label={`Add ${item.name}`}
-          className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-xl font-bold text-red-600 hover:bg-red-600 hover:text-white disabled:opacity-40"
+          className="absolute bottom-2 right-2 flex h-9 w-9 items-center justify-center rounded-full bg-white text-2xl font-bold leading-none text-red-600 shadow-md ring-1 ring-black/5 hover:bg-red-600 hover:text-white disabled:opacity-40"
         >
           +
         </button>
       </div>
+      <p className="mt-2 line-clamp-2 text-sm font-semibold text-plum-ink">{item.name}</p>
+      {item.description && <p className="mt-0.5 line-clamp-1 text-xs text-plum-ink/50">{item.description}</p>}
+      <span className="mt-1 text-sm font-bold text-plum-ink">
+        {item.variants && item.variants.length > 0 && <span className="text-xs font-medium text-plum-ink/50">from </span>}
+        {formatPeso(item.price)}
+      </span>
     </div>
   );
 }
@@ -325,6 +325,15 @@ export function WebOrder(props: WebOrderProps) {
   const [placedId, setPlacedId] = useState<string | null>(null);
   const [cartOpen, setCartOpen] = useState(false); // mobile cart sheet
   const [checkout, setCheckout] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+  // Cheapest delivery fee to advertise on the hero info card (zones min, else
+  // the distance/shipping base). Null when unknown → we show a softer message.
+  const minDeliveryFee = useMemo(() => {
+    if (zones.length > 0) return Math.min(...zones.map((z) => z.fee));
+    const dc = props.delivery;
+    if (dc && (dc.mode === "distance" || dc.mode === "shipping") && dc.baseFee > 0) return dc.baseFee;
+    return null;
+  }, [zones, props.delivery]);
   // A recent order saved in this browser — lets the customer re-open its status
   // even after closing the tab (shown as a banner above the menu).
   const [recentOrderPath, setRecentOrderPath] = useState<string | null>(null);
@@ -967,62 +976,163 @@ export function WebOrder(props: WebOrderProps) {
   );
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <header className="sticky top-0 z-30 bg-plum-ink text-white">
-        <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4">
-          {logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt={restaurantName} className="h-10 w-10 rounded-lg object-cover" />
-          ) : (
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-600 font-bold">{restaurantName.charAt(0)}</div>
-          )}
-          <span className="font-heading text-lg font-extrabold">{restaurantName}</span>
-          {openNow != null && (
-            <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${openNow ? "bg-green-500/20 text-green-300" : "bg-white/10 text-white/60"}`}>
-              {openNow ? "● Open now" : "Closed"}
-            </span>
-          )}
-          <nav className="ml-auto hidden items-center gap-5 text-sm font-semibold text-white/80 md:flex">
-            <a href="#menu" className="hover:text-white">MENU</a>
-            <a href="#info" className="hover:text-white">PAYMENT</a>
-            <a href="#info" className="hover:text-white">DELIVERY</a>
-            <a href="#info" className="hover:text-white">HOURS</a>
-            <a href="#info" className="hover:text-white">CONTACT</a>
-            {acceptsBookings && (
-              <a href={book} className="rounded-full bg-white px-3.5 py-1.5 font-bold text-plum-ink hover:bg-white/90">
-                📅 Book / Order ahead
-              </a>
+    <div className="min-h-screen bg-white">
+      <div className="mx-auto max-w-xl bg-white shadow-sm">
+        {/* Hero cover + overlaid actions */}
+        <div className="relative">
+          <div className="relative h-48 w-full overflow-hidden bg-plum-ink sm:h-56">
+            {props.coverImageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={props.coverImageUrl} alt={restaurantName} className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-plum-ink to-red-700 text-white/30">
+                <span className="font-heading text-5xl font-extrabold">{restaurantName.charAt(0)}</span>
+              </div>
             )}
-          </nav>
-          {acceptsBookings && (
-            <a href={book} className="ml-auto rounded-full bg-white px-3 py-1.5 text-xs font-bold text-plum-ink md:hidden">
-              📅 Book
-            </a>
-          )}
+            {/* Action buttons */}
+            <div className="absolute inset-x-0 top-0 flex items-center justify-between p-3">
+              <button
+                type="button"
+                onClick={() => { if (window.history.length > 1) window.history.back(); else window.location.href = home; }}
+                aria-label="Back"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-lg text-plum-ink shadow"
+              >
+                ←
+              </button>
+              <div className="flex items-center gap-2">
+                <a href="#info" aria-label="Store info" className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-lg text-plum-ink shadow">ⓘ</a>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const url = typeof window !== "undefined" ? window.location.href : "";
+                    try {
+                      if (navigator.share) await navigator.share({ title: restaurantName, url });
+                      else { await navigator.clipboard.writeText(url); setShareCopied(true); setTimeout(() => setShareCopied(false), 1600); }
+                    } catch { /* cancelled */ }
+                  }}
+                  aria-label="Share"
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-lg text-plum-ink shadow"
+                >
+                  ⤴
+                </button>
+              </div>
+            </div>
+            {shareCopied && (
+              <p className="absolute right-3 top-16 rounded-full bg-plum-ink px-3 py-1 text-xs font-semibold text-white shadow">Link copied</p>
+            )}
+          </div>
+
+          {/* Centered logo tile overlapping the cover */}
+          <div className="-mt-10 flex justify-center">
+            <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-md ring-1 ring-black/5">
+              {logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={logoUrl} alt={restaurantName} className="h-full w-full object-cover" />
+              ) : (
+                <span className="font-heading text-2xl font-extrabold text-red-600">{restaurantName.charAt(0)}</span>
+              )}
+            </div>
+          </div>
         </div>
-      </header>
 
-      {recentOrderPath && (
-        <a
-          href={recentOrderPath}
-          className="block bg-green-600 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-green-700"
-        >
-          🧾 You have a recent order — tap to track its status →
-        </a>
-      )}
+        {/* Name + rating */}
+        <div className="px-5 pt-3 text-center">
+          <h1 className="font-heading text-2xl font-extrabold text-plum-ink">{restaurantName}</h1>
+          <div className="mt-1 flex items-center justify-center gap-2 text-sm">
+            {props.rating?.average != null ? (
+              <span className="inline-flex items-center gap-1 font-semibold text-plum-ink">
+                <span className="text-mango">★</span>
+                {props.rating.average.toFixed(1)}
+                <span className="font-normal text-plum-ink/50">({props.rating.count} rating{props.rating.count === 1 ? "" : "s"})</span>
+              </span>
+            ) : openNow != null ? (
+              <span className={`inline-flex items-center gap-1.5 font-semibold ${openNow ? "text-green-600" : "text-plum-ink/50"}`}>
+                <span className={`h-2 w-2 rounded-full ${openNow ? "bg-green-500" : "bg-plum-ink/40"}`} />
+                {openNow ? "Open now" : "Closed"}
+              </span>
+            ) : null}
+          </div>
+        </div>
 
-      {/* Mobile category quick-nav — horizontally scrollable chips that jump to a
-          section. Hidden while searching (sections are filtered) and on desktop
-          (the sidebar handles it). */}
+        {/* Delivery / Pick-up toggle */}
+        <div className="px-5 pt-4">
+          <div className="mx-auto flex w-full max-w-[280px] rounded-full bg-gray-100 p-1 text-sm font-bold">
+            <button
+              type="button"
+              onClick={() => setOrderType("delivery")}
+              className={`flex-1 rounded-full py-2 transition ${orderType === "delivery" ? "bg-white text-plum-ink shadow" : "text-plum-ink/50"}`}
+            >
+              🛵 Delivery
+            </button>
+            <button
+              type="button"
+              onClick={() => setOrderType("takeout")}
+              className={`flex-1 rounded-full py-2 transition ${orderType === "takeout" ? "bg-white text-plum-ink shadow" : "text-plum-ink/50"}`}
+            >
+              🥡 Pick-up
+            </button>
+          </div>
+        </div>
+
+        {/* Delivery / open info card */}
+        <div className="px-5 pt-3">
+          <div className="rounded-2xl border border-plum-ink/10 p-4">
+            <div className="flex items-center justify-between">
+              <p className="font-heading font-bold text-plum-ink">
+                {orderType === "delivery" ? "🛵 Delivery" : "🥡 Pick-up"}
+                {typeof openNow === "boolean" && (
+                  <span className={`ml-2 align-middle text-xs font-semibold ${openNow ? "text-green-600" : "text-guava"}`}>
+                    {openNow ? "· Open now" : "· Closed"}
+                  </span>
+                )}
+              </p>
+              <a href="#info" className="text-sm font-bold text-brand-primary">Details</a>
+            </div>
+            <p className="mt-1 text-sm text-plum-ink/60">
+              {orderType === "delivery"
+                ? minDeliveryFee != null
+                  ? `Delivery fee from ${formatPeso(minDeliveryFee)}. Set your location at checkout.`
+                  : "Delivery available. We'll confirm the fee for your area at checkout."
+                : contact?.address
+                  ? `Pick up at ${contact.address}`
+                  : "Ready for pick-up at the store."}
+            </p>
+          </div>
+        </div>
+
+        {recentOrderPath && (
+          <a
+            href={recentOrderPath}
+            className="mx-5 mt-3 block rounded-2xl bg-green-600 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-green-700"
+          >
+            🧾 You have a recent order — tap to track its status →
+          </a>
+        )}
+
+      {/* Search */}
+      <div className="px-5 pt-4">
+        <div className="flex items-center gap-2 rounded-full bg-gray-100 px-4 py-2.5">
+          <span className="text-plum-ink/40">🔍</span>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search menu"
+            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-plum-ink/40"
+          />
+        </div>
+      </div>
+
+      {/* Sticky category tabs (underline style) */}
       {!q && nonEmpty.length > 1 && (
-        <div className="sticky top-16 z-20 border-b border-plum-ink/10 bg-white/95 backdrop-blur lg:hidden">
-          <div className="flex gap-2 overflow-x-auto px-3 py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {nonEmpty.map((c) => (
+        <div className="sticky top-0 z-20 mt-3 border-b border-plum-ink/10 bg-white/95 backdrop-blur">
+          <div className="flex gap-5 overflow-x-auto px-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {nonEmpty.map((c, i) => (
               <a
                 key={c.id}
                 href={`#cat-${c.id}`}
-                className="shrink-0 rounded-full border border-plum-ink/15 bg-white px-3.5 py-1.5 text-xs font-semibold text-plum-ink/75 hover:border-brand-primary hover:text-brand-primary"
+                className={`shrink-0 border-b-2 py-3 text-sm font-bold ${
+                  i === 0 ? "border-plum-ink text-plum-ink" : "border-transparent text-plum-ink/45 hover:text-plum-ink"
+                }`}
               >
                 {c.name}
               </a>
@@ -1031,65 +1141,32 @@ export function WebOrder(props: WebOrderProps) {
         </div>
       )}
 
-      <div className="mx-auto grid max-w-7xl gap-4 p-4 lg:grid-cols-[230px_1fr_330px]">
-        {/* Left sidebar — sticky so the categories stay visible while you scroll
-            the menu (and after jumping to a category). */}
-        <aside className="hidden lg:block">
-          <div className="sticky top-20 max-h-[calc(100vh-6rem)] space-y-3 overflow-y-auto pb-4">
-            <div className="rounded-xl bg-white p-3 shadow-sm">
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" className="w-full rounded-lg border border-plum-ink/10 px-3 py-2 text-sm" />
-            </div>
-            <div className="rounded-xl bg-white p-2 shadow-sm">
-              <p className="px-2 py-1 font-heading text-xs font-bold uppercase tracking-wide text-plum-ink/50">Menu</p>
-              <ul>
-                {nonEmpty.map((c) => (
-                  <li key={c.id}>
-                    <a href={`#cat-${c.id}`} className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-plum-ink/80 hover:bg-gray-100">
-                      <span className="flex h-6 w-6 items-center justify-center rounded bg-gray-100 text-xs font-bold text-plum-ink/50">{c.name.charAt(0)}</span>
-                      {c.name}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            {loyalty?.enabled && (
-              <div className="rounded-xl bg-white p-4 text-center shadow-sm">
-                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-red-600 text-xl text-white">🔔</div>
-                <p className="mt-2 text-sm font-semibold text-plum-ink">Special Offers</p>
-                <p className="text-xs text-plum-ink/50">Earn points on every order</p>
-              </div>
-            )}
+      {/* Menu */}
+      <main id="menu" className="px-5 pb-28 pt-4">
+        {/* Loyalty promo card */}
+        {loyalty?.enabled && (
+          <div className="mb-4 overflow-hidden rounded-2xl bg-gradient-to-r from-red-600 to-orange-500 p-4 text-white shadow-sm">
+            <p className="font-heading text-base font-extrabold">Earn reward points 🎉</p>
+            <p className="mt-0.5 text-sm text-white/90">
+              ₱{loyalty.pesosPerPoint} spent = 1 point. Enter your phone at checkout to start earning.
+            </p>
           </div>
-        </aside>
+        )}
 
-        {/* Center */}
-        <main id="menu">
-          {/* Mobile search */}
-          <div className="mb-3 lg:hidden">
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search the menu…" className="w-full rounded-lg border border-plum-ink/10 bg-white px-3 py-2 text-sm" />
-          </div>
-
-          {/* Promo banner */}
-          {loyalty?.enabled && (
-            <div className="mb-4 overflow-hidden rounded-xl bg-gradient-to-r from-red-600 to-orange-500 p-5 text-white shadow">
-              <p className="font-heading text-lg font-extrabold">Earn reward points 🎉</p>
-              <p className="mt-1 text-sm text-white/90">
-                Earn points on every order — ₱{loyalty.pesosPerPoint} spent = 1 point. Enter your phone at checkout to start earning.
-              </p>
+        {shownCats.length === 0 && <p className="rounded-2xl bg-gray-50 p-6 text-center text-sm text-plum-ink/50">No items match your search.</p>}
+        {shownCats.map((cat, ci) => (
+          <section key={cat.id} id={`cat-${cat.id}`} className="mb-7 scroll-mt-16">
+            <h2 className="mb-3 flex items-center gap-2 font-heading text-xl font-extrabold text-plum-ink">
+              {ci === 0 && <span aria-hidden>🔥</span>}
+              {cat.name}
+            </h2>
+            <div className="grid grid-cols-2 gap-3">
+              {cat.items.map((item) => (
+                <ProductCard key={item.id} item={item} onPick={pick} />
+              ))}
             </div>
-          )}
-
-          {shownCats.length === 0 && <p className="rounded-xl bg-white p-6 text-center text-sm text-plum-ink/50">No items match your search.</p>}
-          {shownCats.map((cat) => (
-            <section key={cat.id} id={`cat-${cat.id}`} className="mb-6 scroll-mt-28">
-              <h2 className="mb-3 font-heading text-lg font-bold text-plum-ink">{cat.name}</h2>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {cat.items.map((item) => (
-                  <ProductCard key={item.id} item={item} onPick={pick} />
-                ))}
-              </div>
-            </section>
-          ))}
+          </section>
+        ))}
 
           {/* Info / footer */}
           <section id="info" className="mt-8 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-plum-ink/5">
@@ -1198,21 +1275,14 @@ export function WebOrder(props: WebOrderProps) {
             </div>
           </section>
         </main>
-
-        {/* Right cart (desktop) */}
-        <aside className="hidden lg:block">
-          <div className="sticky top-20 h-[calc(100vh-6rem)] overflow-hidden rounded-xl bg-white shadow-sm">
-            {cartPanel}
-          </div>
-        </aside>
       </div>
 
       {/* Item config modal */}
       {configItem && <ItemConfig item={configItem} onAdd={(l) => { setLines((p) => addCartLine(p, l)); setConfigItem(null); }} onCancel={() => setConfigItem(null)} />}
 
-      {/* Mobile cart bar + sheet */}
+      {/* Cart bar + sheet (centered at the app width). */}
       {count > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-20 p-3 lg:hidden">
+        <div className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-xl p-3">
           <button onClick={() => setCartOpen(true)} className="flex w-full items-center justify-between rounded-full bg-green-600 px-5 py-3.5 font-semibold text-white shadow-lg">
             <span>{count} item{count > 1 ? "s" : ""}</span>
             <span>My order · {formatPeso(total)}</span>
@@ -1220,10 +1290,10 @@ export function WebOrder(props: WebOrderProps) {
         </div>
       )}
       {cartOpen && (
-        <div className="fixed inset-0 z-50 bg-white lg:hidden">
-          {/* Full-screen on phones: a fixed close bar, then the cart panel fills
-              the rest (its own body scrolls, the Place-order footer stays put). */}
-          <div className="flex h-full w-full flex-col">
+        <div className="fixed inset-0 z-50 flex justify-center bg-black/40">
+          {/* Centered app-width sheet: a fixed close bar, then the cart panel
+              fills the rest (its own body scrolls, the footer stays put). */}
+          <div className="flex h-full w-full max-w-xl flex-col bg-white">
             <div className="flex shrink-0 justify-end px-2 pt-1">
               <button onClick={() => setCartOpen(false)} className="px-2 text-2xl leading-none text-plum-ink/40" aria-label="Close">×</button>
             </div>

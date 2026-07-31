@@ -3,6 +3,7 @@ import { getRestaurantByHost } from "@/server/restaurants/get-by-host";
 import { getPublicMenu } from "@/server/menu/public-menu";
 import { getLoyaltyConfig } from "@/server/loyalty/loyalty";
 import { getPublicStorefront, isOpenNow } from "@/server/storefront/storefront";
+import { getPublicRatingStats } from "@/server/feedback/queries";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { WebOrder } from "@/components/site/WebOrder";
 import { storefrontMetadata } from "@/lib/site/metadata";
@@ -27,11 +28,12 @@ export default async function SiteHomePage({
   const restaurant = await getRestaurantByHost(decodeURIComponent(host));
   if (!restaurant) notFound();
 
-  const [categories, loyalty, sf, contactRow] = await Promise.all([
+  const [categories, loyalty, sf, contactRow, rating] = await Promise.all([
     getPublicMenu(restaurant.id),
     getLoyaltyConfig(restaurant.id),
     getPublicStorefront(restaurant.id),
     systemDb((tx) => tx.restaurant.findFirst({ where: { id: restaurant.id }, select: { printerConfig: true } })).catch(() => null),
+    getPublicRatingStats(restaurant.id),
   ]);
   const c = (contactRow?.printerConfig as { receipt?: { address?: string; phone?: string } } | null)?.receipt;
 
@@ -40,6 +42,8 @@ export default async function SiteHomePage({
       slug={restaurant.slug}
       restaurantName={restaurant.displayName || restaurant.name}
       logoUrl={restaurant.logoUrl}
+      coverImageUrl={restaurant.coverImageUrl}
+      rating={rating}
       categories={categories}
       contact={{ address: c?.address ?? null, phone: c?.phone ?? null }}
       payOnline={restaurant.paymentOnlineEnabled}

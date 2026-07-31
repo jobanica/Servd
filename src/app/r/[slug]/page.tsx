@@ -3,6 +3,7 @@ import { getPublicRestaurantBySlug } from "@/server/restaurants/get-public";
 import { getPublicMenu } from "@/server/menu/public-menu";
 import { getLoyaltyConfig } from "@/server/loyalty/loyalty";
 import { getPublicStorefront, isOpenNow } from "@/server/storefront/storefront";
+import { getPublicRatingStats } from "@/server/feedback/queries";
 import { hasFeature } from "@/server/billing/feature-gate";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { WebOrder } from "@/components/site/WebOrder";
@@ -41,11 +42,12 @@ export default async function RestaurantSite({
   // Online ordering is a Growth+ feature — Free doesn't get a public order site.
   if (!(await hasFeature(restaurant.id, "onlineOrdering"))) notFound();
 
-  const [categories, loyalty, contact, sf] = await Promise.all([
+  const [categories, loyalty, contact, sf, rating] = await Promise.all([
     getPublicMenu(restaurant.id),
     getLoyaltyConfig(restaurant.id),
     getContact(restaurant.id),
     getPublicStorefront(restaurant.id),
+    getPublicRatingStats(restaurant.id),
   ]);
 
   return (
@@ -53,6 +55,8 @@ export default async function RestaurantSite({
       slug={slug}
       restaurantName={restaurant.displayName || restaurant.name}
       logoUrl={restaurant.logoUrl}
+      coverImageUrl={restaurant.coverImageUrl}
+      rating={rating}
       categories={categories}
       contact={contact}
       payOnline={restaurant.paymentOnlineEnabled}
