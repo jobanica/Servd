@@ -100,6 +100,9 @@ export function WebOrderTracker({
   restaurantName,
   phone,
   homeHref,
+  selfBookRider = false,
+  selfBookRiderNote,
+  pickupAddress = null,
 }: {
   slug: string;
   orderId: string;
@@ -107,6 +110,9 @@ export function WebOrderTracker({
   restaurantName: string;
   phone?: string;
   homeHref: string;
+  selfBookRider?: boolean;
+  selfBookRiderNote?: string;
+  pickupAddress?: string | null;
 }) {
   const delivery = orderType === "delivery";
   const [copied, setCopied] = useState(false);
@@ -271,6 +277,23 @@ export function WebOrderTracker({
                 <p className="mt-1 text-center text-[10px] leading-tight text-plum-ink/50">{label}</p>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Ask the customer to book their own rider (stores with no fleet). */}
+        {selfBookRider && !terminal && (
+          <div className="mt-5 rounded-xl border border-mango/40 bg-mango/10 p-4 text-left">
+            <p className="font-heading font-extrabold text-plum-ink">🛵 Please book your own rider</p>
+            <p className="mt-1 text-sm text-plum-ink/70">
+              {selfBookRiderNote?.trim()
+                ? selfBookRiderNote
+                : "This store doesn't have its own riders. Please book a rider (Lalamove, Grab, etc.) to pick up your order."}
+            </p>
+            {pickupAddress && (
+              <p className="mt-2 text-sm text-plum-ink/70">
+                <span className="font-semibold text-plum-ink">Pick-up address:</span> {pickupAddress}
+              </p>
+            )}
           </div>
         )}
 

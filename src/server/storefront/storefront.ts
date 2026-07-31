@@ -57,6 +57,8 @@ export interface DeliveryConfig {
   //                      false = customer pays the rider directly (food only in-app)
   mapEnabled: boolean; // ask the customer to pin their location on a map at checkout
   //                      (distance mode always needs it; ignored there)
+  selfBookRider: boolean; // after placing, ask the customer to book their OWN rider
+  selfBookRiderNote: string; // instructions shown to the customer (e.g. app/link to use)
 }
 export interface Storefront {
   hours: DayHours[]; // always length 7, index 0=Sun … 6=Sat
@@ -69,7 +71,7 @@ export interface Storefront {
 }
 
 export function defaultDeliveryConfig(): DeliveryConfig {
-  return { mode: "zones", baseFee: 0, perKm: 0, freeKm: 0, minFee: 0, maxKm: 0, roadFactor: 1.3, originLat: null, originLng: null, feeInTotal: true, mapEnabled: true };
+  return { mode: "zones", baseFee: 0, perKm: 0, freeKm: 0, minFee: 0, maxKm: 0, roadFactor: 1.3, originLat: null, originLng: null, feeInTotal: true, mapEnabled: true, selfBookRider: false, selfBookRiderNote: "" };
 }
 
 function num(v: unknown, fallback = 0): number {
@@ -95,6 +97,8 @@ function normalizeDeliveryConfig(raw: unknown): DeliveryConfig {
       feeInTotal: r.feeInTotal === undefined ? true : !!r.feeInTotal,
       // Default true (map shown) so existing stores keep the pin.
       mapEnabled: r.mapEnabled === undefined ? true : !!r.mapEnabled,
+      selfBookRider: !!r.selfBookRider,
+      selfBookRiderNote: typeof r.selfBookRiderNote === "string" ? r.selfBookRiderNote.slice(0, 500) : "",
     };
   }
   return d;

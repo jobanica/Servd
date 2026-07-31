@@ -120,6 +120,8 @@ export default async function StorefrontPage() {
             originLng: sf.delivery.originLng,
             feeInTotal: sf.delivery.feeInTotal,
             mapEnabled: sf.delivery.mapEnabled,
+            selfBookRider: sf.delivery.selfBookRider,
+            selfBookRiderNote: sf.delivery.selfBookRiderNote,
           },
         }}
       />

@@ -128,6 +128,8 @@ export function StorefrontForm({
       originLng: number | null;
       feeInTotal: boolean;
       mapEnabled: boolean;
+      selfBookRider: boolean;
+      selfBookRiderNote: string;
     };
   };
 }) {
@@ -139,6 +141,7 @@ export function StorefrontForm({
   const [mayaOn, setMayaOn] = useState(initial.payment.mayaEnabled);
   const [bankOn, setBankOn] = useState(initial.payment.bankEnabled);
   const [codFeeOn, setCodFeeOn] = useState(initial.payment.codFeeEnabled);
+  const [selfRiderOn, setSelfRiderOn] = useState(initial.delivery.selfBookRider);
   const [packagingOn, setPackagingOn] = useState(initial.payment.packagingFeeEnabled);
   const [deliveryMode, setDeliveryMode] = useState<"zones" | "distance" | "shipping">(initial.delivery.mode);
   const [origin, setOrigin] = useState<{ lat: number; lng: number } | null>(
@@ -256,6 +259,39 @@ export function StorefrontForm({
             </span>
           </span>
         </label>
+
+        {/* Self-book rider — for stores with no delivery fleet: after placing,
+            the customer is asked to book their own rider. */}
+        <div className="mt-3 rounded-lg border border-plum-ink/10 bg-cream/40 p-3">
+          <label className="flex items-start gap-2 text-sm font-semibold">
+            <input
+              type="checkbox"
+              name="selfBookRider"
+              checked={selfRiderOn}
+              onChange={(e) => setSelfRiderOn(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              Ask the customer to book their own rider after ordering
+              <span className="mt-0.5 block text-xs font-normal text-plum-ink/50">
+                For stores without their own riders. After placing a delivery order, the customer is
+                shown a note to book a rider (Lalamove, Grab, etc.) to pick up.
+              </span>
+            </span>
+          </label>
+          {selfRiderOn ? (
+            <textarea
+              name="selfBookRiderNote"
+              defaultValue={initial.delivery.selfBookRiderNote}
+              rows={2}
+              maxLength={500}
+              placeholder="e.g. Please book a Lalamove/Grab rider to pick up your order once we confirm it's ready. We'll message you when to book."
+              className="mt-2 w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+            />
+          ) : (
+            <input type="hidden" name="selfBookRiderNote" value={initial.delivery.selfBookRiderNote} />
+          )}
+        </div>
 
         {/* Zones / shipping-regions editor (kept mounted so values persist across modes). */}
         <div className={deliveryMode !== "distance" ? "mt-4" : "hidden"}>

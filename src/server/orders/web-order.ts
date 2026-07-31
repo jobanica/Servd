@@ -245,23 +245,28 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
   // order still lands (uncounted until the migration runs).
   const extra = { ...(geo ?? {}), ...(sched ?? {}), ...(advance ?? {}), ...pay, source: "web", customerNote: note, paymentReceiptUrl };
 
+  // Persist with graceful degradation across a schema-lagged DB: try the full
+  // set, then everything except the newest `source` column (so the receipt /
+  // note / payment fields still save when only `source` is missing), then the
+  // base fields only. This keeps the GCash receipt from being dropped just
+  // because an unrelated column hasn't been migrated yet.
+  const createWith = (data: typeof base) =>
+    tenantDb(restaurant.id, (tx) => tx.order.create({ data, select: { id: true } }));
+  const extraNoSource = { ...extra };
+  delete (extraNoSource as { source?: string }).source;
   let order;
   try {
-    order = await tenantDb(restaurant.id, (tx) =>
-      tx.order.create({ data: Object.keys(extra).length ? { ...base, ...extra } : base, select: { id: true } }),
-    );
-  } catch (e) {
-    // customerLat/Lng/scheduledFor columns may lag — retry with the base fields only.
-    if (Object.keys(extra).length) {
+    order = await createWith({ ...base, ...extra } as typeof base);
+  } catch {
+    try {
+      order = await createWith({ ...base, ...extraNoSource } as typeof base);
+    } catch {
       try {
-        order = await tenantDb(restaurant.id, (tx) => tx.order.create({ data: base, select: { id: true } }));
+        order = await createWith(base);
       } catch (e2) {
         console.error("placeWebOrder failed", e2);
         return { ok: false, error: "We couldn't place your order. Please try again." };
       }
-    } else {
-      console.error("placeWebOrder failed", e);
-      return { ok: false, error: "We couldn't place your order. Please try again." };
     }
   }
 

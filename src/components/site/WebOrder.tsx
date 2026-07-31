@@ -113,6 +113,8 @@ export interface WebOrderProps {
     originLng: number | null;
     feeInTotal?: boolean;
     mapEnabled?: boolean;
+    selfBookRider?: boolean;
+    selfBookRiderNote?: string;
   };
   // Where to center the delivery map by default (the store's location), so diners
   // start near the store instead of a far-away default view.
@@ -620,6 +622,9 @@ export function WebOrder(props: WebOrderProps) {
         restaurantName={restaurantName}
         phone={phone}
         homeHref={home}
+        selfBookRider={orderType === "delivery" && !!props.delivery?.selfBookRider}
+        selfBookRiderNote={props.delivery?.selfBookRiderNote}
+        pickupAddress={contact?.address ?? null}
       />
     );
   }

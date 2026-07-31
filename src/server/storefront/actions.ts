@@ -108,6 +108,10 @@ export async function updateStorefront(
     feeInTotal: formData.get("deliveryFeeInTotal") === "on",
     // Checkbox: when unchecked, the checkout map pin is hidden (typed address only).
     mapEnabled: formData.get("mapEnabled") === "on",
+    // After placing, ask the customer to book their own rider (for stores with
+    // no delivery fleet) + optional instructions on how.
+    selfBookRider: formData.get("selfBookRider") === "on",
+    selfBookRiderNote: String(formData.get("selfBookRiderNote") ?? "").trim().slice(0, 500),
   };
   const hoursJson = hours as unknown as Prisma.InputJsonValue;
   const zonesJson = zones as unknown as Prisma.InputJsonValue;

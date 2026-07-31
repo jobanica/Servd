@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getRestaurantByHost } from "@/server/restaurants/get-by-host";
+import { getPublicStorefront } from "@/server/storefront/storefront";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { WebOrderTracker } from "@/components/site/WebOrderTracker";
 
@@ -20,13 +21,23 @@ export default async function SiteTrackOrderPage({
   ).catch(() => null);
   if (!order) notFound();
 
+  const isDelivery = order.orderType === "delivery";
+  const sf = isDelivery ? await getPublicStorefront(restaurant.id).catch(() => null) : null;
+  const contact = sf?.delivery.selfBookRider
+    ? await systemDb((tx) => tx.restaurant.findFirst({ where: { id: restaurant.id }, select: { printerConfig: true } })).catch(() => null)
+    : null;
+  const pickupAddress = (contact?.printerConfig as { receipt?: { address?: string } } | null)?.receipt?.address ?? null;
+
   return (
     <WebOrderTracker
       slug={restaurant.slug}
       orderId={orderId}
-      orderType={order.orderType === "delivery" ? "delivery" : "takeout"}
+      orderType={isDelivery ? "delivery" : "takeout"}
       restaurantName={restaurant.displayName || restaurant.name}
       homeHref="/"
+      selfBookRider={isDelivery && !!sf?.delivery.selfBookRider}
+      selfBookRiderNote={sf?.delivery.selfBookRiderNote}
+      pickupAddress={pickupAddress}
     />
   );
 }
