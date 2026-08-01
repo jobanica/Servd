@@ -16,9 +16,8 @@ export function AddInventoryItemForm({
   }, [state]);
 
   return (
-    <form ref={ref} action={action} className="rounded-tile border border-plum-ink/10 bg-white p-4">
-      <h3 className="font-heading font-bold">Add ingredient</h3>
-      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+    <form ref={ref} action={action}>
+      <div className="grid gap-2 sm:grid-cols-3">
         <input name="name" placeholder="Name (e.g. Beef patty)" required className="rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
         <input name="unit" placeholder="Unit (kg, pc, ml)" required className="rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
         <select name="supplierId" className="rounded-lg border border-plum-ink/15 px-3 py-2 text-sm">
