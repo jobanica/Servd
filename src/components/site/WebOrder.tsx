@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatPeso, formatDelta } from "@/lib/money";
 import {
   unitPrice,
@@ -333,6 +333,10 @@ export function WebOrder(props: WebOrderProps) {
   const [cartOpen, setCartOpen] = useState(false); // mobile cart sheet
   const [checkout, setCheckout] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  // Which category tab is underlined. Follows the section you're actually
+  // looking at as you scroll, and updates instantly when a tab is tapped.
+  const [activeCat, setActiveCat] = useState<string | null>(null);
+  const tabStripRef = useRef<HTMLDivElement>(null);
   // Cheapest delivery fee to advertise on the hero info card (zones min, else
   // the distance/shipping base). Null when unknown → we show a softer message.
   const minDeliveryFee = useMemo(() => {
@@ -520,6 +524,40 @@ export function WebOrder(props: WebOrderProps) {
         .map((c) => ({ ...c, items: c.items.filter((i) => i.name.toLowerCase().includes(q)) }))
         .filter((c) => c.items.length > 0)
     : nonEmpty;
+
+  // Underline the tab for whichever category section is currently in view.
+  // Keyed on the visible ids so it re-binds when search filters the list.
+  const sectionIds = shownCats.map((c) => c.id).join(",");
+  useEffect(() => {
+    const ids = sectionIds ? sectionIds.split(",") : [];
+    if (ids.length === 0) return;
+    const nodes = ids
+      .map((id) => document.getElementById(`cat-${id}`))
+      .filter((n): n is HTMLElement => !!n);
+    if (nodes.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Pick the entry nearest the top of the viewport that's still visible.
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+        if (visible?.target.id) setActiveCat(visible.target.id.replace(/^cat-/, ""));
+      },
+      // Focus the band just below the sticky tab strip.
+      { rootMargin: "-64px 0px -70% 0px", threshold: 0 },
+    );
+    nodes.forEach((n) => observer.observe(n));
+    return () => observer.disconnect();
+  }, [sectionIds]);
+
+  // Keep the underlined tab scrolled into view on long category lists.
+  useEffect(() => {
+    if (!activeCat) return;
+    const strip = tabStripRef.current;
+    const tab = strip?.querySelector<HTMLElement>(`[data-cat="${CSS.escape(activeCat)}"]`);
+    tab?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }, [activeCat]);
 
   function pick(item: DinerItem) {
     if (!item.isAvailable) return;
@@ -1142,18 +1180,24 @@ export function WebOrder(props: WebOrderProps) {
       {/* Sticky category tabs (underline style) */}
       {!q && nonEmpty.length > 1 && (
         <div className="sticky top-0 z-20 mt-3 border-b border-plum-ink/10 bg-white/95 backdrop-blur">
-          <div className="flex gap-5 overflow-x-auto px-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {nonEmpty.map((c, i) => (
-              <a
-                key={c.id}
-                href={`#cat-${c.id}`}
-                className={`shrink-0 border-b-2 py-3 text-sm font-bold ${
-                  i === 0 ? "border-plum-ink text-plum-ink" : "border-transparent text-plum-ink/45 hover:text-plum-ink"
-                }`}
-              >
-                {c.name}
-              </a>
-            ))}
+          <div ref={tabStripRef} className="flex gap-5 overflow-x-auto px-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {nonEmpty.map((c, i) => {
+              // Before any scrolling has happened, the first tab is active.
+              const active = activeCat ? activeCat === c.id : i === 0;
+              return (
+                <a
+                  key={c.id}
+                  data-cat={c.id}
+                  href={`#cat-${c.id}`}
+                  onClick={() => setActiveCat(c.id)}
+                  className={`shrink-0 border-b-2 py-3 text-sm font-bold transition-colors ${
+                    active ? "border-plum-ink text-plum-ink" : "border-transparent text-plum-ink/45 hover:text-plum-ink"
+                  }`}
+                >
+                  {c.name}
+                </a>
+              );
+            })}
           </div>
         </div>
       )}
