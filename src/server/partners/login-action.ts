@@ -17,10 +17,10 @@ export async function loginPartner(_prev: LoginState, formData: FormData): Promi
   redirect("/partner");
 }
 
-/** Sign the partner out and return to the partner login. */
+/** Sign the partner out on THIS device only (see signOut in login/actions). */
 export async function signOutPartner(): Promise<void> {
   const supabase = await createSupabaseServerClient();
-  await supabase.auth.signOut();
+  await supabase.auth.signOut({ scope: "local" });
   redirect("/partner/login");
 }
 

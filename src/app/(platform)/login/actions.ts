@@ -52,9 +52,15 @@ export async function signIn(_prev: unknown, formData: FormData) {
   redirect("/admin");
 }
 
+/**
+ * Sign out THIS device only. Supabase defaults to a "global" sign-out, which
+ * revokes every refresh token on the account — so signing out on the office
+ * laptop would also kick the phone, the cashier tablet and the kitchen screen
+ * out mid-shift. "local" ends just the current session's tokens.
+ */
 export async function signOut() {
   const supabase = await createSupabaseServerClient();
-  await supabase.auth.signOut();
+  await supabase.auth.signOut({ scope: "local" });
   redirect("/login");
 }
 
