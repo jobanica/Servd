@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { listSubscriptions, listAllPlans, listCustomerHealth, type SubStatus, type SubscriptionRow, type CustomerHealth } from "@/server/billing/super-admin";
+import { SubscriptionSearch } from "@/components/super-admin/SubscriptionSearch";
 import {
   assignPlan,
   setSubscriptionStatus,
@@ -118,12 +119,21 @@ function filterSubs(
 export default async function SubscriptionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; access?: string; filter?: string }>;
+  searchParams: Promise<{ status?: string; access?: string; filter?: string; q?: string }>;
 }) {
   const sp = await searchParams;
   const [allSubs, plans, health] = await Promise.all([listSubscriptions(), listAllPlans(), listCustomerHealth()]);
   const activePlans = plans.filter((p) => p.isActive);
-  const { rows: subs, label: filterLabel } = filterSubs(allSubs, sp);
+  const { rows: filtered, label: filterLabel } = filterSubs(allSubs, sp);
+
+  // Free-text search on top of any status/access filter.
+  const query = (sp.q ?? "").trim().toLowerCase();
+  const subs = query
+    ? filtered.filter(
+        (s) =>
+          s.restaurantName.toLowerCase().includes(query) || s.slug.toLowerCase().includes(query),
+      )
+    : filtered;
 
   const field = "rounded border border-plum-ink/15 px-2 py-1 text-xs";
   const btn = "rounded border border-plum-ink/15 px-2 py-1 text-xs font-semibold hover:bg-cream";
@@ -144,6 +154,10 @@ export default async function SubscriptionsPage({
               Show all
             </Link>
           </div>
+        ) : query ? (
+          <p className="text-sm text-plum-ink/50">
+            {subs.length} of {allSubs.length} restaurants matching “{sp.q}”.
+          </p>
         ) : (
           <p className="text-sm text-plum-ink/50">
             {subs.length} restaurants. Change plans, force status, extend trials, comp months or
@@ -152,10 +166,15 @@ export default async function SubscriptionsPage({
         )}
       </div>
 
+      <SubscriptionSearch
+        initial={sp.q ?? ""}
+        keep={{ status: sp.status, access: sp.access, filter: sp.filter }}
+      />
+
       <div className="space-y-3">
         {subs.length === 0 && (
           <p className="rounded-tile border border-dashed border-plum-ink/15 bg-white px-4 py-8 text-center text-sm text-plum-ink/50">
-            No restaurants in this group.
+            {query ? `No restaurants match “${sp.q}”.` : "No restaurants in this group."}
           </p>
         )}
         {subs.map((s) => (
