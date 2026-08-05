@@ -50,7 +50,8 @@ const ITEM_FEATURE: Record<string, string> = {
   "/admin/hr": "hr",
   "/admin/storefront": "onlineOrdering",
   "/admin/payments": "onlinePayments",
-  "/admin/domains": "customDomain",
+  // NOT gated here on purpose: Free/trial accounts must be able to open the
+  // page to buy the one-time custom-domain unlock. The page itself locks it.
   "/admin/floor": "floorPlan",
   "/admin/reservations": "reservations",
   "/admin/advance-orders": "onlineOrdering",

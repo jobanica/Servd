@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getPlatformBilling } from "@/server/billing/platform-settings";
 import { XenditBillingProvider } from "@/server/billing/xendit";
 import { activateByProviderRef } from "@/server/billing/activate";
+import { markAddonPaidByProviderRef } from "@/server/billing/addons";
 
 /**
  * Xendit platform billing webhook — fires when a subscriber pays their
@@ -20,6 +21,12 @@ export async function POST(req: NextRequest) {
   const event = provider.verifyAndParseWebhook(rawBody, token);
   if (!event) return new Response("Invalid token", { status: 401 });
   if (event.status !== "paid") return new Response("ok", { status: 200 });
+
+  // One-time add-on (e.g. the custom-domain unlock) — grant it and stop, so it
+  // never activates or extends a subscription.
+  if (await markAddonPaidByProviderRef(event.providerRef)) {
+    return new Response("ok", { status: 200 });
+  }
 
   await activateByProviderRef(event.providerRef);
   return new Response("ok", { status: 200 });

@@ -468,6 +468,7 @@ model Restaurant {
   shiftNotes      ShiftNote[]
   smsCreditLedger SmsCreditLedger[]
   invoices        RestaurantInvoice[]
+  addonPurchases  AddonPurchase[]
   suppliers       Supplier[]
   inventoryItems  InventoryItem[]
   purchaseOrders  PurchaseOrder[]
@@ -669,6 +670,26 @@ model RestaurantInvoice {
 
   @@index([restaurantId])
   @@map("restaurant_invoices")
+}
+
+/// A ONE-TIME add-on a restaurant buys from Servd (currently the custom-domain
+/// unlock for Free/trial accounts). Deliberately separate from
+/// RestaurantInvoice: paying one of these must never activate or extend a
+/// subscription, only grant the add-on.
+model AddonPurchase {
+  id           String    @id @default(uuid())
+  restaurantId String
+  addon        String // "custom_domain"
+  amount       Int // centavos
+  status       String    @default("pending") // pending | paid | failed
+  providerRef  String?   @unique // gateway invoice/checkout id
+  paidAt       DateTime?
+  createdAt    DateTime  @default(now())
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, addon])
+  @@map("addon_purchases")
 }
 
 // ----------------------------------------------------------------------------

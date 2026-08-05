@@ -4,14 +4,20 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireAdminAction } from "@/server/tenancy/require-admin";
-import { hasModule } from "@/server/billing/entitlements";
+import { getCustomDomainAccess } from "@/server/billing/addons";
 import { getDomainProvider } from "@/server/domains";
 
 export type FormState = { ok?: boolean; error?: string } | null;
 
+/**
+ * Custom domains need a PAID Growth/Business plan or the one-time ₱500 unlock —
+ * a trial doesn't grant them. Enforced here so the gate can't be bypassed by
+ * posting straight to the action.
+ */
 async function ensureModule(restaurantId: string) {
-  if (!(await hasModule(restaurantId, "custom_domain"))) {
-    throw new Error("Your plan doesn't include custom domains. Upgrade to enable this.");
+  const access = await getCustomDomainAccess(restaurantId);
+  if (!access.allowed) {
+    throw new Error("Custom domains are locked. Upgrade to Growth or buy the one-time unlock.");
   }
 }
 

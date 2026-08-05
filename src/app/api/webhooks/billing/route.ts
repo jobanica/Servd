@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getBillingProvider } from "@/server/billing";
 import { activateByProviderRef } from "@/server/billing/activate";
+import { markAddonPaidByProviderRef } from "@/server/billing/addons";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { clawbackByInvoiceProviderRef } from "@/server/referrals/accrual";
 
@@ -26,6 +27,12 @@ export async function POST(req: NextRequest) {
   }
 
   if (event.status !== "paid") return new Response("ok", { status: 200 });
+
+  // One-time add-on (e.g. the custom-domain unlock) — grant it and stop, so it
+  // never activates or extends a subscription.
+  if (await markAddonPaidByProviderRef(event.providerRef)) {
+    return new Response("ok", { status: 200 });
+  }
 
   await activateByProviderRef(event.providerRef, {
     paymentMethodId: event.paymentMethodId,
