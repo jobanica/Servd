@@ -81,6 +81,7 @@ declare
     'loyalty_transactions', 'expenses', 'payroll_settings', 'menu_item_costs', 'storefront_settings',
     'feedback', 'customer_contacts',
     'sms_campaigns', 'sms_credit_ledger', 'print_jobs', 'restaurant_invoices',
+    'addon_purchases',
     'menu_item_translations', 'category_translations',
     'suppliers', 'inventory_items', 'recipe_components', 'stock_movements',
     'purchase_orders', 'purchase_order_items',
