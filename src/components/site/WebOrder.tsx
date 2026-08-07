@@ -706,11 +706,20 @@ export function WebOrder(props: WebOrderProps) {
         {/* Checkout details */}
         {checkout && lines.length > 0 && (
           <div className="mt-4 space-y-2 border-t border-black/5 pt-4">
-            <div className="grid grid-cols-2 gap-1 rounded-lg bg-gray-100 p-1">
-              {(([["takeout", "🥡 Pickup"], ["delivery", dcfg?.mode === "shipping" ? "🚚 Ship to me" : "🛵 Delivery"]]) as ["takeout" | "delivery", string][]).map(([k, label]) => (
-                <button key={k} onClick={() => setOrderType(k)} className={`rounded-md py-2 text-sm font-semibold ${orderType === k ? "bg-white text-red-600 shadow-sm" : "text-plum-ink/60"}`}>{label}</button>
-              ))}
-            </div>
+            {/* Only offer the order types this store actually accepts. */}
+            {fulfillment === "both" ? (
+              <div className="grid grid-cols-2 gap-1 rounded-lg bg-gray-100 p-1">
+                {(([["takeout", "🥡 Pickup"], ["delivery", dcfg?.mode === "shipping" ? "🚚 Ship to me" : "🛵 Delivery"]]) as ["takeout" | "delivery", string][]).map(([k, label]) => (
+                  <button key={k} onClick={() => setOrderType(k)} className={`rounded-md py-2 text-sm font-semibold ${orderType === k ? "bg-white text-red-600 shadow-sm" : "text-plum-ink/60"}`}>{label}</button>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg bg-gray-100 p-2 text-center text-sm font-semibold text-plum-ink">
+                {fulfillment === "delivery"
+                  ? dcfg?.mode === "shipping" ? "🚚 Ship to me" : "🛵 Delivery"
+                  : "🥡 Pickup"}
+              </div>
+            )}
 
             {/* When — order now, or schedule it for a future date/time. */}
             {canSchedule && (

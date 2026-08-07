@@ -159,5 +159,10 @@ export async function updateStorefront(
     } catch { /* columns not migrated yet */ }
   }
   revalidatePath("/admin/storefront");
+  // ALSO refresh the customer-facing site — without this the storefront keeps
+  // serving cached settings, so changes like "pick-up only", the VAT line or a
+  // new delivery fee wouldn't show up for diners.
+  revalidatePath("/r/[slug]", "page");
+  revalidatePath("/sites/[host]", "page");
   return { ok: true };
 }
