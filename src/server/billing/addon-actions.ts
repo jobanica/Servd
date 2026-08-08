@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireAdminAction } from "@/server/tenancy/require-admin";
 import { getBillingProvider } from "@/server/billing";
@@ -10,6 +11,71 @@ import {
 } from "@/server/billing/addons";
 
 export type UnlockResult = { checkoutUrl: string } | { error: string };
+
+export type VerifyResult = { unlocked: true } | { unlocked: false; message: string };
+
+/**
+ * "I've already paid" — ask the gateway directly what happened to the pending
+ * checkout, and settle it if it's paid. The webhook is still the normal path;
+ * this is the safety net for when it never arrives (misconfigured endpoint,
+ * gateway downtime), so a paying customer is never left locked out.
+ */
+export async function verifyCustomDomainUnlock(): Promise<VerifyResult> {
+  const { restaurantId } = await requireAdminAction();
+
+  const access = await getCustomDomainAccess(restaurantId);
+  if (access.allowed) return { unlocked: true };
+
+  let pending: { id: string; providerRef: string | null } | null = null;
+  try {
+    pending = await tenantDb(restaurantId, (tx) =>
+      tx.addonPurchase.findFirst({
+        where: { restaurantId, addon: CUSTOM_DOMAIN_ADDON, status: "pending" },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, providerRef: true },
+      }),
+    );
+  } catch {
+    return { unlocked: false, message: "Couldn't check right now. Please try again." };
+  }
+  if (!pending?.providerRef) {
+    return { unlocked: false, message: "We couldn't find a payment to check. Start the unlock below." };
+  }
+
+  const provider = await getBillingProvider();
+  if (!provider?.getCheckoutStatus) {
+    return { unlocked: false, message: "We couldn't verify automatically. Please contact support." };
+  }
+
+  let status: "paid" | "pending" | "failed";
+  try {
+    status = await provider.getCheckoutStatus(pending.providerRef);
+  } catch {
+    return { unlocked: false, message: "Couldn't reach the payment provider. Please try again shortly." };
+  }
+  if (status !== "paid") {
+    return {
+      unlocked: false,
+      message:
+        status === "failed"
+          ? "That payment didn't go through. Please start the unlock again."
+          : "We can't see your payment yet. If you've just paid, wait a moment and check again.",
+    };
+  }
+
+  try {
+    await tenantDb(restaurantId, (tx) =>
+      tx.addonPurchase.update({
+        where: { id: pending.id },
+        data: { status: "paid", paidAt: new Date() },
+      }),
+    );
+  } catch {
+    return { unlocked: false, message: "Couldn't apply the unlock. Please contact support." };
+  }
+  revalidatePath("/admin/domains");
+  return { unlocked: true };
+}
 
 /**
  * Start a hosted checkout for the one-time custom-domain unlock. Mirrors the

@@ -58,7 +58,7 @@ export default async function DomainsPage() {
                     Pay once and keep custom domains on this account — no monthly upgrade needed.
                   </p>
                   <div className="mt-3">
-                    <UnlockCustomDomainButton price={priceLabel} />
+                    <UnlockCustomDomainButton price={priceLabel} pending={access.pending} />
                   </div>
                   {access.pending && (
                     <p className="mt-2 text-xs text-plum-ink/50">

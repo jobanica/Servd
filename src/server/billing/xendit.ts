@@ -52,6 +52,19 @@ export class XenditBillingProvider implements BillingProvider {
     return { gatewayRef: json.id, checkoutUrl: json.invoice_url };
   }
 
+  /** Look up an invoice directly — the fallback when a webhook never lands. */
+  async getCheckoutStatus(gatewayRef: string): Promise<"paid" | "pending" | "failed"> {
+    const res = await fetch(`${API}/v2/invoices/${encodeURIComponent(gatewayRef)}`, {
+      headers: { Authorization: this.auth() },
+    });
+    if (!res.ok) throw new Error(`Xendit invoice lookup ${res.status}`);
+    const json = (await res.json()) as { status?: string };
+    const status = (json.status ?? "").toUpperCase();
+    if (status === "PAID" || status === "SETTLED") return "paid";
+    if (status === "EXPIRED") return "failed";
+    return "pending";
+  }
+
   async chargeSavedCard(): Promise<ChargeResult> {
     // Not supported via the Invoice flow — the cron falls back to re-issuing an
     // invoice the subscriber pays. Returning "pending" keeps the cron safe.

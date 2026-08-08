@@ -45,4 +45,12 @@ export interface BillingProvider {
 
   /** Verify + parse a platform billing webhook (signature-verified). */
   verifyAndParseWebhook(rawBody: string, signature: string): BillingWebhookEvent | null;
+
+  /**
+   * Ask the gateway what a checkout's status actually is. Lets the app settle a
+   * payment when the webhook never arrived (misconfigured endpoint, downtime),
+   * instead of leaving a paying customer stuck. Optional: providers that can't
+   * look one up simply omit it.
+   */
+  getCheckoutStatus?(gatewayRef: string): Promise<"paid" | "pending" | "failed">;
 }
