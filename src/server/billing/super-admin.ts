@@ -396,3 +396,22 @@ export async function listInvoices(limit = 200): Promise<InvoiceRow[]> {
     createdAt: i.createdAt.toISOString(),
   }));
 }
+
+/**
+ * Restaurant ids that hold a settled custom-domain unlock. Used by the
+ * subscriptions page to show (and toggle) who's already paid for it.
+ * Best-effort: an un-migrated table just yields an empty set.
+ */
+export async function listCustomDomainUnlocks(): Promise<Set<string>> {
+  try {
+    const rows = await systemDb((tx) =>
+      tx.addonPurchase.findMany({
+        where: { addon: "custom_domain", status: "paid" },
+        select: { restaurantId: true },
+      }),
+    );
+    return new Set(rows.map((r) => r.restaurantId));
+  } catch {
+    return new Set();
+  }
+}

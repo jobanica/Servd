@@ -14,6 +14,7 @@ import { COMP_FOREVER } from "@/lib/billing/comp";
 import { uniqueSlug } from "@/lib/slug";
 import { addMonths } from "@/lib/billing/period";
 import { ALL_FEATURES, type Feature } from "@/lib/billing/features";
+import { CUSTOM_DOMAIN_ADDON, CUSTOM_DOMAIN_PRICE } from "@/server/billing/addons";
 
 export type ActionState =
   | { ok?: boolean; message?: string; error?: string; credentials?: { username: string; password: string } }
@@ -437,6 +438,61 @@ export async function setRestaurantAccess(formData: FormData): Promise<void> {
   const access = String(formData.get("access")); // "active" | "suspended"
   if (access !== "active" && access !== "suspended") return;
   await systemDb((tx) => tx.restaurant.update({ where: { id: restaurantId }, data: { status: access }, select: { id: true } }));
+  refresh();
+}
+
+// ---------------------------------------------------------------------------
+// One-time add-ons (custom-domain unlock)
+// ---------------------------------------------------------------------------
+
+/**
+ * Grant or revoke the one-time custom-domain unlock by hand. Needed when a
+ * customer has paid but the gateway webhook didn't reach us (or they paid
+ * out-of-band, e.g. bank transfer), and to comp it.
+ */
+export async function setCustomDomainUnlock(formData: FormData): Promise<void> {
+  await requireSuperAdmin();
+  const restaurantId = String(formData.get("restaurantId"));
+  const grant = String(formData.get("grant")) === "1";
+  if (!restaurantId) return;
+
+  await systemDb(async (tx) => {
+    const existing = await tx.addonPurchase.findFirst({
+      where: { restaurantId, addon: CUSTOM_DOMAIN_ADDON },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!grant) {
+      // Revoke: settled rows become void so access is lost but the record stays.
+      if (existing) {
+        await tx.addonPurchase.updateMany({
+          where: { restaurantId, addon: CUSTOM_DOMAIN_ADDON, status: "paid" },
+          data: { status: "void" },
+        });
+      }
+      return;
+    }
+
+    if (existing && existing.status !== "paid") {
+      await tx.addonPurchase.update({
+        where: { id: existing.id },
+        data: { status: "paid", paidAt: new Date() },
+      });
+      return;
+    }
+    if (!existing) {
+      await tx.addonPurchase.create({
+        data: {
+          restaurantId,
+          addon: CUSTOM_DOMAIN_ADDON,
+          amount: CUSTOM_DOMAIN_PRICE,
+          status: "paid",
+          paidAt: new Date(),
+        },
+      });
+    }
+  });
+  revalidatePath("/admin/domains");
   refresh();
 }
 

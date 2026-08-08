@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { listSubscriptions, listAllPlans, listCustomerHealth, type SubStatus, type SubscriptionRow, type CustomerHealth } from "@/server/billing/super-admin";
+import { listSubscriptions, listAllPlans, listCustomerHealth, listCustomDomainUnlocks, type SubStatus, type SubscriptionRow, type CustomerHealth } from "@/server/billing/super-admin";
 import { SubscriptionSearch } from "@/components/super-admin/SubscriptionSearch";
 import {
   assignPlan,
@@ -8,6 +8,7 @@ import {
   compMonth,
   setRestaurantAccess,
   setToLite,
+  setCustomDomainUnlock,
 } from "@/server/billing/super-admin-actions";
 import { isComplimentary } from "@/lib/billing/comp";
 import { GrantAccessControl } from "@/components/super-admin/GrantAccessControl";
@@ -122,7 +123,12 @@ export default async function SubscriptionsPage({
   searchParams: Promise<{ status?: string; access?: string; filter?: string; q?: string }>;
 }) {
   const sp = await searchParams;
-  const [allSubs, plans, health] = await Promise.all([listSubscriptions(), listAllPlans(), listCustomerHealth()]);
+  const [allSubs, plans, health, domainUnlocked] = await Promise.all([
+    listSubscriptions(),
+    listAllPlans(),
+    listCustomerHealth(),
+    listCustomDomainUnlocks(),
+  ]);
   const activePlans = plans.filter((p) => p.isActive);
   const { rows: filtered, label: filterLabel } = filterSubs(allSubs, sp);
 
@@ -301,6 +307,22 @@ export default async function SubscriptionsPage({
                       className={`${btn} border-brand-primary/40 text-brand-primary`}
                     >
                       Set to Lite
+                    </ConfirmSubmitButton>
+                  </form>
+                  {/* Custom-domain unlock — grant by hand when someone paid but
+                      the gateway webhook never landed, or to comp it. */}
+                  <form action={setCustomDomainUnlock}>
+                    <input type="hidden" name="restaurantId" value={s.restaurantId} />
+                    <input type="hidden" name="grant" value={domainUnlocked.has(s.restaurantId) ? "0" : "1"} />
+                    <ConfirmSubmitButton
+                      confirmText={
+                        domainUnlocked.has(s.restaurantId)
+                          ? `Revoke the custom-domain unlock for "${s.restaurantName}"?`
+                          : `Unlock custom domain for "${s.restaurantName}" without payment? Use this when they've already paid.`
+                      }
+                      className={`${btn} ${domainUnlocked.has(s.restaurantId) ? "border-plum-ink/20 text-plum-ink/60" : "border-brand-primary/40 text-brand-primary"}`}
+                    >
+                      {domainUnlocked.has(s.restaurantId) ? "🔓 Domain unlocked" : "🔒 Unlock domain"}
                     </ConfirmSubmitButton>
                   </form>
                 </div>
