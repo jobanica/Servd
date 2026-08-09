@@ -118,6 +118,7 @@ model PlatformSetting {
   crmSequence     Json? // owner-edited CRM follow-up messages (overrides defaults)
   orderCapEnabled Boolean  @default(false) // master switch for monthly order caps across all restaurants
   tutorials       Json? // course/tutorial hub content (sections + YouTube videos) shown at tutorials.<root>
+  featurePrices   Json? // one-time unlock price + sellable flag per gateable feature
   updatedAt       DateTime @updatedAt
 
   @@map("platform_settings")

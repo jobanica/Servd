@@ -49,6 +49,7 @@ const NAV = [
   { label: "Content Engine", href: "/super-admin/content-engine", d: I.film },
   { label: "Tutorials", href: "/super-admin/tutorials", d: I.grad },
   { label: "Plans", href: "/super-admin/plans", d: I.layers },
+  { label: "Feature pricing", href: "/super-admin/feature-pricing", d: I.card },
   { label: "Invoices", href: "/super-admin/invoices", d: I.receipt },
   { label: "Payments", href: "/super-admin/payments", d: I.card },
   { label: "Referrals", href: "/super-admin/referrals", d: I.receipt },
