@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { AppIcon, Wordmark } from "@/components/Wordmark";
-import { PlanCards } from "@/components/billing/PlanCards";
-import { PlanComparisonTable } from "@/components/billing/PlanComparisonTable";
-import { getPublicPricing } from "@/server/billing/public-catalog";
+import { getFeaturePrices } from "@/server/billing/feature-pricing";
+import { OneTimePricing } from "@/components/billing/OneTimePricing";
 
 /* ------------------------------------------------------------------ icons */
 function Icon({ path }: { path: string }) {
@@ -134,8 +133,7 @@ function AnalyticsMock() {
 
 /* ------------------------------------------------------------------ page */
 export default async function Home() {
-  const pricing = await getPublicPricing();
-  const priceByTier = { Free: pricing.Free.pricePesos, Growth: pricing.Growth.pricePesos, Business: pricing.Business.pricePesos };
+  const featurePrices = await getFeaturePrices();
 
   return (
     <main className="bg-cream text-plum-ink">
@@ -473,23 +471,32 @@ export default async function Home() {
       {/* PRICING */}
       <section id="pricing" className="mx-auto max-w-6xl px-6 py-20">
         <div className="mx-auto max-w-2xl text-center">
-          <h2 className="font-heading text-4xl font-extrabold tracking-tight">Simple, honest pricing</h2>
+          <h2 className="font-heading text-4xl font-extrabold tracking-tight">
+            Pay once. Keep it forever.
+          </h2>
           <p className="mt-3 text-plum-ink/70">
-            Stay on the Free plan, or upgrade to Growth or Business for online ordering, payments and
-            marketing. <strong>We handle the setup for you</strong> — message us to get onboarded.
+            No monthly subscription. Start free with QR ordering, then unlock only the features you
+            actually want — each is a <strong>one-time payment</strong> and it&apos;s yours for good.{" "}
+            <strong>We handle the setup for you</strong> — message us to get onboarded.
           </p>
         </div>
-        <div className="mt-12">
-          <PlanCards mode="signup" priceByTier={priceByTier} inviteOnly />
+
+        {/* What every account gets, free */}
+        <div className="mx-auto mt-10 max-w-3xl rounded-tile border border-brand-primary/25 bg-brand-primary/5 p-6 text-center">
+          <p className="font-heading text-xl font-extrabold text-brand-primary">Free to start</p>
+          <p className="mt-1.5 text-sm text-plum-ink/70">
+            Unlimited dine-in QR codes, the cashier POS, kitchen display and your online ordering
+            page — at no cost, with no card required.
+          </p>
         </div>
 
-        {/* Full feature comparison */}
-        <div className="mt-12">
-          <h3 className="mb-4 text-center font-heading text-2xl font-extrabold tracking-tight">
-            Compare every feature
-          </h3>
-          <PlanComparisonTable limitsByTier={pricing} />
+        <div className="mt-10">
+          <OneTimePricing prices={featurePrices} />
         </div>
+        <p className="mx-auto mt-6 max-w-2xl text-center text-sm text-plum-ink/55">
+          Buy features one at a time, whenever you need them. Prices may change, but anything you
+          have already bought stays yours.
+        </p>
 
         {/* Refund policy */}
         <div id="refund" className="mx-auto mt-12 max-w-2xl scroll-mt-24 rounded-tile border border-plum-ink/10 bg-white p-6 text-center">

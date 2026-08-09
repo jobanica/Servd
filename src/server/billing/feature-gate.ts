@@ -10,6 +10,7 @@ import {
   sanitizeFeatures,
   type Feature,
 } from "@/lib/billing/features";
+import { listOwnedFeatures } from "@/server/billing/owned-features";
 
 /**
  * Plan-based feature gating. Entitlements are resolved LIVE from the features
@@ -94,14 +95,23 @@ async function getPlanAccessByTier(restaurantId: string): Promise<PlanAccess> {
  * trial override.
  */
 export async function hasFeature(restaurantId: string, feature: Feature): Promise<boolean> {
-  const { features } = await getPlanAccess(restaurantId);
+  const features = await getEntitledFeatures(restaurantId);
   return features.has(feature);
 }
 
-/** The full set of features the restaurant currently has access to. */
+/**
+ * The full set of features the restaurant currently has access to: whatever its
+ * plan grants, PLUS anything bought outright as a one-time unlock. Owned
+ * features are permanent — they survive a plan change or downgrade.
+ */
 export async function getEntitledFeatures(restaurantId: string): Promise<Set<Feature>> {
-  const { features } = await getPlanAccess(restaurantId);
-  return features;
+  const [{ features }, owned] = await Promise.all([
+    getPlanAccess(restaurantId),
+    listOwnedFeatures(restaurantId),
+  ]);
+  const all = new Set(features);
+  for (const f of owned) all.add(f);
+  return all;
 }
 
 /** Page guard: redirect to the billing page (to upgrade) if the plan lacks it. */

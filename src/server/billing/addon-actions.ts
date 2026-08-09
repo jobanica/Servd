@@ -4,33 +4,115 @@ import { revalidatePath } from "next/cache";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireAdminAction } from "@/server/tenancy/require-admin";
 import { getBillingProvider } from "@/server/billing";
-import {
-  CUSTOM_DOMAIN_ADDON,
-  CUSTOM_DOMAIN_PRICE,
-  getCustomDomainAccess,
-} from "@/server/billing/addons";
+import { isFeature, type Feature } from "@/lib/billing/features";
+import { addonKeyFor, listOwnedFeatures } from "@/server/billing/owned-features";
+import { getFeaturePrices } from "@/server/billing/feature-pricing";
+import { getPlanAccess } from "@/server/billing/feature-gate";
+import { getCustomDomainAccess } from "@/server/billing/addons";
 
 export type UnlockResult = { checkoutUrl: string } | { error: string };
-
 export type VerifyResult = { unlocked: true } | { unlocked: false; message: string };
 
-/**
- * "I've already paid" — ask the gateway directly what happened to the pending
- * checkout, and settle it if it's paid. The webhook is still the normal path;
- * this is the safety net for when it never arrives (misconfigured endpoint,
- * gateway downtime), so a paying customer is never left locked out.
- */
-export async function verifyCustomDomainUnlock(): Promise<VerifyResult> {
-  const { restaurantId } = await requireAdminAction();
+/** Refresh everywhere a newly-owned feature changes what's visible. */
+function refreshAfterUnlock() {
+  revalidatePath("/admin/billing");
+  revalidatePath("/admin/domains");
+  revalidatePath("/admin", "layout");
+}
 
-  const access = await getCustomDomainAccess(restaurantId);
-  if (access.allowed) return { unlocked: true };
+/**
+ * Start a hosted checkout to buy a feature outright. Mirrors the subscription
+ * flow: this only creates the pending purchase + checkout — access is granted
+ * by the signature-verified webhook (or the "already paid?" check), never here.
+ */
+export async function startFeatureUnlock(featureKey: string): Promise<UnlockResult> {
+  const { restaurantId } = await requireAdminAction();
+  if (!isFeature(featureKey)) return { error: "Unknown feature." };
+  const feature: Feature = featureKey;
+
+  // Already granted by the plan, or already bought → nothing to sell.
+  const [access, owned, prices] = await Promise.all([
+    getPlanAccess(restaurantId),
+    listOwnedFeatures(restaurantId),
+    getFeaturePrices(),
+  ]);
+  if (owned.has(feature)) return { error: "You already own this feature." };
+  // A live trial unlocks everything temporarily; custom domain deliberately
+  // doesn't count, so buying during a trial stays possible for it.
+  if (feature !== "customDomain" && !access.onTrial && access.features.has(feature)) {
+    return { error: "Your plan already includes this feature." };
+  }
+
+  const priced = prices[feature];
+  if (!priced?.enabled || priced.price <= 0) {
+    return { error: "This feature isn't available to buy right now." };
+  }
+
+  const provider = await getBillingProvider();
+  if (!provider) return { error: "Payments aren't configured on the platform yet." };
+
+  const addon = addonKeyFor(feature);
+  let purchaseId: string;
+  try {
+    purchaseId = await tenantDb(restaurantId, async (tx) => {
+      const existing = await tx.addonPurchase.findFirst({
+        where: { restaurantId, addon, status: "pending" },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+      });
+      if (existing) return existing.id;
+      const created = await tx.addonPurchase.create({
+        data: { restaurantId, addon, amount: priced.price, status: "pending" },
+        select: { id: true },
+      });
+      return created.id;
+    });
+  } catch {
+    return { error: "Couldn't start the purchase. Please try again." };
+  }
+
+  const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  let checkout;
+  try {
+    checkout = await provider.createInvoiceCheckout({
+      amount: priced.price,
+      description: `Servd — ${feature} (one-time unlock)`,
+      // Prefixed so it's obvious in the gateway this isn't a subscription.
+      referenceNumber: `add-${purchaseId.slice(0, 12)}`,
+      successUrl: `${base}/admin/billing?unlocked=${encodeURIComponent(feature)}`,
+    });
+  } catch {
+    return { error: "Couldn't start checkout. Please try again." };
+  }
+
+  try {
+    await tenantDb(restaurantId, (tx) =>
+      tx.addonPurchase.update({ where: { id: purchaseId }, data: { providerRef: checkout.gatewayRef } }),
+    );
+  } catch {
+    return { error: "Couldn't start checkout. Please try again." };
+  }
+  return { checkoutUrl: checkout.checkoutUrl };
+}
+
+/**
+ * "I've already paid" — ask the gateway what actually happened to a pending
+ * checkout and settle it. The webhook is the normal path; this is the safety
+ * net so a missed callback never strands a paying customer.
+ */
+export async function verifyFeatureUnlock(featureKey: string): Promise<VerifyResult> {
+  const { restaurantId } = await requireAdminAction();
+  if (!isFeature(featureKey)) return { unlocked: false, message: "Unknown feature." };
+  const addon = addonKeyFor(featureKey);
+
+  const owned = await listOwnedFeatures(restaurantId);
+  if (owned.has(featureKey)) return { unlocked: true };
 
   let pending: { id: string; providerRef: string | null } | null = null;
   try {
     pending = await tenantDb(restaurantId, (tx) =>
       tx.addonPurchase.findFirst({
-        where: { restaurantId, addon: CUSTOM_DOMAIN_ADDON, status: "pending" },
+        where: { restaurantId, addon, status: "pending" },
         orderBy: { createdAt: "desc" },
         select: { id: true, providerRef: true },
       }),
@@ -39,7 +121,7 @@ export async function verifyCustomDomainUnlock(): Promise<VerifyResult> {
     return { unlocked: false, message: "Couldn't check right now. Please try again." };
   }
   if (!pending?.providerRef) {
-    return { unlocked: false, message: "We couldn't find a payment to check. Start the unlock below." };
+    return { unlocked: false, message: "We couldn't find a payment to check." };
   }
 
   const provider = await getBillingProvider();
@@ -58,85 +140,36 @@ export async function verifyCustomDomainUnlock(): Promise<VerifyResult> {
       unlocked: false,
       message:
         status === "failed"
-          ? "That payment didn't go through. Please start the unlock again."
+          ? "That payment didn't go through. Please try again."
           : "We can't see your payment yet. If you've just paid, wait a moment and check again.",
     };
   }
 
   try {
     await tenantDb(restaurantId, (tx) =>
-      tx.addonPurchase.update({
-        where: { id: pending.id },
-        data: { status: "paid", paidAt: new Date() },
-      }),
+      tx.addonPurchase.update({ where: { id: pending.id }, data: { status: "paid", paidAt: new Date() } }),
     );
   } catch {
     return { unlocked: false, message: "Couldn't apply the unlock. Please contact support." };
   }
-  revalidatePath("/admin/domains");
+  refreshAfterUnlock();
   return { unlocked: true };
 }
 
-/**
- * Start a hosted checkout for the one-time custom-domain unlock. Mirrors the
- * subscription flow: we only ever create the pending purchase + checkout here —
- * access is granted by the signature-verified webhook, never by this action.
- */
+// ---------------------------------------------------------------------------
+// Back-compat wrappers for the custom-domain screen (shipped before this was
+// generalised).
+// ---------------------------------------------------------------------------
+
 export async function startCustomDomainUnlock(): Promise<UnlockResult> {
   const { restaurantId } = await requireAdminAction();
-
   const access = await getCustomDomainAccess(restaurantId);
   if (access.allowed) return { error: "Custom domains are already unlocked for this account." };
+  return startFeatureUnlock("customDomain");
+}
 
-  const provider = await getBillingProvider();
-  if (!provider) return { error: "Payments aren't configured on the platform yet." };
-
-  // Reuse an unpaid attempt so repeated clicks don't pile up rows.
-  let purchaseId: string;
-  try {
-    purchaseId = await tenantDb(restaurantId, async (tx) => {
-      const existing = await tx.addonPurchase.findFirst({
-        where: { restaurantId, addon: CUSTOM_DOMAIN_ADDON, status: "pending" },
-        orderBy: { createdAt: "desc" },
-        select: { id: true },
-      });
-      if (existing) return existing.id;
-      const created = await tx.addonPurchase.create({
-        data: {
-          restaurantId,
-          addon: CUSTOM_DOMAIN_ADDON,
-          amount: CUSTOM_DOMAIN_PRICE,
-          status: "pending",
-        },
-        select: { id: true },
-      });
-      return created.id;
-    });
-  } catch {
-    return { error: "Couldn't start the purchase. Please try again." };
-  }
-
-  const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  let checkout;
-  try {
-    checkout = await provider.createInvoiceCheckout({
-      amount: CUSTOM_DOMAIN_PRICE,
-      description: "Servd custom domain — one-time unlock",
-      // Prefixed so it's obvious in the gateway dashboard this isn't a subscription.
-      referenceNumber: `dom-${purchaseId.slice(0, 12)}`,
-      successUrl: `${base}/admin/domains?unlocked=1`,
-    });
-  } catch {
-    return { error: "Couldn't start checkout. Please try again." };
-  }
-
-  try {
-    await tenantDb(restaurantId, (tx) =>
-      tx.addonPurchase.update({ where: { id: purchaseId }, data: { providerRef: checkout.gatewayRef } }),
-    );
-  } catch {
-    return { error: "Couldn't start checkout. Please try again." };
-  }
-
-  return { checkoutUrl: checkout.checkoutUrl };
+export async function verifyCustomDomainUnlock(): Promise<VerifyResult> {
+  const res = await verifyFeatureUnlock("customDomain");
+  if (res.unlocked) revalidatePath("/admin/domains");
+  return res;
 }
