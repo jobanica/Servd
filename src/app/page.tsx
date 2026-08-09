@@ -1,7 +1,5 @@
 import Link from "next/link";
 import { AppIcon, Wordmark } from "@/components/Wordmark";
-import { getFeaturePrices } from "@/server/billing/feature-pricing";
-import { OneTimePricing } from "@/components/billing/OneTimePricing";
 
 /* ------------------------------------------------------------------ icons */
 function Icon({ path }: { path: string }) {
@@ -133,8 +131,6 @@ function AnalyticsMock() {
 
 /* ------------------------------------------------------------------ page */
 export default async function Home() {
-  const featurePrices = await getFeaturePrices();
-
   return (
     <main className="bg-cream text-plum-ink">
       <Nav />
@@ -490,12 +486,9 @@ export default async function Home() {
           </p>
         </div>
 
-        <div className="mt-10">
-          <OneTimePricing prices={featurePrices} />
-        </div>
         <p className="mx-auto mt-6 max-w-2xl text-center text-sm text-plum-ink/55">
-          Buy features one at a time, whenever you need them. Prices may change, but anything you
-          have already bought stays yours.
+          Unlock features one at a time, whenever you need them — you&apos;ll see the price for each
+          inside your dashboard. Message us and we&apos;ll walk you through what fits your restaurant.
         </p>
 
         {/* Refund policy */}
