@@ -2,7 +2,6 @@ import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { getCurrentSubscription } from "@/server/billing/subscription";
-import { cancelSubscription } from "@/server/billing/portal-actions";
 import { PayNowButton } from "@/components/admin/PayNowButton";
 import { FeatureStore, type StoreRow } from "@/components/billing/FeatureStore";
 import { getPlanAccess } from "@/server/billing/feature-gate";
@@ -46,9 +45,6 @@ export default async function BillingPage({
   const onTrial = sub?.status === "trialing" && !!sub.trialEndsAt && new Date(sub.trialEndsAt).getTime() > Date.now();
   const trialDays = onTrial ? daysLeft(sub!.trialEndsAt) : null;
 
-  // Grandfathered: an active PAID subscription from before the one-time switch.
-  // These keep everything they have at the price they signed up at.
-  const grandfathered = sub?.status === "active" && (sub?.plan.priceMonthly ?? 0) > 0;
   const needsPayment = sub?.status === "past_due";
 
   const rows: StoreRow[] = FEATURE_META.map((f) => {
@@ -94,30 +90,16 @@ export default async function BillingPage({
         </div>
       )}
 
-      {/* Grandfathered subscribers — nothing changes for them. */}
-      {grandfathered && sub && (
-        <div className="rounded-tile border border-brand-primary/30 bg-brand-primary/5 p-5">
-          <p className="font-heading text-lg font-bold text-brand-primary">
-            You&apos;re on {sub.plan.name} — {formatPeso(sub.plan.priceMonthly)}/month
-          </p>
-          <p className="mt-1 text-sm text-plum-ink/70">
-            Your plan keeps working exactly as it is, at the price you signed up at. Everything it
-            includes stays unlocked — there&apos;s nothing you need to do or buy.
-          </p>
-          {sub.cancelAtPeriodEnd && (
-            <p className="mt-2 text-sm text-guava">Cancels at the end of the current period.</p>
-          )}
-        </div>
-      )}
-
       {trialDays !== null && (
         <div className="rounded-tile border border-brand-primary/30 bg-brand-primary/5 p-5">
           <p className="font-heading text-lg font-bold text-brand-primary">
             ✨ {trialDays} day{trialDays === 1 ? "" : "s"} left in your free trial
           </p>
           <p className="mt-1 text-sm text-plum-ink/70">
-            Everything is unlocked while the trial runs. Unlock the features you want to keep — each
-            is a one-time payment, so they stay yours when the trial ends.
+            <strong>Every feature is unlocked</strong> until your trial ends. After that you keep QR
+            ordering, the POS, kitchen display and your ordering page for free — anything else needs
+            a one-time unlock. Buy what you want to keep now and it stays yours; there&apos;s no
+            monthly subscription either way.
           </p>
         </div>
       )}
@@ -166,11 +148,6 @@ export default async function BillingPage({
         )}
       </div>
 
-      {grandfathered && sub && !sub.cancelAtPeriodEnd && (
-        <form action={cancelSubscription}>
-          <button className="text-xs text-muted hover:text-guava">Cancel subscription</button>
-        </form>
-      )}
     </div>
   );
 }
