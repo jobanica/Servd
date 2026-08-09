@@ -87,7 +87,7 @@ declare
     'purchase_orders', 'purchase_order_items',
     'employees', 'employee_documents', 'shifts', 'availabilities',
     'shift_swap_requests', 'time_entries', 'leave_types', 'leave_requests',
-    'leave_balances'
+    'leave_balances', 'payroll_deductions'
   ];
 begin
   foreach t in array tenant_tables loop

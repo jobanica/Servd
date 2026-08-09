@@ -60,10 +60,18 @@ export function listLeaveRequests(restaurantId: string) {
   );
 }
 
-export function listTimeEntries(restaurantId: string, from: Date, to: Date) {
+export function listTimeEntries(
+  restaurantId: string,
+  from: Date,
+  to: Date,
+  employeeId?: string,
+) {
   return tenantDb(restaurantId, (tx) =>
     tx.timeEntry.findMany({
-      where: { clockIn: { gte: from, lte: to } },
+      where: {
+        clockIn: { gte: from, lte: to },
+        ...(employeeId ? { employeeId } : {}),
+      },
       orderBy: { clockIn: "desc" },
       include: { employee: { select: { fullName: true } } },
     }),

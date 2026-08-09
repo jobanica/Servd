@@ -470,6 +470,7 @@ model Restaurant {
   smsCreditLedger SmsCreditLedger[]
   invoices        RestaurantInvoice[]
   addonPurchases  AddonPurchase[]
+  payrollDeductions PayrollDeduction[]
   suppliers       Supplier[]
   inventoryItems  InventoryItem[]
   purchaseOrders  PurchaseOrder[]
@@ -1245,9 +1246,30 @@ model Employee {
   leaveRequests LeaveRequest[]
   leaveBalances LeaveBalance[]
   swapRequests  ShiftSwapRequest[]
+  deductions    PayrollDeduction[]
 
   @@index([restaurantId])
   @@map("employees")
+}
+
+/// A one-off payroll deduction entered by hand (cash advance, loan, uniform,
+/// breakage…). Applies to whichever payroll period `appliedOn` falls in, so it
+/// shows up once and never repeats.
+model PayrollDeduction {
+  id           String   @id @default(uuid())
+  restaurantId String
+  employeeId   String
+  label        String
+  amount       Int // centavos
+  appliedOn    DateTime // date this belongs to (matched against the payroll period)
+  createdAt    DateTime @default(now())
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  employee   Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, appliedOn])
+  @@index([employeeId])
+  @@map("payroll_deductions")
 }
 
 model EmployeeDocument {

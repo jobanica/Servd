@@ -25,6 +25,8 @@ export interface PayrollRow {
   pagibig: number;
   bir: number;
   thirteenthAccrual: number;
+  otherDeductions: number; // manual one-off deductions in this period
+  otherItems: { label: string; amount: number }[];
   net: number;
 }
 
@@ -34,6 +36,7 @@ interface Raw {
   employees: { id: string; fullName: string; payType: "hourly" | "daily" | "monthly"; payRate: number }[];
   entries: { employeeId: string; clockIn: Date; clockOut: Date | null; breakMinutes: number }[];
   shifts: { employeeId: string | null; startsAt: Date }[];
+  deductions: { employeeId: string; label: string; amount: number }[];
 }
 
 async function load(restaurantId: string, from: Date, to: Date): Promise<Raw> {
@@ -55,7 +58,19 @@ async function load(restaurantId: string, from: Date, to: Date): Promise<Raw> {
         select: { employeeId: true, startsAt: true },
       }),
     ]);
-    return { employees, entries, shifts };
+    // Manual one-off deductions dated inside the period. Best-effort so an
+    // un-migrated table just means no extra deductions.
+    let deductions: { employeeId: string; label: string; amount: number }[] = [];
+    try {
+      deductions = await tx.payrollDeduction.findMany({
+        where: { appliedOn: { gte: from, lte: to } },
+        orderBy: { appliedOn: "asc" },
+        select: { employeeId: true, label: true, amount: true },
+      });
+    } catch {
+      /* payroll_deductions not migrated yet */
+    }
+    return { employees, entries, shifts, deductions };
   });
 }
 
@@ -97,7 +112,17 @@ export async function getPayroll(
   const d = deriveByEmployee(raw, graceMinutes);
   const cfg = await getPayrollConfig(restaurantId);
 
+  // Manual deductions grouped per employee.
+  const manual = new Map<string, { label: string; amount: number }[]>();
+  for (const d of raw.deductions) {
+    const list = manual.get(d.employeeId) ?? [];
+    list.push({ label: d.label, amount: d.amount });
+    manual.set(d.employeeId, list);
+  }
+
   return raw.employees.map((e) => {
+    const otherItems = manual.get(e.id) ?? [];
+    const otherDeductions = otherItems.reduce((s, x) => s + x.amount, 0);
     const agg = d.hours.get(e.id) ?? { hours: 0, ot: 0 };
     const scheduled = d.scheduledDays.get(e.id) ?? new Set<string>();
     const present = d.presentDays.get(e.id) ?? new Set<string>();
@@ -138,7 +163,9 @@ export async function getPayroll(
         pagibig: stat.pagibig,
         bir: stat.bir,
         thirteenthAccrual: stat.thirteenthAccrual,
-        net: Math.max(0, base - absDed - lateDed - stat.total),
+        otherDeductions,
+        otherItems,
+        net: Math.max(0, base - absDed - lateDed - stat.total - otherDeductions),
       };
     }
     if (e.payType === "daily") {
@@ -162,7 +189,9 @@ export async function getPayroll(
         pagibig: stat.pagibig,
         bir: stat.bir,
         thirteenthAccrual: stat.thirteenthAccrual,
-        net: Math.max(0, gross - stat.total),
+        otherDeductions,
+        otherItems,
+        net: Math.max(0, gross - stat.total - otherDeductions),
       };
     }
 
@@ -185,7 +214,9 @@ export async function getPayroll(
       pagibig: stat.pagibig,
       bir: stat.bir,
       thirteenthAccrual: stat.thirteenthAccrual,
-      net: Math.max(0, gross - stat.total),
+      otherDeductions,
+      otherItems,
+      net: Math.max(0, gross - stat.total - otherDeductions),
     };
   });
 }

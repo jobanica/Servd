@@ -22,24 +22,37 @@ export default async function PayslipPage({
   searchParams,
 }: {
   params: Promise<{ employeeId: string }>;
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{ period?: string; from?: string; to?: string }>;
 }) {
   const { restaurantId, eligible } = await requireHrPage();
   if (!eligible) return <p className="text-sm text-plum-ink/60">HRIS not enabled.</p>;
 
   const { employeeId } = await params;
-  const period = (await searchParams).period === "last" ? "last" : "this";
-  const { from, to } = monthRange(period);
+  const sp = await searchParams;
+  const period = sp.period === "last" ? "last" : "this";
+  const preset = monthRange(period);
+  // Honour an explicit covered-date range from the payroll page.
+  const day = (v: string | undefined, end = false) =>
+    v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(`${v}T${end ? "23:59:59" : "00:00:00"}`) : null;
+  const customFrom = day(sp.from);
+  const customTo = day(sp.to, true);
+  const custom = !!(customFrom || customTo);
+  const from = customFrom ?? preset.from;
+  const to = customTo ?? preset.to;
+  const backQs = custom
+    ? `from=${from.toISOString().slice(0, 10)}&to=${to.toISOString().slice(0, 10)}`
+    : `period=${period}`;
   const slip = await getPayslip(restaurantId, employeeId, from, to);
   if (!slip) notFound();
   const { row, days } = slip;
   const totalDed =
-    row.absenceDeduction + row.lateDeduction + row.sss + row.philhealth + row.pagibig + row.bir;
+    row.absenceDeduction + row.lateDeduction + row.sss + row.philhealth + row.pagibig + row.bir +
+    row.otherDeductions;
 
   return (
     <div className="space-y-6">
       <div>
-        <Link href={`/admin/hr/payroll?period=${period}`} className="text-sm text-plum-ink/50">← Payroll</Link>
+        <Link href={`/admin/hr/payroll?${backQs}`} className="text-sm text-plum-ink/50">← Payroll</Link>
         <h1 className="font-heading text-2xl font-bold">{row.name} — payslip</h1>
         <p className="text-sm text-plum-ink/50">{from.toLocaleDateString()} – {to.toLocaleDateString()}</p>
       </div>
@@ -58,6 +71,9 @@ export default async function PayslipPage({
           {row.philhealth > 0 && <div className="flex justify-between"><dt className="text-plum-ink/60">PhilHealth</dt><dd className="text-guava">−{formatPeso(row.philhealth)}</dd></div>}
           {row.pagibig > 0 && <div className="flex justify-between"><dt className="text-plum-ink/60">Pag-IBIG</dt><dd className="text-guava">−{formatPeso(row.pagibig)}</dd></div>}
           {row.bir > 0 && <div className="flex justify-between"><dt className="text-plum-ink/60">BIR withholding</dt><dd className="text-guava">−{formatPeso(row.bir)}</dd></div>}
+          {row.otherItems.map((item, i) => (
+            <div key={i} className="flex justify-between"><dt className="text-plum-ink/60">{item.label}</dt><dd className="text-guava">−{formatPeso(item.amount)}</dd></div>
+          ))}
           <div className="flex justify-between border-t border-plum-ink/10 pt-2"><dt className="text-plum-ink/60">Total deductions</dt><dd className="text-guava">−{formatPeso(totalDed)}</dd></div>
           <div className="flex justify-between font-heading text-lg font-bold"><dt>Net pay</dt><dd>{formatPeso(row.net)}</dd></div>
           {row.thirteenthAccrual > 0 && (

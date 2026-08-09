@@ -354,3 +354,41 @@ function toMinutes(hhmm: string): number | null {
   if (!m) return null;
   return Number(m[1]) * 60 + Number(m[2]);
 }
+
+// ---------------------------------------------------------------------------
+// Manual payroll deductions (cash advance, loan, uniform, breakage…)
+// ---------------------------------------------------------------------------
+
+/**
+ * Record a one-off deduction against an employee. It applies to whichever
+ * payroll period `appliedOn` falls in, so it's taken once and never repeats.
+ */
+export async function addPayrollDeduction(formData: FormData): Promise<void> {
+  const { restaurantId } = await requireHrAction();
+  const employeeId = String(formData.get("employeeId") ?? "").trim();
+  const label = String(formData.get("label") ?? "").trim().slice(0, 80);
+  const pesos = Number(formData.get("amountPesos"));
+  const dateRaw = String(formData.get("appliedOn") ?? "").trim();
+  if (!employeeId || !label || !Number.isFinite(pesos) || pesos <= 0) return;
+
+  const appliedOn = /^\d{4}-\d{2}-\d{2}$/.test(dateRaw)
+    ? new Date(`${dateRaw}T12:00:00`)
+    : new Date();
+  if (Number.isNaN(appliedOn.getTime())) return;
+
+  await tenantDb(restaurantId, (tx) =>
+    tx.payrollDeduction.create({
+      data: { restaurantId, employeeId, label, amount: pesosToCentavos(pesos), appliedOn },
+      select: { id: true },
+    }),
+  );
+  revalidatePath("/admin/hr/payroll");
+}
+
+export async function deletePayrollDeduction(formData: FormData): Promise<void> {
+  const { restaurantId } = await requireHrAction();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  await tenantDb(restaurantId, (tx) => tx.payrollDeduction.deleteMany({ where: { id } }));
+  revalidatePath("/admin/hr/payroll");
+}
