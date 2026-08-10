@@ -138,7 +138,7 @@ export function BookingForm({
         <div className="mx-auto flex h-16 max-w-3xl items-center gap-3 px-4">
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt={restaurantName} className="h-10 w-10 rounded-lg object-cover" />
+            <img src={logoUrl} alt={restaurantName} className="h-10 w-auto max-w-[120px] rounded-lg object-contain" />
           ) : (
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-600 font-bold">{restaurantName.charAt(0)}</div>
           )}

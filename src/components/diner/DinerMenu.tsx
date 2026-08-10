@@ -386,10 +386,11 @@ export function DinerMenu({
         </div>
         {/* Logo tile — sits in front of the cover (overlapping it) */}
         <div className="relative z-10 -mt-11 flex justify-center">
-          <div className="flex h-[70px] w-[70px] items-center justify-center overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-black/5">
+          {/* Height-fixed, width-flexible so a wide wordmark logo isn't cropped. */}
+          <div className="flex h-[70px] min-w-[70px] items-center justify-center overflow-hidden rounded-2xl bg-white px-3 shadow-lg ring-1 ring-black/5">
             {brand.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={brand.logoUrl} alt={brand.name} className="h-full w-full object-cover" />
+              <img src={brand.logoUrl} alt={brand.name} className="max-h-full w-auto max-w-[200px] object-contain" />
             ) : (
               <span className="font-heading text-xl font-extrabold text-brand-primary">{brand.name.charAt(0)}</span>
             )}
