@@ -19,12 +19,16 @@ import { getWebOrderCapStatus } from "@/server/billing/order-cap";
 import { getLoyaltyConfig, enrollAccount } from "@/server/loyalty/loyalty";
 import { markCartConverted } from "@/server/marketing/cart-recovery";
 import { formatPeso } from "@/lib/money";
+import { isValidPhone, normalizePhone } from "@/lib/phone";
 
 const schema = z.object({
   slug: z.string().min(1),
   orderType: z.enum(["takeout", "delivery"]),
   customerName: z.string().trim().min(1, "Enter your name").max(80),
-  customerPhone: z.string().trim().min(7, "Enter your phone number").max(30),
+  customerPhone: z
+    .string()
+    .trim()
+    .refine(isValidPhone, "Enter an 11-digit phone number (e.g. 09171234567)."),
   customerAddress: z.string().trim().max(300).optional(),
   deliveryZone: z.string().trim().max(80).optional(),
   lat: z.number().optional(),
@@ -213,7 +217,7 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
     restaurantId: restaurant.id,
     orderType: d.orderType,
     customerName: d.customerName.trim(),
-    customerPhone: d.customerPhone.replace(/[^\d+]/g, ""),
+    customerPhone: normalizePhone(d.customerPhone),
     customerAddress: addressLine,
     status: "pending" as const,
     paymentStatus: "unpaid" as const,

@@ -5,6 +5,7 @@ import { systemDb } from "@/server/tenancy/scoped-db";
 import { getPublicRestaurantBySlug } from "@/server/restaurants/get-public";
 import { getPublicStorefront } from "@/server/storefront/storefront";
 import { hasFeature } from "@/server/billing/feature-gate";
+import { isValidPhone } from "@/lib/phone";
 
 /**
  * Customer-facing "Book a table" flow. Diners have no session, so this runs in
@@ -19,7 +20,10 @@ export type BookingResult = { ok: true } | { ok: false; error: string };
 const schema = z.object({
   slug: z.string().trim().min(1).max(120),
   customerName: z.string().trim().min(1, "Please enter your name.").max(80),
-  customerPhone: z.string().trim().min(7, "Please enter a contact number.").max(30),
+  customerPhone: z
+    .string()
+    .trim()
+    .refine(isValidPhone, "Enter an 11-digit phone number (e.g. 09171234567)."),
   partySize: z.coerce.number().int().min(1, "How many people?").max(50, "For big groups, please call us."),
   date: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date."),
   time: z.string().trim().regex(/^\d{2}:\d{2}$/, "Pick a time."),

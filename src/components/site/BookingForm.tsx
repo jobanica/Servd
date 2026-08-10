@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { createPublicBooking } from "@/server/reservations/public-booking";
+import { isValidPhone, phoneError } from "@/lib/phone";
 
 interface DayHours { open: string; close: string; closed: boolean }
 
@@ -54,6 +55,7 @@ export function BookingForm({
   const [party, setParty] = useState(2);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const phoneErr = phoneError(phone);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +91,7 @@ export function BookingForm({
     return out;
   }, [date, hours, todayKey, nowMinutes]);
 
-  const canSubmit = date && time && name.trim() && phone.trim() && party >= 1 && !busy;
+  const canSubmit = date && time && name.trim() && isValidPhone(phone) && party >= 1 && !busy;
 
   function prevMonth() {
     // Don't page before the current month.
@@ -302,7 +304,8 @@ export function BookingForm({
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-semibold text-plum-ink/70">Contact number</label>
-                  <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="09XX XXX XXXX" className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />
+                  <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="numeric" maxLength={13} placeholder="09XX XXX XXXX" aria-invalid={!!phoneErr} className={`w-full rounded-lg border px-3 py-2 text-sm ${phoneErr ? "border-guava" : "border-plum-ink/15"}`} />
+                  {phoneErr && <p className="mt-1 text-xs text-guava">{phoneErr}</p>}
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-semibold text-plum-ink/70">Note <span className="font-normal text-plum-ink/40">(optional)</span></label>

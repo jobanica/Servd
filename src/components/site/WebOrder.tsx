@@ -11,6 +11,7 @@ import {
 } from "@/lib/cart/pricing";
 import type { CartLine, DinerCategory, DinerItem, Selection } from "@/lib/cart/types";
 import { placeWebOrder } from "@/server/orders/web-order";
+import { isValidPhone, phoneError } from "@/lib/phone";
 import { getWebOrderStatus } from "@/server/orders/web-order-status";
 import { previewPromoCode } from "@/server/promotions/redeem";
 import { captureCartLead } from "@/server/marketing/cart-recovery";
@@ -423,6 +424,7 @@ export function WebOrder(props: WebOrderProps) {
   // The owner can insist on proof of payment before an online-paid order lands.
   const receiptRequired = !!pay?.requireReceipt && payMethod !== "cod";
   const receiptMissing = receiptRequired && !receipt;
+  const phoneErr = phoneError(phone);
 
   // Compress the chosen receipt image in the browser so the upload stays small.
   async function pickReceipt(file: File | undefined) {
@@ -773,14 +775,17 @@ export function WebOrder(props: WebOrderProps) {
               onChange={(e) => setPhone(e.target.value)}
               onBlur={() => {
                 // Capture an abandoned-cart lead once a usable phone is entered.
-                if (phone.replace(/[^\d+]/g, "").length >= 7 && lines.length > 0) {
+                if (isValidPhone(phone) && lines.length > 0) {
                   captureCartLead({ slug, name, phone, itemCount: lines.length, total: subtotal }).catch(() => {});
                 }
               }}
-              inputMode="tel"
-              placeholder="Phone number"
-              className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+              inputMode="numeric"
+              maxLength={13}
+              placeholder="Phone number (e.g. 09171234567)"
+              aria-invalid={!!phoneErr}
+              className={`w-full rounded-lg border px-3 py-2 text-sm ${phoneErr ? "border-guava" : "border-plum-ink/15"}`}
             />
+            {phoneErr && <p className="-mt-1 text-xs text-guava">{phoneErr}</p>}
             {orderType === "delivery" && (
               shippingMode ? (
                 /* Nationwide shipping — typed postal address, no map pin. */
@@ -1022,7 +1027,7 @@ export function WebOrder(props: WebOrderProps) {
         ) : (
           <button
             onClick={submit}
-            disabled={busy || receiptMissing || lines.length === 0 || !name.trim() || !phone.trim() || (schedulingLater && !scheduledIso) || (orderType === "delivery" && (shippingMode ? !shippingReady : (!address.trim() || (showMap && !geo) || !collectDeliveryFee && !agreeRider || (distanceMode ? !!distance?.outOfRange : (zones.length > 0 && !zone)))))}
+            disabled={busy || receiptMissing || lines.length === 0 || !name.trim() || !isValidPhone(phone) || (schedulingLater && !scheduledIso) || (orderType === "delivery" && (shippingMode ? !shippingReady : (!address.trim() || (showMap && !geo) || !collectDeliveryFee && !agreeRider || (distanceMode ? !!distance?.outOfRange : (zones.length > 0 && !zone)))))}
             className="mt-3 w-full rounded-lg bg-green-600 py-3 font-semibold text-white disabled:opacity-50"
           >
             {busy
