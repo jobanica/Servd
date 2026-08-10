@@ -521,7 +521,7 @@ export default async function Home() {
         <div className="mt-10 space-y-3">
           {[
             ["Do diners need to download an app?", "No. They scan the QR on the table and your menu opens in their browser — order and pay right there."],
-            ["Where does the money go?", "Straight to your own PayMongo account. Servd uses connected accounts, so we never hold your funds."],
+            ["Where does the money go?", "Your money goes directly to you. We don't hold any of your money — payments land in your own account."],
             ["Can I use my own branding?", "Yes — your logo, colors, tagline, and even your own domain. Diners only ever see your brand."],
             ["Is there a free trial?", "Yes — every new account starts with a 30-day free trial of every feature, no card required. When the trial ends you're moved to the Free plan automatically (QR dine-in ordering, kitchen display and cashier POS) — keep using it for free forever, or upgrade to Growth or Business for online ordering, payments, marketing and the back office."],
             ["Does it work on iPad for the cashier?", "Yes. Printing supports cloud/poll printers and AirPrint so it works on any device."],
