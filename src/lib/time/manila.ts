@@ -44,3 +44,34 @@ export function manilaDate(d: Date | string): string {
     day: "numeric",
   });
 }
+
+/**
+ * The UTC instant at which the Manila calendar day containing `ref` began.
+ *
+ * The server runs in UTC, so `new Date().setHours(0,0,0,0)` yields midnight UTC
+ * — which is 8 AM in Manila. Using that as "start of today" silently drops
+ * every order taken between midnight and 8 AM into yesterday. Always derive
+ * day boundaries for reports through here.
+ */
+export function manilaStartOfDay(ref: Date | string = new Date()): Date {
+  const ms = new Date(ref).getTime() + MANILA_OFFSET_MS;
+  const dayStart = Math.floor(ms / 86_400_000) * 86_400_000;
+  return new Date(dayStart - MANILA_OFFSET_MS);
+}
+
+/** The UTC instant at which the Manila day containing `ref` ends (exclusive). */
+export function manilaEndOfDay(ref: Date | string = new Date()): Date {
+  return new Date(manilaStartOfDay(ref).getTime() + 86_400_000);
+}
+
+/** Start of the Manila day `days` before the one containing `ref`. */
+export function manilaStartOfDaysAgo(days: number, ref: Date | string = new Date()): Date {
+  return new Date(manilaStartOfDay(ref).getTime() - days * 86_400_000);
+}
+
+/** Manila-day boundaries for a "YYYY-MM-DD" string, as UTC instants. */
+export function manilaDayRange(dayKey: string): { from: Date; to: Date } {
+  const from = new Date(`${dayKey}T00:00:00.000Z`);
+  const start = new Date(from.getTime() - MANILA_OFFSET_MS);
+  return { from: start, to: new Date(start.getTime() + 86_400_000) };
+}

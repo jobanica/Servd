@@ -3,12 +3,13 @@ import { requireAdminPage } from "@/server/tenancy/require-admin";
 import { requireFeaturePage } from "@/server/billing/feature-gate";
 import { getSalesReport, getVatReport, getCogs, getExpenses } from "@/server/accounting/queries";
 import { formatPeso } from "@/lib/money";
+import { manilaStartOfDay } from "@/lib/time/manila";
 
 type Period = "today" | "this" | "last";
 function range(p: Period) {
   const now = new Date();
   if (p === "today") {
-    const from = new Date(now); from.setHours(0, 0, 0, 0);
+    const from = manilaStartOfDay(now);
     return { from, to: now };
   }
   const y = now.getFullYear();

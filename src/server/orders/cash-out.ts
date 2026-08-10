@@ -3,6 +3,7 @@
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { requireStaff } from "@/server/tenancy/current-user";
 import { pesosToCentavos } from "@/lib/money";
+import { manilaStartOfDay } from "@/lib/time/manila";
 
 export type CashOutState = { ok?: boolean; message?: string; error?: string } | null;
 
@@ -16,8 +17,7 @@ export interface CashOutRow {
 
 /** Today's cash-outs for a restaurant (systemDb + explicit id, RLS-proof). */
 export async function getCashOutsToday(restaurantId: string): Promise<CashOutRow[]> {
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
+  const startOfDay = manilaStartOfDay();
   try {
     const rows = await systemDb((tx) =>
       tx.cashMovement.findMany({

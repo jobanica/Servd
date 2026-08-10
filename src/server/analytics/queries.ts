@@ -41,7 +41,7 @@ export async function getAnalytics(
     const orderCount = orders._count;
 
     const revenueByDay = await tx.$queryRaw<{ day: string; revenue: number }[]>`
-      select to_char(date_trunc('day', "createdAt"), 'YYYY-MM-DD') as day,
+      select to_char(date_trunc('day', "createdAt" at time zone 'UTC' at time zone 'Asia/Manila'), 'YYYY-MM-DD') as day,
              sum("total")::float8 as revenue
       from orders
       where "restaurantId" = ${restaurantId}
@@ -87,7 +87,7 @@ export async function getAnalytics(
       group by 1 order by 1`;
 
     const ratingTrend = await tx.$queryRaw<{ day: string; avg: number; count: number }[]>`
-      select to_char(date_trunc('day', "createdAt"), 'YYYY-MM-DD') as day,
+      select to_char(date_trunc('day', "createdAt" at time zone 'UTC' at time zone 'Asia/Manila'), 'YYYY-MM-DD') as day,
              avg(rating)::float8 as avg, count(*)::int as count
       from feedback
       where "restaurantId" = ${restaurantId}

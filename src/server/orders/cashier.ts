@@ -21,6 +21,7 @@ import { isVoidReason } from "@/lib/orders/void-reasons";
 import { writeAudit } from "@/server/audit/log";
 import { awardPointsForOrder, getBalance, getLoyaltyConfig, redeemPoints, enrollAccount } from "@/server/loyalty/loyalty";
 import { notifyCustomer, restaurantDisplayName } from "@/server/sms/notify";
+import { manilaStartOfDay } from "@/lib/time/manila";
 
 export interface CashierOrder {
   id: string;
@@ -603,8 +604,7 @@ export async function getClosedOrders(): Promise<ClosedOrder[]> {
   } catch {
     return [];
   }
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
+  const startOfDay = manilaStartOfDay();
   const rows = await tenantDb(staff.restaurantId, (tx) =>
     tx.order.findMany({
       where: { status: "closed", updatedAt: { gte: startOfDay } },
@@ -890,8 +890,7 @@ export async function getVoidedOrders(): Promise<VoidedOrder[]> {
   } catch {
     return [];
   }
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
+  const startOfDay = manilaStartOfDay();
   try {
     const rows = await tenantDb(staff.restaurantId, (tx) =>
       tx.order.findMany({

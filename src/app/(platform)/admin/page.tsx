@@ -10,6 +10,7 @@ import { getPlanAccess } from "@/server/billing/feature-gate";
 import { getPlanBannerData } from "@/server/billing/plan-status";
 import { PlanStatusBanner } from "@/components/billing/PlanStatusBanner";
 import { formatPeso } from "@/lib/money";
+import { manilaStartOfDay, manilaStartOfDaysAgo } from "@/lib/time/manila";
 import { RevenueChart } from "@/components/analytics/Charts";
 import { getAiInsights, aiInsightsEnabled } from "@/server/ai/insights";
 
@@ -67,8 +68,10 @@ export default async function AdminHome() {
   if (!restaurant.onboardingCompletedAt) redirect("/admin/onboarding");
 
   const now = new Date();
-  const startOfDay = new Date(now); startOfDay.setHours(0, 0, 0, 0);
-  const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7);
+  // Manila day boundaries — the server runs in UTC, so a plain setHours(0,0,0,0)
+  // would start "today" at 8 AM Manila and drop the early-morning trade.
+  const startOfDay = manilaStartOfDay(now);
+  const weekAgo = manilaStartOfDaysAgo(7, now);
 
   const inventoryOn = await safe(hasModule(rid, "inventory"), false);
 
