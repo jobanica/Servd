@@ -99,6 +99,7 @@ export interface WebOrderProps {
     packagingFee?: number; // centavos
     packagingFeeScope?: "delivery" | "all";
     packagingFeeMode?: "order" | "item";
+    requireReceipt?: boolean;
     showVat?: boolean;
   };
   delivery?: {
@@ -419,6 +420,9 @@ export function WebOrder(props: WebOrderProps) {
   const [riderNote, setRiderNote] = useState(""); // customer's note to the rider
   const [cutlery, setCutlery] = useState(true); // include cutlery/utensils (default yes)
   const selectedOnline = onlineMethods.find((m) => m.key === payMethod) ?? null;
+  // The owner can insist on proof of payment before an online-paid order lands.
+  const receiptRequired = !!pay?.requireReceipt && payMethod !== "cod";
+  const receiptMissing = receiptRequired && !receipt;
 
   // Compress the chosen receipt image in the browser so the upload stays small.
   async function pickReceipt(file: File | undefined) {
@@ -913,7 +917,11 @@ export function WebOrder(props: WebOrderProps) {
                       </div>
                     ) : (
                       <label className="mt-2 block cursor-pointer rounded-lg border border-dashed border-plum-ink/25 px-3 py-2 text-xs font-semibold text-plum-ink/60">
-                        {receiptBusy ? "Processing…" : "📎 Upload payment receipt (optional)"}
+                        {receiptBusy
+                          ? "Processing…"
+                          : receiptRequired
+                            ? "📎 Upload payment receipt (required)"
+                            : "📎 Upload payment receipt (optional)"}
                         <input
                           type="file"
                           accept="image/png,image/jpeg,image/webp"
@@ -922,7 +930,13 @@ export function WebOrder(props: WebOrderProps) {
                         />
                       </label>
                     )}
-                    <p className="mt-1 text-[11px] text-plum-ink/45">Optional — add the reference or receipt to help us confirm, or just show your payment to the rider on arrival.</p>
+                    {receiptRequired ? (
+                      <p className="mt-1 text-[11px] font-semibold text-guava">
+                        A screenshot of your payment is required before you can place this order.
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-[11px] text-plum-ink/45">Optional — add the reference or receipt to help us confirm, or just show your payment to the rider on arrival.</p>
+                    )}
                   </div>
                 )}
               </div>
@@ -1008,7 +1022,7 @@ export function WebOrder(props: WebOrderProps) {
         ) : (
           <button
             onClick={submit}
-            disabled={busy || lines.length === 0 || !name.trim() || !phone.trim() || (schedulingLater && !scheduledIso) || (orderType === "delivery" && (shippingMode ? !shippingReady : (!address.trim() || (showMap && !geo) || !collectDeliveryFee && !agreeRider || (distanceMode ? !!distance?.outOfRange : (zones.length > 0 && !zone)))))}
+            disabled={busy || receiptMissing || lines.length === 0 || !name.trim() || !phone.trim() || (schedulingLater && !scheduledIso) || (orderType === "delivery" && (shippingMode ? !shippingReady : (!address.trim() || (showMap && !geo) || !collectDeliveryFee && !agreeRider || (distanceMode ? !!distance?.outOfRange : (zones.length > 0 && !zone)))))}
             className="mt-3 w-full rounded-lg bg-green-600 py-3 font-semibold text-white disabled:opacity-50"
           >
             {busy

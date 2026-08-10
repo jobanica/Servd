@@ -181,6 +181,13 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
       : 0;
   if (codFee > 0 && addressLine) addressLine = `[COD +${formatPeso(codFee)}] ${addressLine}`;
 
+  // Proof of payment, when the owner insists on it. Checked after `choice` is
+  // resolved so it only applies to an actually-online payment, and enforced here
+  // because the client's disabled button is not a guarantee.
+  if (storefront.payment.requireReceipt && choice !== "cod" && !d.paymentReceipt) {
+    return { ok: false, error: "Please attach a screenshot of your payment to place this order." };
+  }
+
   // Packaging fee for food packaging (tubs/containers) on to-go online orders.
   // Applies to delivery only, or pickup + delivery, per config — and either a
   // flat charge per order or per item (× total quantity), per packagingFeeMode.

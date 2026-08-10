@@ -114,6 +114,7 @@ export function StorefrontForm({
       packagingFeePesos: number;
       packagingFeeScope: "delivery" | "all";
       packagingFeeMode: "order" | "item";
+      requireReceipt: boolean;
       showVat: boolean;
     };
     delivery: {
@@ -530,6 +531,25 @@ export function StorefrontForm({
           setEnabled={setBankOn}
           initial={{ name: initial.payment.bankName, number: initial.payment.bankNumber, qrUrl: initial.payment.bankQrUrl }}
         />
+
+        {/* Proof of payment — blocks checkout until a screenshot is attached. */}
+        <div className="mt-4 rounded-lg border border-plum-ink/10 bg-cream/40 p-3">
+          <label className="flex items-start gap-2 text-sm font-semibold">
+            <input
+              type="checkbox"
+              name="requireReceipt"
+              defaultChecked={initial.payment.requireReceipt}
+              className="mt-0.5"
+            />
+            <span>
+              Require the customer to upload a payment receipt
+              <span className="mt-0.5 block text-xs font-normal text-plum-ink/50">
+                They can&apos;t place the order until a screenshot is attached. Applies to whichever
+                online method they pick (GCash, Maya or bank) — cash orders are unaffected.
+              </span>
+            </span>
+          </label>
+        </div>
       </div>
 
       {/* Advance booking & ordering */}

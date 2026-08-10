@@ -37,6 +37,8 @@ export interface PaymentConfig {
   packagingFee: number; // centavos (per order, or per item — see packagingFeeMode)
   packagingFeeScope: "delivery" | "all"; // delivery only, or pickup & delivery
   packagingFeeMode: "order" | "item"; // flat once per order, or charged per item (× quantity)
+  requireReceipt: boolean; // customer must attach a payment screenshot before they
+  //                          can place an online-paid order (GCash / Maya / Bank)
   showVat: boolean; // show the "VAT (12%) included" line at web checkout
   //                    (off for non-VAT / percentage-tax businesses)
 }
@@ -113,7 +115,7 @@ export function defaultPaymentConfig(): PaymentConfig {
     mayaEnabled: false, mayaName: "", mayaNumber: "", mayaQrUrl: "",
     bankEnabled: false, bankName: "", bankNumber: "", bankQrUrl: "",
     packagingFeeEnabled: false, packagingFee: 0, packagingFeeScope: "delivery", packagingFeeMode: "order",
-    showVat: true,
+    requireReceipt: false, showVat: true,
   };
 }
 
@@ -142,6 +144,7 @@ function normalizePaymentConfig(raw: unknown): PaymentConfig {
       packagingFeeEnabled: !!r.packagingFeeEnabled,
       packagingFee: Math.max(0, Math.round(Number(r.packagingFee) || 0)),
       packagingFeeScope: r.packagingFeeScope === "all" ? "all" : "delivery",
+      requireReceipt: !!r.requireReceipt,
       // Default "order" (flat) so existing stores' totals are unchanged.
       packagingFeeMode: r.packagingFeeMode === "item" ? "item" : "order",
       // Default true so existing stores keep showing "VAT (12%) included".
