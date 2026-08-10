@@ -61,6 +61,12 @@ export interface MerchantData {
   incoming: MerchantOrder[]; // pending — awaiting accept/reject
   active: MerchantOrder[]; // accepted → in progress (new/preparing/done)
   history: MerchantOrder[]; // recent closed/cancelled
+  /** Booked for later — surfaced as a heads-up, not in the live queue. */
+  upcoming: {
+    advanceOrders: number; // scheduled orders still awaiting acceptance
+    bookings: number; // table reservations still to come
+    nextAt: string | null; // ISO of the soonest of either, if any
+  };
 }
 
 const ITEM_SELECT = {
@@ -165,12 +171,63 @@ async function loadMerchantData(restaurantId: string): Promise<MerchantData> {
   const extras = await loadExtras(restaurantId, allIds);
   const get = (id: string): OrderExtra => extras.get(id) ?? { prepMinutes: null, cancelReason: null, scheduledFor: null, paymentChoice: null, paymentRef: null, paymentReceiptUrl: null, customerNote: null };
 
+  // Scheduled orders still awaiting acceptance + upcoming table bookings.
+  const upcoming = await loadUpcoming(
+    restaurantId,
+    incomingRows.map((o) => get(o.id).scheduledFor),
+  );
+
   return {
     // Advance orders (scheduled for later) are handled on the Advance orders page,
     // so they're kept out of the live "incoming now" queue until sent to kitchen.
     incoming: incomingRows.map((o) => shape(o as Row, get(o.id))).filter((o) => !o.scheduledFor),
     active: activeRows.map((o) => shape(o as Row, get(o.id))),
     history: historyRows.map((o) => shape(o as Row, get(o.id))),
+    upcoming,
+  };
+}
+
+/**
+ * Counts of things booked for LATER — scheduled orders and table reservations.
+ * They deliberately stay out of the live queue, so without this the merchant
+ * would never learn one had come in. Best-effort: a lagging column or a missing
+ * reservations table just yields zeroes.
+ */
+async function loadUpcoming(
+  restaurantId: string,
+  scheduledIso: (string | null)[],
+): Promise<MerchantData["upcoming"]> {
+  const now = Date.now();
+  const times: number[] = [];
+  let advanceOrders = 0;
+  for (const iso of scheduledIso) {
+    if (!iso) continue;
+    const t = new Date(iso).getTime();
+    if (Number.isNaN(t)) continue;
+    advanceOrders++;
+    if (t >= now) times.push(t);
+  }
+
+  let bookings = 0;
+  try {
+    const rows = await tenantDb(restaurantId, (tx) =>
+      tx.reservation.findMany({
+        where: { status: "booked", reservedAt: { gte: new Date() } },
+        orderBy: { reservedAt: "asc" },
+        select: { reservedAt: true },
+      }),
+    );
+    bookings = rows.length;
+    for (const r of rows) if (r.reservedAt) times.push(r.reservedAt.getTime());
+  } catch {
+    /* reservations not available — advance orders alone still show */
+  }
+
+  times.sort((a, b) => a - b);
+  return {
+    advanceOrders,
+    bookings,
+    nextAt: times.length ? new Date(times[0]).toISOString() : null,
   };
 }
 

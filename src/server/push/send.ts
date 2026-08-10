@@ -55,6 +55,14 @@ export async function sendOrderPush(restaurantId: string, payload: OrderPushPayl
     url: "/merchant",
   });
 
+  await deliver(subs, body);
+}
+
+/** Fan a payload out to every device, pruning subscriptions the browser dropped. */
+async function deliver(
+  subs: { endpoint: string; p256dh: string; auth: string }[],
+  body: string,
+): Promise<void> {
   const dead: string[] = [];
   await Promise.all(
     subs.map(async (s) => {
@@ -72,4 +80,44 @@ export async function sendOrderPush(restaurantId: string, payload: OrderPushPayl
       await systemDb((tx) => tx.pushSubscription.deleteMany({ where: { endpoint: { in: dead } } }));
     } catch { /* best-effort cleanup */ }
   }
+}
+
+/**
+ * Alerts merchant devices that a customer booked a table from the website.
+ * Deliberately quieter than a live order — it's for later, not for right now.
+ */
+export async function sendBookingPush(
+  restaurantId: string,
+  p: { customerName: string; partySize: number; reservedAt: Date | null },
+): Promise<void> {
+  if (!ensureConfigured()) return;
+  let subs: { endpoint: string; p256dh: string; auth: string }[] = [];
+  try {
+    subs = await systemDb((tx) =>
+      tx.pushSubscription.findMany({ where: { restaurantId }, select: { endpoint: true, p256dh: true, auth: true } }),
+    );
+  } catch {
+    return;
+  }
+  if (subs.length === 0) return;
+
+  const when = p.reservedAt
+    ? p.reservedAt.toLocaleString("en-PH", {
+        timeZone: "Asia/Manila",
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    : "no set time";
+
+  await deliver(
+    subs,
+    JSON.stringify({
+      title: "New table booking 📅",
+      body: `${p.customerName} · ${p.partySize} pax · ${when}`,
+      url: "/admin/reservations",
+    }),
+  );
 }

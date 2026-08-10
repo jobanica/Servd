@@ -346,6 +346,34 @@ export function MerchantBoard({
         </button>
       )}
 
+      {/* Booked for later — advance orders and table reservations don't join the
+          live queue, so surface them here or staff never learn they came in. */}
+      {(data.upcoming?.advanceOrders ?? 0) + (data.upcoming?.bookings ?? 0) > 0 && (
+        <a
+          href="/admin/advance-orders"
+          className="flex items-center justify-between gap-3 border-b border-mango/30 bg-mango/10 px-4 py-3"
+        >
+          <span className="min-w-0">
+            <span className="font-heading text-sm font-extrabold text-plum-ink">
+              📅 {[
+                data.upcoming.advanceOrders > 0
+                  ? `${data.upcoming.advanceOrders} advance order${data.upcoming.advanceOrders === 1 ? "" : "s"}`
+                  : null,
+                data.upcoming.bookings > 0
+                  ? `${data.upcoming.bookings} booking${data.upcoming.bookings === 1 ? "" : "s"}`
+                  : null,
+              ].filter(Boolean).join(" · ")}
+            </span>
+            {data.upcoming.nextAt && (
+              <span className="block text-xs text-plum-ink/60">Next: {schedLabel(data.upcoming.nextAt)}</span>
+            )}
+          </span>
+          <span className="shrink-0 rounded-full bg-plum-ink px-4 py-2 text-xs font-bold text-white">
+            View →
+          </span>
+        </a>
+      )}
+
       {/* FULL-SCREEN incoming-order alert (the loud one) */}
       {topIncoming && (
         <div

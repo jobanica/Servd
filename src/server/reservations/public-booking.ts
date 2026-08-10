@@ -6,6 +6,8 @@ import { getPublicRestaurantBySlug } from "@/server/restaurants/get-public";
 import { getPublicStorefront } from "@/server/storefront/storefront";
 import { hasFeature } from "@/server/billing/feature-gate";
 import { isValidPhone } from "@/lib/phone";
+import { notifyOrdersChanged } from "@/server/realtime/notify";
+import { sendBookingPush } from "@/server/push/send";
 
 /**
  * Customer-facing "Book a table" flow. Diners have no session, so this runs in
@@ -136,6 +138,17 @@ export async function createPublicBooking(input: BookingInput): Promise<BookingR
       }),
     );
   } catch { /* source column not migrated yet */ }
+
+  // Tell the merchant devices. Without this a self-booked reservation lands
+  // silently and staff only find it if they happen to open Reservations.
+  try {
+    await notifyOrdersChanged(restaurant.id);
+    await sendBookingPush(restaurant.id, {
+      customerName: v.customerName,
+      partySize: v.partySize,
+      reservedAt,
+    });
+  } catch { /* alerting must never fail the booking */ }
 
   return { ok: true };
 }
