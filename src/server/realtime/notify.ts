@@ -54,11 +54,14 @@ export async function notifyWaiterCall(
   await broadcast(restaurantId, "waiter", { tableNumber, at: Date.now() });
 }
 
-/** Alert staff that a table requested the bill (cash = a waiter must collect). */
+/**
+ * Alert staff that a table requested the bill. "cash" = a waiter must collect;
+ * "gcash_qr" = a waiter must bring the printed GCash QR to the table.
+ */
 export async function notifyBillRequest(
   restaurantId: string,
   tableNumber: string,
-  method: "cash" | "online",
+  method: "cash" | "online" | "gcash_qr",
 ): Promise<void> {
   await broadcast(restaurantId, "bill", { tableNumber, method, at: Date.now() });
 }

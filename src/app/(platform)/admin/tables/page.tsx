@@ -5,13 +5,16 @@ import { restaurantOrderUrl, qrSvg } from "@/lib/qr";
 import { AddTableForm } from "@/components/admin/AddTableForm";
 import { QrDownloadButton } from "@/components/admin/QrDownloadButton";
 import { createCounterTable, deleteTable, regenerateQrToken } from "@/server/tables/actions";
+import { DineInGcashForm } from "@/components/admin/DineInGcashForm";
+import { getStorefront } from "@/server/storefront/storefront";
 
 export default async function TablesPage() {
   const { restaurantId } = await requireAdminPage();
-  const [tables, counter, restaurant] = await Promise.all([
+  const [tables, counter, restaurant, { payment }] = await Promise.all([
     getTables(restaurantId),
     getCounterTable(restaurantId),
     getRestaurantBrief(restaurantId),
+    getStorefront(restaurantId),
   ]);
 
   const qrUrl = (qrToken: string) =>
@@ -145,6 +148,16 @@ export default async function TablesPage() {
           </form>
         )}
       </div>
+
+      {/* How diners settle the bill from the table QR (cash is always offered). */}
+      <DineInGcashForm
+        initial={{
+          enabled: payment.dineInGcashEnabled,
+          name: payment.gcashName,
+          number: payment.gcashNumber,
+          qrUrl: payment.gcashQrUrl,
+        }}
+      />
     </div>
   );
 }

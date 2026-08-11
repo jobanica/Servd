@@ -7,7 +7,7 @@ import { notifyOrdersChanged, notifyBillRequest } from "@/server/realtime/notify
 const schema = z.object({
   slug: z.string().min(1),
   tableToken: z.string().min(1),
-  method: z.enum(["cash", "online"]).optional(),
+  method: z.enum(["cash", "online", "gcash_qr"]).optional(),
 });
 
 /** Resolve a table from the public slug + token (no session). */
@@ -95,12 +95,13 @@ export async function getTableBill(input: {
  * Diner-triggered "request the bill". No session — authorized by the table
  * token in the URL. Flags every open order at the table so the cashier board
  * lights up, then pings the live screens. When `method` is given (the diner
- * chose how to pay), staff get a popup — cash means a waiter must collect.
+ * chose how to pay), staff get a popup — cash means a waiter must collect,
+ * `gcash_qr` means a waiter must bring the store's printed GCash QR over.
  */
 export async function requestBill(input: {
   slug: string;
   tableToken: string;
-  method?: "cash" | "online";
+  method?: "cash" | "online" | "gcash_qr";
 }): Promise<{ ok: boolean; flagged?: number; error?: string }> {
   const parsed = schema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Invalid request." };

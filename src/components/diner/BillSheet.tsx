@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { getTableBill, requestBill, type TableBill } from "@/server/orders/request-bill";
 import { applyBillPromo, clearBillPromo, listRedeemableCodes, type RedeemableCode } from "@/server/promotions/apply-bill";
 import { createTableCheckout } from "@/server/payments/checkout";
+import { getDineInGcash, type DineInGcash } from "@/server/tables/dine-in-gcash";
 
 function peso(centavos: number) {
   return `₱${(centavos / 100).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
@@ -11,8 +12,11 @@ function peso(centavos: number) {
 
 /**
  * The diner's bill, with a choice of how to pay:
- *   • Cash   → flag the cashier (a waiter comes to collect) + "on the way" note.
- *   • Online → hosted GCash/card checkout (PayMongo / Xendit).
+ *   • Cash     → flag the cashier (a waiter comes to collect) + "on the way" note.
+ *   • GCash QR → the store's own GCash QR, no gateway involved: staff are alerted
+ *                and a waiter brings the printed QR to the table (the saved QR
+ *                image, if any, also shows on the diner's phone right away).
+ *   • Online   → hosted GCash/card checkout (PayMongo / Xendit).
  */
 export function BillSheet({
   slug,
@@ -26,7 +30,8 @@ export function BillSheet({
   onClose: () => void;
 }) {
   const [bill, setBill] = useState<TableBill | null | "loading">("loading");
-  const [phase, setPhase] = useState<"choose" | "cash" | "redirecting">("choose");
+  const [phase, setPhase] = useState<"choose" | "cash" | "gcash" | "redirecting">("choose");
+  const [gcash, setGcash] = useState<DineInGcash | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [code, setCode] = useState("");
@@ -51,6 +56,9 @@ export function BillSheet({
     listRedeemableCodes({ slug })
       .then(setCodes)
       .catch(() => setCodes([]));
+    getDineInGcash({ slug })
+      .then((g) => setGcash(g.enabled ? g : null))
+      .catch(() => setGcash(null));
   }, [loadBill, slug]);
 
   async function applyCode(raw?: string) {
@@ -82,6 +90,19 @@ export function BillSheet({
     const res = await requestBill({ slug, tableToken, method: "cash" });
     setBusy(false);
     if (res.ok) setPhase("cash");
+    else setError(res.error ?? "Couldn't notify the cashier.");
+  }
+
+  /**
+   * GCash QR: no gateway, no redirect. We just flag the table so staff bring the
+   * store's printed QR over, and show the saved QR here meanwhile.
+   */
+  async function payGcashQr() {
+    setBusy(true);
+    setError(null);
+    const res = await requestBill({ slug, tableToken, method: "gcash_qr" });
+    setBusy(false);
+    if (res.ok) setPhase("gcash");
     else setError(res.error ?? "Couldn't notify the cashier.");
   }
 
@@ -125,6 +146,47 @@ export function BillSheet({
               Someone will come to your table to collect your cash payment. Thank you!
             </p>
             <button onClick={onClose} className="mt-6 w-full rounded-full py-3 font-semibold btn-brand">
+              Done
+            </button>
+          </div>
+        ) : phase === "gcash" ? (
+          <div className="py-4 text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-sky-500 text-2xl text-white">
+              📱
+            </div>
+            <h2 className="mt-4 font-heading text-xl font-bold text-brand-ink">Pay with GCash</h2>
+            <p className="mt-1 text-sm text-brand-ink/60">
+              A waiter is bringing the GCash QR code to your table.
+            </p>
+
+            {gcash?.qrUrl && (
+              <>
+                <p className="mt-4 text-xs text-brand-ink/50">Or scan it here now:</p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={gcash.qrUrl}
+                  alt="GCash QR code"
+                  className="mx-auto mt-2 w-56 max-w-full rounded-tile border border-plum-ink/10 object-contain"
+                />
+              </>
+            )}
+
+            {bill !== "loading" && bill !== null && (
+              <p className="mt-4 font-heading text-2xl font-extrabold text-brand-ink">{peso(bill.total)}</p>
+            )}
+
+            {(gcash?.name || gcash?.number) && (
+              <div className="mt-3 rounded-xl bg-cream/60 px-3 py-2 text-sm">
+                {gcash.name && <p className="font-semibold text-brand-ink">{gcash.name}</p>}
+                {gcash.number && <p className="tracking-wide text-brand-ink/70">{gcash.number}</p>}
+              </div>
+            )}
+
+            <p className="mt-3 text-xs text-brand-ink/50">
+              Send the exact amount, then show your GCash confirmation to the staff so they can
+              close your bill.
+            </p>
+            <button onClick={onClose} className="mt-5 w-full rounded-full py-3 font-semibold btn-brand">
               Done
             </button>
           </div>
@@ -358,6 +420,15 @@ export function BillSheet({
                       {phase === "redirecting"
                         ? "Opening…"
                         : `💳 Pay online${tipCentavos() > 0 ? ` ${peso(bill.total + tipCentavos())}` : ""} (GCash / Card)`}
+                    </button>
+                  )}
+                  {gcash && (
+                    <button
+                      onClick={payGcashQr}
+                      disabled={busy}
+                      className="w-full rounded-full border border-sky-400/60 bg-sky-50 py-3 font-semibold text-sky-700 disabled:opacity-60"
+                    >
+                      📱 Pay with GCash QR
                     </button>
                   )}
                   <button

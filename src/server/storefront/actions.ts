@@ -6,7 +6,7 @@ import { requireAdminAction } from "@/server/tenancy/require-admin";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { uploadMenuImage } from "@/server/storage/menu-images";
 import { pesosToCentavos } from "@/lib/money";
-import type { DayHours, DeliveryZone } from "./storefront";
+import { getStorefront, type DayHours, type DeliveryZone } from "./storefront";
 
 export type StorefrontState = { ok?: boolean; error?: string } | null;
 
@@ -65,7 +65,11 @@ export async function updateStorefront(
   if (typeof bankQrUrl !== "string") return bankQrUrl;
 
   const str = (k: string, max: number) => String(formData.get(k) ?? "").trim().slice(0, max);
+  // The dine-in GCash QR toggle is set on the Tables page, not here — carry the
+  // saved value over so saving the website settings never switches it off.
+  const { payment: savedPayment } = await getStorefront(restaurantId);
   const paymentConfig = {
+    dineInGcashEnabled: savedPayment.dineInGcashEnabled,
     codEnabled: formData.get("codEnabled") === "on",
     codFeeEnabled: formData.get("codFeeEnabled") === "on",
     codFee: pesosToCentavos(Math.max(0, Number(formData.get("codFeePesos")) || 0)),

@@ -185,7 +185,7 @@ export function CashierBoard({
       .on("broadcast", { event: "bill" }, (msg) => {
         const p = (msg as { payload?: { tableNumber?: string; method?: string } }).payload ?? {};
         const tableNumber = String(p.tableNumber ?? "—");
-        const method = p.method === "online" ? "online" : "cash";
+        const method = p.method === "online" ? "online" : p.method === "gcash_qr" ? "gcash_qr" : "cash";
         chime();
         refresh();
         setBillCalls((prev) => [
@@ -882,7 +882,11 @@ export function CashierBoard({
                 <li
                   key={c.id}
                   className={`flex items-center justify-between rounded-lg border p-3 ${
-                    c.method === "cash" ? "border-guava/40 bg-guava/5" : "border-brand-primary/30 bg-brand-primary/5"
+                    c.method === "cash"
+                      ? "border-guava/40 bg-guava/5"
+                      : c.method === "gcash_qr"
+                        ? "border-sky-400/50 bg-sky-50"
+                        : "border-brand-primary/30 bg-brand-primary/5"
                   }`}
                 >
                   <span>
@@ -890,7 +894,9 @@ export function CashierBoard({
                     <span className="block text-xs text-plum-ink/60">
                       {c.method === "cash"
                         ? "💵 Cash — collect payment at the table"
-                        : "💳 Paying online…"}
+                        : c.method === "gcash_qr"
+                          ? "📱 GCash QR — bring the QR code to the table"
+                          : "💳 Paying online…"}
                     </span>
                   </span>
                   <button

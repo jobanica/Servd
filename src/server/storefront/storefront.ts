@@ -25,6 +25,9 @@ export interface PaymentConfig {
   gcashName: string; // account name shown to the customer
   gcashNumber: string; // GCash mobile number
   gcashQrUrl: string; // uploaded QR image URL
+  dineInGcashEnabled: boolean; // offer "Pay with GCash QR" on the table-QR bill —
+  //                              the waiter brings the printed QR to the table
+  //                              (direct to the store's own GCash, no gateway)
   mayaEnabled: boolean;
   mayaName: string; // account name shown to the customer
   mayaNumber: string; // Maya mobile number
@@ -111,7 +114,7 @@ function normalizeDeliveryConfig(raw: unknown): DeliveryConfig {
 export function defaultPaymentConfig(): PaymentConfig {
   return {
     codEnabled: true, codFeeEnabled: false, codFee: 0,
-    gcashEnabled: false, gcashName: "", gcashNumber: "", gcashQrUrl: "",
+    gcashEnabled: false, gcashName: "", gcashNumber: "", gcashQrUrl: "", dineInGcashEnabled: false,
     mayaEnabled: false, mayaName: "", mayaNumber: "", mayaQrUrl: "",
     bankEnabled: false, bankName: "", bankNumber: "", bankQrUrl: "",
     packagingFeeEnabled: false, packagingFee: 0, packagingFeeScope: "delivery", packagingFeeMode: "order",
@@ -133,6 +136,7 @@ function normalizePaymentConfig(raw: unknown): PaymentConfig {
       gcashName: str(r.gcashName, 120),
       gcashNumber: str(r.gcashNumber, 40),
       gcashQrUrl: str(r.gcashQrUrl, 500),
+      dineInGcashEnabled: !!r.dineInGcashEnabled,
       mayaEnabled: !!r.mayaEnabled,
       mayaName: str(r.mayaName, 120),
       mayaNumber: str(r.mayaNumber, 40),
