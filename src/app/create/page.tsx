@@ -6,6 +6,7 @@ import { StickyCta } from "@/components/create/StickyCta";
 import { LazyVideo } from "@/components/create/LazyVideo";
 import { Pixel, LandingView } from "@/components/create/Pixel";
 import { PhoneMock } from "@/components/create/PhoneMock";
+import { getLandingConfig } from "@/server/landing/settings";
 
 /**
  * The Facebook-ad landing page. One job: get a restaurant owner, on a phone,
@@ -23,12 +24,10 @@ import { PhoneMock } from "@/components/create/PhoneMock";
  *    rather than an image, and the pixel loads after interactive — the in-app
  *    browser is slow and every kilobyte before the hero is paid for in people.
  *
- * Static by construction: no database read on the request path.
+ * The only server read is the landing config, behind a tagged cache.
  */
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.servdph.com";
-const VIDEO_URL = process.env.NEXT_PUBLIC_CREATE_VIDEO_URL ?? "";
-const VIDEO_POSTER = process.env.NEXT_PUBLIC_CREATE_VIDEO_POSTER ?? "";
 const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID ?? "";
 
 const TITLE = "Create your restaurant's online ordering page — free";
@@ -98,16 +97,17 @@ const FAQ: [string, string][] = [
 ];
 
 /**
- * Deliberately reads NOTHING per-request — no searchParams, no cookies, no
- * database. That keeps the whole page prerendered and served from the CDN,
- * which is the single biggest thing that can be done for a visitor on a phone
- * in Davao inside a slow in-app browser.
+ * Reads no per-request state — no searchParams, no cookies. The one read is
+ * the landing config, and that goes through a tagged cache so the video can be
+ * changed from super-admin without putting a database round-trip in front of
+ * the hero on every ad click.
  *
  * The ad tags still reach /build: the middleware puts them in a cookie on the
  * way in, and the CTA appends them to the href at click time.
  */
-export default function CreatePage() {
+export default async function CreatePage() {
   const buildHref = "/build";
+  const { videoUrl, posterUrl } = await getLandingConfig();
 
   return (
     <main className="bg-cream text-plum-ink">
@@ -164,9 +164,9 @@ export default function CreatePage() {
             You can have your own online ordering page in just a few minutes.
           </p>
 
-          {VIDEO_URL && (
+          {videoUrl && (
             <div className="mt-7">
-              <LazyVideo src={VIDEO_URL} poster={VIDEO_POSTER || undefined} />
+              <LazyVideo src={videoUrl} poster={posterUrl || undefined} />
             </div>
           )}
 

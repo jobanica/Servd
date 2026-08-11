@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { requireSuperAdminPage } from "@/server/tenancy/require-admin";
 import { getFunnel } from "@/server/build/funnel";
+import { getLandingConfig } from "@/server/landing/settings";
+import { LandingVideoForm } from "@/components/super-admin/LandingVideoForm";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +18,7 @@ function pct(n: number, of: number): string {
  */
 export default async function FunnelPage() {
   await requireSuperAdminPage();
-  const f = await getFunnel(14);
+  const [f, landing] = await Promise.all([getFunnel(14), getLandingConfig()]);
   const t = f.totals;
 
   const stages = [
@@ -65,6 +67,8 @@ export default async function FunnelPage() {
           <p className="font-heading text-3xl font-extrabold text-brand-primary">{f.diyAccounts}</p>
         </div>
       </div>
+
+      <LandingVideoForm initial={landing.videoUrl} />
 
       {/* The ad report. Sorted by activations, because that's the only column
           that decides whether a creative keeps its budget — a cheap click that

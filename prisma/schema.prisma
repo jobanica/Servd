@@ -126,6 +126,9 @@ model PlatformSetting {
   uploadPostKeyEnc  String? // encrypted Upload-Post API key (social scheduling)
   emailCredsEnc     String? // encrypted JSON { apiKey, fromName, fromEmail, replyTo } for marketing email
   emailAutomationOn Boolean  @default(false) // master switch for the acquisition follow-up tracks
+  /// YouTube (or Vimeo / MP4) link shown in the /create landing page's
+  /// "See how easy it is" section. Empty = the section renders steps only.
+  landingVideoUrl   String?
   updatedAt         DateTime @updatedAt
 
   @@map("platform_settings")

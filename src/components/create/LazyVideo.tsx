@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toAutoplayEmbedUrl, isVideoFile } from "@/lib/video";
 
 /**
  * A click-to-load video facade.
@@ -22,8 +23,8 @@ export function LazyVideo({
   title?: string;
 }) {
   const [playing, setPlaying] = useState(false);
-  const embed = toEmbedUrl(src);
-  const isFile = /\.(mp4|webm|mov)(\?|$)/i.test(src);
+  const embed = toAutoplayEmbedUrl(src);
+  const isFile = isVideoFile(src);
 
   return (
     <div className="relative aspect-video w-full overflow-hidden rounded-tile border border-plum-ink/10 bg-plum-ink shadow-lg">
@@ -68,18 +69,4 @@ export function LazyVideo({
       )}
     </div>
   );
-}
-
-/**
- * Normalizes the configured URL to something embeddable, so the founder can
- * paste whatever YouTube gave them (watch link, share link, or embed) and have
- * it work. Anything unrecognized is passed through untouched.
- */
-export function toEmbedUrl(src: string): string {
-  const autoplay = "autoplay=1&rel=0&playsinline=1";
-  const yt = src.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]{6,})/);
-  if (yt) return `https://www.youtube.com/embed/${yt[1]}?${autoplay}`;
-  const vimeo = src.match(/vimeo\.com\/(?:video\/)?(\d+)/);
-  if (vimeo) return `https://player.vimeo.com/video/${vimeo[1]}?autoplay=1`;
-  return src;
 }

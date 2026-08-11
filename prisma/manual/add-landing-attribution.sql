@@ -10,6 +10,11 @@
 -- Run in the Supabase SQL editor. Idempotent.
 -- Requires add-diy-builder.sql first.
 
+-- The landing page's how-it-works video, pasted in from super-admin rather than
+-- set as an environment variable — changing the video shouldn't need a deploy.
+ALTER TABLE "platform_settings"
+  ADD COLUMN IF NOT EXISTS "landingVideoUrl" TEXT;
+
 ALTER TABLE "restaurants"
   ADD COLUMN IF NOT EXISTS "utmSource"   TEXT,
   ADD COLUMN IF NOT EXISTS "utmMedium"   TEXT,
