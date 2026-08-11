@@ -18,13 +18,21 @@ import { systemDb } from "@/server/tenancy/scoped-db";
 
 const WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
-export type Bucket = "build:create" | "build:write" | "build:upload" | "build:activate";
+export type Bucket =
+  | "build:create"
+  | "build:write"
+  | "build:upload"
+  | "build:scan"
+  | "build:activate";
 
 /** Per-hour allowance for each bucket, per IP. */
 const LIMITS: Record<Bucket, number> = {
   "build:create": 5, // new previews started
   "build:write": 300, // edits (menu rows add up fast — this is generous on purpose)
   "build:upload": 40, // logo + item photos
+  // AI menu scans cost real model tokens on an unauthenticated endpoint —
+  // this is the one bucket where the limit is about spend, not just spam.
+  "build:scan": 12,
   "build:activate": 10, // invoice attempts
 };
 

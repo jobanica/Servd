@@ -5,6 +5,7 @@ import { formatPeso } from "@/lib/money";
 import { saveBusiness, addBuildItem, deleteBuildItem, type BuildResult } from "@/server/build/actions";
 import { requestActivation } from "@/server/build/activate-action";
 import type { BuildState } from "@/server/build/queries";
+import { MenuScanPanel } from "./MenuScanPanel";
 
 const MIN_ITEMS = 3;
 const STEPS = ["Business", "Menu", "Preview", "Activate"] as const;
@@ -55,6 +56,10 @@ export function BuildWizard({ initial, appUrl }: { initial: BuildState | null; a
           pending={pending}
           onAdd={(fd) => start(async () => { apply(await addBuildItem(fd)); })}
           onDelete={(id) => start(async () => { apply(await deleteBuildItem(id)); })}
+          onImported={(next) => {
+            setState(next);
+            setError(null);
+          }}
           onBack={() => setStep(0)}
           onNext={() => setStep(2)}
         />
@@ -203,6 +208,7 @@ function MenuStep({
   pending,
   onAdd,
   onDelete,
+  onImported,
   onBack,
   onNext,
 }: {
@@ -210,6 +216,7 @@ function MenuStep({
   pending: boolean;
   onAdd: (fd: FormData) => void;
   onDelete: (id: string) => void;
+  onImported: (state: BuildState) => void;
   onBack: () => void;
   onNext: () => void;
 }) {
@@ -306,6 +313,10 @@ function MenuStep({
           {pending ? "Adding…" : "+ Add item"}
         </button>
       </form>
+
+      {/* Shortcut for owners who already have a printed menu. Manual quick-add
+          above stays the primary path — this just saves the typing. */}
+      <MenuScanPanel disabled={pending} onImported={(next) => onImported(next)} />
 
       <div className="mt-5 flex gap-2">
         <button onClick={onBack} className="rounded-full border border-plum-ink/15 px-5 py-3 text-sm font-semibold">
