@@ -35,6 +35,17 @@ export function manilaDateTime(d: Date | string): string {
   });
 }
 
+/** "Jun 26, 2:07 PM" — date + clock time in Manila, no year (compact lists). */
+export function manilaShortDateTime(d: Date | string): string {
+  return new Date(d).toLocaleString("en-PH", {
+    timeZone: MANILA_TZ,
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 /** "Jun 26, 2026" — calendar date in Manila. */
 export function manilaDate(d: Date | string): string {
   return new Date(d).toLocaleDateString("en-PH", {

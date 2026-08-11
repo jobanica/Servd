@@ -4,10 +4,12 @@ import { getMyStatus, getMyAttendance, getMyLeave } from "@/server/hr/employee-p
 import { EmployeeClock } from "@/components/hr/EmployeeClock";
 import { EmployeeLeave } from "@/components/hr/EmployeeLeave";
 import { EmployeeLogin } from "@/components/hr/EmployeeLogin";
+import { manilaShortDateTime } from "@/lib/time/manila";
 
-function fmt(iso: string): string {
-  return new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-}
+// This page renders on the server (UTC on Vercel), so formatting without an
+// explicit timezone showed every shift 8 hours early — a 5:56 PM clock-in read
+// as 9:56 AM, while the admin timesheet (which formats in Manila) was right.
+const fmt = manilaShortDateTime;
 
 export default async function EmployeePortal() {
   const session = await getEmployeeSession();
