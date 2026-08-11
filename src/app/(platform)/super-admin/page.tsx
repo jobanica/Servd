@@ -7,6 +7,7 @@ import { FREE_WEB_ORDER_CAP } from "@/server/billing/order-cap";
 import { capFor } from "@/lib/billing/planLimits";
 import { formatPeso } from "@/lib/money";
 import { BillingRunButton } from "@/components/super-admin/BillingRunButton";
+import { getMonthlyFeatureUsage } from "@/server/billing/feature-subscriptions";
 
 function Stat({
   label,
@@ -40,10 +41,11 @@ function Stat({
 }
 
 export default async function SuperAdminHome() {
-  const [m, platform, capEnabled] = await Promise.all([
+  const [m, platform, capEnabled, scheduler] = await Promise.all([
     getSubscriptionMetrics(),
     getPlatformMetrics(),
     getOrderCapEnabled(),
+      getMonthlyFeatureUsage("contentScheduler"),
   ]);
 
   return (
@@ -107,6 +109,23 @@ export default async function SuperAdminHome() {
         <Stat label="Orders (30d)" value={platform.orders30} />
         <Stat label="SMS credits used" value={platform.smsCreditsUsed} />
         <Stat label="Active (access)" value={platform.activeRestaurants} href="/super-admin/subscriptions?access=active" />
+      </div>
+
+      {/* Content scheduler take-up — size the Upload-Post plan against this. */}
+      <div>
+        <h2 className="mb-2 font-heading text-sm font-bold uppercase tracking-wide text-plum-ink/50">
+          Content scheduler
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Stat label="Paying now" value={scheduler.active} accent />
+          <Stat label="Profiles in use" value={scheduler.connected} />
+          <Stat label="Awaiting payment" value={scheduler.pending} />
+          <Stat label="Lapsed" value={scheduler.lapsed} />
+        </div>
+        <p className="mt-2 text-xs text-plum-ink/50">
+          <span className="font-semibold text-plum-ink/70">Profiles in use</span> is what your
+          Upload-Post plan has to cover — a profile stays provisioned after a subscription lapses.
+        </p>
       </div>
 
       <BillingRunButton />

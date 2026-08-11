@@ -229,3 +229,45 @@ export async function renewFeatureSubscriptions(now: Date = new Date()): Promise
 
   return s;
 }
+
+export interface MonthlyFeatureUsage {
+  active: number; // paid and live — these consume an Upload-Post profile
+  pending: number; // started checkout, not paid yet
+  lapsed: number; // past_due / expired
+  connected: number; // restaurants with an Upload-Post profile provisioned
+}
+
+/**
+ * Platform-wide take-up of a monthly feature, for capacity planning (e.g. how
+ * many Upload-Post profiles are actually in use). Super-admin only.
+ */
+export async function getMonthlyFeatureUsage(feature: string): Promise<MonthlyFeatureUsage> {
+  const empty: MonthlyFeatureUsage = { active: 0, pending: 0, lapsed: 0, connected: 0 };
+  try {
+    return await systemDb(async (tx) => {
+      const rows = await tx.featureSubscription.findMany({
+        where: { feature },
+        select: { status: true, currentPeriodEnd: true },
+      });
+      const now = Date.now();
+      let active = 0;
+      let pending = 0;
+      let lapsed = 0;
+      for (const r of rows) {
+        const live = r.status === "active" && !!r.currentPeriodEnd && r.currentPeriodEnd.getTime() > now;
+        if (live) active++;
+        else if (r.status === "pending") pending++;
+        else lapsed++;
+      }
+      // Profiles provisioned on Upload-Post — these exist even after a lapse,
+      // so this is the number the subscription actually has to cover.
+      const connected =
+        feature === "contentScheduler"
+          ? await tx.restaurant.count({ where: { uploadPostUser: { not: null } } })
+          : 0;
+      return { active, pending, lapsed, connected };
+    });
+  } catch {
+    return empty; // table not migrated yet
+  }
+}
