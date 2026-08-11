@@ -8,7 +8,7 @@ import { countSegment } from "./audience";
 import { isSegment, type SegmentKey } from "@/lib/email/segments";
 import { sendCampaign } from "./campaigns";
 import type { SendReport } from "./campaigns";
-import { renderEmail } from "@/lib/email/render";
+import { renderEmail, buildRecipientLinks } from "@/lib/email/render";
 
 const PATH = "/super-admin/email";
 
@@ -116,10 +116,17 @@ export async function sendTestEmail(
   const creds = await getEmailCreds();
   if (!creds) return { ok: false, error: "Add your sending key first." };
 
+  // Stand-in recipient shaped like a real unpaid lead, so the test lands with
+  // a real activate link and shows exactly what the segment would receive.
   const base = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const links = buildRecipientLinks(base, {
+    status: "preview",
+    slug: "your-restaurant",
+    buildToken: "sample-build-token",
+  });
   const { text, html } = renderEmail(
     parsed.data.body,
-    { name: "Brew Mate Cafe", email: to },
+    { name: "Brew Mate Cafe", email: to, ...links },
     `${base}/unsubscribe/test-preview`,
   );
   const [outcome] = await sendBatch(creds, [

@@ -22,6 +22,10 @@ export interface Recipient {
   name: string;
   email: string;
   unsubToken: string;
+  /** Feeds the {{activate}} / {{preview}} links — see lib/email/render.ts. */
+  status: string;
+  slug: string;
+  buildToken: string | null;
 }
 
 /**
@@ -79,14 +83,30 @@ export async function countAllSegments(): Promise<Record<SegmentKey, number>> {
  * working one-click unsubscribe, so the token is part of being addressable.
  */
 export async function resolveSegment(segment: SegmentKey, limit: number): Promise<Recipient[]> {
-  let rows: { id: string; name: string; contactEmail: string | null; unsubToken: string | null }[];
+  let rows: {
+    id: string;
+    name: string;
+    slug: string;
+    status: string;
+    buildToken: string | null;
+    contactEmail: string | null;
+    unsubToken: string | null;
+  }[];
   try {
     rows = await systemDb((tx) =>
       tx.restaurant.findMany({
         where: whereFor(segment),
         orderBy: { createdAt: "desc" },
         take: limit,
-        select: { id: true, name: true, contactEmail: true, unsubToken: true },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          status: true,
+          buildToken: true,
+          contactEmail: true,
+          unsubToken: true,
+        },
       }),
     );
   } catch {
@@ -108,7 +128,15 @@ export async function resolveSegment(segment: SegmentKey, limit: number): Promis
         continue; // can't guarantee an unsubscribe link → don't email them
       }
     }
-    out.push({ restaurantId: r.id, name: r.name, email, unsubToken: token });
+    out.push({
+      restaurantId: r.id,
+      name: r.name,
+      email,
+      unsubToken: token,
+      status: r.status,
+      slug: r.slug,
+      buildToken: r.buildToken,
+    });
   }
   return out;
 }

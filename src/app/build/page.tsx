@@ -11,14 +11,23 @@ export const metadata = {
  * The public DIY builder. No login: if the visitor already has a build cookie we
  * pick their preview back up, otherwise they start fresh.
  */
-export default async function BuildPage() {
+export default async function BuildPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ go?: string }>;
+}) {
+  const { go } = await searchParams;
   const token = await readBuildCookie();
   const initial = token ? await getBuildState(token) : null;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.servdph.com";
 
   return (
     <main className="min-h-screen bg-cream">
-      <BuildWizard initial={initial} appUrl={appUrl} />
+      <BuildWizard
+        initial={initial}
+        appUrl={appUrl}
+        startAt={go === "activate" || go === "preview" ? go : undefined}
+      />
     </main>
   );
 }

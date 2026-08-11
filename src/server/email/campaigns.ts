@@ -1,7 +1,7 @@
 import "server-only";
 
 import { systemDb } from "@/server/tenancy/scoped-db";
-import { renderEmail } from "@/lib/email/render";
+import { renderEmail, buildRecipientLinks } from "@/lib/email/render";
 import { getEmailCreds, sendBatch, type OutgoingEmail } from "./provider";
 import { resolveSegment } from "./audience";
 import { MAX_RECIPIENTS, type SegmentKey } from "@/lib/email/segments";
@@ -78,9 +78,10 @@ export async function sendCampaign(input: {
   for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
     const chunk = recipients.slice(i, i + BATCH_SIZE);
     const emails: OutgoingEmail[] = chunk.map((r) => {
+      const links = buildRecipientLinks(base, r);
       const { text, html } = renderEmail(
         input.body,
-        { name: r.name, email: r.email },
+        { name: r.name, email: r.email, ...links },
         `${base}/unsubscribe/${r.unsubToken}`,
       );
       return { to: r.email, subject: input.subject, text, html };

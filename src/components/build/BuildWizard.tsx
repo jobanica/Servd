@@ -18,9 +18,23 @@ type Step = 0 | 1 | 2 | 3;
  * The order of the steps is the point. The owner must reach a real, working
  * preview of THEIR menu within about two minutes — before we ask for anything.
  */
-export function BuildWizard({ initial, appUrl }: { initial: BuildState | null; appUrl: string }) {
+export function BuildWizard({
+  initial,
+  appUrl,
+  startAt,
+}: {
+  initial: BuildState | null;
+  appUrl: string;
+  /** Deep link from a marketing email — open straight on that step. */
+  startAt?: "activate" | "preview";
+}) {
   const [state, setState] = useState<BuildState | null>(initial);
-  const [step, setStep] = useState<Step>(initial ? (initial.canPreview ? 2 : 1) : 0);
+  const [step, setStep] = useState<Step>(() => {
+    if (!initial) return 0;
+    if (startAt === "activate" && initial.canPreview) return 3;
+    if (startAt === "preview" && initial.canPreview) return 2;
+    return initial.canPreview ? 2 : 1;
+  });
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
