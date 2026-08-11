@@ -35,6 +35,7 @@ const I = {
   print: "M6 9V3h12v6M6 18H4a2 2 0 01-2-2v-3a2 2 0 012-2h16a2 2 0 012 2v3a2 2 0 01-2 2h-2M6 14h12v7H6z",
   globe: "M12 2a10 10 0 100 20 10 10 0 000-20M2 12h20M12 2c2.5 3 2.5 17 0 20M12 2c-2.5 3-2.5 17 0 20",
   receipt: "M5 3v18l2-1 2 1 2-1 2 1 2-1 2 1V3l-2 1-2-1-2 1-2-1-2 1z M9 8h6M9 12h6",
+  film: "M3 4h18v16H3zM7 4v16M17 4v16M3 9h4M17 9h4M3 15h4M17 15h4",
 };
 
 // Nav items that require a plan feature — hidden when the plan lacks it.
@@ -46,6 +47,7 @@ const ITEM_FEATURE: Record<string, string> = {
   "/admin/loyalty": "loyalty",
   "/admin/customers": "customers",
   "/admin/sms": "sms",
+  "/admin/content": "contentScheduler",
   "/admin/inventory": "inventory",
   "/admin/hr": "hr",
   "/admin/storefront": "onlineOrdering",
@@ -96,6 +98,7 @@ const NAV: { group: string; items: Item[] }[] = [
       { label: "Refer & earn", href: "/admin/referrals", d: I.star },
       { label: "Customers", href: "/admin/customers", d: I.users },
       { label: "SMS marketing", href: "/admin/sms", d: I.chat },
+      { label: "Content scheduler", href: "/admin/content", d: I.film },
     ],
   },
   {

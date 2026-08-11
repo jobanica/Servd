@@ -78,3 +78,28 @@ export async function saveXenditCreds(creds: XenditCreds): Promise<void> {
     }),
   );
 }
+
+/** The platform's Upload-Post API key (decrypted). Null when not configured. */
+export async function getUploadPostKey(): Promise<string | null> {
+  try {
+    const row = await systemDb((tx) =>
+      tx.platformSetting.findUnique({ where: { id: "platform" }, select: { uploadPostKeyEnc: true } }),
+    );
+    if (!row?.uploadPostKeyEnc) return null;
+    return decryptJson<{ key: string }>(row.uploadPostKeyEnc).key;
+  } catch {
+    return null;
+  }
+}
+
+/** Save (or clear with "") the Upload-Post API key. */
+export async function setUploadPostKey(key: string): Promise<void> {
+  const enc = key ? encryptJson({ key }) : null;
+  await systemDb((tx) =>
+    tx.platformSetting.upsert({
+      where: { id: "platform" },
+      create: { id: "platform", uploadPostKeyEnc: enc },
+      update: { uploadPostKeyEnc: enc },
+    }),
+  );
+}

@@ -8,7 +8,7 @@ import { systemDb } from "@/server/tenancy/scoped-db";
 import { requireSuperAdmin } from "@/server/tenancy/current-user";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { runBillingCron, type CronSummary } from "@/server/billing/run-cron";
-import { saveXenditCreds, setOrderCapEnabled } from "@/server/billing/platform-settings";
+import { saveXenditCreds, setOrderCapEnabled, setUploadPostKey } from "@/server/billing/platform-settings";
 import { provisionTrial, getFreePlan } from "@/server/billing/subscription";
 import { COMP_FOREVER } from "@/lib/billing/comp";
 import { uniqueSlug } from "@/lib/slug";
@@ -718,4 +718,19 @@ export async function createBusinessAccount(_prev: ActionState, formData: FormDa
     message: `${restaurantName} created. Give the owner these login details — they can change their email & password from the dashboard:`,
     credentials: { username, password },
   };
+}
+
+/** Save (or clear) the platform-wide Upload-Post API key for social scheduling. */
+export async function saveUploadPostKey(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireSuperAdmin();
+  const apiKey = String(formData.get("apiKey") ?? "").trim();
+  // Blank = keep whatever is stored (the field never echoes the saved key).
+  if (!apiKey) return { ok: true, message: "Unchanged." };
+  try {
+    await setUploadPostKey(apiKey);
+  } catch {
+    return { error: "Couldn't save. Run the social-posts migration if you haven't yet." };
+  }
+  revalidatePath("/super-admin/payments");
+  return { ok: true, message: "Upload-Post connected." };
 }

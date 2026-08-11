@@ -29,7 +29,8 @@ export type Feature =
   | "inventory"
   | "hr"
   | "customDomain"
-  | "whiteLabel";
+  | "whiteLabel"
+  | "contentScheduler";
 
 export interface FeatureMeta {
   key: Feature;
@@ -48,6 +49,7 @@ export const FEATURE_META: FeatureMeta[] = [
   { key: "promotions", label: "Promotions, promo codes & happy hours", group: "Marketing & growth" },
   { key: "customers", label: "Customer book + CSV export", group: "Marketing & growth" },
   { key: "sms", label: "SMS marketing", group: "Marketing & growth" },
+  { key: "contentScheduler", label: "Social content scheduler", group: "Marketing & growth" },
   { key: "aiMenuImport", label: "AI menu import", group: "Marketing & growth" },
   { key: "dataExport", label: "Data export (sales, orders, menu)", group: "Operations & back office" },
   { key: "auditLog", label: "Audit log (who changed what)", group: "Operations & back office" },
@@ -97,6 +99,7 @@ export const FEATURE_TIERS: Record<Feature, Tier[]> = {
   inventory: ["Business"],
   hr: ["Business"],
   whiteLabel: ["Business"],
+  contentScheduler: ["Growth", "Business"],
 };
 
 /** Map a plan name to a known tier, if it is one. */

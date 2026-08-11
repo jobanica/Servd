@@ -22,6 +22,7 @@ export const DEFAULT_FEATURE_PRICES: FeaturePriceMap = {
   loyalty: { price: 120_000, enabled: true },
   promotions: { price: 100_000, enabled: true },
   customers: { price: 70_000, enabled: true },
+  contentScheduler: { price: 150_000, enabled: true },
   // Metered: each text costs real money — keep it on credits, not a one-time buy.
   sms: { price: 0, enabled: false },
   // Burns API credits per import — cheap unlock, or leave off and meter it.

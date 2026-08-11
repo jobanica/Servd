@@ -119,6 +119,7 @@ model PlatformSetting {
   orderCapEnabled Boolean  @default(false) // master switch for monthly order caps across all restaurants
   tutorials       Json? // course/tutorial hub content (sections + YouTube videos) shown at tutorials.<root>
   featurePrices   Json? // one-time unlock price + sellable flag per gateable feature
+  uploadPostKeyEnc String? // encrypted Upload-Post API key (social scheduling)
   updatedAt       DateTime @updatedAt
 
   @@map("platform_settings")
@@ -426,6 +427,7 @@ model Restaurant {
   smsDoubleOptIn   Boolean @default(true)
 
   // Premium custom-domain tier (gated by the custom_domain plan module).
+  uploadPostUser         String?   @unique // Upload-Post profile username for social scheduling
   subdomain              String?   @unique
   customDomain           String?   @unique
   customDomainVerifiedAt DateTime?
@@ -471,6 +473,7 @@ model Restaurant {
   invoices        RestaurantInvoice[]
   addonPurchases  AddonPurchase[]
   payrollDeductions PayrollDeduction[]
+  socialPosts     SocialPost[]
   suppliers       Supplier[]
   inventoryItems  InventoryItem[]
   purchaseOrders  PurchaseOrder[]
@@ -672,6 +675,28 @@ model RestaurantInvoice {
 
   @@index([restaurantId])
   @@map("restaurant_invoices")
+}
+
+/// A social post composed in the app and published/scheduled through
+/// Upload-Post. `providerRef` is the request id it returns, so a post can be
+/// traced back to the provider.
+model SocialPost {
+  id           String    @id @default(uuid())
+  restaurantId String
+  caption      String
+  mediaUrl     String? // uploaded image; null = text-only post
+  platforms    String // comma-separated: "facebook,instagram"
+  scheduledFor DateTime? // null = published immediately
+  status       String    @default("scheduled") // scheduled | posted | failed
+  providerRef  String? // Upload-Post request_id
+  error        String?
+  postedAt     DateTime?
+  createdAt    DateTime  @default(now())
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, scheduledFor])
+  @@map("social_posts")
 }
 
 /// A ONE-TIME add-on a restaurant buys from Servd (currently the custom-domain

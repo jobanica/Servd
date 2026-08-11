@@ -1,8 +1,11 @@
 import { getBillingStatus } from "@/server/billing/platform-settings";
 import { XenditForm } from "@/components/super-admin/XenditForm";
+import { UploadPostForm } from "@/components/super-admin/UploadPostForm";
+import { getUploadPostKey } from "@/server/billing/platform-settings";
 
 export default async function SuperAdminPaymentsPage() {
   const status = await getBillingStatus();
+  const uploadPostConfigured = !!(await getUploadPostKey());
   const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const webhookUrl = `${base.replace(/\/$/, "")}/api/webhooks/xendit`;
 
@@ -17,6 +20,8 @@ export default async function SuperAdminPaymentsPage() {
       </div>
 
       <XenditForm configured={status.xenditConfigured} webhookUrl={webhookUrl} />
+
+      <UploadPostForm configured={uploadPostConfigured} />
 
       <div className="rounded-tile border border-plum-ink/10 bg-white p-5 text-sm text-plum-ink/65">
         <p className="font-semibold text-plum-ink">How it works</p>
