@@ -2,9 +2,11 @@ import { requireSuperAdminPage } from "@/server/tenancy/require-admin";
 import { countAllSegments } from "@/server/email/audience";
 import { listCampaigns } from "@/server/email/campaigns";
 import { getEmailStatus } from "@/server/email/provider";
+import { getAutomation, runAutomation, CATCH_UP_DAYS } from "@/server/email/automation";
 import { SEGMENTS } from "@/lib/email/segments";
 import { EmailComposer } from "@/components/super-admin/EmailComposer";
 import { EmailSettingsForm } from "@/components/super-admin/EmailSettingsForm";
+import { EmailAutomation } from "@/components/super-admin/EmailAutomation";
 
 export const dynamic = "force-dynamic";
 
@@ -17,11 +19,16 @@ const SEGMENT_LABEL = new Map(SEGMENTS.map((s) => [s.key, s.label]));
  */
 export default async function EmailMarketingPage() {
   await requireSuperAdminPage();
-  const [counts, campaigns, status] = await Promise.all([
+  const [counts, campaigns, status, automation, preview] = await Promise.all([
     countAllSegments(),
     listCampaigns(),
     getEmailStatus(),
+    getAutomation(),
+    // Dry run: how many each step would reach right now, without sending.
+    runAutomation({ dryRun: true }),
   ]);
+  const dueNow: Record<number, number> = {};
+  for (const s of preview.steps) dueNow[s.dayOffset] = s.due;
 
   return (
     <div className="space-y-6">
@@ -31,6 +38,13 @@ export default async function EmailMarketingPage() {
           Follow up with the owners who built a page at <span className="font-mono">/build</span>.
         </p>
       </div>
+
+      <EmailAutomation
+        enabled={automation.enabled}
+        steps={automation.steps}
+        dueNow={dueNow}
+        catchUpDays={CATCH_UP_DAYS}
+      />
 
       <EmailComposer counts={counts} configured={status.configured} />
 
