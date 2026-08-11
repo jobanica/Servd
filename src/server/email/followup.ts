@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { renderEmail, buildRecipientLinks } from "@/lib/email/render";
 import { computeSchedule, stepDef, ALL_STEPS, type Track } from "@/lib/email/tracks";
+import { decideSend } from "@/lib/email/suppression";
 import { DEFAULT_COPY } from "@/lib/email/default-copy";
 import { getEmailCreds, sendBatch } from "./provider";
 
@@ -269,13 +270,11 @@ export async function runFollowUps(now = new Date()): Promise<RunReport> {
 
   for (const send of dueSends) {
     const template = templates.get(send.stepKey);
-    if (!template || !template.enabled) {
-      await skip(send.id, "disabled");
-      continue;
-    }
 
-    // Re-read the lead NOW. Everything below is the §5 suppression list, and
-    // it runs against current state rather than the state at scheduling time.
+    // Re-read the lead NOW. The decision below runs against current state
+    // rather than the state at scheduling time — that's the only way "don't
+    // email someone who just paid" can actually hold for a step queued a week
+    // ago. A read failure defers rather than burning the step.
     let lead;
     try {
       lead = await systemDb((tx) =>
@@ -298,33 +297,16 @@ export async function runFollowUps(now = new Date()): Promise<RunReport> {
       continue;
     }
 
-    if (!lead) {
-      await skip(send.id, "lead_gone");
-      continue;
+    const decision = decideSend(send, { template, lead, configured: !!creds });
+    if (!decision.send) {
+      if ("skip" in decision) await skip(send.id, decision.skip);
+      continue; // a `defer` leaves the row scheduled for the next pass
     }
-    // They paid — the account is live and lifecycle moves in-app.
-    if (lead.status !== "preview") {
-      await skip(send.id, "activated");
-      continue;
-    }
-    if (lead.emailOptOut) {
-      await skip(send.id, "unsubscribed");
-      continue;
-    }
-    // A Track A step for someone who has since reached a preview: they've
-    // already done what A was asking for, and Track B is now carrying them.
-    if (send.track === "A" && lead.previewReachedAt) {
-      await skip(send.id, "moved_to_B");
-      continue;
-    }
-    if (!lead.contactEmail?.trim()) {
-      await skip(send.id, "no_email");
-      continue;
-    }
-    if (!creds) {
-      // Not configured: leave it scheduled rather than burning the step.
-      continue;
-    }
+    // decideSend has already refused a missing template, a null lead, an empty
+    // address and an unconfigured provider. This restates that for the type
+    // checker rather than scattering non-null assertions down the send path.
+    if (!template || !lead || !creds) continue;
+    const to = lead.contactEmail!.trim();
 
     // Every marketing email needs a live unsubscribe link.
     let token = lead.unsubToken;
@@ -333,7 +315,7 @@ export async function runFollowUps(now = new Date()): Promise<RunReport> {
       try {
         await systemDb((tx) =>
           tx.restaurant.update({
-            where: { id: lead!.id },
+            where: { id: lead.id },
             data: { unsubToken: token },
             select: { id: true },
           }),
@@ -372,11 +354,11 @@ export async function runFollowUps(now = new Date()): Promise<RunReport> {
     const links = buildRecipientLinks(base, lead);
     const { text, html } = renderEmail(
       template.body,
-      { name: lead.name, email: lead.contactEmail, ...links },
+      { name: lead.name, email: to, ...links },
       `${base}/unsubscribe/${token}`,
     );
     const [outcome] = await sendBatch(creds, [
-      { to: lead.contactEmail, subject: template.subject, text, html },
+      { to, subject: template.subject, text, html },
     ]);
 
     if (outcome?.ok) {
