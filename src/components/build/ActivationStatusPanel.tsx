@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { pollActivation } from "@/server/build/status-action";
+import { trackPurchase } from "@/components/create/Pixel";
 import type { ActivationStatus } from "@/server/build/activation";
+
+const ACTIVATION_PESOS = 499;
 
 /**
  * "Processing — your login is on the way." Polls until the webhook has done the
@@ -19,6 +22,18 @@ export function ActivationStatusPanel({
   initial: ActivationStatus;
 }) {
   const [status, setStatus] = useState(initial);
+
+  // Tell the ad platform a restaurant actually PAID — the event Facebook should
+  // be optimizing toward, rather than the clicks it would otherwise chase. The
+  // ref keeps it to once per page even though this fires on every re-render
+  // that follows activation.
+  const reported = useRef(false);
+  useEffect(() => {
+    if (status.status === "activated" && !reported.current) {
+      reported.current = true;
+      trackPurchase(ACTIVATION_PESOS);
+    }
+  }, [status.status]);
 
   useEffect(() => {
     if (status.status === "activated") return;

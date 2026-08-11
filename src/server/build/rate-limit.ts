@@ -23,7 +23,8 @@ export type Bucket =
   | "build:write"
   | "build:upload"
   | "build:scan"
-  | "build:activate";
+  | "build:activate"
+  | "landing:event";
 
 /** Per-hour allowance for each bucket, per IP. */
 const LIMITS: Record<Bucket, number> = {
@@ -34,6 +35,10 @@ const LIMITS: Record<Bucket, number> = {
   // this is the one bucket where the limit is about spend, not just spam.
   "build:scan": 12,
   "build:activate": 10, // invoice attempts
+  // Landing beacons: generous, because one visitor legitimately fires several
+  // (a view plus a click, and they may come back). This is a graffiti guard on
+  // the founder's ad numbers, not a gate on anything that matters.
+  "landing:event": 200,
 };
 
 /** Hashed client IP, or "unknown" behind a proxy that strips everything. */

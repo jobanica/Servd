@@ -455,6 +455,14 @@ model Restaurant {
   previewReachedAt      DateTime? // first time they saw their own storefront
   activationRequestedAt DateTime? // tapped "Activate" (invoice created)
 
+  // Which ad brought them, captured at /create and stamped on at first save.
+  // Kept on the lead itself so an activation can be traced back to a creative —
+  // the only number that decides where the ad budget goes.
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmContent  String?
+
   // Language the base menu text was written in (the i18n fallback).
   defaultLocale String @default("en")
 
@@ -890,6 +898,28 @@ model RateLimit {
   @@unique([bucket, key, windowAt])
   @@index([windowAt])
   @@map("rate_limits")
+}
+
+/// Landing-page counters for the ad funnel: views and CTA clicks on /create,
+/// per Manila day and per UTM combination.
+///
+/// Aggregated rather than one row per hit — an ad campaign generates a lot of
+/// views, and none of them are individually interesting. The empty string, not
+/// NULL, marks a missing tag: Postgres treats NULLs as distinct in a unique
+/// index, which would silently split one campaign's counter into many rows.
+model LandingStat {
+  id       String @id @default(uuid())
+  day      String // "YYYY-MM-DD" in Manila
+  event    String // "view" | "cta"
+  source   String @default("")
+  medium   String @default("")
+  campaign String @default("")
+  content  String @default("")
+  count    Int    @default(0)
+
+  @@unique([day, event, source, medium, campaign, content])
+  @@index([day])
+  @@map("landing_stats")
 }
 
 // ----------------------------------------------------------------------------

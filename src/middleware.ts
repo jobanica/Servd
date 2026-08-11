@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { parseHost } from "@/lib/host";
+import { readUtmParams, encodeUtm, UTM_COOKIE, UTM_MAX_AGE } from "@/lib/utm";
 
 /**
  * Host-based multi-tenant routing.
@@ -34,6 +35,36 @@ function captureRef(req: NextRequest, res: NextResponse): NextResponse {
     }
   }
   return res;
+}
+
+/**
+ * Ad attribution: capture utm_* (or a bare fbclid) into a 90-day cookie the
+ * builder later stamps onto the lead. Done here rather than in a client
+ * component so it survives a visitor with JS still loading, and so the cookie
+ * is httpOnly — nothing on the page needs to read it back.
+ *
+ * Deliberately only writes when the URL actually carries tags: a plain reload
+ * of /create must not erase which ad brought them.
+ */
+function captureUtm(req: NextRequest, res: NextResponse): NextResponse {
+  const utm = readUtmParams(req.nextUrl.searchParams);
+  if (utm) {
+    const value = encodeUtm(utm);
+    if (value) {
+      res.cookies.set(UTM_COOKIE, value, {
+        maxAge: UTM_MAX_AGE,
+        path: "/",
+        httpOnly: true,
+        sameSite: "lax",
+      });
+    }
+  }
+  return res;
+}
+
+/** Both click-attribution captures, applied to whatever response we're sending. */
+function captureAttribution(req: NextRequest, res: NextResponse): NextResponse {
+  return captureUtm(req, captureRef(req, res));
 }
 
 type PendingCookie = { name: string; value: string; options?: Record<string, unknown> };
@@ -97,7 +128,7 @@ export async function middleware(req: NextRequest) {
   if (rootDomain && host === `tutorials.${rootDomain.toLowerCase()}`) {
     const rest = pathname === "/" ? "" : pathname;
     const url = new URL(`/tutorials${rest}${search}`, req.url);
-    return captureRef(req, NextResponse.rewrite(url));
+    return captureAttribution(req, NextResponse.rewrite(url));
   }
 
   const info = parseHost(host, rootDomain);
@@ -109,13 +140,13 @@ export async function middleware(req: NextRequest) {
     // Renew the session before rendering, so an expired access token is
     // refreshed instead of logging staff out mid-shift.
     const session = await refreshSession(req);
-    return withSession(captureRef(req, NextResponse.next({ request: req })), session);
+    return withSession(captureAttribution(req, NextResponse.next({ request: req })), session);
   }
 
   // Tenant host → rewrite to the internal sites segment.
   const rest = pathname === "/" ? "" : pathname;
   const url = new URL(`/sites/${host}${rest}${search}`, req.url);
-  return captureRef(req, NextResponse.rewrite(url));
+  return captureAttribution(req, NextResponse.rewrite(url));
 }
 
 export const config = {

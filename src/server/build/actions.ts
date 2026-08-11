@@ -15,6 +15,8 @@ import {
 } from "./session";
 import { getBuildState, type BuildState } from "./queries";
 import { enrolTrackA } from "@/server/email/followup";
+import { currentUtm } from "@/server/landing/stats";
+import { hasUtm } from "@/lib/utm";
 
 /**
  * Server actions behind the public DIY builder (/build). There is no session:
@@ -108,6 +110,18 @@ export async function saveBusiness(formData: FormData): Promise<BuildResult> {
   if (!limited.ok) return { ok: false, error: limited.error! };
 
   const token = newBuildToken();
+  // Which ad brought them. Captured into a cookie by the middleware at /create,
+  // stamped on here so the activation can be traced back to a creative.
+  const utm = await currentUtm();
+  const attribution = hasUtm(utm)
+    ? {
+        utmSource: utm.source || null,
+        utmMedium: utm.medium || null,
+        utmCampaign: utm.campaign || null,
+        utmContent: utm.content || null,
+      }
+    : {};
+
   let ctx: BuildContext;
   try {
     ctx = await systemDb(async (tx) => {
@@ -141,6 +155,23 @@ export async function saveBusiness(formData: FormData): Promise<BuildResult> {
     });
   } catch {
     return { ok: false, error: "Couldn't start your preview. Please try again." };
+  }
+
+  // Written separately from the create above, deliberately: if these columns
+  // haven't been migrated onto the live database yet, a failed metric must not
+  // cost someone the preview they were starting.
+  if (hasUtm(utm)) {
+    try {
+      await systemDb((tx) =>
+        tx.restaurant.update({
+          where: { id: ctx.restaurantId },
+          data: attribution,
+          select: { id: true },
+        }),
+      );
+    } catch {
+      /* columns not migrated yet */
+    }
   }
 
   if (hasLogo) {

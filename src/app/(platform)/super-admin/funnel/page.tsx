@@ -66,6 +66,52 @@ export default async function FunnelPage() {
         </div>
       </div>
 
+      {/* The ad report. Sorted by activations, because that's the only column
+          that decides whether a creative keeps its budget — a cheap click that
+          never becomes a restaurant is a cost, not a result. */}
+      {f.byUtm.length > 0 && (
+        <div className="overflow-x-auto rounded-tile border border-plum-ink/10 bg-white">
+          <div className="px-4 pt-4">
+            <h2 className="font-heading text-lg font-bold">By ad · last 14 days</h2>
+            <p className="text-sm text-plum-ink/50">
+              From the <span className="font-mono">/create</span> landing page through to a paid
+              activation. Tag your Facebook ad links with{" "}
+              <span className="font-mono text-xs">utm_source</span> /{" "}
+              <span className="font-mono text-xs">utm_campaign</span> /{" "}
+              <span className="font-mono text-xs">utm_content</span> to split them out here.
+            </p>
+          </div>
+          <table className="mt-3 w-full min-w-[640px] text-sm">
+            <thead className="bg-cream/60 text-left text-xs uppercase tracking-wide text-plum-ink/45">
+              <tr>
+                <th className="px-4 py-2">Ad</th>
+                <th className="px-4 py-2">Views</th>
+                <th className="px-4 py-2">CTA taps</th>
+                <th className="px-4 py-2">Started</th>
+                <th className="px-4 py-2">Preview</th>
+                <th className="px-4 py-2">Activated</th>
+                <th className="px-4 py-2">View → paid</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-plum-ink/5">
+              {f.byUtm.map((u) => (
+                <tr key={u.label}>
+                  <td className="px-4 py-2 font-semibold">{u.label}</td>
+                  <td className="px-4 py-2">{u.views}</td>
+                  <td className="px-4 py-2">{u.ctaClicks}</td>
+                  <td className="px-4 py-2">{u.started}</td>
+                  <td className="px-4 py-2">{u.reachedPreview}</td>
+                  <td className="px-4 py-2 font-semibold text-brand-primary">{u.activated}</td>
+                  <td className="px-4 py-2 text-xs text-plum-ink/50">
+                    {pct(u.activated, u.views)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {/* Per-day detail */}
       <div className="overflow-x-auto rounded-tile border border-plum-ink/10 bg-white">
         <table className="w-full min-w-[520px] text-sm">

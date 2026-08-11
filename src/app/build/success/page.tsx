@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getActivationStatus } from "@/server/build/activation";
 import { ActivationStatusPanel } from "@/components/build/ActivationStatusPanel";
+import { Pixel } from "@/components/create/Pixel";
 
 export const metadata = {
   title: "Activating your restaurant · Servd",
@@ -27,6 +28,9 @@ export default async function BuildSuccessPage({
 
   return (
     <main className="min-h-screen bg-cream px-4 py-16">
+      {/* Loaded here so the panel can report the Purchase — this is the page
+          that knows a payment actually landed. */}
+      <Pixel pixelId={process.env.NEXT_PUBLIC_META_PIXEL_ID ?? ""} />
       <ActivationStatusPanel requestId={r} initial={status} />
     </main>
   );

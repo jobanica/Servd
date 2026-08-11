@@ -267,3 +267,11 @@ alter table email_sends force row level security;
 drop policy if exists super_only on email_sends;
 create policy super_only on email_sends for all
   using (app.is_super_admin()) with check (app.is_super_admin());
+
+-- landing_stats: /create view + CTA-click counters for the ad funnel.
+-- Platform-level (the founder's ad numbers), super-admin only.
+alter table landing_stats enable row level security;
+alter table landing_stats force row level security;
+drop policy if exists super_only on landing_stats;
+create policy super_only on landing_stats for all
+  using (app.is_super_admin()) with check (app.is_super_admin());
