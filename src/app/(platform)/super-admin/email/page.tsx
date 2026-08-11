@@ -2,7 +2,12 @@ import { requireSuperAdminPage } from "@/server/tenancy/require-admin";
 import { countAllSegments } from "@/server/email/audience";
 import { listCampaigns } from "@/server/email/campaigns";
 import { getEmailStatus } from "@/server/email/provider";
-import { getAutomation, runAutomation, CATCH_UP_DAYS } from "@/server/email/automation";
+import {
+  getAutomation,
+  runAutomation,
+  CATCH_UP_DAYS,
+  MIN_HOURS_BEFORE_FIRST,
+} from "@/server/email/automation";
 import { SEGMENTS } from "@/lib/email/segments";
 import { EmailComposer } from "@/components/super-admin/EmailComposer";
 import { EmailSettingsForm } from "@/components/super-admin/EmailSettingsForm";
@@ -44,6 +49,7 @@ export default async function EmailMarketingPage() {
         steps={automation.steps}
         dueNow={dueNow}
         catchUpDays={CATCH_UP_DAYS}
+        minHours={MIN_HOURS_BEFORE_FIRST}
       />
 
       <EmailComposer counts={counts} configured={status.configured} />

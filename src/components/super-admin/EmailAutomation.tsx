@@ -26,11 +26,13 @@ export function EmailAutomation({
   steps,
   dueNow,
   catchUpDays,
+  minHours,
 }: {
   enabled: boolean;
   steps: AutomationStep[];
   dueNow: Record<number, number>;
   catchUpDays: number;
+  minHours: number;
 }) {
   const [runState, runAction] = useActionState<AutomationActionState, FormData>(
     runAutomationNow,
@@ -48,8 +50,9 @@ export function EmailAutomation({
         <div>
           <h2 className="font-heading text-lg font-bold">Automated follow-up</h2>
           <p className="text-sm text-plum-ink/50">
-            Counted from the day someone creates their preview. Stops by itself the moment they
-            activate.
+            Everyone who gives an email on the builder joins automatically. Counted from that
+            day, with nothing sent in the first {minHours} hours. Stops by itself the moment
+            they activate.
           </p>
         </div>
         <form action={setAutomationEnabled}>
@@ -67,8 +70,8 @@ export function EmailAutomation({
       {/* Steps */}
       {steps.length === 0 ? (
         <p className="mt-4 rounded-lg bg-cream/60 px-3 py-3 text-sm text-plum-ink/55">
-          No steps yet. Add the first one below — day 1 or 2 works well, while they still
-          remember building it.
+          No steps yet. Add the first one below — day 1 works well, while they still remember
+          building it. It lands a full day after they signed up, never sooner.
         </p>
       ) : (
         <ol className="mt-4 space-y-2">
@@ -144,7 +147,7 @@ export function EmailAutomation({
             <input
               name="dayOffset"
               type="number"
-              min={0}
+              min={1}
               max={365}
               defaultValue={1}
               className="w-16 rounded-lg border border-plum-ink/15 px-2 py-2 text-sm"
@@ -194,7 +197,7 @@ function StepEditor({ step, onDone }: { step: AutomationStep; onDone: () => void
           <input
             name="dayOffset"
             type="number"
-            min={0}
+            min={1}
             max={365}
             defaultValue={step.dayOffset}
             className="w-16 rounded-lg border border-plum-ink/15 px-2 py-2 text-sm"

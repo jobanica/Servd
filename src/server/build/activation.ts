@@ -8,6 +8,7 @@ import { XenditBillingProvider } from "@/server/billing/xendit";
 import { provisionFreePlan } from "@/server/billing/subscription";
 import { addonKeyFor } from "@/server/billing/owned-features";
 import { readBuildCookie } from "./session";
+import { sendActivationEmail } from "@/server/email/transactional";
 import { ACTIVATION_PRICE } from "./queries";
 
 /**
@@ -260,6 +261,11 @@ async function activateRequest(requestId: string): Promise<boolean> {
     }
     return false;
   }
+
+  // Their username + set-password link, by email. Best-effort and last: a mail
+  // failure must never undo an activation that already succeeded — the success
+  // page and super-admin both still show the link.
+  await sendActivationEmail(restaurant.id);
   return true;
 }
 

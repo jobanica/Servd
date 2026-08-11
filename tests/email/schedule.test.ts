@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { daysSince, isStepDue, dueRange, CATCH_UP_DAYS } from "@/lib/email/schedule";
+import {
+  daysSince,
+  isStepDue,
+  dueRange,
+  hasWaitedMinimum,
+  CATCH_UP_DAYS,
+  MIN_HOURS_BEFORE_FIRST,
+} from "@/lib/email/schedule";
 
 // 2026-08-11 12:00 Manila (= 04:00 UTC).
 const NOW = new Date("2026-08-11T04:00:00Z");
@@ -70,5 +77,29 @@ describe("dueRange", () => {
   it("spans exactly the catch-up window", () => {
     const { from, to } = dueRange(5, NOW);
     expect(Math.round((to.getTime() - from.getTime()) / 86_400_000)).toBe(CATCH_UP_DAYS);
+  });
+});
+
+describe("hasWaitedMinimum", () => {
+  it("waits a full day before anything is sendable", () => {
+    expect(MIN_HOURS_BEFORE_FIRST).toBe(24);
+    expect(hasWaitedMinimum(new Date(NOW.getTime() - 23 * 3_600_000), NOW)).toBe(false);
+    expect(hasWaitedMinimum(new Date(NOW.getTime() - 24 * 3_600_000), NOW)).toBe(true);
+  });
+
+  // The case the floor exists for: calendar-day maths alone would call an
+  // 11:50 PM signup "1 day old" ten minutes later, and fire step one at once.
+  it("blocks a late-night signup that a calendar day would already call due", () => {
+    const tenMinutesBeforeMidnightManila = new Date("2026-08-10T15:50:00Z"); // 23:50 +08
+    const justAfterMidnight = new Date("2026-08-10T16:10:00Z"); // 00:10 +08 next day
+
+    expect(isStepDue(1, tenMinutesBeforeMidnightManila, justAfterMidnight)).toBe(true);
+    expect(hasWaitedMinimum(tenMinutesBeforeMidnightManila, justAfterMidnight)).toBe(false);
+  });
+
+  it("lets that same signup through once a real day has passed", () => {
+    const signup = new Date("2026-08-10T15:50:00Z");
+    const nextEvening = new Date("2026-08-11T16:10:00Z"); // ~24.3 hours later
+    expect(hasWaitedMinimum(signup, nextEvening)).toBe(true);
   });
 });

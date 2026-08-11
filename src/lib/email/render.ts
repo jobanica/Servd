@@ -143,3 +143,30 @@ export function buildRecipientLinks(base: string, r: LinkSource): RecipientLinks
   // Archived preview (media dropped, token cleared) — send them to rebuild.
   return { activateUrl: `${root}/build`, previewUrl: `${root}/build` };
 }
+
+/**
+ * An ACCOUNT email — activation confirmations, credentials, password notices.
+ *
+ * Deliberately a separate function from renderEmail rather than a flag on it:
+ * marketing mail must always carry an unsubscribe link, and the way to keep
+ * that guarantee absolute is to give it no bypass. These are transactional —
+ * someone who unsubscribed from marketing still needs to be told how to get
+ * into the account they just paid for.
+ */
+export function renderAccountEmail(paragraphs: string[]): RenderedEmail {
+  const text = paragraphs.join("\n\n");
+  const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;color:#2b2130;max-width:560px;margin:0 auto;padding:24px">
+${paragraphs
+    .map(
+      (p) =>
+        `<p style="margin:0 0 16px;line-height:1.6">${linkifyEscaped(escapeHtml(p)).replace(/\n/g, "<br>")}</p>`,
+    )
+    .join("")}
+</div>`;
+  return { text, html };
+}
+
+/** A standalone call-to-action button for an account email. */
+export function accountButton(label: string, url: string): string {
+  return `<p style="margin:0 0 16px;text-align:center"><a href="${escapeHtml(url)}" style="display:inline-block;background:#e8622c;color:#ffffff;font-weight:700;font-size:16px;text-decoration:none;padding:14px 28px;border-radius:999px">${escapeHtml(label)}</a></p>`;
+}

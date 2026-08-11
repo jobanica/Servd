@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { sendPasswordSetEmail } from "@/server/email/transactional";
 
 /**
  * One-time claim link handed to an owner after their DIY activation is paid.
@@ -104,6 +105,10 @@ export async function submitClaim(_prev: ClaimState, formData: FormData): Promis
       await tx.staffUser.update({ where: { id: owner.id }, data: { email }, select: { id: true } });
     }
   });
+
+  // A record of the username they'll sign in with. Best-effort — the password
+  // is already saved, so a mail failure changes nothing for them.
+  await sendPasswordSetEmail(target.id);
 
   return { ok: true, username: owner.username ?? "" };
 }

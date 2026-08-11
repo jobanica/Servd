@@ -17,6 +17,22 @@ import { manilaStartOfDay } from "@/lib/time/manila";
 export const CATCH_UP_DAYS = 3;
 
 /**
+ * No automated email goes out until a full day has really passed since they
+ * gave us their address.
+ *
+ * Day offsets are calendar days, so without this floor a lead who signed up at
+ * 11:50 PM would be "1 day old" ten minutes later and get their first follow-up
+ * almost immediately. The sequence starts after 24 real hours, always.
+ */
+export const MIN_HOURS_BEFORE_FIRST = 24;
+
+/** Have a full 24 hours actually elapsed since they subscribed? */
+export function hasWaitedMinimum(subscribedAt: Date | string, now: Date = new Date()): boolean {
+  const elapsed = now.getTime() - new Date(subscribedAt).getTime();
+  return elapsed >= MIN_HOURS_BEFORE_FIRST * 3_600_000;
+}
+
+/**
  * Whole days elapsed in Manila between two instants. Calendar days, not 24-hour
  * blocks: a preview created at 11 PM Monday is "1 day old" on Tuesday, which is
  * what "day 1" means to the person reading the schedule.

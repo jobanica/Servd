@@ -3,7 +3,7 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { renderEmail, buildRecipientLinks } from "@/lib/email/render";
-import { dueRange, CATCH_UP_DAYS } from "@/lib/email/schedule";
+import { dueRange, hasWaitedMinimum, CATCH_UP_DAYS, MIN_HOURS_BEFORE_FIRST } from "@/lib/email/schedule";
 import { getEmailCreds, sendBatch, type OutgoingEmail } from "./provider";
 
 /**
@@ -20,6 +20,10 @@ import { getEmailCreds, sendBatch, type OutgoingEmail } from "./provider";
  *  3. A step is due for a few days, not forever (see CATCH_UP_DAYS), so a
  *     missed cron run catches up but a newly-added step doesn't retro-blast
  *     every lead who's already past that day.
+ *
+ * Everyone who gives an email on the builder is subscribed automatically, and
+ * the first step can't land until a full 24 hours have really passed — see
+ * MIN_HOURS_BEFORE_FIRST.
  */
 
 export interface AutomationStep {
@@ -141,6 +145,7 @@ export async function runAutomation(
       buildToken: string | null;
       contactEmail: string | null;
       unsubToken: string | null;
+      previewCreatedAt: Date | null;
     }[];
     try {
       // Exclude prior recipients IN THE QUERY, not after it — filtering a
@@ -173,9 +178,14 @@ export async function runAutomation(
             buildToken: true,
             contactEmail: true,
             unsubToken: true,
+            previewCreatedAt: true,
           },
         }),
       );
+      // Calendar-day offsets alone would let an 11:50 PM signup receive their
+      // first follow-up ten minutes later. The sequence starts after a full
+      // day, measured in real hours.
+      leads = leads.filter((l) => l.previewCreatedAt && hasWaitedMinimum(l.previewCreatedAt, now));
     } catch {
       continue;
     }
@@ -281,4 +291,4 @@ export async function runAutomation(
   return report;
 }
 
-export { CATCH_UP_DAYS };
+export { CATCH_UP_DAYS, MIN_HOURS_BEFORE_FIRST };
