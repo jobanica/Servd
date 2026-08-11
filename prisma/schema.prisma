@@ -474,6 +474,7 @@ model Restaurant {
   addonPurchases  AddonPurchase[]
   payrollDeductions PayrollDeduction[]
   socialPosts     SocialPost[]
+  featureSubs     FeatureSubscription[]
   suppliers       Supplier[]
   inventoryItems  InventoryItem[]
   purchaseOrders  PurchaseOrder[]
@@ -675,6 +676,28 @@ model RestaurantInvoice {
 
   @@index([restaurantId])
   @@map("restaurant_invoices")
+}
+
+/// A per-feature MONTHLY subscription (e.g. the content scheduler at ₱499/mo).
+/// Separate from the plan and from one-time AddonPurchases: access is granted
+/// only while `status` is active and `currentPeriodEnd` is still in the future,
+/// so a trial never unlocks it and the first month must be paid up front.
+model FeatureSubscription {
+  id               String    @id @default(uuid())
+  restaurantId     String
+  feature          String // gateable feature key, e.g. "contentScheduler"
+  status           String    @default("pending") // pending | active | past_due | cancelled
+  priceMonthly     Int // centavos, snapshotted at purchase
+  currentPeriodEnd DateTime?
+  providerRef      String?   @unique // latest gateway checkout/invoice id
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, feature])
+  @@index([status, currentPeriodEnd])
+  @@map("feature_subscriptions")
 }
 
 /// A social post composed in the app and published/scheduled through

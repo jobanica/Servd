@@ -11,6 +11,7 @@ import {
   type Feature,
 } from "@/lib/billing/features";
 import { listOwnedFeatures } from "@/server/billing/owned-features";
+import { listActiveMonthlyFeatures, isMonthlyFeature } from "@/server/billing/feature-subscriptions";
 
 /**
  * Plan-based feature gating. Entitlements are resolved LIVE from the features
@@ -105,12 +106,17 @@ export async function hasFeature(restaurantId: string, feature: Feature): Promis
  * features are permanent — they survive a plan change or downgrade.
  */
 export async function getEntitledFeatures(restaurantId: string): Promise<Set<Feature>> {
-  const [{ features }, owned] = await Promise.all([
+  const [{ features }, owned, monthly] = await Promise.all([
     getPlanAccess(restaurantId),
     listOwnedFeatures(restaurantId),
+    listActiveMonthlyFeatures(restaurantId),
   ]);
   const all = new Set(features);
   for (const f of owned) all.add(f);
+  // Features billed as their own monthly subscription are NEVER granted by a
+  // plan or by the trial's blanket unlock — only by a paid, live subscription.
+  for (const f of all) if (isMonthlyFeature(f)) all.delete(f);
+  for (const f of monthly) all.add(f);
   return all;
 }
 

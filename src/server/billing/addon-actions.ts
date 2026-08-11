@@ -9,6 +9,12 @@ import { addonKeyFor, listOwnedFeatures } from "@/server/billing/owned-features"
 import { getFeaturePrices } from "@/server/billing/feature-pricing";
 import { getPlanAccess } from "@/server/billing/feature-gate";
 import { getCustomDomainAccess } from "@/server/billing/addons";
+import {
+  MONTHLY_FEATURES,
+  isMonthlyFeature,
+  getFeatureSubscription,
+  activateFeatureSubByProviderRef,
+} from "@/server/billing/feature-subscriptions";
 
 export type UnlockResult = { checkoutUrl: string } | { error: string };
 export type VerifyResult = { unlocked: true } | { unlocked: false; message: string };
@@ -172,4 +178,118 @@ export async function verifyCustomDomainUnlock(): Promise<VerifyResult> {
   const res = await verifyFeatureUnlock("customDomain");
   if (res.unlocked) revalidatePath("/admin/domains");
   return res;
+}
+
+// ---------------------------------------------------------------------------
+// Monthly per-feature subscriptions (e.g. the ₱499/mo content scheduler)
+// ---------------------------------------------------------------------------
+
+/**
+ * Start checkout for the FIRST month of a monthly feature. Access is granted by
+ * the signature-verified webhook, never here — so nothing unlocks until the
+ * money actually lands.
+ */
+export async function startFeatureSubscription(featureKey: string): Promise<UnlockResult> {
+  const { restaurantId } = await requireAdminAction();
+  if (!isFeature(featureKey) || !isMonthlyFeature(featureKey)) return { error: "Unknown feature." };
+  const meta = MONTHLY_FEATURES[featureKey];
+
+  const current = await getFeatureSubscription(restaurantId, featureKey);
+  if (current.active) return { error: "This is already active on your account." };
+
+  const provider = await getBillingProvider();
+  if (!provider) return { error: "Payments aren't configured on the platform yet." };
+
+  let subId: string;
+  try {
+    subId = await tenantDb(restaurantId, async (tx) => {
+      const row = await tx.featureSubscription.upsert({
+        where: { restaurantId_feature: { restaurantId, feature: featureKey } },
+        create: {
+          restaurantId,
+          feature: featureKey,
+          status: "pending",
+          priceMonthly: meta.priceMonthly,
+        },
+        update: { priceMonthly: meta.priceMonthly },
+        select: { id: true },
+      });
+      return row.id;
+    });
+  } catch {
+    return { error: "Couldn't start the purchase. Please try again." };
+  }
+
+  const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  let checkout;
+  try {
+    checkout = await provider.createInvoiceCheckout({
+      amount: meta.priceMonthly,
+      description: `Servd ${meta.label} — 1 month`,
+      referenceNumber: `sub-${subId.slice(0, 12)}`,
+      successUrl: `${base}/admin/content?subscribed=1`,
+    });
+  } catch {
+    return { error: "Couldn't start checkout. Please try again." };
+  }
+
+  try {
+    await tenantDb(restaurantId, (tx) =>
+      tx.featureSubscription.update({
+        where: { id: subId },
+        data: { providerRef: checkout.gatewayRef },
+      }),
+    );
+  } catch {
+    return { error: "Couldn't start checkout. Please try again." };
+  }
+  return { checkoutUrl: checkout.checkoutUrl };
+}
+
+/** "I've already paid" fallback for a monthly feature, when a webhook is missed. */
+export async function verifyFeatureSubscription(featureKey: string): Promise<VerifyResult> {
+  const { restaurantId } = await requireAdminAction();
+  if (!isFeature(featureKey) || !isMonthlyFeature(featureKey)) {
+    return { unlocked: false, message: "Unknown feature." };
+  }
+  const current = await getFeatureSubscription(restaurantId, featureKey);
+  if (current.active) return { unlocked: true };
+
+  let ref: string | null = null;
+  try {
+    const row = await tenantDb(restaurantId, (tx) =>
+      tx.featureSubscription.findFirst({
+        where: { restaurantId, feature: featureKey },
+        select: { providerRef: true },
+      }),
+    );
+    ref = row?.providerRef ?? null;
+  } catch {
+    return { unlocked: false, message: "Couldn't check right now. Please try again." };
+  }
+  if (!ref) return { unlocked: false, message: "We couldn't find a payment to check." };
+
+  const provider = await getBillingProvider();
+  if (!provider?.getCheckoutStatus) {
+    return { unlocked: false, message: "We couldn't verify automatically. Please contact support." };
+  }
+  let status: "paid" | "pending" | "failed";
+  try {
+    status = await provider.getCheckoutStatus(ref);
+  } catch {
+    return { unlocked: false, message: "Couldn't reach the payment provider. Please try again shortly." };
+  }
+  if (status !== "paid") {
+    return {
+      unlocked: false,
+      message:
+        status === "failed"
+          ? "That payment didn't go through. Please try again."
+          : "We can't see your payment yet. If you've just paid, wait a moment and check again.",
+    };
+  }
+
+  await activateFeatureSubByProviderRef(ref);
+  revalidatePath("/admin/content");
+  return { unlocked: true };
 }

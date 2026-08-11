@@ -99,7 +99,8 @@ export const FEATURE_TIERS: Record<Feature, Tier[]> = {
   inventory: ["Business"],
   hr: ["Business"],
   whiteLabel: ["Business"],
-  contentScheduler: ["Growth", "Business"],
+  // Sold separately as a monthly subscription — no plan includes it.
+  contentScheduler: [],
 };
 
 /** Map a plan name to a known tier, if it is one. */

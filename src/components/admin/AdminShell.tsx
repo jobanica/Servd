@@ -47,7 +47,8 @@ const ITEM_FEATURE: Record<string, string> = {
   "/admin/loyalty": "loyalty",
   "/admin/customers": "customers",
   "/admin/sms": "sms",
-  "/admin/content": "contentScheduler",
+  // NOT gated here: a locked account must be able to open the page to
+  // subscribe (₱499/mo). The page itself shows the lock.
   "/admin/inventory": "inventory",
   "/admin/hr": "hr",
   "/admin/storefront": "onlineOrdering",

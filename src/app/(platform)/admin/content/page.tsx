@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
-import { requireFeaturePage } from "@/server/billing/feature-gate";
+import { hasFeature } from "@/server/billing/feature-gate";
+import { getFeatureSubscription } from "@/server/billing/feature-subscriptions";
+import { SubscribeScheduler } from "@/components/admin/social/SubscribeScheduler";
+import { formatPeso } from "@/lib/money";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { getConnectedPlatforms, deleteSocialPost } from "@/server/social/actions";
 import { ComposePost } from "@/components/admin/social/ComposePost";
 import { platformLabels } from "@/lib/social/platforms";
-import { manilaDateTime } from "@/lib/time/manila";
+import { manilaDateTime, manilaDate } from "@/lib/time/manila";
 
 export const dynamic = "force-dynamic";
 
@@ -18,12 +21,26 @@ const STATUS_STYLE: Record<string, string> = {
 export default async function ContentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ connected?: string }>;
+  searchParams: Promise<{ connected?: string; subscribed?: string }>;
 }) {
   const { restaurantId } = await requireAdminPage();
-  await requireFeaturePage(restaurantId, "contentScheduler");
   const { connected: justConnected } = await searchParams;
 
+  // Locked until the monthly subscription is paid — a trial doesn't open it.
+  if (!(await hasFeature(restaurantId, "contentScheduler"))) {
+    const sub = await getFeatureSubscription(restaurantId, "contentScheduler");
+    return (
+      <div className="max-w-2xl space-y-5">
+        <div>
+          <Link href="/admin" className="text-sm text-plum-ink/50">← Dashboard</Link>
+          <h1 className="font-heading text-2xl font-bold">Content scheduler</h1>
+        </div>
+        <SubscribeScheduler price={formatPeso(sub.priceMonthly)} pending={sub.pending} />
+      </div>
+    );
+  }
+
+  const sub = await getFeatureSubscription(restaurantId, "contentScheduler");
   const [posts, connected] = await Promise.all([
     tenantDb(restaurantId, (tx) =>
       tx.socialPost.findMany({ orderBy: { createdAt: "desc" }, take: 50 }),
@@ -42,6 +59,11 @@ export default async function ContentPage({
         <p className="text-sm text-plum-ink/50">
           Write once and post to your social accounts — now, or scheduled for later.
         </p>
+        {sub.currentPeriodEnd && (
+          <p className="text-xs text-plum-ink/45">
+            {formatPeso(sub.priceMonthly)}/month · paid through {manilaDate(sub.currentPeriodEnd)}
+          </p>
+        )}
       </div>
 
       {justConnected && (
