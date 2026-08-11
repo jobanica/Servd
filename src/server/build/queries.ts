@@ -1,6 +1,7 @@
 import "server-only";
 
 import { systemDb } from "@/server/tenancy/scoped-db";
+import { moveToTrackB } from "@/server/email/followup";
 
 /** Minimum items before the preview is worth showing (§ "the aha must be fast"). */
 export const MIN_PREVIEW_ITEMS = 3;
@@ -120,12 +121,15 @@ export async function getPreviewRestaurant(slug: string) {
  */
 export async function stampPreviewReached(restaurantId: string): Promise<void> {
   try {
-    await systemDb((tx) =>
+    const res = await systemDb((tx) =>
       tx.restaurant.updateMany({
         where: { id: restaurantId, previewReachedAt: null },
         data: { previewReachedAt: new Date() },
       }),
     );
+    // Only on the FIRST view: they've done what Track A was asking for, so it
+    // stops and Track B ("activate") takes over. Re-visits change nothing.
+    if (res.count > 0) await moveToTrackB(restaurantId);
   } catch {
     /* column not migrated yet — the preview still works */
   }

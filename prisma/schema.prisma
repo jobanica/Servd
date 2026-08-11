@@ -125,7 +125,7 @@ model PlatformSetting {
   featurePrices     Json? // one-time unlock price + sellable flag per gateable feature
   uploadPostKeyEnc  String? // encrypted Upload-Post API key (social scheduling)
   emailCredsEnc     String? // encrypted JSON { apiKey, fromName, fromEmail, replyTo } for marketing email
-  emailAutomationOn Boolean  @default(false) // master switch for the follow-up drip
+  emailAutomationOn Boolean  @default(false) // master switch for the acquisition follow-up tracks
   updatedAt         DateTime @updatedAt
 
   @@map("platform_settings")
@@ -493,6 +493,7 @@ model Restaurant {
   invoices           RestaurantInvoice[]
   addonPurchases     AddonPurchase[]
   activationRequests ActivationRequest[]
+  emailSends         EmailSend[]
   payrollDeductions  PayrollDeduction[]
   socialPosts        SocialPost[]
   featureSubs        FeatureSubscription[]
@@ -834,41 +835,47 @@ model EmailMessage {
   @@map("email_messages")
 }
 
-/// One step in the automated follow-up sequence, fired N days after someone
-/// creates a preview. The sequence stops on its own when they activate — the
-/// runner only ever looks at restaurants that are still unpaid previews.
-model EmailAutomationStep {
+/// Editable copy for one step of an acquisition track. The SEQUENCE (which
+/// steps exist and when they land) is fixed in lib/email/tracks.ts; only the
+/// words and the on/off switch live here, so a founder can rewrite a subject
+/// line without being able to accidentally reshape the funnel.
+model EmailTemplate {
   id        String   @id @default(uuid())
-  dayOffset Int // days after previewCreatedAt (0 = same day)
+  stepKey   String   @unique // "A_immediate", "B_day3", …
   subject   String
-  body      String // same merge tags as a campaign
+  body      String
   enabled   Boolean  @default(true)
-  createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  sends EmailAutomationSend[]
-
-  @@index([enabled, dayOffset])
-  @@map("email_automation_steps")
+  @@map("email_templates")
 }
 
-/// Proof that one lead already received one step. The unique pair is the
-/// no-double-send guarantee: the runner can be re-run, or run twice
-/// concurrently, without anyone getting the same follow-up twice.
-model EmailAutomationSend {
-  id           String   @id @default(uuid())
-  stepId       String
+/// One scheduled email to one lead. Rows are written the moment someone enters
+/// a track, so the whole sequence is visible before any of it goes out — and
+/// the unique pair means a step can never be scheduled, or sent, twice.
+model EmailSend {
+  id           String    @id @default(uuid())
   restaurantId String
-  email        String
-  status       String   @default("sent") // sent | failed
+  track        String // "A" | "B"
+  stepKey      String
+  sendAt       DateTime
+  /// Stamped when a run CLAIMS the row, then again on success — so while the
+  /// status is `sending` this doubles as "when did a pass take this", which is
+  /// how a crashed run's rows get recovered.
+  sentAt       DateTime?
+  /// scheduled → sending → sent, or back to scheduled on a retryable failure.
+  status       String    @default("scheduled") // scheduled | sending | sent | skipped | failed
+  skipReason   String? // activated | unsubscribed | moved_to_B | disabled | …
+  attempts     Int       @default(0)
   error        String?
-  sentAt       DateTime @default(now())
+  createdAt    DateTime  @default(now())
 
-  step EmailAutomationStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
-  @@unique([stepId, restaurantId])
+  @@unique([restaurantId, stepKey])
+  @@index([status, sendAt])
   @@index([restaurantId])
-  @@map("email_automation_sends")
+  @@map("email_sends")
 }
 
 /// Fixed-window counter for unauthenticated endpoints (the public builder).

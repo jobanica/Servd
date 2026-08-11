@@ -9,6 +9,7 @@ import { provisionFreePlan } from "@/server/billing/subscription";
 import { addonKeyFor } from "@/server/billing/owned-features";
 import { readBuildCookie } from "./session";
 import { sendActivationEmail } from "@/server/email/transactional";
+import { suppressOnActivation } from "@/server/email/followup";
 import { ACTIVATION_PRICE } from "./queries";
 
 /**
@@ -261,6 +262,10 @@ async function activateRequest(requestId: string): Promise<boolean> {
     }
     return false;
   }
+
+  // THE suppression hook. They paid — every unsent acquisition email is
+  // cancelled for good. From here the relationship is in-app, not in the inbox.
+  await suppressOnActivation(restaurant.id);
 
   // Their username + set-password link, by email. Best-effort and last: a mail
   // failure must never undo an activation that already succeeded — the success

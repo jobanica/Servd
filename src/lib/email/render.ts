@@ -11,6 +11,8 @@ export interface MergeFields {
   activateUrl: string;
   /** Their storefront: the preview while unpaid, the live site once active. */
   previewUrl: string;
+  /** Back into the builder to finish — the Track A call to action. */
+  buildUrl: string;
 }
 
 /** The big call-to-action. Rendered as a button in HTML, a URL in plain text. */
@@ -27,6 +29,7 @@ export function applyMergeTags(body: string, fields: MergeFields): string {
     if (key === "email") return fields.email;
     if (key === "activate") return fields.activateUrl;
     if (key === "preview") return fields.previewUrl;
+    if (key === "build") return fields.buildUrl;
     return whole;
   });
 }
@@ -116,6 +119,7 @@ export interface LinkSource {
 export interface RecipientLinks {
   activateUrl: string;
   previewUrl: string;
+  buildUrl: string;
 }
 
 /**
@@ -135,13 +139,18 @@ export function buildRecipientLinks(base: string, r: LinkSource): RecipientLinks
     return {
       activateUrl: `${root}/build/${r.buildToken}?go=activate`,
       previewUrl: `${root}/preview/${r.slug}`,
+      buildUrl: `${root}/build/${r.buildToken}`,
     };
   }
   if (r.status === "active") {
-    return { activateUrl: `${root}/login`, previewUrl: `${root}/r/${r.slug}` };
+    return {
+      activateUrl: `${root}/login`,
+      previewUrl: `${root}/r/${r.slug}`,
+      buildUrl: `${root}/login`,
+    };
   }
   // Archived preview (media dropped, token cleared) — send them to rebuild.
-  return { activateUrl: `${root}/build`, previewUrl: `${root}/build` };
+  return { activateUrl: `${root}/build`, previewUrl: `${root}/build`, buildUrl: `${root}/build` };
 }
 
 /**

@@ -2,16 +2,18 @@ import { requireSuperAdminPage } from "@/server/tenancy/require-admin";
 import { countAllSegments } from "@/server/email/audience";
 import { listCampaigns } from "@/server/email/campaigns";
 import { getEmailStatus } from "@/server/email/provider";
-import {
-  getAutomation,
-  runAutomation,
-  CATCH_UP_DAYS,
-  MIN_HOURS_BEFORE_FIRST,
-} from "@/server/email/automation";
+import { getTemplates } from "@/server/email/followup";
+import { getFollowUpStats } from "@/server/email/followup-stats";
+import { systemDb } from "@/server/tenancy/scoped-db";
+import { ALL_STEPS, timingLabel } from "@/lib/email/tracks";
 import { SEGMENTS } from "@/lib/email/segments";
+import { manilaDateTime } from "@/lib/time/manila";
 import { EmailComposer } from "@/components/super-admin/EmailComposer";
 import { EmailSettingsForm } from "@/components/super-admin/EmailSettingsForm";
-import { EmailAutomation } from "@/components/super-admin/EmailAutomation";
+import {
+  EmailFollowUp,
+  type FollowUpStepView,
+} from "@/components/super-admin/EmailFollowUp";
 
 export const dynamic = "force-dynamic";
 
@@ -24,16 +26,40 @@ const SEGMENT_LABEL = new Map(SEGMENTS.map((s) => [s.key, s.label]));
  */
 export default async function EmailMarketingPage() {
   await requireSuperAdminPage();
-  const [counts, campaigns, status, automation, preview] = await Promise.all([
+
+  const [counts, campaigns, status, templates, stats, setting] = await Promise.all([
     countAllSegments(),
     listCampaigns(),
     getEmailStatus(),
-    getAutomation(),
-    // Dry run: how many each step would reach right now, without sending.
-    runAutomation({ dryRun: true }),
+    getTemplates(),
+    getFollowUpStats(),
+    systemDb((tx) =>
+      tx.platformSetting.findUnique({
+        where: { id: "platform" },
+        select: { emailAutomationOn: true },
+      }),
+    ).catch(() => null),
   ]);
-  const dueNow: Record<number, number> = {};
-  for (const s of preview.steps) dueNow[s.dayOffset] = s.due;
+
+  const steps: FollowUpStepView[] = ALL_STEPS.map((def) => {
+    const t = templates.get(def.key);
+    const s = stats.steps[def.key];
+    return {
+      key: def.key,
+      track: def.track,
+      timing: timingLabel(def.timing),
+      goal: def.goal,
+      subject: t?.subject ?? def.key,
+      body: t?.body ?? "",
+      enabled: t?.enabled ?? true,
+      sent: s?.sent ?? 0,
+      scheduled: s?.scheduled ?? 0,
+      skipped: s?.skipped ?? 0,
+      failed: s?.failed ?? 0,
+      influenced: s?.influenced ?? 0,
+      credited: s?.credited ?? 0,
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -44,12 +70,11 @@ export default async function EmailMarketingPage() {
         </p>
       </div>
 
-      <EmailAutomation
-        enabled={automation.enabled}
-        steps={automation.steps}
-        dueNow={dueNow}
-        catchUpDays={CATCH_UP_DAYS}
-        minHours={MIN_HOURS_BEFORE_FIRST}
+      <EmailFollowUp
+        enabled={!!setting?.emailAutomationOn}
+        steps={steps}
+        totals={stats.totals}
+        unavailable={stats.unavailable}
       />
 
       <EmailComposer counts={counts} configured={status.configured} />
@@ -80,7 +105,7 @@ export default async function EmailMarketingPage() {
                     {c.failed}
                   </td>
                   <td className="px-4 py-2 text-xs text-plum-ink/50">
-                    {c.sentAt ? new Date(c.sentAt).toLocaleString("en-PH", { timeZone: "Asia/Manila" }) : "—"}
+                    {c.sentAt ? manilaDateTime(c.sentAt) : "—"}
                   </td>
                 </tr>
               ))}

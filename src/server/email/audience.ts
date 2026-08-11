@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { SEGMENTS, isSegment, type SegmentKey } from "@/lib/email/segments";
+import { suppressOnUnsubscribe } from "./followup";
 
 /**
  * Who a campaign goes to. Segments mirror the DIY funnel, because that's what
@@ -152,6 +153,9 @@ export async function unsubscribeByToken(token: string): Promise<{ name: string 
     await systemDb((tx) =>
       tx.restaurant.update({ where: { id: r.id }, data: { emailOptOut: true }, select: { id: true } }),
     );
+    // Flag alone isn't enough — cancel what's already queued for them, so an
+    // unsubscribe takes effect now rather than at the next scheduler pass.
+    await suppressOnUnsubscribe(r.id);
     return { name: r.name };
   } catch {
     return null;

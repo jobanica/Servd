@@ -14,6 +14,7 @@ import {
   type BuildContext,
 } from "./session";
 import { getBuildState, type BuildState } from "./queries";
+import { enrolTrackA } from "@/server/email/followup";
 
 /**
  * Server actions behind the public DIY builder (/build). There is no session:
@@ -154,6 +155,10 @@ export async function saveBusiness(formData: FormData): Promise<BuildResult> {
   }
 
   await setBuildCookie(token);
+  // Auto-subscribe to the acquisition follow-up. They gave us an address so we
+  // could save their work — this is how we do that. Best-effort: scheduling
+  // must never cost someone the build they just started.
+  await enrolTrackA(ctx.restaurantId);
   return stateOf(ctx);
 }
 

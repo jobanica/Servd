@@ -15,8 +15,8 @@
       "schedule": "30 3 * * *"
     },
     {
-      "path": "/api/cron/email-automation",
-      "schedule": "0 1 * * *"
+      "path": "/api/cron/email-followup",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

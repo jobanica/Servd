@@ -17,6 +17,7 @@ const fields: MergeFields = {
   email: "a@b.co",
   activateUrl: `${BASE}/build/tok123?go=activate`,
   previewUrl: `${BASE}/preview/brew-mate`,
+  buildUrl: `${BASE}/build/tok123`,
 };
 
 describe("applyMergeTags", () => {
@@ -27,8 +28,8 @@ describe("applyMergeTags", () => {
   });
 
   it("fills the per-recipient links", () => {
-    expect(applyMergeTags("Go: {{activate}} · See: {{preview}}", fields)).toBe(
-      `Go: ${fields.activateUrl} · See: ${fields.previewUrl}`,
+    expect(applyMergeTags("Go: {{activate}} · See: {{preview}} · Back: {{build}}", fields)).toBe(
+      `Go: ${fields.activateUrl} · See: ${fields.previewUrl} · Back: ${fields.buildUrl}`,
     );
   });
 
@@ -150,6 +151,8 @@ describe("buildRecipientLinks", () => {
     });
     expect(links.activateUrl).toBe(`${BASE}/build/tok123?go=activate`);
     expect(links.previewUrl).toBe(`${BASE}/preview/brew-mate`);
+    // Track A's call to action: back into the wizard, not to the payment step.
+    expect(links.buildUrl).toBe(`${BASE}/build/tok123`);
   });
 
   it("sends a paying customer to login and their live site, not to activation", () => {

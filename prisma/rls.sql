@@ -254,16 +254,16 @@ drop policy if exists super_only on email_messages;
 create policy super_only on email_messages for all
   using (app.is_super_admin()) with check (app.is_super_admin());
 
--- email_automation_steps / _sends: the follow-up drip for the founder's own
--- leads. Platform-level, super-admin only.
-alter table email_automation_steps enable row level security;
-alter table email_automation_steps force row level security;
-drop policy if exists super_only on email_automation_steps;
-create policy super_only on email_automation_steps for all
+-- email_templates / email_sends: the acquisition follow-up tracks for the
+-- founder's own leads. Platform-level, super-admin only.
+alter table email_templates enable row level security;
+alter table email_templates force row level security;
+drop policy if exists super_only on email_templates;
+create policy super_only on email_templates for all
   using (app.is_super_admin()) with check (app.is_super_admin());
 
-alter table email_automation_sends enable row level security;
-alter table email_automation_sends force row level security;
-drop policy if exists super_only on email_automation_sends;
-create policy super_only on email_automation_sends for all
+alter table email_sends enable row level security;
+alter table email_sends force row level security;
+drop policy if exists super_only on email_sends;
+create policy super_only on email_sends for all
   using (app.is_super_admin()) with check (app.is_super_admin());
