@@ -4,6 +4,7 @@ import { effectivePrice } from "@/lib/pricing/happy-hour";
 import { getActiveHappyHours } from "@/server/pricing/happy-hour";
 import { getServingStates } from "@/server/menu/servings";
 import { getVariantsMap } from "@/server/menu/variants";
+import { getUnavailableModifierIds } from "@/server/menu/modifier-availability";
 
 /**
  * Loads a restaurant's full menu for the diner page, by restaurantId. Returns
@@ -30,7 +31,18 @@ export async function getPublicMenu(
             modifierGroups: {
               orderBy: { sortOrder: "asc" },
               include: {
-                group: { include: { modifiers: { orderBy: { sortOrder: "asc" } } } },
+                group: {
+                  // Explicit columns: `isAvailable` on a modifier arrives in a
+                  // manual migration, and a wide include would break the whole
+                  // menu on a database that hasn't run it yet. It's layered on
+                  // below from a best-effort query instead.
+                  include: {
+                    modifiers: {
+                      orderBy: { sortOrder: "asc" },
+                      select: { id: true, name: true, priceDelta: true },
+                    },
+                  },
+                },
               },
             },
           },
@@ -47,6 +59,9 @@ export async function getPublicMenu(
   const servings = await getServingStates(restaurantId, itemIds);
   // Sizes/variants per item (best-effort).
   const variantsMap = await getVariantsMap(itemIds);
+  // Add-ons the kitchen marked out — shown disabled rather than hidden, so the
+  // diner can see the option exists and is just unavailable right now.
+  const modsOut = await getUnavailableModifierIds(restaurantId);
 
   // Overlay the requested locale's translations, falling back to base text.
   return categories.map((c) => ({
@@ -91,6 +106,7 @@ export async function getPublicMenu(
           id: m.id,
           name: m.name,
           priceDelta: m.priceDelta,
+          isAvailable: !modsOut.has(m.id),
         })),
       })),
       };

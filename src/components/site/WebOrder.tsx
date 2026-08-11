@@ -183,10 +183,15 @@ function ItemConfig({ item, onAdd, onCancel }: { item: DinerItem; onAdd: (l: Car
   const price = useMemo(() => unitPrice(effItem, selection), [effItem, selection]);
   const error = useMemo(() => validateSelection(effItem, selection), [effItem, selection]);
 
-  function toggle(g: string, m: string, single: boolean, max: number) {
+  // Tap to select, tap again to clear — so an accidental tap can be undone. A
+  // required single-select group keeps its choice (pick another one instead).
+  function toggle(g: string, m: string, single: boolean, max: number, required: boolean) {
     setSelection((prev) => {
       const cur = prev[g] ?? [];
-      if (single) return { ...prev, [g]: [m] };
+      if (single) {
+        if (!cur.includes(m)) return { ...prev, [g]: [m] };
+        return required ? prev : { ...prev, [g]: [] };
+      }
       if (cur.includes(m)) return { ...prev, [g]: cur.filter((x) => x !== m) };
       if (cur.length >= max) return prev;
       return { ...prev, [g]: [...cur, m] };
@@ -246,15 +251,29 @@ function ItemConfig({ item, onAdd, onCancel }: { item: DinerItem; onAdd: (l: Car
             <fieldset key={group.id} className="mt-4">
               <legend className="font-semibold text-plum-ink">{group.name}{group.required && <span className="text-guava"> *</span>}</legend>
               <div className="mt-2 space-y-1">
-                {group.modifiers.map((mod) => (
-                  <label key={mod.id} className="flex items-center justify-between rounded-lg border border-plum-ink/10 px-3 py-2 text-sm">
-                    <span className="flex items-center gap-2">
-                      <input type={single ? "radio" : "checkbox"} name={group.id} checked={chosen.includes(mod.id)} onChange={() => toggle(group.id, mod.id, single, group.maxSelect)} />
-                      {mod.name}
-                    </span>
-                    {mod.priceDelta !== 0 && <span className="text-red-600">{formatDelta(mod.priceDelta)}</span>}
-                  </label>
-                ))}
+                {group.modifiers.map((mod) => {
+                  const out = mod.isAvailable === false;
+                  return (
+                    <label key={mod.id} className={`flex items-center justify-between rounded-lg border border-plum-ink/10 px-3 py-2 text-sm ${out ? "cursor-not-allowed opacity-50" : ""}`}>
+                      <span className="flex items-center gap-2">
+                        {/* onClick, not onChange: a radio doesn't fire change when
+                            it's already selected, and re-tapping is how a diner
+                            clears an option they hit by accident. */}
+                        <input
+                          type={single ? "radio" : "checkbox"}
+                          name={group.id}
+                          checked={chosen.includes(mod.id)}
+                          disabled={out}
+                          onClick={() => toggle(group.id, mod.id, single, group.maxSelect, group.required)}
+                          onChange={() => {}}
+                        />
+                        {mod.name}
+                        {out && <span className="text-xs font-semibold text-guava">Sold out</span>}
+                      </span>
+                      {mod.priceDelta !== 0 && <span className="text-red-600">{formatDelta(mod.priceDelta)}</span>}
+                    </label>
+                  );
+                })}
               </div>
             </fieldset>
           );

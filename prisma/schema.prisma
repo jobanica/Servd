@@ -1099,6 +1099,7 @@ model Modifier {
   name            String // "Large", "Extra cheese"
   priceDelta      Int      @default(0) // centavos; +30, +20, can be negative
   sortOrder       Int      @default(0)
+  isAvailable     Boolean  @default(true) // false = marked out (add-on ran out)
 
   group ModifierGroup @relation(fields: [modifierGroupId], references: [id], onDelete: Cascade)
 

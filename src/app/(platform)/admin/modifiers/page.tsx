@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
 import { getModifierGroups } from "@/server/menu/queries";
+import { getModifierAvailability } from "@/server/menu/modifier-availability";
 import { AddModifierGroupForm } from "@/components/admin/AddModifierGroupForm";
 import { AddModifierForm } from "@/components/admin/AddModifierForm";
 import { ModifierRow } from "@/components/admin/ModifierRow";
@@ -8,7 +9,10 @@ import { ModifierGroupHeader } from "@/components/admin/ModifierGroupHeader";
 
 export default async function ModifiersPage() {
   const { restaurantId } = await requireAdminPage();
-  const groups = await getModifierGroups(restaurantId);
+  const [groups, availability] = await Promise.all([
+    getModifierGroups(restaurantId),
+    getModifierAvailability(restaurantId),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -39,7 +43,13 @@ export default async function ModifiersPage() {
 
           <ul className="mt-3 space-y-1">
             {group.modifiers.map((m) => (
-              <ModifierRow key={m.id} id={m.id} name={m.name} priceDelta={m.priceDelta} />
+              <ModifierRow
+                key={m.id}
+                id={m.id}
+                name={m.name}
+                priceDelta={m.priceDelta}
+                isAvailable={availability.get(m.id) ?? true}
+              />
             ))}
           </ul>
 

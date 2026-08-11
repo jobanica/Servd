@@ -8,6 +8,7 @@ export interface DinerModifier {
   id: string;
   name: string;
   priceDelta: number; // centavos
+  isAvailable?: boolean; // false = marked out (add-on ran out); shown disabled
 }
 
 export interface DinerModifierGroup {

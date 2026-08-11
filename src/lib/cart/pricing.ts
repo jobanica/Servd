@@ -28,7 +28,8 @@ export function unitPrice(item: DinerItem, selection: Selection): number {
 /**
  * Validates a selection against each group's rules:
  *  - required group must have at least max(minSelect, 1) choices
- *  - optional group with choices must still respect minSelect
+ *  - an optional group can always be skipped entirely (no minimum), even if an
+ *    old row still carries a minSelect from back when it was required
  *  - never exceed maxSelect
  * Returns the first human-readable problem, or null if valid.
  */
@@ -38,7 +39,7 @@ export function validateSelection(
 ): string | null {
   for (const group of item.groups) {
     const count = (selection[group.id] ?? []).length;
-    const min = group.required ? Math.max(group.minSelect, 1) : group.minSelect;
+    const min = group.required ? Math.max(group.minSelect, 1) : 0;
 
     if (count > group.maxSelect) {
       return `Choose at most ${group.maxSelect} for ${group.name}.`;

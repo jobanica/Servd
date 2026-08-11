@@ -6,6 +6,7 @@ import { effectivePrice } from "@/lib/pricing/happy-hour";
 import { getActiveHappyHoursTenant } from "@/server/pricing/happy-hour";
 import { getServingStates } from "@/server/menu/servings";
 import { getVariantsMap } from "@/server/menu/variants";
+import { getUnavailableModifierIds } from "@/server/menu/modifier-availability";
 import type { DinerItem, Selection } from "@/lib/cart/types";
 
 /**
@@ -58,7 +59,14 @@ export async function buildValidatedOrder(
       include: {
         modifierGroups: {
           orderBy: { sortOrder: "asc" },
-          include: { group: { include: { modifiers: true } } },
+          // Explicit modifier columns — `isAvailable` lands in a manual
+          // migration and is layered on separately (see modsOut below), so an
+          // un-migrated database can still take orders.
+          include: {
+            group: {
+              include: { modifiers: { select: { id: true, name: true, priceDelta: true } } },
+            },
+          },
         },
       },
     }),
@@ -73,6 +81,9 @@ export async function buildValidatedOrder(
   const servings = await getServingStates(restaurantId, itemIds);
   // Sizes/variants per item (best-effort). Prices are re-resolved server-side.
   const variantsMap = await getVariantsMap(itemIds);
+  // Add-ons marked out by the kitchen — rejected here too, so a stale menu on
+  // someone's phone can't sneak an unavailable option into a real order.
+  const modsOut = await getUnavailableModifierIds(restaurantId);
 
   let total = 0;
   const items: BuiltOrderItem[] = [];
@@ -166,6 +177,7 @@ export async function buildValidatedOrder(
       const group = dinerItem.groups.find((g) => g.modifiers.some((m) => m.id === modId));
       const mod = group?.modifiers.find((m) => m.id === modId);
       if (!group || !mod) throw new OrderValidationError("An option is no longer available.");
+      if (modsOut.has(mod.id)) throw new OrderValidationError(`"${mod.name}" is sold out.`);
       (selection[group.id] ??= []).push(modId);
       chosen.push({ modifierId: mod.id, nameAtTime: mod.name, priceDeltaAtTime: mod.priceDelta });
     }

@@ -523,6 +523,26 @@ export async function updateModifier(
   return { ok: true };
 }
 
+/**
+ * Mark an add-on out / back in ("86 it") without deleting it. The option keeps
+ * its place in the group; diners see it disabled and the server refuses to
+ * accept it on an order while it's out.
+ */
+export async function setModifierAvailability(formData: FormData): Promise<void> {
+  const { restaurantId } = await requireAdminAction();
+  const id = String(formData.get("id"));
+  const isAvailable = formData.get("isAvailable") === "on";
+  try {
+    // updateMany (scoped by id) so RLS blocks any cross-tenant edit.
+    await tenantDb(restaurantId, (tx) =>
+      tx.modifier.updateMany({ where: { id }, data: { isAvailable } }),
+    );
+  } catch {
+    // `isAvailable` column not migrated yet — nothing to toggle.
+  }
+  await refresh();
+}
+
 export async function deleteModifier(formData: FormData): Promise<void> {
   const { restaurantId } = await requireAdminAction();
   const id = String(formData.get("id"));

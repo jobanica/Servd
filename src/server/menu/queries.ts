@@ -44,7 +44,14 @@ export function getModifierGroups(restaurantId: string) {
   return tenantDb(restaurantId, (tx) =>
     tx.modifierGroup.findMany({
       orderBy: { createdAt: "asc" },
-      include: { modifiers: { orderBy: { sortOrder: "asc" } } },
+      // Explicit columns: `isAvailable` ships in a manual migration, so it's
+      // read separately (best-effort) rather than through a wide include.
+      include: {
+        modifiers: {
+          orderBy: { sortOrder: "asc" },
+          select: { id: true, name: true, priceDelta: true },
+        },
+      },
     }),
   );
 }

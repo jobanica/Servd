@@ -70,6 +70,15 @@ describe("validateSelection", () => {
     });
     expect(err).toMatch(/at most 2/);
   });
+  // Switching a group from Required to Optional used to leave minSelect at 1,
+  // so the diner was still forced to pick. Optional must mean skippable.
+  it("lets an optional group be skipped even with a leftover minSelect", () => {
+    const legacy: DinerItem = {
+      ...item,
+      groups: [{ ...item.groups[1], required: false, minSelect: 1 }],
+    };
+    expect(validateSelection(legacy, {})).toBeNull();
+  });
 });
 
 describe("selectionToLineModifiers", () => {

@@ -15,6 +15,7 @@ export function ModifierGroupHeader({
   group: { id: string; name: string; required: boolean; minSelect: number; maxSelect: number };
 }) {
   const [editing, setEditing] = useState(false);
+  const [required, setRequired] = useState(group.required);
   const [state, action] = useActionState<FormState, FormData>(updateModifierGroup, null);
 
   useEffect(() => {
@@ -33,13 +34,25 @@ export function ModifierGroupHeader({
         />
         <div className="flex flex-wrap items-center gap-4 text-sm">
           <label className="flex items-center gap-2">
-            <input type="checkbox" name="required" defaultChecked={group.required} />
+            <input
+              type="checkbox"
+              name="required"
+              checked={required}
+              onChange={(e) => setRequired(e.target.checked)}
+            />
             Required
           </label>
-          <label className="flex items-center gap-2">
-            Min
-            <input name="minSelect" type="number" min="0" defaultValue={group.minSelect} className="w-16 rounded-lg border border-plum-ink/15 px-2 py-1" />
-          </label>
+          {/* Min only means anything for a required group — an optional one can
+              always be skipped, so we hide it rather than let a stale minimum
+              keep forcing a choice. */}
+          {required ? (
+            <label className="flex items-center gap-2">
+              Min
+              <input name="minSelect" type="number" min="1" defaultValue={Math.max(1, group.minSelect)} className="w-16 rounded-lg border border-plum-ink/15 px-2 py-1" />
+            </label>
+          ) : (
+            <span className="text-xs text-plum-ink/45">Diners can skip this group.</span>
+          )}
           <label className="flex items-center gap-2">
             Max
             <input name="maxSelect" type="number" min="1" defaultValue={group.maxSelect} className="w-16 rounded-lg border border-plum-ink/15 px-2 py-1" />
@@ -48,7 +61,14 @@ export function ModifierGroupHeader({
         {state?.error && <p className="text-sm text-guava">{state.error}</p>}
         <div className="flex items-center gap-3">
           <SubmitButton pendingLabel="Saving…">Save</SubmitButton>
-          <button type="button" onClick={() => setEditing(false)} className="text-xs font-semibold text-muted hover:text-plum-ink">
+          <button
+            type="button"
+            onClick={() => {
+              setRequired(group.required);
+              setEditing(false);
+            }}
+            className="text-xs font-semibold text-muted hover:text-plum-ink"
+          >
             Cancel
           </button>
         </div>
@@ -68,7 +88,10 @@ export function ModifierGroupHeader({
       <div className="flex items-center gap-3">
         <button
           type="button"
-          onClick={() => setEditing(true)}
+          onClick={() => {
+            setRequired(group.required);
+            setEditing(true);
+          }}
           className="text-xs font-semibold text-plum-ink/60 hover:text-brand-primary"
         >
           Edit

@@ -42,10 +42,10 @@ export const modifierGroupSchema = z
     message: "Max selections must be ≥ min selections",
     path: ["maxSelect"],
   })
-  .refine((g) => !g.required || g.minSelect >= 1, {
-    message: "A required group must allow at least 1 selection",
-    path: ["minSelect"],
-  });
+  // "Optional" has to really mean optional. Without this, switching a group from
+  // Required to Optional left minSelect at 1 and the diner was STILL forced to
+  // choose. Required implies at least one; optional implies no minimum at all.
+  .transform((g) => ({ ...g, minSelect: g.required ? Math.max(1, g.minSelect) : 0 }));
 
 export const modifierSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(80),

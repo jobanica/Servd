@@ -50,10 +50,26 @@ export function ItemModal({
     [effItem, selection],
   );
 
-  function toggle(groupId: string, modId: string, single: boolean, max: number) {
+  /**
+   * Tap to select, tap again to clear. A single-select group used to be a
+   * one-way street — once you tapped an option you couldn't take it back, which
+   * is painful when it was an accidental tap. Now re-tapping clears it, unless
+   * the group is required (there it has to keep a choice, so re-tapping is a
+   * no-op and the diner just picks a different option).
+   */
+  function toggle(
+    groupId: string,
+    modId: string,
+    single: boolean,
+    max: number,
+    required: boolean,
+  ) {
     setSelection((prev) => {
       const current = prev[groupId] ?? [];
-      if (single) return { ...prev, [groupId]: [modId] };
+      if (single) {
+        if (!current.includes(modId)) return { ...prev, [groupId]: [modId] };
+        return required ? prev : { ...prev, [groupId]: [] };
+      }
       if (current.includes(modId)) {
         return { ...prev, [groupId]: current.filter((m) => m !== modId) };
       }
@@ -176,21 +192,30 @@ export function ItemModal({
               <div className="mt-2 space-y-1">
                 {group.modifiers.map((mod) => {
                   const isChosen = chosen.includes(mod.id);
+                  const out = mod.isAvailable === false;
                   return (
                     <label
                       key={mod.id}
-                      className="flex cursor-pointer items-center justify-between rounded-lg border border-plum-ink/10 px-3 py-2"
+                      className={`flex items-center justify-between rounded-lg border border-plum-ink/10 px-3 py-2 ${
+                        out ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+                      }`}
                     >
                       <span className="flex items-center gap-2 text-sm">
                         <input
                           type={single ? "radio" : "checkbox"}
                           name={group.id}
                           checked={isChosen}
-                          onChange={() =>
-                            toggle(group.id, mod.id, single, group.maxSelect)
+                          disabled={out}
+                          // A radio never fires onChange when it's ALREADY the
+                          // selected one, so the toggle has to hang off click —
+                          // that's what lets a diner undo an accidental tap.
+                          onClick={() =>
+                            toggle(group.id, mod.id, single, group.maxSelect, group.required)
                           }
+                          onChange={() => {}}
                         />
                         {mod.name}
+                        {out && <span className="text-xs font-semibold text-guava">Sold out</span>}
                       </span>
                       {mod.priceDelta !== 0 && (
                         <span className="text-sm text-brand-primary">
