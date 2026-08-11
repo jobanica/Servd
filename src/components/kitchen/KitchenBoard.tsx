@@ -7,6 +7,7 @@ import type { KitchenOrder } from "@/lib/orders/types";
 import { useOnline } from "@/lib/offline/useOnline";
 import { kvGet, kvSet, outboxAdd, outboxAll, outboxRemove, type OutboxOp } from "@/lib/offline/idb";
 import { ConnectivityPill } from "@/components/offline/ConnectivityPill";
+import { chime } from "@/lib/sound";
 
 /** Elapsed time as mm:ss (or h:mm:ss once past an hour). */
 function elapsed(iso: string, nowMs: number): string {
@@ -86,6 +87,8 @@ function OrderCard({
 
 const CACHE_KEY = "kitchen:orders";
 
+const SOUND_KEY = "kitchen:sound";
+
 export function KitchenBoard({
   restaurantId,
   initialOrders,
@@ -102,10 +105,21 @@ export function KitchenBoard({
   const [pending, setPending] = useState(0);
   const online = useOnline();
   const syncing = useRef(false);
+  // Tickets already announced, so a refresh/poll never re-rings the same order.
+  const seenOrders = useRef<Set<string>>(new Set(initialOrders.map((o) => o.id)));
+  const seeded = useRef(false);
+  const soundOn = useRef(true);
+  const [soundEnabled, setSoundEnabled] = useState(true);
 
   const refresh = useCallback(async () => {
     try {
       const fresh = await getKitchenOrders();
+      // Ring for tickets the kitchen hasn't seen yet. The first load only seeds
+      // the seen-set, so opening the screen mid-service doesn't set it off.
+      const unseen = fresh.filter((o) => !seenOrders.current.has(o.id));
+      for (const o of fresh) seenOrders.current.add(o.id);
+      if (unseen.length > 0 && seeded.current && soundOn.current) chime();
+      seeded.current = true;
       setOrders(fresh);
       if (offlineEnabled) kvSet(CACHE_KEY, fresh); // keep the offline read-cache warm
     } catch {
@@ -133,6 +147,29 @@ export function KitchenBoard({
     }
     await refresh();
   }, [offlineEnabled, refresh]);
+
+  // Remember whether the kitchen muted the chime.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(SOUND_KEY);
+      if (saved === "off") {
+        soundOn.current = false;
+        setSoundEnabled(false);
+      }
+    } catch { /* storage unavailable */ }
+  }, []);
+
+  function toggleSound() {
+    const next = !soundOn.current;
+    soundOn.current = next;
+    setSoundEnabled(next);
+    try {
+      localStorage.setItem(SOUND_KEY, next ? "on" : "off");
+    } catch { /* ignore */ }
+    // Browsers gate audio behind a gesture — this tap unlocks it, and doubles
+    // as a way to hear what the alert sounds like.
+    if (next) chime();
+  }
 
   // On mount: hydrate from the cache if we loaded offline, and show the queue size.
   useEffect(() => {
@@ -238,6 +275,14 @@ export function KitchenBoard({
           {live ? "Live" : "Polling (realtime offline)"}
         </span>
         {offlineEnabled && <ConnectivityPill online={online} pending={pending} />}
+        <button
+          type="button"
+          onClick={toggleSound}
+          className="ml-auto rounded-full border border-plum-ink/15 px-3 py-1 text-xs font-semibold text-plum-ink/70"
+          title={soundEnabled ? "Mute the new-order chime" : "Turn the new-order chime on"}
+        >
+          {soundEnabled ? "🔔 Sound on" : "🔕 Sound off"}
+        </button>
       </div>
 
       {error && (
