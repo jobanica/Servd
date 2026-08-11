@@ -124,6 +124,7 @@ model PlatformSetting {
   tutorials        Json? // course/tutorial hub content (sections + YouTube videos) shown at tutorials.<root>
   featurePrices    Json? // one-time unlock price + sellable flag per gateable feature
   uploadPostKeyEnc String? // encrypted Upload-Post API key (social scheduling)
+  emailCredsEnc    String? // encrypted JSON { apiKey, fromName, fromEmail, replyTo } for marketing email
   updatedAt        DateTime @updatedAt
 
   @@map("platform_settings")
@@ -444,8 +445,11 @@ model Restaurant {
   // the ₱499 activation invoice is paid (verified by the Xendit webhook).
   buildToken            String?   @unique // capability token: lets an anon builder return to edit
   builtVia              String    @default("manual") // "diy" | "manual"
-  contactPhone          String? // lead capture — phone OR facebook page
+  contactEmail          String? // lead capture — required on a DIY build (email marketing)
+  contactPhone          String?
   contactFb             String?
+  emailOptOut           Boolean   @default(false) // unsubscribed from platform marketing email
+  unsubToken            String?   @unique // one-click unsubscribe link, no login needed
   previewCreatedAt      DateTime? // build started
   previewReachedAt      DateTime? // first time they saw their own storefront
   activationRequestedAt DateTime? // tapped "Activate" (invoice created)
@@ -786,6 +790,47 @@ model ActivationRequest {
   @@index([status, createdAt])
   @@index([restaurantId])
   @@map("activation_requests")
+}
+
+/// One marketing email blast to a segment of leads. Platform-level: the
+/// audience is restaurants (owners who built a preview), not their diners —
+/// per-restaurant customer messaging is the SMS campaign system.
+model EmailCampaign {
+  id         String    @id @default(uuid())
+  subject    String
+  body       String // plain text with {{name}} merge tags
+  segment    String // audience key — see server/email/audience.ts
+  status     String    @default("draft") // draft | sending | sent | failed
+  recipients Int       @default(0)
+  sent       Int       @default(0)
+  failed     Int       @default(0)
+  sentAt     DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  messages EmailMessage[]
+
+  @@index([status, createdAt])
+  @@map("email_campaigns")
+}
+
+/// One recipient of one campaign. Kept after sending so a re-send can skip
+/// anyone who already got it, and so failures are visible rather than silent.
+model EmailMessage {
+  id           String    @id @default(uuid())
+  campaignId   String
+  restaurantId String?
+  email        String
+  status       String    @default("queued") // queued | sent | failed
+  error        String?
+  providerRef  String?
+  sentAt       DateTime?
+  createdAt    DateTime  @default(now())
+
+  campaign EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId, status])
+  @@map("email_messages")
 }
 
 /// Fixed-window counter for unauthenticated endpoints (the public builder).

@@ -22,6 +22,7 @@ export interface BuildState {
   name: string;
   slug: string;
   logoUrl: string | null;
+  contactEmail: string;
   contactPhone: string;
   contactFb: string;
   items: BuildItem[];
@@ -42,6 +43,7 @@ export async function getBuildState(token: string): Promise<BuildState | null> {
           name: true,
           slug: true,
           logoUrl: true,
+          contactEmail: true,
           contactPhone: true,
           contactFb: true,
           menuItems: {
@@ -69,6 +71,7 @@ export async function getBuildState(token: string): Promise<BuildState | null> {
       name: r.name,
       slug: r.slug,
       logoUrl: r.logoUrl,
+      contactEmail: r.contactEmail ?? "",
       contactPhone: r.contactPhone ?? "",
       contactFb: r.contactFb ?? "",
       items: r.menuItems.map((i) => ({

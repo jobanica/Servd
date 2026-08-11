@@ -5,7 +5,7 @@ import { systemDb } from "@/server/tenancy/scoped-db";
 import { uniqueSlug } from "@/lib/slug";
 import { pesosToCentavos } from "@/lib/money";
 import { uploadMenuImage } from "@/server/storage/menu-images";
-import { normalizePhone } from "@/lib/phone";
+import { normalizePhone, isValidPhone } from "@/lib/phone";
 import { rateLimit } from "./rate-limit";
 import {
   currentBuild,
@@ -27,9 +27,15 @@ export type BuildResult = { ok: true; state: BuildState } | { ok: false; error: 
 
 const DEFAULT_CATEGORY = "Menu";
 
+// Email and phone are REQUIRED: this is the founder's follow-up list, and a
+// lead with no way to reach them is worth nothing. Facebook stays optional.
 const businessSchema = z.object({
   name: z.string().trim().min(2, "Enter your restaurant name").max(80),
-  contactPhone: z.string().trim().max(30).optional().or(z.literal("")),
+  contactEmail: z.string().trim().toLowerCase().email("Enter a valid email address").max(160),
+  contactPhone: z
+    .string()
+    .trim()
+    .refine((v) => isValidPhone(v), "Enter an 11-digit mobile number (e.g. 09171234567)"),
   contactFb: z.string().trim().max(200).optional().or(z.literal("")),
 });
 
@@ -47,16 +53,15 @@ async function stateOf(ctx: BuildContext): Promise<BuildResult> {
 export async function saveBusiness(formData: FormData): Promise<BuildResult> {
   const parsed = businessSchema.safeParse({
     name: formData.get("name"),
+    contactEmail: formData.get("contactEmail") ?? "",
     contactPhone: formData.get("contactPhone") ?? "",
     contactFb: formData.get("contactFb") ?? "",
   });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Please check the form." };
   }
-  const { name } = parsed.data;
-  // Phone is normalized when it looks like one, but never rejected — this is
-  // lead capture, not checkout, and friction here costs builds.
-  const contactPhone = parsed.data.contactPhone ? normalizePhone(parsed.data.contactPhone) : "";
+  const { name, contactEmail } = parsed.data;
+  const contactPhone = normalizePhone(parsed.data.contactPhone);
   const contactFb = parsed.data.contactFb ?? "";
 
   const existing = await currentBuild();
@@ -86,6 +91,7 @@ export async function saveBusiness(formData: FormData): Promise<BuildResult> {
         data: {
           name,
           displayName: name,
+          contactEmail,
           contactPhone: contactPhone || null,
           contactFb: contactFb || null,
           ...(logoUrl ? { logoUrl } : {}),
@@ -118,6 +124,7 @@ export async function saveBusiness(formData: FormData): Promise<BuildResult> {
           status: "preview",
           buildToken: token,
           builtVia: "diy",
+          contactEmail,
           contactPhone: contactPhone || null,
           contactFb: contactFb || null,
           previewCreatedAt: new Date(),

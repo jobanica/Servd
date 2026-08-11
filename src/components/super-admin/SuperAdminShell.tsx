@@ -48,6 +48,7 @@ const NAV = [
   { label: "Prospecting", href: "/super-admin/prospecting", d: I.pin },
   { label: "Client CRM", href: "/super-admin/crm", d: I.inbox },
   { label: "Outreach videos", href: "/super-admin/outreach", d: I.video },
+  { label: "Email marketing", href: "/super-admin/email", d: I.inbox },
   { label: "Content Engine", href: "/super-admin/content-engine", d: I.film },
   { label: "Tutorials", href: "/super-admin/tutorials", d: I.grad },
   { label: "Plans", href: "/super-admin/plans", d: I.layers },

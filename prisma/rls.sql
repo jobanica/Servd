@@ -239,3 +239,17 @@ alter table rate_limits force row level security;
 drop policy if exists super_only on rate_limits;
 create policy super_only on rate_limits for all
   using (app.is_super_admin()) with check (app.is_super_admin());
+
+-- email_campaigns / email_messages: platform-level marketing to the founder's
+-- own leads (restaurant owners), not to any tenant's diners. Super-admin only.
+alter table email_campaigns enable row level security;
+alter table email_campaigns force row level security;
+drop policy if exists super_only on email_campaigns;
+create policy super_only on email_campaigns for all
+  using (app.is_super_admin()) with check (app.is_super_admin());
+
+alter table email_messages enable row level security;
+alter table email_messages force row level security;
+drop policy if exists super_only on email_messages;
+create policy super_only on email_messages for all
+  using (app.is_super_admin()) with check (app.is_super_admin());

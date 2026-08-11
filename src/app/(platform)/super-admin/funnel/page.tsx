@@ -144,8 +144,11 @@ export default async function FunnelPage() {
                     saw preview
                   </span>
                 ) : null}
-                <span className="ml-auto text-xs text-plum-ink/60">
-                  {l.contactPhone || l.contactFb || "no contact"}
+                <span className="ml-auto text-right text-xs text-plum-ink/60">
+                  {l.contactEmail && <span className="block">{l.contactEmail}</span>}
+                  <span className="block text-plum-ink/40">
+                    {l.contactPhone || l.contactFb || (l.contactEmail ? "" : "no contact")}
+                  </span>
                 </span>
               </li>
             ))}

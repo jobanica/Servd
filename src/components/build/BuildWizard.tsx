@@ -172,22 +172,38 @@ function BusinessStep({
         />
       </div>
 
-      <label className="mt-5 block text-sm font-semibold text-plum-ink/70">
-        Phone or Facebook page
-      </label>
-      <p className="text-xs text-plum-ink/45">So we can save your preview and send you the link.</p>
+      <label className="mt-5 block text-sm font-semibold text-plum-ink/70">Email address</label>
+      <p className="text-xs text-plum-ink/45">
+        We&apos;ll send your preview link here so you can pick it back up on any device.
+      </p>
+      <input
+        name="contactEmail"
+        type="email"
+        required
+        defaultValue={state?.contactEmail ?? ""}
+        placeholder="you@example.com"
+        className="mt-1 w-full rounded-xl border border-plum-ink/15 px-3 py-3 text-base"
+      />
+
+      <label className="mt-4 block text-sm font-semibold text-plum-ink/70">Mobile number</label>
       <input
         name="contactPhone"
+        type="tel"
+        required
         defaultValue={state?.contactPhone ?? ""}
         inputMode="tel"
         placeholder="09xx xxx xxxx"
         className="mt-1 w-full rounded-xl border border-plum-ink/15 px-3 py-3 text-base"
       />
+
+      <label className="mt-4 block text-sm font-semibold text-plum-ink/70">
+        Facebook page <span className="font-normal text-plum-ink/40">(optional)</span>
+      </label>
       <input
         name="contactFb"
         defaultValue={state?.contactFb ?? ""}
-        placeholder="facebook.com/yourpage (optional)"
-        className="mt-2 w-full rounded-xl border border-plum-ink/15 px-3 py-3 text-base"
+        placeholder="facebook.com/yourpage"
+        className="mt-1 w-full rounded-xl border border-plum-ink/15 px-3 py-3 text-base"
       />
 
       <button

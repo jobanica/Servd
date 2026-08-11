@@ -27,6 +27,7 @@ export interface FunnelSummary {
     id: string;
     name: string;
     slug: string;
+    contactEmail: string | null;
     contactPhone: string | null;
     contactFb: string | null;
     items: number;
@@ -65,6 +66,7 @@ export async function getFunnel(days = 14): Promise<FunnelSummary> {
           name: true,
           slug: true,
           status: true,
+          contactEmail: true,
           contactPhone: true,
           contactFb: true,
           previewCreatedAt: true,
@@ -100,6 +102,7 @@ export async function getFunnel(days = 14): Promise<FunnelSummary> {
         id: b.id,
         name: b.name,
         slug: b.slug,
+        contactEmail: b.contactEmail,
         contactPhone: b.contactPhone,
         contactFb: b.contactFb,
         items: b._count.menuItems,
