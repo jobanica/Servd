@@ -25,6 +25,9 @@ export async function listBusinesses(limit = 100): Promise<BusinessRow[]> {
   try {
     const rows = await systemDb((tx) =>
       tx.restaurant.findMany({
+        // DIY previews live on the funnel page, not here — this list is real
+        // businesses, and unactivated builds would swamp it.
+        where: { status: { notIn: ["preview", "archived"] } },
         orderBy: { createdAt: "desc" },
         take: limit,
         select: {
@@ -103,6 +106,8 @@ const SYNTHETIC_LOGIN_DOMAIN = process.env.INTERNAL_LOGIN_DOMAIN || "staff.servd
 export async function listSubscriptions(): Promise<SubscriptionRow[]> {
   const restaurants = await systemDb((tx) =>
     tx.restaurant.findMany({
+      // Unactivated DIY previews have no subscription to show — see the funnel.
+      where: { status: { notIn: ["preview", "archived"] } },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,

@@ -4,6 +4,10 @@ import { XenditBillingProvider } from "@/server/billing/xendit";
 import { activateByProviderRef } from "@/server/billing/activate";
 import { markAddonPaidByProviderRef } from "@/server/billing/addons";
 import { activateFeatureSubByProviderRef } from "@/server/billing/feature-subscriptions";
+import {
+  activatePreviewByProviderRef,
+  abandonPreviewByProviderRef,
+} from "@/server/build/activation";
 
 /**
  * Xendit platform billing webhook — fires when a subscriber pays their
@@ -21,7 +25,19 @@ export async function POST(req: NextRequest) {
   const provider = new XenditBillingProvider(billing.xendit.secretKey, billing.xendit.callbackToken);
   const event = provider.verifyAndParseWebhook(rawBody, token);
   if (!event) return new Response("Invalid token", { status: 401 });
-  if (event.status !== "paid") return new Response("ok", { status: 200 });
+
+  if (event.status !== "paid") {
+    // An expired/failed DIY activation invoice: the preview survives as a warm
+    // lead for manual follow-up, and the funnel numbers stay honest.
+    await abandonPreviewByProviderRef(event.providerRef);
+    return new Response("ok", { status: 200 });
+  }
+
+  // A paid DIY activation (₱499) — turn the preview into a real account. This
+  // is the ONLY place activation can happen; the success page just reads it.
+  if (await activatePreviewByProviderRef(event.providerRef)) {
+    return new Response("ok", { status: 200 });
+  }
 
   // A monthly per-feature subscription (e.g. the content scheduler) — activate
   // that feature only, never the main plan.

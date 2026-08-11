@@ -16,7 +16,9 @@ export async function listDemoStorefronts(): Promise<DemoStorefrontRow[]> {
   try {
     const rows = await systemDb((tx) =>
       tx.restaurant.findMany({
-        where: { staff: { none: {} } },
+        // Also login-less, but a different funnel entirely: DIY previews belong
+        // on the funnel page, not in the partner/super-admin demo list.
+        where: { staff: { none: {} }, status: { notIn: ["preview", "archived"] } },
         orderBy: { createdAt: "desc" },
         take: 300,
         select: {

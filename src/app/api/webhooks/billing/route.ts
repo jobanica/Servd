@@ -3,6 +3,7 @@ import { getBillingProvider } from "@/server/billing";
 import { activateByProviderRef } from "@/server/billing/activate";
 import { markAddonPaidByProviderRef } from "@/server/billing/addons";
 import { activateFeatureSubByProviderRef } from "@/server/billing/feature-subscriptions";
+import { activatePreviewByProviderRef } from "@/server/build/activation";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { clawbackByInvoiceProviderRef } from "@/server/referrals/accrual";
 
@@ -28,6 +29,11 @@ export async function POST(req: NextRequest) {
   }
 
   if (event.status !== "paid") return new Response("ok", { status: 200 });
+
+  // A paid DIY activation (₱499) — turn that preview into a real account.
+  if (await activatePreviewByProviderRef(event.providerRef)) {
+    return new Response("ok", { status: 200 });
+  }
 
   // A monthly per-feature subscription (e.g. the content scheduler) — activate
   // that feature only, never the main plan.

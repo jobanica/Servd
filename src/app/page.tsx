@@ -170,13 +170,20 @@ export default async function Home() {
               ))}
             </ul>
             <div className="mt-8 flex flex-wrap gap-3">
-              <a href="#how" className="rounded-full px-7 py-3.5 font-semibold btn-brand shadow-lg text-white">
+              {/* Self-serve funnel: build first, decide later. */}
+              <Link href="/build" className="rounded-full px-7 py-3.5 font-semibold btn-brand shadow-lg text-white">
+                Create your FREE restaurant preview
+              </Link>
+              <a href="#how" className="rounded-full border border-plum-ink/15 bg-white px-7 py-3.5 font-semibold">
                 See how it works
               </a>
               <Link href="/login" className="rounded-full border border-plum-ink/15 bg-white px-7 py-3.5 font-semibold">
                 Log in
               </Link>
             </div>
+            <p className="mt-3 text-sm text-plum-ink/50">
+              No signup, no card — see your own ordering page in about two minutes.
+            </p>
             <div className="mt-5 flex flex-wrap gap-2">
               {["No setup fees", "No contracts", "No risk"].map((x) => (
                 <span key={x} className="rounded-full border border-plum-ink/10 bg-white px-3 py-1 text-xs font-semibold text-plum-ink/60">

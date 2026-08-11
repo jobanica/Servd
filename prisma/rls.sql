@@ -87,7 +87,8 @@ declare
     'purchase_orders', 'purchase_order_items',
     'employees', 'employee_documents', 'shifts', 'availabilities',
     'shift_swap_requests', 'time_entries', 'leave_types', 'leave_requests',
-    'leave_balances', 'payroll_deductions', 'social_posts', 'feature_subscriptions'
+    'leave_balances', 'payroll_deductions', 'social_posts', 'feature_subscriptions',
+    'activation_requests'
   ];
 begin
   foreach t in array tenant_tables loop
@@ -229,4 +230,12 @@ alter table platform_admins enable row level security;
 alter table platform_admins force row level security;
 drop policy if exists super_only on platform_admins;
 create policy super_only on platform_admins for all
+  using (app.is_super_admin()) with check (app.is_super_admin());
+
+-- rate_limits: platform-level counters for unauthenticated endpoints (the
+-- public DIY builder). No tenant owns them; only the service role writes them.
+alter table rate_limits enable row level security;
+alter table rate_limits force row level security;
+drop policy if exists super_only on rate_limits;
+create policy super_only on rate_limits for all
   using (app.is_super_admin()) with check (app.is_super_admin());

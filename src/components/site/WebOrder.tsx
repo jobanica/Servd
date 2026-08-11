@@ -74,6 +74,14 @@ export interface WebOrderProps {
   acceptsBookings?: boolean;
   bookHref?: string;
   scheduleFor?: string; // ISO — preselect "schedule for later" (from the pre-order page)
+  /**
+   * DIY preview: render the storefront exactly as a live one, but intercept the
+   * final "Place order" tap with the activation prompt instead of creating an
+   * order. Demo DEMONSTRATES the product; it never provides the service — and
+   * the server refuses preview restaurants on every order path anyway.
+   */
+  demo?: boolean;
+  onDemoOrder?: () => void;
   booking?: {
     requireDownpayment: boolean;
     downpaymentType: "percent" | "fixed";
@@ -327,7 +335,7 @@ function ProductCard({ item, onPick }: { item: DinerItem; onPick: (i: DinerItem)
 }
 
 export function WebOrder(props: WebOrderProps) {
-  const { slug, restaurantName, logoUrl, categories, contact, payOnline, loyalty, hours, zones = [], openNow, pauseWhenClosed, acceptsBookings, bookHref } = props;
+  const { slug, restaurantName, logoUrl, categories, contact, payOnline, loyalty, hours, zones = [], openNow, pauseWhenClosed, acceptsBookings, bookHref, demo = false, onDemoOrder } = props;
   const home = props.homeHref ?? `/r/${slug}`;
   const book = bookHref ?? `/r/${slug}/book`;
   const paused = !!pauseWhenClosed && openNow === false;
@@ -610,6 +618,12 @@ export function WebOrder(props: WebOrderProps) {
     : 0;
 
   async function submit() {
+    // Preview build: show the "activate to go live" prompt instead of ordering.
+    // Nothing is sent — no order, no notification, no payment.
+    if (demo) {
+      onDemoOrder?.();
+      return;
+    }
     setBusy(true);
     setError(null);
     const res = await placeWebOrder({
@@ -1046,7 +1060,7 @@ export function WebOrder(props: WebOrderProps) {
         ) : (
           <button
             onClick={submit}
-            disabled={busy || receiptMissing || lines.length === 0 || !name.trim() || !isValidPhone(phone) || (schedulingLater && !scheduledIso) || (orderType === "delivery" && (shippingMode ? !shippingReady : (!address.trim() || (showMap && !geo) || !collectDeliveryFee && !agreeRider || (distanceMode ? !!distance?.outOfRange : (zones.length > 0 && !zone)))))}
+            disabled={!demo && (busy || receiptMissing || lines.length === 0 || !name.trim() || !isValidPhone(phone) || (schedulingLater && !scheduledIso) || (orderType === "delivery" && (shippingMode ? !shippingReady : (!address.trim() || (showMap && !geo) || !collectDeliveryFee && !agreeRider || (distanceMode ? !!distance?.outOfRange : (zones.length > 0 && !zone))))))}
             className="mt-3 w-full rounded-lg bg-green-600 py-3 font-semibold text-white disabled:opacity-50"
           >
             {busy

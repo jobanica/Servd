@@ -35,6 +35,7 @@ const I = {
   film: "M3 4h18v16H3zM7 4v16M17 4v16M3 9h4M17 9h4M3 15h4M17 15h4",
   video: "M15 10l4.55-2.28A1 1 0 0121 8.62v6.76a1 1 0 01-1.45.9L15 14M4 6h9a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z",
   grad: "M22 10L12 5 2 10l10 5 10-5zM6 12v5c0 1 2.7 2 6 2s6-1 6-2v-5",
+  chart: "M3 3v18h18M7 15l3-4 3 3 4-6",
   back: "M19 12H5M12 19l-7-7 7-7",
 };
 
@@ -43,6 +44,7 @@ const NAV = [
   { label: "Subscriptions", href: "/super-admin/subscriptions", d: I.card },
   { label: "Create account", href: "/super-admin/accounts", d: I.userPlus },
   { label: "Demo storefronts", href: "/super-admin/storefronts", d: I.store },
+  { label: "DIY funnel", href: "/super-admin/funnel", d: I.chart },
   { label: "Prospecting", href: "/super-admin/prospecting", d: I.pin },
   { label: "Client CRM", href: "/super-admin/crm", d: I.inbox },
   { label: "Outreach videos", href: "/super-admin/outreach", d: I.video },

@@ -36,6 +36,8 @@ enum RestaurantStatus {
   active
   suspended
   pending
+  preview // DIY self-serve build — real data, but not a live account yet
+  archived // stale preview that never activated; heavy media dropped
 }
 
 enum OrderStatus {
@@ -114,15 +116,15 @@ model PlatformAdmin {
 /// Platform-wide settings owned by the super-admin (single row, id="platform").
 /// Holds the subscription billing provider + its encrypted credentials.
 model PlatformSetting {
-  id              String   @id @default("platform")
-  billingProvider String? // "xendit" | "paymongo" | null
-  xenditCredsEnc  String? // encrypted JSON { secretKey, callbackToken }
-  crmSequence     Json? // owner-edited CRM follow-up messages (overrides defaults)
-  orderCapEnabled Boolean  @default(false) // master switch for monthly order caps across all restaurants
-  tutorials       Json? // course/tutorial hub content (sections + YouTube videos) shown at tutorials.<root>
-  featurePrices   Json? // one-time unlock price + sellable flag per gateable feature
+  id               String   @id @default("platform")
+  billingProvider  String? // "xendit" | "paymongo" | null
+  xenditCredsEnc   String? // encrypted JSON { secretKey, callbackToken }
+  crmSequence      Json? // owner-edited CRM follow-up messages (overrides defaults)
+  orderCapEnabled  Boolean  @default(false) // master switch for monthly order caps across all restaurants
+  tutorials        Json? // course/tutorial hub content (sections + YouTube videos) shown at tutorials.<root>
+  featurePrices    Json? // one-time unlock price + sellable flag per gateable feature
   uploadPostKeyEnc String? // encrypted Upload-Post API key (social scheduling)
-  updatedAt       DateTime @updatedAt
+  updatedAt        DateTime @updatedAt
 
   @@map("platform_settings")
 }
@@ -131,14 +133,14 @@ model PlatformSetting {
 /// surfaced to the super-admin. Platform-level (no tenant RLS); written + read
 /// through systemDb.
 model PlatformFeedback {
-  id           String   @id @default(uuid())
-  restaurantId String?
+  id             String   @id @default(uuid())
+  restaurantId   String?
   restaurantName String?
-  authorEmail  String?
-  rating       Int? // optional 1–5
-  message      String
-  resolved     Boolean  @default(false)
-  createdAt    DateTime @default(now())
+  authorEmail    String?
+  rating         Int? // optional 1–5
+  message        String
+  resolved       Boolean  @default(false)
+  createdAt      DateTime @default(now())
 
   @@index([createdAt])
   @@map("platform_feedback")
@@ -174,26 +176,26 @@ model ProspectLead {
 /// Outreach CRM (platform/super-admin only): clients you message on Facebook,
 /// tracked through a follow-up sequence until they reply. Never tenant-visible.
 model CrmClient {
-  id          String     @id @default(uuid())
-  name        String
-  facebookUrl String?
-  contactName String?
-  phone       String?
-  email       String?
-  address     String?
-  notes       String?
-  stage       String     @default("new") // new | in_sequence | replied | won | lost | revisit
-  step        Int        @default(0) // touches sent (0..TOTAL_TOUCHES)
-  lastTouchAt DateTime?
-  nextDueAt   DateTime? // when the next follow-up is due
-  repliedAt   DateTime?
-  revisitAt   DateTime? // when to re-approach a no-reply prospect (revisit bucket)
+  id               String          @id @default(uuid())
+  name             String
+  facebookUrl      String?
+  contactName      String?
+  phone            String?
+  email            String?
+  address          String?
+  notes            String?
+  stage            String          @default("new") // new | in_sequence | replied | won | lost | revisit
+  step             Int             @default(0) // touches sent (0..TOTAL_TOUCHES)
+  lastTouchAt      DateTime?
+  nextDueAt        DateTime? // when the next follow-up is due
+  repliedAt        DateTime?
+  revisitAt        DateTime? // when to re-approach a no-reply prospect (revisit bucket)
   demoRestaurantId String? // the demo storefront created for this client, if any
-  source      String     @default("manual")
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  touches     CrmTouch[]
-  outreachVideos OutreachVideo[]
+  source           String          @default("manual")
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  touches          CrmTouch[]
+  outreachVideos   OutreachVideo[]
 
   @@index([stage])
   @@index([nextDueAt])
@@ -372,11 +374,11 @@ model PlanModule {
 // ----------------------------------------------------------------------------
 
 model Restaurant {
-  id     String           @id @default(uuid())
-  name   String
-  slug   String           @unique // used in /order/{slug}/{tableToken}
-  status RestaurantStatus @default(pending)
-  planId String?
+  id            String           @id @default(uuid())
+  name          String
+  slug          String           @unique // used in /order/{slug}/{tableToken}
+  status        RestaurantStatus @default(pending)
+  planId        String?
   // Set when a partner creates this as a DEMO storefront (no login) to pitch a
   // prospect. Null for real tenants + super-admin demos.
   demoPartnerId String?
@@ -408,19 +410,19 @@ model Restaurant {
   feedbackMode    FeedbackMode @default(follow_up)
 
   // --- Printing ---
-  printMethod      PrintMethod @default(network)
-  printerConfig    Json? // transport-specific details (ip, port, cloudprnt url…)
-  autoPrint        Boolean     @default(false)
-  cashierVoidPin   String? // PIN a cashier must enter to void an unpaid order
+  printMethod    PrintMethod @default(network)
+  printerConfig  Json? // transport-specific details (ip, port, cloudprnt url…)
+  autoPrint      Boolean     @default(false)
+  cashierVoidPin String? // PIN a cashier must enter to void an unpaid order
   // Kitchen routing: true => on-screen kitchen display; false => print a kitchen
   // ticket for the kitchen when an order is accepted/created (no screen).
-  kitchenDisplay   Boolean     @default(true)
+  kitchenDisplay Boolean     @default(true)
 
   // --- Payments (connected-accounts model) ---
   // Each restaurant stores its OWN PayMongo credentials, encrypted at rest.
-  paymentGateway          Gateway? // null until they connect a gateway
-  paymentCredentialsEnc   String? // encrypted blob — never stored in plaintext
-  paymentOnlineEnabled    Boolean  @default(false)
+  paymentGateway        Gateway? // null until they connect a gateway
+  paymentCredentialsEnc String? // encrypted blob — never stored in plaintext
+  paymentOnlineEnabled  Boolean  @default(false)
 
   // --- SMS (post-MVP) ---
   smsSenderName    String?
@@ -437,11 +439,22 @@ model Restaurant {
   // Self-serve onboarding: null until the owner finishes/dismisses the wizard.
   onboardingCompletedAt DateTime?
 
+  // --- DIY self-serve builder (public, no-login funnel at /build) ---
+  // A DIY build starts as status=preview and only becomes a real account once
+  // the ₱499 activation invoice is paid (verified by the Xendit webhook).
+  buildToken            String?   @unique // capability token: lets an anon builder return to edit
+  builtVia              String    @default("manual") // "diy" | "manual"
+  contactPhone          String? // lead capture — phone OR facebook page
+  contactFb             String?
+  previewCreatedAt      DateTime? // build started
+  previewReachedAt      DateTime? // first time they saw their own storefront
+  activationRequestedAt DateTime? // tapped "Activate" (invoice created)
+
   // Language the base menu text was written in (the i18n fallback).
   defaultLocale String @default("en")
 
   // Inventory: auto-flip a menu item to out-of-stock when an ingredient hits 0.
-  autoOutOfStock Boolean @default(false)
+  autoOutOfStock     Boolean @default(false)
   lowStockAlertPhone String? // phone to SMS when an ingredient drops to its reorder level
 
   // --- Loyalty & rewards (points per peso) ---
@@ -452,42 +465,43 @@ model Restaurant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  plan            Plan?            @relation(fields: [planId], references: [id])
-  staff           StaffUser[]
-  subscriptions   Subscription[]
-  tables          Table[]
-  categories      Category[]
-  menuItems       MenuItem[]
-  modifierGroups  ModifierGroup[]
-  orders          Order[]
-  printJobs       PrintJob[]
-  feedback        Feedback[]
-  promotions      Promotion[]
-  customers       CustomerContact[]
-  smsCampaigns    SmsCampaign[]
-  auditLogs       AuditLog[]
-  happyHours      HappyHour[]
-  giftCards       GiftCard[]
-  reservations    Reservation[]
-  cartLeads       CartLead[]
-  shiftNotes      ShiftNote[]
-  smsCreditLedger SmsCreditLedger[]
-  invoices        RestaurantInvoice[]
-  addonPurchases  AddonPurchase[]
-  payrollDeductions PayrollDeduction[]
-  socialPosts     SocialPost[]
-  featureSubs     FeatureSubscription[]
-  suppliers       Supplier[]
-  inventoryItems  InventoryItem[]
-  purchaseOrders  PurchaseOrder[]
-  employees       Employee[]
-  loyaltyAccounts LoyaltyAccount[]
-  loyaltyTxns     LoyaltyTransaction[]
-  expenses        Expense[]
-  payrollSetting  PayrollSetting?
-  menuItemCosts   MenuItemCost[]
-  storefront      StorefrontSetting?
-  pushSubscriptions PushSubscription[]
+  plan               Plan?                 @relation(fields: [planId], references: [id])
+  staff              StaffUser[]
+  subscriptions      Subscription[]
+  tables             Table[]
+  categories         Category[]
+  menuItems          MenuItem[]
+  modifierGroups     ModifierGroup[]
+  orders             Order[]
+  printJobs          PrintJob[]
+  feedback           Feedback[]
+  promotions         Promotion[]
+  customers          CustomerContact[]
+  smsCampaigns       SmsCampaign[]
+  auditLogs          AuditLog[]
+  happyHours         HappyHour[]
+  giftCards          GiftCard[]
+  reservations       Reservation[]
+  cartLeads          CartLead[]
+  shiftNotes         ShiftNote[]
+  smsCreditLedger    SmsCreditLedger[]
+  invoices           RestaurantInvoice[]
+  addonPurchases     AddonPurchase[]
+  activationRequests ActivationRequest[]
+  payrollDeductions  PayrollDeduction[]
+  socialPosts        SocialPost[]
+  featureSubs        FeatureSubscription[]
+  suppliers          Supplier[]
+  inventoryItems     InventoryItem[]
+  purchaseOrders     PurchaseOrder[]
+  employees          Employee[]
+  loyaltyAccounts    LoyaltyAccount[]
+  loyaltyTxns        LoyaltyTransaction[]
+  expenses           Expense[]
+  payrollSetting     PayrollSetting?
+  menuItemCosts      MenuItemCost[]
+  storefront         StorefrontSetting?
+  pushSubscriptions  PushSubscription[]
 
   @@index([demoPartnerId])
   @@map("restaurants")
@@ -511,15 +525,15 @@ model PushSubscription {
 
 /// Public website settings: store hours + delivery zones/fees.
 model StorefrontSetting {
-  id             String  @id @default(uuid())
-  restaurantId   String  @unique
-  hours          Json? // [{open,close,closed}] index 0=Sun … 6=Sat
-  deliveryZones  Json? // [{name, fee}] fee in centavos
+  id              String  @id @default(uuid())
+  restaurantId    String  @unique
+  hours           Json? // [{open,close,closed}] index 0=Sun … 6=Sat
+  deliveryZones   Json? // [{name, fee}] fee in centavos
   pauseWhenClosed Boolean @default(false) // block online orders outside hours
   acceptsBookings Boolean @default(false) // show the "Book a table" flow on the website
-  bookingConfig  Json? // { requireDownpayment, downpaymentType, downpaymentValue, downpaymentInstructions }
-  paymentConfig  Json? // { codEnabled, gcashEnabled, gcashName, gcashNumber, gcashQrUrl }
-  deliveryConfig Json? // { mode, baseFee, perKm, freeKm, minFee, maxKm, roadFactor, originLat, originLng }
+  bookingConfig   Json? // { requireDownpayment, downpaymentType, downpaymentValue, downpaymentInstructions }
+  paymentConfig   Json? // { codEnabled, gcashEnabled, gcashName, gcashNumber, gcashQrUrl }
+  deliveryConfig  Json? // { mode, baseFee, perKm, freeKm, minFee, maxKm, roadFactor, originLat, originLng }
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
@@ -528,13 +542,13 @@ model StorefrontSetting {
 
 /// Customizable statutory payroll deductions per restaurant (PH).
 model PayrollSetting {
-  id              String  @id @default(uuid())
-  restaurantId    String  @unique
-  sssAmount        Int    @default(0) // fixed centavos per pay period (employee share)
-  philhealthAmount Int    @default(0)
-  pagibigAmount    Int    @default(0)
-  birAmount        Int    @default(0)
-  thirteenthMonth Boolean @default(false) // accrue 1/12 of base
+  id               String  @id @default(uuid())
+  restaurantId     String  @unique
+  sssAmount        Int     @default(0) // fixed centavos per pay period (employee share)
+  philhealthAmount Int     @default(0)
+  pagibigAmount    Int     @default(0)
+  birAmount        Int     @default(0)
+  thirteenthMonth  Boolean @default(false) // accrue 1/12 of base
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
@@ -641,20 +655,20 @@ model StaffUser {
 }
 
 model Subscription {
-  id               String             @id @default(uuid())
-  restaurantId     String // current subscription is the latest row; app keeps one active
-  planId           String
-  status           SubscriptionStatus @default(trialing)
-  trialEndsAt      DateTime?
-  currentPeriodEnd DateTime?
-  cancelAtPeriodEnd Boolean           @default(false)
+  id                      String             @id @default(uuid())
+  restaurantId            String // current subscription is the latest row; app keeps one active
+  planId                  String
+  status                  SubscriptionStatus @default(trialing)
+  trialEndsAt             DateTime?
+  currentPeriodEnd        DateTime?
+  cancelAtPeriodEnd       Boolean            @default(false)
   // Dunning: how many consecutive charge attempts have failed.
-  failedCharges    Int                @default(0)
+  failedCharges           Int                @default(0)
   // Gateway refs for off-session recurring charges (platform's PayMongo account).
   providerCustomerId      String?
   providerPaymentMethodId String?
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   plan       Plan       @relation(fields: [planId], references: [id])
@@ -745,6 +759,49 @@ model AddonPurchase {
   @@map("addon_purchases")
 }
 
+/// One "activate my DIY preview for ₱499" attempt. The Xendit invoice's
+/// external_id is this row's id, so the verified webhook knows exactly which
+/// preview to turn into a real account. Rows are never deleted — an abandoned
+/// one is the founder's warm-lead follow-up list.
+model ActivationRequest {
+  id            String    @id @default(uuid())
+  restaurantId  String
+  status        String    @default("pending") // pending | paid | activated | abandoned
+  amount        Int       @default(49900) // centavos
+  contactPhone  String?
+  contactFb     String?
+  note          String?
+  providerRef   String?   @unique // Xendit invoice id — the idempotency key
+  checkoutUrl   String? // hosted Xendit invoice URL (so we can re-offer it)
+  /// Username of the login created on activation. The PASSWORD is never stored:
+  /// the owner sets their own through the one-time claim link.
+  loginUsername String?
+  paidAt        DateTime?
+  activatedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([restaurantId])
+  @@map("activation_requests")
+}
+
+/// Fixed-window counter for unauthenticated endpoints (the public builder).
+/// Platform-level: no tenant owns it, and it's only ever touched by systemDb.
+model RateLimit {
+  id       String   @id @default(uuid())
+  bucket   String // "build:create", "build:upload", …
+  key      String // hashed client IP — never the raw address
+  windowAt DateTime // start of the fixed window
+  count    Int      @default(0)
+
+  @@unique([bucket, key, windowAt])
+  @@index([windowAt])
+  @@map("rate_limits")
+}
+
 // ----------------------------------------------------------------------------
 // Affiliate & referral program (Track 1: restaurant-to-restaurant credit)
 // ----------------------------------------------------------------------------
@@ -788,17 +845,17 @@ model Referral {
 
 /// A platform-level affiliate / reseller. Has its own login (Supabase auth).
 model Partner {
-  id              String   @id @default(uuid())
-  authUserId      String?  @unique // Supabase auth user for the partner portal
-  name            String
-  email           String   @unique
-  status          String   @default("pending") // pending | approved | suspended
-  tier            String   @default("affiliate") // affiliate | reseller
-  payoutMethod    String? // "gcash" | "bank"
+  id               String   @id @default(uuid())
+  authUserId       String?  @unique // Supabase auth user for the partner portal
+  name             String
+  email            String   @unique
+  status           String   @default("pending") // pending | approved | suspended
+  tier             String   @default("affiliate") // affiliate | reseller
+  payoutMethod     String? // "gcash" | "bank"
   payoutDetailsEnc String? // encrypted JSON (account name/number)
-  taxInfoEnc      String? // encrypted JSON (TIN, etc.) — supports PH reporting
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  taxInfoEnc       String? // encrypted JSON (TIN, etc.) — supports PH reporting
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@map("partners")
 }
@@ -923,16 +980,16 @@ enum TableStatus {
 }
 
 model Table {
-  id           String   @id @default(uuid())
+  id           String      @id @default(uuid())
   restaurantId String
   tableNumber  String // string so "T1", "Patio-3" etc. are allowed
-  qrToken      String   @unique // non-guessable token embedded in the QR
-  isCounter    Boolean  @default(false) // a single stall/takeout QR — issues order numbers, not a seat
+  qrToken      String      @unique // non-guessable token embedded in the QR
+  isCounter    Boolean     @default(false) // a single stall/takeout QR — issues order numbers, not a seat
   status       TableStatus @default(empty) // floor-plan status (occupancy is also derived from open orders)
   posX         Int? // floor-plan layout position
   posY         Int?
   seats        Int? // capacity (optional, used by reservations)
-  createdAt    DateTime @default(now())
+  createdAt    DateTime    @default(now())
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   orders     Order[]
@@ -971,7 +1028,7 @@ model Category {
   sortOrder    Int      @default(0)
   createdAt    DateTime @default(now())
 
-  restaurant   Restaurant           @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  restaurant   Restaurant            @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   menuItems    MenuItem[]
   translations CategoryTranslation[]
 
@@ -994,22 +1051,22 @@ model CategoryTranslation {
 }
 
 model MenuItem {
-  id           String   @id @default(uuid())
-  restaurantId String // denormalized for RLS + simple tenant scoping
-  categoryId   String
-  name         String
-  description  String?
-  price        Int // centavos
-  imageUrl     String?
-  videoUrl     String? // uploaded file URL or a YouTube/Vimeo/direct link
+  id             String   @id @default(uuid())
+  restaurantId   String // denormalized for RLS + simple tenant scoping
+  categoryId     String
+  name           String
+  description    String?
+  price          Int // centavos
+  imageUrl       String?
+  videoUrl       String? // uploaded file URL or a YouTube/Vimeo/direct link
   videoPosterUrl String? // optional poster; UI falls back to imageUrl
-  isAvailable  Boolean  @default(true) // false => out of stock
-  dietaryTags  String[] @default([]) // diet/allergen tag keys (see src/lib/menu/dietary.ts)
-  sortOrder    Int      @default(0)
-  createdAt    DateTime @default(now())
+  isAvailable    Boolean  @default(true) // false => out of stock
+  dietaryTags    String[] @default([]) // diet/allergen tag keys (see src/lib/menu/dietary.ts)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
 
-  restaurant     Restaurant              @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  category       Category                @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  restaurant       Restaurant              @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  category         Category                @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   modifierGroups   MenuItemModifierGroup[]
   orderItems       OrderItem[]
   translations     MenuItemTranslation[]
@@ -1048,10 +1105,10 @@ model MenuItemVariant {
 // table so existing menu_items reads stay safe on a lagging DB. `soldToday` is
 // reset lazily against `soldOn` (the Manila day key) when counted.
 model MenuItemServing {
-  menuItemId   String  @id
+  menuItemId   String   @id
   restaurantId String
   dailyLimit   Int? // null = unlimited (no cap)
-  soldToday    Int     @default(0)
+  soldToday    Int      @default(0)
   soldOn       String? // Manila day key (YYYY-MM-DD) the count belongs to
   updatedAt    DateTime @updatedAt
 
@@ -1094,12 +1151,12 @@ model ModifierGroup {
 }
 
 model Modifier {
-  id              String   @id @default(uuid())
+  id              String  @id @default(uuid())
   modifierGroupId String
   name            String // "Large", "Extra cheese"
-  priceDelta      Int      @default(0) // centavos; +30, +20, can be negative
-  sortOrder       Int      @default(0)
-  isAvailable     Boolean  @default(true) // false = marked out (add-on ran out)
+  priceDelta      Int     @default(0) // centavos; +30, +20, can be negative
+  sortOrder       Int     @default(0)
+  isAvailable     Boolean @default(true) // false = marked out (add-on ran out)
 
   group ModifierGroup @relation(fields: [modifierGroupId], references: [id], onDelete: Cascade)
 
@@ -1156,16 +1213,16 @@ model Supplier {
 }
 
 model InventoryItem {
-  id           String   @id @default(uuid())
-  restaurantId String
-  name         String
-  unit         String // "kg", "pc", "ml", …
-  stockQty     Float    @default(0)
-  costPerUnit  Int      @default(0) // centavos (weighted-average)
-  reorderLevel Float    @default(0)
+  id                String    @id @default(uuid())
+  restaurantId      String
+  name              String
+  unit              String // "kg", "pc", "ml", …
+  stockQty          Float     @default(0)
+  costPerUnit       Int       @default(0) // centavos (weighted-average)
+  reorderLevel      Float     @default(0)
   lowStockAlertedAt DateTime? // set when a low-stock alert was sent; cleared on restock
-  supplierId   String?
-  createdAt    DateTime @default(now())
+  supplierId        String?
+  createdAt         DateTime  @default(now())
 
   restaurant       Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   supplier         Supplier?           @relation(fields: [supplierId], references: [id])
@@ -1386,17 +1443,17 @@ model ShiftSwapRequest {
 }
 
 model TimeEntry {
-  id           String    @id @default(uuid())
-  restaurantId String
-  employeeId   String
-  clockIn      DateTime
-  clockOut     DateTime?
-  breakMinutes Int       @default(0)
-  source       String    @default("qr") // qr | pin | selfie
-  approved     Boolean   @default(false)
+  id               String    @id @default(uuid())
+  restaurantId     String
+  employeeId       String
+  clockIn          DateTime
+  clockOut         DateTime?
+  breakMinutes     Int       @default(0)
+  source           String    @default("qr") // qr | pin | selfie
+  approved         Boolean   @default(false)
   clockInPhotoUrl  String? // storage path of the clock-in selfie
   clockOutPhotoUrl String? // storage path of the clock-out selfie
-  createdAt    DateTime  @default(now())
+  createdAt        DateTime  @default(now())
 
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
@@ -1463,43 +1520,43 @@ enum OrderType {
 }
 
 model Order {
-  id            String        @id @default(uuid())
-  restaurantId  String
-  tableId       String?
-  orderType     OrderType     @default(dine_in)
-  orderNumber   Int? // daily ticket number for counter/stall orders (resets daily)
-  customerName  String? // for pickup / delivery
-  customerPhone String?
-  customerAddress String? // for delivery
-  customerLat   Float? // pinned delivery location
-  customerLng   Float?
-  deliveryStatus String? // null → out_for_delivery → delivered
-  status        OrderStatus   @default(new)
-  billRequested Boolean       @default(false)
-  paymentStatus PaymentStatus @default(unpaid)
-  total         Int           @default(0) // centavos (gross subtotal)
-  discountAmount Int          @default(0) // centavos taken off (senior/PWD/custom)
-  discountLabel String? // e.g. "Senior Citizen (20%)"
-  creditApplied Int           @default(0) // centavos paid by a redeemed gift card / store credit
-  giftCardId    String? // the gift card credit was redeemed from
-  tipAmount     Int           @default(0) // centavos gratuity added at online checkout
+  id                  String        @id @default(uuid())
+  restaurantId        String
+  tableId             String?
+  orderType           OrderType     @default(dine_in)
+  orderNumber         Int? // daily ticket number for counter/stall orders (resets daily)
+  customerName        String? // for pickup / delivery
+  customerPhone       String?
+  customerAddress     String? // for delivery
+  customerLat         Float? // pinned delivery location
+  customerLng         Float?
+  deliveryStatus      String? // null → out_for_delivery → delivered
+  status              OrderStatus   @default(new)
+  billRequested       Boolean       @default(false)
+  paymentStatus       PaymentStatus @default(unpaid)
+  total               Int           @default(0) // centavos (gross subtotal)
+  discountAmount      Int           @default(0) // centavos taken off (senior/PWD/custom)
+  discountLabel       String? // e.g. "Senior Citizen (20%)"
+  creditApplied       Int           @default(0) // centavos paid by a redeemed gift card / store credit
+  giftCardId          String? // the gift card credit was redeemed from
+  tipAmount           Int           @default(0) // centavos gratuity added at online checkout
   inventoryDeductedAt DateTime? // set once stock is deducted (idempotency)
-  servedAt      DateTime? // set when the cashier confirms the food was served
-  voidedAt      DateTime? // set when a cashier voids the (unpaid) order
-  prepMinutes   Int? // prep-time estimate (minutes) a merchant sets on accept
-  cancelReason  String? // reason a merchant rejected the order
-  scheduledFor  DateTime? // advance order: requested pickup/delivery time (null = ASAP)
-  approvalStatus String? // advance order: awaiting | approved | declined (null = not an advance order)
-  downpaymentAmount Int? // centavos owner requires up-front to confirm an advance order
-  downpaymentRef String? // customer's payment reference (e.g. GCash ref) for the downpayment
-  downpaymentPaid Boolean      @default(false) // owner confirmed the downpayment landed
-  paymentChoice String? // website order's chosen method: "cod" | "gcash" (null = not set)
-  paymentRef    String? // customer's GCash reference for the full payment
-  paymentReceiptUrl String? // uploaded screenshot of the customer's online payment
-  customerNote  String? // customer's note to the rider / kitchen (online orders)
-  source        String? // where the order came from: "web" (online site) | null (dine-in/POS)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  servedAt            DateTime? // set when the cashier confirms the food was served
+  voidedAt            DateTime? // set when a cashier voids the (unpaid) order
+  prepMinutes         Int? // prep-time estimate (minutes) a merchant sets on accept
+  cancelReason        String? // reason a merchant rejected the order
+  scheduledFor        DateTime? // advance order: requested pickup/delivery time (null = ASAP)
+  approvalStatus      String? // advance order: awaiting | approved | declined (null = not an advance order)
+  downpaymentAmount   Int? // centavos owner requires up-front to confirm an advance order
+  downpaymentRef      String? // customer's payment reference (e.g. GCash ref) for the downpayment
+  downpaymentPaid     Boolean       @default(false) // owner confirmed the downpayment landed
+  paymentChoice       String? // website order's chosen method: "cod" | "gcash" (null = not set)
+  paymentRef          String? // customer's GCash reference for the full payment
+  paymentReceiptUrl   String? // uploaded screenshot of the customer's online payment
+  customerNote        String? // customer's note to the rider / kitchen (online orders)
+  source              String? // where the order came from: "web" (online site) | null (dine-in/POS)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
 
   restaurant Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   table      Table?      @relation(fields: [tableId], references: [id])
@@ -1558,12 +1615,12 @@ model DeliveryBooking {
 
 /// Shift handover notes — free-text left by one shift for the next.
 model ShiftNote {
-  id           String   @id @default(uuid())
-  restaurantId String
+  id            String   @id @default(uuid())
+  restaurantId  String
   authorStaffId String?
-  authorName   String?
-  body         String
-  createdAt    DateTime @default(now())
+  authorName    String?
+  body          String
+  createdAt     DateTime @default(now())
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
@@ -1619,18 +1676,18 @@ model Reservation {
 /// load/redeem is a GiftCardTxn and the running balance is recomputed from them
 /// (the stored `balance` is a cache).
 model GiftCard {
-  id             String   @id @default(uuid())
+  id             String    @id @default(uuid())
   restaurantId   String
   code           String // redemption code (unique per restaurant, case-insensitive)
   initialBalance Int // centavos issued
   balance        Int // centavos remaining
   customerPhone  String? // optional owner
   customerName   String?
-  active         Boolean  @default(true)
+  active         Boolean   @default(true)
   expiresAt      DateTime?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime  @default(now())
 
-  restaurant   Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  restaurant   Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   transactions GiftCardTxn[]
 
   @@unique([restaurantId, code])
@@ -1722,10 +1779,10 @@ model OrderItem {
 }
 
 model OrderItemModifier {
-  id              String @id @default(uuid())
-  orderItemId     String
-  modifierId      String
-  nameAtTime      String // snapshot of modifier name
+  id               String @id @default(uuid())
+  orderItemId      String
+  modifierId       String
+  nameAtTime       String // snapshot of modifier name
   priceDeltaAtTime Int // snapshot of price delta (centavos)
 
   orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
@@ -1738,14 +1795,14 @@ model OrderItemModifier {
 /// endpoint and pulls pending jobs (ESC/POS, base64). Also records jobs for the
 /// network transport for auditing.
 model PrintJob {
-  id           String   @id @default(uuid())
-  restaurantId String
-  orderId      String?
-  method       PrintMethod
+  id            String      @id @default(uuid())
+  restaurantId  String
+  orderId       String?
+  method        PrintMethod
   payloadBase64 String // ESC/POS bytes, base64
-  status       String   @default("queued") // queued | printed | failed
-  createdAt    DateTime @default(now())
-  printedAt    DateTime?
+  status        String      @default("queued") // queued | printed | failed
+  createdAt     DateTime    @default(now())
+  printedAt     DateTime?
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
@@ -1775,15 +1832,15 @@ model Payment {
 // ----------------------------------------------------------------------------
 
 model Feedback {
-  id           String   @id @default(uuid())
-  restaurantId String
-  orderId      String?
-  rating       Int // 1-5 stars
-  comment      String?
+  id                String   @id @default(uuid())
+  restaurantId      String
+  orderId           String?
+  rating            Int // 1-5 stars
+  comment           String?
   // The Google review invite is shown to EVERYONE regardless of rating.
-  googleInviteShown Boolean @default(false)
-  googleClick       Boolean @default(false)
-  createdAt    DateTime @default(now())
+  googleInviteShown Boolean  @default(false)
+  googleClick       Boolean  @default(false)
+  createdAt         DateTime @default(now())
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   order      Order?     @relation(fields: [orderId], references: [id], onDelete: SetNull)
@@ -1798,18 +1855,18 @@ model Feedback {
 // ----------------------------------------------------------------------------
 
 model CustomerContact {
-  id              String           @id @default(uuid())
-  restaurantId    String
-  phone           String
-  name            String?
+  id               String           @id @default(uuid())
+  restaurantId     String
+  phone            String
+  name             String?
   marketingConsent MarketingConsent @default(none)
   // Proof of consent — store exactly what was shown and where.
-  consentText     String?
-  consentSource   String? // "payment_screen" | "feedback_screen"
-  optInAt         DateTime?
-  confirmedAt     DateTime?
-  optOutAt        DateTime?
-  createdAt       DateTime         @default(now())
+  consentText      String?
+  consentSource    String? // "payment_screen" | "feedback_screen"
+  optInAt          DateTime?
+  confirmedAt      DateTime?
+  optOutAt         DateTime?
+  createdAt        DateTime         @default(now())
 
   restaurant  Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   smsMessages SmsMessage[]
