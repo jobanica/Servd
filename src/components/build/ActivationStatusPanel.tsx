@@ -44,7 +44,8 @@ export function ActivationStatusPanel({
           {status.restaurantName} is live
         </h1>
         <p className="mt-1 text-sm text-plum-ink/55">
-          Your 30-day free trial starts now. Set your password to open your dashboard.
+          Your online ordering system is yours for life — one payment, no monthly fees. Set
+          your password to open your dashboard.
         </p>
 
         {status.claimUrl ? (

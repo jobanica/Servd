@@ -5,7 +5,8 @@ import { systemDb } from "@/server/tenancy/scoped-db";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getPlatformBilling } from "@/server/billing/platform-settings";
 import { XenditBillingProvider } from "@/server/billing/xendit";
-import { provisionTrial } from "@/server/billing/subscription";
+import { provisionFreePlan } from "@/server/billing/subscription";
+import { addonKeyFor } from "@/server/billing/owned-features";
 import { readBuildCookie } from "./session";
 import { ACTIVATION_PRICE } from "./queries";
 
@@ -149,7 +150,7 @@ export async function createActivationCheckout(
 /**
  * Flips a paid preview into a live account. Idempotent: an already-activated
  * request returns immediately, so Xendit's webhook retries can't create a
- * second login or restart the 30-day trial clock.
+ * second login or grant the online-ordering unlock twice.
  */
 async function activateRequest(requestId: string): Promise<boolean> {
   const request = await systemDb((tx) =>
@@ -214,9 +215,31 @@ async function activateRequest(requestId: string): Promise<boolean> {
         data: { restaurantId: restaurant.id, authUserId, role: "admin", email, username },
         select: { id: true },
       });
-      // 30-day trial through the existing plan system — same as every other
-      // new account, so nothing about billing is special-cased for DIY.
-      await provisionTrial(tx, restaurant.id);
+      // The ₱499 buys the online ordering system outright — one payment, no
+      // trial and no monthly fee. So: a lifetime (never-expiring) plan, plus a
+      // recorded one-time purchase of onlineOrdering. Recording the purchase
+      // rather than leaning on whatever the Free plan happens to include means
+      // the entitlement survives any later change to that plan's features —
+      // they paid for it, so they own it.
+      await provisionFreePlan(tx, restaurant.id);
+      const addon = addonKeyFor("onlineOrdering");
+      const already = await tx.addonPurchase.findFirst({
+        where: { restaurantId: restaurant.id, addon, status: "paid" },
+        select: { id: true },
+      });
+      if (!already) {
+        await tx.addonPurchase.create({
+          data: {
+            restaurantId: restaurant.id,
+            addon,
+            amount: ACTIVATION_PRICE,
+            status: "paid",
+            providerRef: `diy:${request.id}`, // unique → a replay can't double-grant
+            paidAt: new Date(),
+          },
+          select: { id: true },
+        });
+      }
       await tx.activationRequest.update({
         where: { id: request.id },
         data: {

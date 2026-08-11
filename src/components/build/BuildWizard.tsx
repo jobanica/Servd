@@ -414,7 +414,7 @@ function ActivateStep({
           "Real orders straight to your kitchen",
           "Your own ordering website + table QR codes",
           "Cashier, kitchen and sales dashboard",
-          "30 days of everything, free — starts when you activate",
+          "Yours for life — one payment, no monthly fees",
         ].map((line) => (
           <li key={line} className="flex gap-2">
             <span className="text-brand-primary">✓</span>
