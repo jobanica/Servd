@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS "feature_subscriptions" (
   "priceMonthly"     INTEGER NOT NULL,
   "currentPeriodEnd" TIMESTAMP(3),
   "providerRef"      TEXT,
+  "renewUrl"         TEXT,
   "createdAt"        TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt"        TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "feature_subscriptions_pkey" PRIMARY KEY ("id")
@@ -33,3 +34,6 @@ CREATE POLICY tenant_isolation ON "feature_subscriptions"
   USING (app.is_super_admin() OR "restaurantId" = app.current_restaurant_id())
   WITH CHECK (app.is_super_admin() OR "restaurantId" = app.current_restaurant_id());
 GRANT SELECT, INSERT, UPDATE, DELETE ON "feature_subscriptions" TO app_user;
+
+-- If the table already existed from an earlier run, add the renewal link.
+ALTER TABLE "feature_subscriptions" ADD COLUMN IF NOT EXISTS "renewUrl" TEXT;

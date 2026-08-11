@@ -690,6 +690,7 @@ model FeatureSubscription {
   priceMonthly     Int // centavos, snapshotted at purchase
   currentPeriodEnd DateTime?
   providerRef      String?   @unique // latest gateway checkout/invoice id
+  renewUrl         String? // hosted checkout for the pending renewal, if any
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 

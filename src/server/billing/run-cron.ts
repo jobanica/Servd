@@ -4,6 +4,7 @@ import { getBillingProvider } from "@/server/billing";
 import { nextBillingAction } from "@/lib/billing/lifecycle";
 import { addMonths } from "@/lib/billing/period";
 import { PLAN_FIELDS } from "@/server/billing/subscription";
+import { renewFeatureSubscriptions } from "@/server/billing/feature-subscriptions";
 import {
   consumeCreditForCycle,
   onInvoicePaid,
@@ -17,6 +18,10 @@ export interface CronSummary {
   awaiting: number;
   suspended: number;
   cancelled: number;
+  /** Per-feature monthly subscriptions (e.g. the content scheduler). */
+  featuresRenewed: number;
+  featuresInvoiced: number;
+  featuresLapsed: number;
 }
 
 /**
@@ -39,7 +44,10 @@ export async function runBillingCron(now: Date = new Date()): Promise<CronSummar
     }),
   ]);
 
-  const s: CronSummary = { processed: subs.length, charged: 0, failed: 0, awaiting: 0, suspended: 0, cancelled: 0 };
+  const s: CronSummary = {
+    processed: subs.length, charged: 0, failed: 0, awaiting: 0, suspended: 0, cancelled: 0,
+    featuresRenewed: 0, featuresInvoiced: 0, featuresLapsed: 0,
+  };
 
   for (const sub of subs) {
     const decision = nextBillingAction(
@@ -178,6 +186,12 @@ export async function runBillingCron(now: Date = new Date()): Promise<CronSummar
       s.failed++;
     }
   }
+
+  // Per-feature monthly subscriptions renew on the same daily pass.
+  const feat = await renewFeatureSubscriptions(now);
+  s.featuresRenewed = feat.renewed;
+  s.featuresInvoiced = feat.invoiced;
+  s.featuresLapsed = feat.lapsed;
 
   return s;
 }

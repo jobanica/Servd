@@ -66,6 +66,17 @@ export default async function ContentPage({
         )}
       </div>
 
+      {sub.renewUrl && (
+        <a
+          href={sub.renewUrl}
+          className="block rounded-tile border border-mango/40 bg-mango/10 p-4 text-sm text-plum-ink"
+        >
+          <span className="font-heading font-bold">Renewal due</span> — your next month of the
+          content scheduler ({formatPeso(sub.priceMonthly)}) is ready to pay.{" "}
+          <span className="font-semibold text-brand-primary underline">Pay now →</span>
+        </a>
+      )}
+
       {justConnected && (
         <div className="rounded-tile border border-mango/40 bg-mango/10 p-4 text-sm font-semibold text-plum-ink">
           ✓ Accounts connected. Anything you tick below will post to them.

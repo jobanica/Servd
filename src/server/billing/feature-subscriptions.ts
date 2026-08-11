@@ -25,6 +25,8 @@ export interface FeatureSubStatus {
   priceMonthly: number;
   /** A checkout was started but hasn't been paid yet. */
   pending: boolean;
+  /** Hosted checkout for an issued renewal that's still unpaid. */
+  renewUrl: string | null;
 }
 
 /** Where this restaurant stands on a monthly feature. */
@@ -39,6 +41,7 @@ export async function getFeatureSubscription(
     currentPeriodEnd: null,
     priceMonthly: price,
     pending: false,
+    renewUrl: null,
   };
   try {
     const row = await systemDb((tx) =>
@@ -53,6 +56,7 @@ export async function getFeatureSubscription(
       currentPeriodEnd: row.currentPeriodEnd,
       priceMonthly: row.priceMonthly || price,
       pending: row.status === "pending",
+      renewUrl: row.renewUrl,
     };
   } catch {
     return none; // table not migrated yet → locked, nothing breaks
@@ -91,11 +95,137 @@ export async function activateFeatureSubByProviderRef(providerRef: string): Prom
         row.currentPeriodEnd && row.currentPeriodEnd > now ? row.currentPeriodEnd : now;
       await tx.featureSubscription.update({
         where: { id: row.id },
-        data: { status: "active", currentPeriodEnd: addMonths(base, 1) },
+        data: { status: "active", currentPeriodEnd: addMonths(base, 1), renewUrl: null },
       });
       return true;
     });
   } catch {
     return false;
   }
+}
+
+/** Days before a period ends that we start trying to renew. */
+const RENEW_WINDOW_DAYS = 3;
+
+export interface FeatureRenewalSummary {
+  processed: number;
+  renewed: number; // charged off-session and extended
+  invoiced: number; // renewal checkout issued, awaiting payment
+  lapsed: number; // period ran out unpaid → access off
+}
+
+/**
+ * Renew per-feature monthly subscriptions. Runs inside the daily billing cron.
+ *
+ * Tries an off-session charge when the restaurant has a saved card; otherwise
+ * (the usual case on Xendit, which has no off-session charging here) it issues
+ * a hosted renewal invoice and stores its URL so the owner can pay in a click.
+ * Access is only ever extended by a real payment — either this charge or the
+ * webhook — so an unpaid feature simply lapses.
+ */
+export async function renewFeatureSubscriptions(now: Date = new Date()): Promise<FeatureRenewalSummary> {
+  const s: FeatureRenewalSummary = { processed: 0, renewed: 0, invoiced: 0, lapsed: 0 };
+  const dueBefore = new Date(now.getTime() + RENEW_WINDOW_DAYS * 86_400_000);
+
+  let due: {
+    id: string;
+    restaurantId: string;
+    feature: string;
+    priceMonthly: number;
+    currentPeriodEnd: Date | null;
+    renewUrl: string | null;
+  }[] = [];
+  try {
+    due = await systemDb((tx) =>
+      tx.featureSubscription.findMany({
+        where: { status: { in: ["active", "past_due"] }, currentPeriodEnd: { lte: dueBefore } },
+        select: {
+          id: true,
+          restaurantId: true,
+          feature: true,
+          priceMonthly: true,
+          currentPeriodEnd: true,
+          renewUrl: true,
+        },
+      }),
+    );
+  } catch {
+    return s; // table not migrated yet
+  }
+  s.processed = due.length;
+  if (due.length === 0) return s;
+
+  const { getBillingProvider } = await import("@/server/billing");
+  const provider = await getBillingProvider();
+
+  for (const sub of due) {
+    const lapsed = !!sub.currentPeriodEnd && sub.currentPeriodEnd <= now;
+    const meta = MONTHLY_FEATURES[sub.feature];
+    const label = meta?.label ?? sub.feature;
+
+    // Off-session charge, when the account has a card saved on its plan.
+    const card = await systemDb((tx) =>
+      tx.subscription.findFirst({
+        where: { restaurantId: sub.restaurantId },
+        orderBy: { createdAt: "desc" },
+        select: { providerPaymentMethodId: true, providerCustomerId: true },
+      }),
+    ).catch(() => null);
+
+    if (provider && card?.providerPaymentMethodId) {
+      try {
+        const res = await provider.chargeSavedCard({
+          amount: sub.priceMonthly,
+          description: `Servd ${label} — 1 month`,
+          paymentMethodId: card.providerPaymentMethodId,
+          customerId: card.providerCustomerId ?? undefined,
+        });
+        if (res.status === "paid") {
+          const base = sub.currentPeriodEnd && sub.currentPeriodEnd > now ? sub.currentPeriodEnd : now;
+          await systemDb((tx) =>
+            tx.featureSubscription.update({
+              where: { id: sub.id },
+              data: { status: "active", currentPeriodEnd: addMonths(base, 1), renewUrl: null },
+            }),
+          );
+          s.renewed++;
+          continue;
+        }
+      } catch {
+        /* fall through to invoicing */
+      }
+    }
+
+    // No saved card (or the charge didn't settle) → issue a payable renewal.
+    if (provider && !sub.renewUrl) {
+      try {
+        const base = process.env.NEXT_PUBLIC_APP_URL ?? "";
+        const checkout = await provider.createInvoiceCheckout({
+          amount: sub.priceMonthly,
+          description: `Servd ${label} — 1 month`,
+          referenceNumber: `sub-${sub.id.slice(0, 12)}`,
+          successUrl: `${base}/admin/content?subscribed=1`,
+        });
+        await systemDb((tx) =>
+          tx.featureSubscription.update({
+            where: { id: sub.id },
+            data: { providerRef: checkout.gatewayRef, renewUrl: checkout.checkoutUrl },
+          }),
+        );
+        s.invoiced++;
+      } catch {
+        /* try again on the next run */
+      }
+    }
+
+    // Period actually ran out and it's still unpaid → mark it, access is already off.
+    if (lapsed) {
+      await systemDb((tx) =>
+        tx.featureSubscription.update({ where: { id: sub.id }, data: { status: "past_due" } }),
+      ).catch(() => {});
+      s.lapsed++;
+    }
+  }
+
+  return s;
 }

@@ -37,6 +37,9 @@ export function BillingRunButton() {
               ["Failed", state.summary.failed],
               ["Awaiting", state.summary.awaiting],
               ["Suspended", state.summary.suspended],
+              ["Features renewed", state.summary.featuresRenewed],
+              ["Feature invoices", state.summary.featuresInvoiced],
+              ["Features lapsed", state.summary.featuresLapsed],
               ["Cancelled", state.summary.cancelled],
             ] as const
           ).map(([label, value]) => (
