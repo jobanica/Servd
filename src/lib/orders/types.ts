@@ -10,6 +10,8 @@ export interface KitchenOrderItem {
 export interface KitchenOrder {
   id: string;
   tableNumber: string;
+  /** "Dine in" | "Takeaway" | "Delivery" — shown under the card title. */
+  typeLabel?: string;
   status: "new" | "preparing" | "done";
   createdAt: string; // ISO string (serializable across the server boundary)
   total: number; // centavos

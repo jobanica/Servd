@@ -72,6 +72,7 @@ export async function getKitchenOrders(): Promise<KitchenOrder[]> {
 
   // Best-effort pickup/delivery/counter labels (columns may lag on prod).
   const labels = new Map<string, string>();
+  const types = new Map<string, string>();
   try {
     const meta = await tenantDb(staff.restaurantId, (tx) =>
       tx.order.findMany({
@@ -82,13 +83,13 @@ export async function getKitchenOrders(): Promise<KitchenOrder[]> {
     for (const m of meta) {
       // A counter/stall order shows its big daily ticket number to the kitchen.
       if (m.orderNumber != null) {
-        labels.set(m.id, `🧾 ${formatOrderNumber(m.orderNumber)}`);
+        labels.set(m.id, formatOrderNumber(m.orderNumber));
+        types.set(m.id, m.orderType === "delivery" ? "Delivery" : "Takeaway");
         continue;
       }
-      labels.set(
-        m.id,
-        `${m.orderType === "delivery" ? "🛵 Delivery" : "🥡 Pickup"} — ${m.customerName ?? "Customer"}`,
-      );
+      // Title = who the order is for; the type shows on its own line.
+      labels.set(m.id, m.customerName?.trim() || "Customer");
+      types.set(m.id, m.orderType === "delivery" ? "Delivery" : "Takeaway");
     }
   } catch {
     /* not migrated yet */
@@ -97,6 +98,7 @@ export async function getKitchenOrders(): Promise<KitchenOrder[]> {
   return orders.map((o) => ({
     id: o.id,
     tableNumber: labels.get(o.id) ?? o.table?.tableNumber ?? "—",
+    typeLabel: types.get(o.id) ?? "Dine in",
     status: o.status as KitchenOrder["status"],
     createdAt: o.createdAt.toISOString(),
     total: o.total,

@@ -8,50 +8,75 @@ import { useOnline } from "@/lib/offline/useOnline";
 import { kvGet, kvSet, outboxAdd, outboxAll, outboxRemove, type OutboxOp } from "@/lib/offline/idb";
 import { ConnectivityPill } from "@/components/offline/ConnectivityPill";
 
-function minutesAgo(iso: string): string {
-  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (mins < 1) return "just now";
-  return `${mins}m ago`;
+/** Elapsed time as mm:ss (or h:mm:ss once past an hour). */
+function elapsed(iso: string, nowMs: number): string {
+  const secs = Math.max(0, Math.floor((nowMs - new Date(iso).getTime()) / 1000));
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const sec = secs % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
+}
+
+/**
+ * Urgency from how long the order has been waiting. Green while it's fresh,
+ * amber once it's dragging, red when it's genuinely late — readable across the
+ * kitchen at a glance.
+ */
+function urgency(iso: string, nowMs: number): { head: string; text: string } {
+  const mins = (nowMs - new Date(iso).getTime()) / 60000;
+  if (mins >= 20) return { head: "bg-red-500", text: "text-white" };
+  if (mins >= 10) return { head: "bg-amber-400", text: "text-plum-ink" };
+  return { head: "bg-green-500", text: "text-white" };
 }
 
 function OrderCard({
   order,
   onAdvance,
   busy,
+  nowMs,
 }: {
   order: KitchenOrder;
   onAdvance: (id: string, to: "preparing" | "done") => void;
   busy: boolean;
+  nowMs: number;
 }) {
   const next = order.status === "new" ? "preparing" : "done";
   const label = order.status === "new" ? "Start preparing" : "Mark ready 🔔";
+  const tone = urgency(order.createdAt, nowMs);
+
   return (
-    <div className="rounded-tile border border-plum-ink/10 bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between">
-        <span className="font-heading text-lg font-extrabold">
-          Table {order.tableNumber}
-        </span>
-        <span className="text-xs text-plum-ink/50">
-          {minutesAgo(order.createdAt)}
-        </span>
+    <div className="flex flex-col overflow-hidden rounded-xl bg-white shadow-md ring-1 ring-plum-ink/10">
+      {/* Colour-coded header: who it's for + how long it's been waiting. */}
+      <div className={`${tone.head} ${tone.text} px-3 py-2`}>
+        <p className="font-heading text-2xl font-extrabold leading-none">{order.tableNumber}</p>
+        <p className="mt-1 text-xs font-semibold tabular-nums opacity-90">
+          {elapsed(order.createdAt, nowMs)}
+        </p>
       </div>
-      <ul className="mt-2 space-y-1.5">
+
+      <p className="border-b border-plum-ink/10 px-3 py-2 text-sm italic text-plum-ink/70">
+        {order.typeLabel ?? "Dine in"}
+      </p>
+
+      <ul className="flex-1 space-y-3 px-3 py-3">
         {order.items.map((it) => (
-          <li key={it.id} className="text-sm">
-            <span className="font-semibold">{it.quantity}×</span> {it.name}
+          <li key={it.id}>
+            <p className="text-base font-semibold leading-snug text-plum-ink">
+              {it.quantity} x {it.name}
+            </p>
             {it.modifiers.length > 0 && (
-              <span className="text-plum-ink/50"> · {it.modifiers.join(", ")}</span>
+              <p className="text-sm leading-snug text-plum-ink/45">{it.modifiers.join(", ")}</p>
             )}
-            {it.note && (
-              <span className="block text-xs italic text-guava">“{it.note}”</span>
-            )}
+            {it.note && <p className="text-sm font-medium leading-snug text-guava">“{it.note}”</p>}
           </li>
         ))}
       </ul>
+
       <button
         onClick={() => onAdvance(order.id, next)}
         disabled={busy}
-        className="mt-3 w-full rounded-lg py-2 text-sm font-semibold btn-brand disabled:opacity-60"
+        className="m-3 mt-0 rounded-lg py-2.5 text-sm font-bold btn-brand disabled:opacity-60"
       >
         {label}
       </button>
@@ -194,6 +219,14 @@ export function KitchenBoard({
     }
   }
 
+  // One clock for the whole board — each card derives its own elapsed time,
+  // so the timers stay in sync and we only re-render once a second.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
   const incoming = orders.filter((o) => o.status === "new");
   const preparing = orders.filter((o) => o.status === "preparing");
 
@@ -213,22 +246,23 @@ export function KitchenBoard({
         </div>
       )}
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="space-y-6">
         <section>
           <h2 className="mb-3 font-heading text-lg font-bold">
             New <span className="text-plum-ink/40">({incoming.length})</span>
           </h2>
-          <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {incoming.map((o) => (
               <OrderCard
                 key={o.id}
                 order={o}
                 onAdvance={handleAdvance}
                 busy={busyId === o.id}
+                nowMs={nowMs}
               />
             ))}
             {incoming.length === 0 && (
-              <p className="text-sm text-plum-ink/40">No new orders.</p>
+              <p className="col-span-full text-sm text-plum-ink/40">No new orders.</p>
             )}
           </div>
         </section>
@@ -238,17 +272,18 @@ export function KitchenBoard({
             Preparing{" "}
             <span className="text-plum-ink/40">({preparing.length})</span>
           </h2>
-          <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {preparing.map((o) => (
               <OrderCard
                 key={o.id}
                 order={o}
                 onAdvance={handleAdvance}
                 busy={busyId === o.id}
+                nowMs={nowMs}
               />
             ))}
             {preparing.length === 0 && (
-              <p className="text-sm text-plum-ink/40">Nothing in progress.</p>
+              <p className="col-span-full text-sm text-plum-ink/40">Nothing in progress.</p>
             )}
           </div>
         </section>
