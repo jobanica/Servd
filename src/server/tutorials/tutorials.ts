@@ -1,5 +1,6 @@
 import "server-only";
 
+import { unstable_cache } from "next/cache";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { parseVideoSource } from "@/lib/video";
 
@@ -75,4 +76,30 @@ export async function getTutorials(): Promise<TutorialsData> {
 export function tutorialEmbed(url: string): { kind: "youtube" | "vimeo" | "file"; src: string } {
   const s = parseVideoSource(url);
   return s.kind === "file" ? { kind: "file", src: s.url } : { kind: s.kind, src: s.embedUrl };
+}
+
+/**
+ * Whether there is anything to watch yet.
+ *
+ * Read on every admin page render to decide whether to offer the Tutorials
+ * link at all — a permanent button that leads to "coming soon" teaches owners
+ * the link is worthless, and they stop trying it. So it's cached: the answer
+ * changes only when the super-admin edits the hub, which busts the tag.
+ */
+export const TUTORIALS_TAG = "tutorials-content";
+
+export async function hasTutorials(): Promise<boolean> {
+  const cached = unstable_cache(
+    async () => {
+      const { sections } = await getTutorials();
+      return sections.some((s) => s.videos.length > 0);
+    },
+    [TUTORIALS_TAG],
+    { revalidate: 600, tags: [TUTORIALS_TAG] },
+  );
+  try {
+    return await cached();
+  } catch {
+    return false;
+  }
 }

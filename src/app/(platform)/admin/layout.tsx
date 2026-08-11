@@ -1,6 +1,7 @@
 import { getCurrentUser } from "@/server/tenancy/current-user";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { getEntitledFeatures } from "@/server/billing/feature-gate";
+import { hasTutorials } from "@/server/tutorials/tutorials";
 import { AdminShell } from "@/components/admin/AdminShell";
 
 /**
@@ -18,7 +19,7 @@ export default async function AdminLayout({
     return <>{children}</>;
   }
 
-  const [restaurant, features] = await Promise.all([
+  const [restaurant, features, tutorialsReady] = await Promise.all([
     tenantDb(user.restaurantId, (tx) =>
       tx.restaurant.findFirstOrThrow({
         select: {
@@ -33,6 +34,7 @@ export default async function AdminLayout({
       }),
     ),
     getEntitledFeatures(user.restaurantId),
+    hasTutorials(),
   ]);
 
   return (
@@ -50,6 +52,7 @@ export default async function AdminLayout({
       // Full white-label (no "Powered by Servd") is now a per-plan feature.
       fullWhiteLabel={features.has("whiteLabel")}
       features={[...features]}
+      showTutorials={tutorialsReady}
     >
       {children}
     </AdminShell>

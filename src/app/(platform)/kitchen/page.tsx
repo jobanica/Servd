@@ -6,6 +6,7 @@ import { hasFeature } from "@/server/billing/feature-gate";
 import { KitchenBoard } from "@/components/kitchen/KitchenBoard";
 import { ServiceWorkerRegister } from "@/components/offline/ServiceWorkerRegister";
 import { StaffDataError } from "@/components/StaffDataError";
+import { hasTutorials } from "@/server/tutorials/tutorials";
 import { signOut } from "../login/actions";
 
 export default async function KitchenHome() {
@@ -44,6 +45,16 @@ export default async function KitchenHome() {
           {user.role === "admin" && (
             <a href="/admin" className="rounded-full border border-plum-ink/15 px-4 py-2 text-sm font-semibold">
               ← Dashboard
+            </a>
+          )}
+          {(await hasTutorials()) && (
+            <a
+              href="/tutorials"
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-full border border-plum-ink/15 px-4 py-2 text-sm font-semibold"
+            >
+              🎓 Tutorials
             </a>
           )}
           <a href="/clock/me" className="rounded-full px-4 py-2 text-sm font-semibold btn-brand">

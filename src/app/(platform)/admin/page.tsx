@@ -13,6 +13,7 @@ import { formatPeso } from "@/lib/money";
 import { manilaStartOfDay, manilaStartOfDaysAgo } from "@/lib/time/manila";
 import { RevenueChart } from "@/components/analytics/Charts";
 import { getAiInsights, aiInsightsEnabled } from "@/server/ai/insights";
+import { hasTutorials } from "@/server/tutorials/tutorials";
 
 /** Resolves a promise, returning a fallback if it throws (schema-lag safe). */
 async function safe<T>(p: Promise<T>, fallback: T): Promise<T> {
@@ -74,6 +75,8 @@ export default async function AdminHome() {
   const weekAgo = manilaStartOfDaysAgo(7, now);
 
   const inventoryOn = await safe(hasModule(rid, "inventory"), false);
+  // Cached platform-wide, so this is not a per-dashboard query.
+  const tutorialsReady = await hasTutorials();
 
   const [today, week, counts, recent, feedback, lowStock] = await Promise.all([
     safe(getAnalytics(rid, startOfDay, now), null),
@@ -283,6 +286,13 @@ export default async function AdminHome() {
             <a href={`/r/${restaurant.slug}`} target="_blank" rel="noopener" className="block rounded-lg border border-brand-primary/30 bg-brand-primary/5 px-3 py-2 text-sm font-semibold text-brand-primary hover:border-brand-primary">
               🌐 View your online website <span className="opacity-40">→</span>
             </a>
+            {/* Only offered once there's something to watch — a button that
+                leads to "coming soon" teaches owners the link is worthless. */}
+            {tutorialsReady && (
+              <a href="/tutorials" target="_blank" rel="noopener" className="block rounded-lg border border-plum-ink/10 px-3 py-2 text-sm font-semibold hover:border-brand-primary">
+                🎓 Watch tutorials <span className="text-plum-ink/30">→</span>
+              </a>
+            )}
             {[["Add a menu item", "/admin/menu"], ["Print table QR", "/admin/tables"], ["Add staff login", "/admin/staff"]].map(([l, h]) => (
               <Link key={h} href={h} className="block rounded-lg border border-plum-ink/10 px-3 py-2 text-sm font-semibold hover:border-brand-primary">
                 {l} <span className="text-plum-ink/30">→</span>

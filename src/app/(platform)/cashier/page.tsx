@@ -7,6 +7,7 @@ import { hasFeature } from "@/server/billing/feature-gate";
 import { CashierBoard } from "@/components/cashier/CashierBoard";
 import { ServiceWorkerRegister } from "@/components/offline/ServiceWorkerRegister";
 import { StaffDataError } from "@/components/StaffDataError";
+import { hasTutorials } from "@/server/tutorials/tutorials";
 
 export default async function CashierHome() {
   const user = await getCurrentUser();
@@ -57,6 +58,7 @@ export default async function CashierHome() {
         initialIncoming={initialIncoming}
         isAdmin={user.role === "admin"}
         offlineEnabled={offlineEnabled}
+        showTutorials={await hasTutorials()}
       />
       {offlineEnabled && <ServiceWorkerRegister />}
     </div>

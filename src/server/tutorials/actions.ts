@@ -1,10 +1,10 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { requireSuperAdminAction } from "@/server/tenancy/require-admin";
-import { normalizeTutorials, type TutorialsData } from "@/server/tutorials/tutorials";
+import { normalizeTutorials, TUTORIALS_TAG, type TutorialsData } from "@/server/tutorials/tutorials";
 
 export type SaveTutorialsResult = { ok: true } | { ok: false; error: string };
 
@@ -33,5 +33,9 @@ export async function saveTutorials(data: TutorialsData): Promise<SaveTutorialsR
   }
   revalidatePath("/tutorials");
   revalidatePath("/super-admin/tutorials");
+  // Publishing the first video is what makes the Tutorials link appear in every
+  // owner's dashboard, so that answer has to be refreshed here rather than
+  // waiting out its cache.
+  revalidateTag(TUTORIALS_TAG);
   return { ok: true };
 }

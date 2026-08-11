@@ -70,12 +70,15 @@ export function CashierBoard({
   initialIncoming = [],
   isAdmin = false,
   offlineEnabled = false,
+  showTutorials = false,
 }: {
   restaurantId: string;
   initialTables: CashierTable[];
   initialIncoming?: IncomingOrder[];
   isAdmin?: boolean;
   offlineEnabled?: boolean;
+  /** False when the tutorials hub has no videos yet. */
+  showTutorials?: boolean;
 }) {
   const [tables, setTables] = useState<CashierTable[]>(initialTables);
   const [incoming, setIncoming] = useState<IncomingOrder[]>(initialIncoming);
@@ -377,6 +380,15 @@ export function CashierBoard({
       <button onClick={() => setShiftNotesOpen(true)} className={sidebarBtn}>📝 Handover notes</button>
 
       <div className="my-1 border-t border-plum-ink/10" />
+
+      {/* Cashiers are the staff most often learning the system mid-shift, and
+          they have no access to the admin sidebar where help usually lives.
+          New tab, so an open till stays exactly as they left it. */}
+      {showTutorials && (
+        <a href="/tutorials" target="_blank" rel="noreferrer" className={`${sidebarBtn} text-center`}>
+          🎓 Tutorials
+        </a>
+      )}
 
       <form action={signOut}>
         <button className={sidebarBtn}>Sign out</button>

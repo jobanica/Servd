@@ -36,6 +36,7 @@ const I = {
   globe: "M12 2a10 10 0 100 20 10 10 0 000-20M2 12h20M12 2c2.5 3 2.5 17 0 20M12 2c-2.5 3-2.5 17 0 20",
   receipt: "M5 3v18l2-1 2 1 2-1 2 1 2-1 2 1V3l-2 1-2-1-2 1-2-1-2 1z M9 8h6M9 12h6",
   film: "M3 4h18v16H3zM7 4v16M17 4v16M3 9h4M17 9h4M3 15h4M17 15h4",
+  play: "M4 5a2 2 0 012-2h12a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2zM10 8.5l5 3.5-5 3.5z",
 };
 
 // Nav items that require a plan feature — hidden when the plan lacks it.
@@ -133,12 +134,15 @@ export function AdminShell({
   theme,
   fullWhiteLabel = false,
   features,
+  showTutorials = false,
   children,
 }: {
   brand: { name: string; slug: string; status: string; logoUrl?: string | null };
   theme?: BrandInput;
   fullWhiteLabel?: boolean;
   features?: string[];
+  /** False when the hub has no videos yet — see the sidebar link below. */
+  showTutorials?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -223,6 +227,22 @@ export function AdminShell({
       </Link>
       {nav}
       <div className="space-y-1 border-t border-plum-ink/10 p-3">
+        {/* Help lives at the bottom of the sidebar, so it's reachable from every
+            page rather than only the dashboard. Opens in a new tab: an owner
+            checking how to do something shouldn't lose the page they were
+            halfway through. */}
+        {showTutorials && (
+          <a
+            href="/tutorials"
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-plum-ink/60 hover:bg-plum-ink/5 hover:text-plum-ink"
+          >
+            <Icon d={I.play} />
+            <span className="flex-1">Tutorials</span>
+            <span className="text-plum-ink/30">↗</span>
+          </a>
+        )}
         <PlatformFeedbackButton />
         <form action={signOut}>
           <button className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-plum-ink/60 hover:bg-plum-ink/5">
