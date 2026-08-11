@@ -427,10 +427,13 @@ export async function declineOrder(orderId: string): Promise<CashierState> {
   return { ok: true, incoming: await getIncomingOrders(), tables: await getCashierTables() };
 }
 
-/** Record an in-person payment (cash/card). Marks paid AND closes the order. */
+/** Payment methods a cashier can record in person. */
+export type CounterMethod = "cash" | "card_terminal" | "gcash" | "maya";
+
+/** Record an in-person payment (cash/card/e-wallet). Marks paid AND closes the order. */
 export async function markOrderPaid(
   orderId: string,
-  method: "cash" | "card_terminal",
+  method: CounterMethod,
 ): Promise<{ ok: boolean; tables?: CashierTable[]; error?: string; printTicket?: boolean }> {
   let staff;
   try {
@@ -497,7 +500,7 @@ export type PartialPaymentResult =
 export async function recordPartialPayment(
   orderId: string,
   amountPesos: number,
-  method: "cash" | "card_terminal",
+  method: CounterMethod,
 ): Promise<PartialPaymentResult> {
   let staff;
   try {

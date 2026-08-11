@@ -37,6 +37,8 @@ export interface ReceiptBranding {
 const METHOD_LABEL: Record<string, string> = {
   cash: "Cash",
   card_terminal: "Card",
+  gcash: "GCash",
+  maya: "Maya",
   online_gcash: "GCash",
   online_card: "Card (online)",
 };

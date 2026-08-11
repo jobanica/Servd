@@ -10,6 +10,7 @@ import {
   acceptOrder,
   declineOrder,
   markOrderPaid,
+  type CounterMethod,
   markServed,
   closeOrder,
   type CashierTable,
@@ -18,6 +19,7 @@ import {
 import { formatPeso } from "@/lib/money";
 import { chime } from "@/lib/sound";
 import { PrintTicketButton } from "./PrintTicketButton";
+import { PayModal } from "./PayModal";
 import { NewOrderModal } from "./NewOrderModal";
 import { DiscountModal } from "./DiscountModal";
 import { LoyaltyRedeemModal } from "./LoyaltyRedeemModal";
@@ -90,7 +92,9 @@ export function CashierBoard({
   const [voidOrderTarget, setVoidOrderTarget] = useState<{ id: string; label: string } | null>(null);
   const [editOrderTarget, setEditOrderTarget] = useState<{ id: string; label: string } | null>(null);
   const [addItemsTarget, setAddItemsTarget] = useState<{ id: string; label: string } | null>(null);
-  const [menuOrderId, setMenuOrderId] = useState<string | null>(null); // which order's "⋯ more" menu is open
+  const [menuOrderId, setMenuOrderId] = useState<string | null>(null);
+  // Order being settled — drives the tendered/change payment modal.
+  const [payTarget, setPayTarget] = useState<{ id: string; label: string; due: number; method: CounterMethod } | null>(null);
   const [giftCardTarget, setGiftCardTarget] = useState<{ id: string; label: string } | null>(null);
   const [splitTarget, setSplitTarget] = useState<{ id: string; label: string; remaining: number } | null>(null);
   const [discountOrder, setDiscountOrder] = useState<CashierTable["orders"][number] | null>(null);
@@ -246,13 +250,16 @@ export function CashierBoard({
     }
   }
 
-  async function pay(orderId: string, method: "cash" | "card_terminal") {
+  async function pay(orderId: string, method: CounterMethod, change = 0) {
     setBusy(orderId);
+    setPayTarget(null);
     try {
       const res = await markOrderPaid(orderId, method);
       if (res.ok && res.tables) {
         setTables(res.tables);
-        showToast("Payment recorded — order closed.");
+        showToast(
+          change > 0 ? `Paid — give ${formatPeso(change)} change.` : "Payment recorded — order closed.",
+        );
         await printPaidReceipt(orderId);
       } else if (!res.ok) {
         showToast(res.error ?? "Couldn't record the payment.");
@@ -559,11 +566,18 @@ export function CashierBoard({
                     {o.paymentStatus !== "paid" && (
                       <>
                         <button
-                          onClick={() => pay(o.id, "cash")}
+                          onClick={() => setPayTarget({ id: o.id, label: t.label, due: Math.max(0, o.net - o.paid), method: "cash" })}
                           disabled={busy === o.id}
                           className="rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
                         >
-                          Paid (cash)
+                          💵 Cash
+                        </button>
+                        <button
+                          onClick={() => setPayTarget({ id: o.id, label: t.label, due: Math.max(0, o.net - o.paid), method: "gcash" })}
+                          disabled={busy === o.id}
+                          className="rounded-lg border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
+                        >
+                          📱 GCash / Maya
                         </button>
                         <div className="relative">
                           <button
@@ -903,6 +917,17 @@ export function CashierBoard({
         <NewOrderModal
           onClose={() => setNewOrderOpen(false)}
           onCreated={(t) => setTables(t)}
+        />
+      )}
+
+      {payTarget && (
+        <PayModal
+          label={payTarget.label}
+          due={payTarget.due}
+          busy={busy === payTarget.id}
+          initialMethod={payTarget.method}
+          onConfirm={(method, change) => pay(payTarget.id, method, change)}
+          onCancel={() => setPayTarget(null)}
         />
       )}
 

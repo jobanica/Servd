@@ -8,6 +8,8 @@ import { manilaStartOfDay, manilaEndOfDay } from "@/lib/time/manila";
 const METHOD_LABEL: Record<string, string> = {
   cash: "Cash",
   card_terminal: "Card",
+  gcash: "GCash",
+  maya: "Maya",
   online_gcash: "GCash (online)",
   online_card: "Card (online)",
 };

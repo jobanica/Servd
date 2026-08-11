@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { recordPartialPayment, type CashierTable } from "@/server/orders/cashier";
+import type { CounterMethod } from "@/server/orders/cashier";
 
 function peso(centavos: number) {
   return `₱${(centavos / 100).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
@@ -23,7 +24,7 @@ export function SplitPaymentModal({
 }) {
   const [owed, setOwed] = useState(remaining);
   const [amount, setAmount] = useState((remaining / 100).toFixed(2));
-  const [method, setMethod] = useState<"cash" | "card_terminal">("cash");
+  const [method, setMethod] = useState<CounterMethod>("cash");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -78,10 +79,12 @@ export function SplitPaymentModal({
             <span className="font-medium">Method</span>
             <select
               value={method}
-              onChange={(e) => setMethod(e.target.value as "cash" | "card_terminal")}
+              onChange={(e) => setMethod(e.target.value as CounterMethod)}
               className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2"
             >
               <option value="cash">Cash</option>
+              <option value="gcash">GCash</option>
+              <option value="maya">Maya</option>
               <option value="card_terminal">Card</option>
             </select>
           </label>

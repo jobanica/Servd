@@ -391,7 +391,7 @@ export function NewOrderModal({
                 <div className="grid grid-cols-3 gap-1 rounded-lg bg-cream/60 p-1">
                   {([
                     ["dine_in", "Dine-in"],
-                    ["takeout", "Pickup"],
+                    ["takeout", "Takeout"],
                     ["delivery", "Delivery"],
                   ] as const).map(([k, label]) => (
                     <button

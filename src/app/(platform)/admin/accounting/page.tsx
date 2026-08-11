@@ -19,7 +19,8 @@ function range(p: Period) {
   return { from, to };
 }
 const METHOD_LABEL: Record<string, string> = {
-  cash: "Cash", card_terminal: "Card (terminal)", online_gcash: "GCash (online)", online_card: "Card (online)",
+  cash: "Cash", card_terminal: "Card (terminal)", gcash: "GCash (counter)", maya: "Maya (counter)",
+  online_gcash: "GCash (online)", online_card: "Card (online)",
 };
 
 export default async function AccountingPage({

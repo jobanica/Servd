@@ -60,6 +60,8 @@ enum PaymentMethod {
   online_card
   cash
   card_terminal
+  gcash // scanned at the counter (in person)
+  maya // scanned at the counter (in person)
 }
 
 enum Gateway {
