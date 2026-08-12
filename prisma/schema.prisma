@@ -490,6 +490,7 @@ model Restaurant {
   modifierGroups     ModifierGroup[]
   orders             Order[]
   printJobs          PrintJob[]
+  cashierShifts      CashierShift[]
   feedback           Feedback[]
   promotions         Promotion[]
   customers          CustomerContact[]
@@ -613,10 +614,40 @@ model CashMovement {
   amount       Int // centavos
   note         String?
   staffEmail   String? // who recorded it
+  shiftId      String? // the cashier shift it came out of
   createdAt    DateTime @default(now())
 
   @@index([restaurantId, createdAt])
+  @@index([shiftId])
   @@map("cash_movements")
+}
+
+/// One cashier's turn at the till.
+///
+/// Opened the first time they act on the cashier screen, closed by "End shift"
+/// (which prints the Z-report and signs them out). Every payment and cash-out
+/// they take is stamped with it, so the summary counts THEIR drawer rather than
+/// the whole restaurant's day — the previous behaviour, where a cashier saw the
+/// takings of everyone before them, is what made separate logins pointless.
+///
+/// A stale shift (browser closed, session expired) is auto-closed at the start
+/// of the next business day rather than carrying over.
+model CashierShift {
+  id           String    @id @default(uuid())
+  restaurantId String
+  staffUserId  String
+  /// Snapshot of the name, so a renamed or deleted login keeps its Z-report.
+  staffName    String
+  openedAt     DateTime  @default(now())
+  closedAt     DateTime?
+  status       String    @default("open") // open | closed
+  closedReason String? // ended | auto_end_of_day
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, status])
+  @@index([restaurantId, staffUserId, openedAt])
+  @@map("cashier_shifts")
 }
 
 /// A customer's loyalty balance at a restaurant, keyed by phone number.
@@ -1678,6 +1709,12 @@ model Order {
   paymentReceiptUrl   String? // uploaded screenshot of the customer's online payment
   customerNote        String? // customer's note to the rider / kitchen (online orders)
   source              String? // where the order came from: "web" (online site) | null (dine-in/POS)
+  /// The cashier who opened this order, shown on the floor so a table can be
+  /// traced back to whoever rang it up. Attribution only — every cashier can
+  /// still settle every table, or a customer would be stranded the moment the
+  /// staff member who served them went on break.
+  openedByStaffId     String?
+  openedByName        String?
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
 
@@ -1934,19 +1971,25 @@ model PrintJob {
 }
 
 model Payment {
-  id         String        @id @default(uuid())
-  orderId    String
-  amount     Int // centavos
-  method     PaymentMethod
-  gateway    Gateway
-  gatewayRef String? // gateway's checkout/intent id
-  status     PaymentStatus @default(pending)
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  id          String        @id @default(uuid())
+  orderId     String
+  amount      Int // centavos
+  method      PaymentMethod
+  gateway     Gateway
+  gatewayRef  String? // gateway's checkout/intent id
+  status      PaymentStatus @default(pending)
+  /// Which cashier took this money, and during which shift. Null for online
+  /// payments (no cashier touched them) and for anything recorded before
+  /// shift tracking existed — the summary treats both as "not in my drawer".
+  staffUserId String?
+  shiftId     String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
+  @@index([shiftId])
   @@map("payments")
 }
 

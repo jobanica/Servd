@@ -5,6 +5,10 @@ import { tenantDb } from "@/server/tenancy/scoped-db";
 import { getSalesReport, getExpenses } from "@/server/accounting/queries";
 import { getCashOutsToday } from "@/server/orders/cash-out";
 import { manilaStartOfDay, manilaEndOfDay } from "@/lib/time/manila";
+import { ensureShift } from "./shift-session";
+import { getShiftSales, getShiftCashOuts } from "./shift-sales";
+import { expectedCash } from "@/lib/orders/shift-rollup";
+import { staffLabel } from "@/server/tenancy/staff-name";
 
 const METHOD_LABEL: Record<string, string> = {
   cash: "Cash",
@@ -18,6 +22,9 @@ const METHOD_LABEL: Record<string, string> = {
 export interface ShiftSummary {
   restaurantName: string;
   cashier: string;
+  /** Null when shift tracking isn't migrated yet — the report is day-wide then. */
+  shiftId: string | null;
+  openedAt: string | null;
   from: string;
   to: string;
   gross: number;
@@ -33,29 +40,18 @@ export interface ShiftSummary {
   net: number; // gross − expenses
 }
 
-/**
- * The restaurant's name and a human name for the cashier, for the printed
- * header. Falls back through displayName → username → email, because a DIY
- * account's login address is synthetic (`slug@staff.servdph.com`) and printing
- * that on a Z-report the owner signs is just noise.
- */
+/** The restaurant's name and a human name for the cashier, for the header. */
 async function identify(
   restaurantId: string,
   staffUserId: string,
 ): Promise<{ restaurantName: string; cashier: string }> {
   try {
     return await tenantDb(restaurantId, async (tx) => {
-      const [r, s] = await Promise.all([
+      const [r, name] = await Promise.all([
         tx.restaurant.findFirstOrThrow({ select: { name: true, displayName: true } }),
-        tx.staffUser.findFirst({
-          where: { id: staffUserId },
-          select: { displayName: true, username: true, email: true },
-        }),
+        staffLabel(restaurantId, staffUserId),
       ]);
-      return {
-        restaurantName: r.displayName || r.name,
-        cashier: s?.displayName || s?.username || s?.email?.split("@")[0] || "—",
-      };
+      return { restaurantName: r.displayName || r.name, cashier: name };
     });
   } catch {
     return { restaurantName: "", cashier: "—" };
@@ -63,9 +59,17 @@ async function identify(
 }
 
 /**
- * End-of-shift / daily Z-report for the logged-in cashier: today's collected
- * sales (by payment method), expenses recorded today, and the net. Built from
- * confirmed payments so it matches the accounting sales report.
+ * The Z-report for the CURRENT cashier's open shift: what they took, what came
+ * out of their drawer, and what should be in it.
+ *
+ * Scoped to the shift, not the calendar day. It used to total every payment the
+ * restaurant took since midnight, so the second cashier of the day opened their
+ * summary and found the first cashier's sales already in it — which is what
+ * made separate logins pointless.
+ *
+ * Falls back to the whole-day view when shift tracking isn't available yet
+ * (migration not run). Wrong-but-familiar beats an empty report the cashier
+ * can't close their drawer with.
  */
 export async function getShiftSummary(): Promise<ShiftSummary | null> {
   let staff;
@@ -75,15 +79,36 @@ export async function getShiftSummary(): Promise<ShiftSummary | null> {
     return null;
   }
 
-  const from = manilaStartOfDay();
-  const to = manilaEndOfDay();
+  const who = await identify(staff.restaurantId, staff.staffUserId);
+  const shift = await ensureShift(staff.restaurantId, staff.staffUserId, () =>
+    staffLabel(staff.restaurantId, staff.staffUserId),
+  );
 
-  const [sales, expenses, cashOuts, who] = await Promise.all([
-    getSalesReport(staff.restaurantId, from, to),
-    getExpenses(staff.restaurantId, from, to),
-    getCashOutsToday(staff.restaurantId),
-    identify(staff.restaurantId, staff.staffUserId),
-  ]);
+  // Expenses stay day-scoped: they're recorded in the back office against a
+  // date, not by a cashier at a till, so there is nothing to attribute.
+  const dayFrom = manilaStartOfDay();
+  const dayTo = manilaEndOfDay();
+  const expenses = await getExpenses(staff.restaurantId, dayFrom, dayTo);
+
+  let sales;
+  let cashOuts;
+  let from = shift?.openedAt ?? dayFrom;
+  if (shift) {
+    [sales, cashOuts] = await Promise.all([
+      getShiftSales(staff.restaurantId, shift.id),
+      getShiftCashOuts(staff.restaurantId, shift.id),
+    ]);
+  } else {
+    // Pre-migration fallback: the old day-wide behaviour.
+    from = dayFrom;
+    [sales, cashOuts] = await Promise.all([
+      getSalesReport(staff.restaurantId, dayFrom, dayTo),
+      getCashOutsToday(staff.restaurantId).then((rows) =>
+        rows.map((r) => ({ amount: r.amount, note: r.note, at: r.createdAt })),
+      ),
+    ]);
+  }
+  const to = dayTo;
 
   const expensesTotal = expenses.reduce((s, e) => s + e.amount, 0);
   const cashOutTotal = cashOuts.reduce((s, c) => s + c.amount, 0);
@@ -92,6 +117,8 @@ export async function getShiftSummary(): Promise<ShiftSummary | null> {
   return {
     restaurantName: who.restaurantName,
     cashier: who.cashier,
+    shiftId: shift?.id ?? null,
+    openedAt: shift?.openedAt.toISOString() ?? null,
     from: from.toISOString(),
     to: to.toISOString(),
     gross: sales.gross,
@@ -105,9 +132,9 @@ export async function getShiftSummary(): Promise<ShiftSummary | null> {
     expensesTotal,
     expenses: expenses.map((e) => ({ category: e.category, amount: e.amount, note: e.note })),
     cashOutTotal,
-    cashOuts: cashOuts.map((c) => ({ amount: c.amount, note: c.note, at: c.createdAt })),
+    cashOuts,
     cashCollected,
-    expectedCash: Math.max(0, cashCollected - cashOutTotal),
+    expectedCash: expectedCash(cashCollected, cashOutTotal),
     net: sales.gross - expensesTotal,
   };
 }

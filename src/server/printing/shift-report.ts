@@ -49,8 +49,12 @@ export async function getShiftReport(): Promise<ShiftReportBundle | null> {
     phone: r.phone,
     cashier: summary.cashier,
     // Manila, explicitly: the server runs UTC, so an unqualified date would
-    // label a 9 PM shift with tomorrow's day.
-    dayLabel: manilaDate(summary.from),
+    // label a 9 PM shift with tomorrow's day. When shifts are on, this is the
+    // shift's own start rather than midnight — the report covers one turn at
+    // the till, and the paper should say which one.
+    dayLabel: summary.openedAt
+      ? `${manilaDate(summary.openedAt)} ${manilaTime(summary.openedAt)}`
+      : manilaDate(summary.from),
     printedAt: manilaTime(new Date()),
     orderCount: summary.orderCount,
     gross: summary.gross,

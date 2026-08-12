@@ -471,13 +471,25 @@ export function CashierBoard({
               t.billRequested ? "border-guava" : "border-plum-ink/10"
             }`}
           >
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <h2 className="font-heading text-lg font-extrabold">{t.label}</h2>
-              {t.billRequested && (
-                <span className="rounded-full bg-guava/15 px-2 py-0.5 text-xs font-semibold text-guava">
-                  Bill requested
-                </span>
-              )}
+              <div className="flex shrink-0 items-center gap-2">
+                {/* Who rang it up. Any cashier can still settle any table —
+                    this says whose sale it was, it doesn't lock the table. */}
+                {t.openedByName && (
+                  <span
+                    title={`Opened by ${t.openedByName}`}
+                    className="rounded-full bg-plum-ink/5 px-2 py-0.5 text-[11px] font-semibold text-plum-ink/50"
+                  >
+                    {t.openedByName}
+                  </span>
+                )}
+                {t.billRequested && (
+                  <span className="rounded-full bg-guava/15 px-2 py-0.5 text-xs font-semibold text-guava">
+                    Bill requested
+                  </span>
+                )}
+              </div>
             </div>
             {(t.customerPhone || t.customerAddress || t.mapUrl) && (
               <p className="mt-0.5 text-xs text-plum-ink/50">

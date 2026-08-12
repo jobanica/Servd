@@ -3,17 +3,27 @@
 import { useEffect, useState } from "react";
 import { getShiftSummary, type ShiftSummary } from "@/server/orders/shift-summary";
 import { printShiftSummaryTicket } from "@/server/printing/print";
+import { endMyShift } from "@/server/orders/shift-actions";
+import { signOut } from "@/app/(platform)/login/actions";
 import { runReportDispatch } from "@/lib/print/run-dispatch";
 import { formatPeso } from "@/lib/money";
+import { manilaTime } from "@/lib/time/manila";
 
 /**
- * End-of-shift review: today's sales (by method), expenses and net — with a
- * button to print the summary. (Clock in/out lives in HR, not here.)
+ * End-of-shift review for THIS cashier's shift: what they took, what came out
+ * of their drawer, and what should be in it.
+ *
+ * Scoped to the shift rather than the calendar day, so the second cashier on a
+ * double shift doesn't open this and find the first cashier's sales already
+ * counted. "End shift" prints the Z-report, closes the shift, and signs them
+ * out — the next cashier starts from zero.
  */
 export function ShiftSummaryModal({ onClose }: { onClose: () => void }) {
   const [s, setS] = useState<ShiftSummary | null | "loading">("loading");
   const [printing, setPrinting] = useState(false);
   const [printMsg, setPrintMsg] = useState<string | null>(null);
+  const [ending, setEnding] = useState(false);
+  const [confirmEnd, setConfirmEnd] = useState(false);
 
   useEffect(() => {
     getShiftSummary().then(setS).catch(() => setS(null));
@@ -40,6 +50,30 @@ export function ShiftSummaryModal({ onClose }: { onClose: () => void }) {
     }
   }
 
+  /**
+   * Print → close → sign out, in that order.
+   *
+   * Printing FIRST matters: once the shift is closed its totals are no longer
+   * "current", so a cashier who closed before printing would have to go and ask
+   * the owner for their own numbers. A print failure doesn't block the close —
+   * the report is still on screen, and the shift has to end either way.
+   */
+  async function handleEndShift() {
+    setEnding(true);
+    try {
+      await handlePrint();
+    } catch {
+      /* keep going — see above */
+    }
+    const res = await endMyShift();
+    if (res?.error) {
+      setPrintMsg(res.error);
+      setEnding(false);
+      return;
+    }
+    await signOut();
+  }
+
   const row = "flex justify-between py-1 text-sm";
 
   return (
@@ -56,7 +90,22 @@ export function ShiftSummaryModal({ onClose }: { onClose: () => void }) {
           <p className="py-6 text-center text-sm text-plum-ink/50">Couldn&apos;t load the summary.</p>
         ) : (
           <div className="overflow-y-auto">
-            <p className="text-xs text-plum-ink/50">Today · {new Date(s.from).toLocaleDateString()}</p>
+            {/* Whose shift, and since when — the two facts that tell a cashier
+                these numbers are theirs and not the whole day's. */}
+            <div className="rounded-lg bg-cream/70 px-3 py-2">
+              <p className="text-sm font-semibold">{s.cashier}</p>
+              <p className="text-xs text-plum-ink/55">
+                {s.openedAt
+                  ? `Shift started ${manilaTime(s.openedAt)}`
+                  : "Today's totals for the whole restaurant"}
+              </p>
+            </div>
+            {!s.shiftId && (
+              <p className="mt-2 rounded-lg bg-mango/10 px-3 py-2 text-xs text-plum-ink/70">
+                Per-cashier shifts aren&apos;t switched on yet, so this shows the whole
+                restaurant&apos;s day. Run <span className="font-mono">add-cashier-shifts.sql</span>.
+              </p>
+            )}
 
             <div className="mt-3 rounded-lg border border-plum-ink/10 p-3">
               <p className="text-[11px] font-bold uppercase tracking-widest text-plum-ink/40">Sales</p>
@@ -107,16 +156,50 @@ export function ShiftSummaryModal({ onClose }: { onClose: () => void }) {
               <span className="font-heading text-lg font-extrabold text-brand-primary">{formatPeso(s.net)}</span>
             </div>
 
-            <div className="mt-4">
+            <div className="mt-4 space-y-2">
               <button
                 onClick={handlePrint}
-                disabled={printing}
+                disabled={printing || ending}
                 className="w-full rounded-full px-4 py-2.5 text-center text-sm font-semibold btn-brand disabled:opacity-60"
               >
-                {printing ? "Printing…" : "🖨 Print summary"}
+                {printing && !ending ? "Printing…" : "🖨 Print summary"}
               </button>
+
+              {s.shiftId &&
+                (confirmEnd ? (
+                  <div className="rounded-lg border border-guava/30 bg-guava/5 p-3">
+                    <p className="text-xs text-plum-ink/70">
+                      This prints your summary, closes your shift and signs you out. The next
+                      cashier starts from zero.
+                    </p>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        onClick={handleEndShift}
+                        disabled={ending}
+                        className="flex-1 rounded-full bg-guava px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+                      >
+                        {ending ? "Ending…" : "Yes, end my shift"}
+                      </button>
+                      <button
+                        onClick={() => setConfirmEnd(false)}
+                        disabled={ending}
+                        className="rounded-full border border-plum-ink/15 px-4 py-2 text-sm font-semibold"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmEnd(true)}
+                    className="w-full rounded-full border border-plum-ink/15 px-4 py-2.5 text-center text-sm font-semibold text-plum-ink/70 hover:border-guava hover:text-guava"
+                  >
+                    End shift &amp; sign out
+                  </button>
+                ))}
+
               {printMsg && (
-                <p className="mt-2 text-center text-xs text-plum-ink/55">{printMsg}</p>
+                <p className="text-center text-xs text-plum-ink/55">{printMsg}</p>
               )}
             </div>
           </div>

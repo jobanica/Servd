@@ -4,6 +4,8 @@ import { systemDb } from "@/server/tenancy/scoped-db";
 import { requireStaff } from "@/server/tenancy/current-user";
 import { pesosToCentavos } from "@/lib/money";
 import { manilaStartOfDay } from "@/lib/time/manila";
+import { ensureShift, stampCashMovementShift } from "./shift-session";
+import { staffLabel } from "@/server/tenancy/staff-name";
 
 export type CashOutState = { ok?: boolean; message?: string; error?: string } | null;
 
@@ -62,8 +64,13 @@ export async function recordCashOut(_prev: CashOutState, formData: FormData): Pr
   if (!Number.isFinite(pesos) || pesos <= 0) return { error: "Enter an amount." };
   const note = String(formData.get("note") ?? "").trim() || null;
 
+  const shift = await ensureShift(staff.restaurantId, staff.staffUserId, () =>
+    staffLabel(staff.restaurantId, staff.staffUserId),
+  );
+
+  let movementId: string;
   try {
-    await systemDb((tx) =>
+    const m = await systemDb((tx) =>
       tx.cashMovement.create({
         data: {
           restaurantId: staff.restaurantId,
@@ -72,10 +79,14 @@ export async function recordCashOut(_prev: CashOutState, formData: FormData): Pr
           note,
           staffEmail: staff.email,
         },
+        select: { id: true },
       }),
     );
+    movementId = m.id;
   } catch {
     return { error: "Couldn't record the cash-out. Run the migration if you haven't yet." };
   }
+  // Money out of THIS cashier's drawer, so it comes off THEIR expected cash.
+  await stampCashMovementShift(movementId, shift?.id ?? null);
   return { ok: true, message: "Cash-out recorded." };
 }

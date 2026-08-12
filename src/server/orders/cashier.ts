@@ -2,6 +2,8 @@
 
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireStaff } from "@/server/tenancy/current-user";
+import { ensureShift, stampPaymentShift } from "./shift-session";
+import { staffLabel } from "@/server/tenancy/staff-name";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
 import { autoPrintIfEnabled, printReceipt, printKitchenIfNeeded } from "@/server/printing/print";
 import { getPublicMenu } from "@/server/menu/public-menu";
@@ -87,6 +89,12 @@ export interface CashierTable {
   orders: CashierOrder[];
   outstanding: number; // sum of unpaid order totals (centavos)
   billRequested: boolean;
+  /**
+   * The cashier who rang this up. Shown so a table can be traced back to a
+   * person — it does NOT restrict who may settle it. Hiding another cashier's
+   * tables would strand a customer the moment their server went on break.
+   */
+  openedByName: string | null;
 }
 
 /** Best-effort per-order type/customer lookup (columns may lag on prod). */
@@ -94,14 +102,14 @@ async function orderMetaMap(
   restaurantId: string,
   ids: string[],
 ): Promise<
-  Map<string, { orderType: string; customerName: string | null; customerPhone: string | null; customerAddress: string | null; mapUrl: string | null; orderNumber: number | null }>
+  Map<string, { orderType: string; customerName: string | null; customerPhone: string | null; customerAddress: string | null; mapUrl: string | null; orderNumber: number | null; openedByName: string | null }>
 > {
   if (ids.length === 0) return new Map();
   try {
     const rows = await tenantDb(restaurantId, (tx) =>
       tx.order.findMany({
         where: { id: { in: ids } },
-        select: { id: true, orderType: true, customerName: true, customerPhone: true, customerAddress: true, customerLat: true, customerLng: true, orderNumber: true },
+        select: { id: true, orderType: true, customerName: true, customerPhone: true, customerAddress: true, customerLat: true, customerLng: true, orderNumber: true, openedByName: true },
       }),
     );
     return new Map(
@@ -114,6 +122,7 @@ async function orderMetaMap(
           customerAddress: o.customerAddress,
           mapUrl: o.customerLat != null && o.customerLng != null ? `https://maps.google.com/?q=${o.customerLat},${o.customerLng}` : null,
           orderNumber: o.orderNumber,
+          openedByName: o.openedByName,
         },
       ]),
     );
@@ -252,6 +261,7 @@ export async function getCashierTables(): Promise<CashierTable[]> {
         orders: [],
         outstanding: 0,
         billRequested: false,
+        openedByName: m?.openedByName ?? null,
       });
     }
     const t = byTable.get(key)!;
@@ -447,6 +457,13 @@ export async function markOrderPaid(
   const credit = (await creditMap(staff.restaurantId, [orderId])).get(orderId) ?? 0;
   let netPaid = 0;
 
+  // Whose drawer this money lands in. Resolved before the transaction so a
+  // shift lookup can never hold a settle open.
+  const shift = await ensureShift(staff.restaurantId, staff.staffUserId, () =>
+    staffLabel(staff.restaurantId, staff.staffUserId),
+  );
+  let paymentId: string | null = null;
+
   try {
     await tenantDb(staff.restaurantId, async (tx) => {
       const order = await tx.order.findFirst({ where: { id: orderId }, select: { total: true } });
@@ -464,15 +481,20 @@ export async function markOrderPaid(
         data: { paymentStatus: "paid", billRequested: false, status: "closed" },
       });
       if (amount > 0) {
-        await tx.payment.create({
+        const p = await tx.payment.create({
           data: { orderId, amount, method, gateway: "manual", status: "paid" },
+          select: { id: true },
         });
+        paymentId = p.id;
       }
     });
   } catch (e) {
     console.error("markOrderPaid failed", e);
     return { ok: false, error: e instanceof Error ? e.message : "Could not record the payment." };
   }
+
+  // Credit the takings to this cashier's shift (best-effort — see the helper).
+  if (paymentId) await stampPaymentShift(paymentId, shift?.id ?? null, staff.staffUserId);
 
   // Award loyalty points (best-effort) to the order's customer phone.
   const phone = (await orderMetaMap(staff.restaurantId, [orderId])).get(orderId)?.customerPhone ?? null;
@@ -513,8 +535,14 @@ export async function recordPartialPayment(
 
   const disc = (await discountMap(staff.restaurantId, [orderId])).get(orderId);
   const credit = (await creditMap(staff.restaurantId, [orderId])).get(orderId) ?? 0;
+  const shift = await ensureShift(staff.restaurantId, staff.staffUserId, () =>
+    staffLabel(staff.restaurantId, staff.staffUserId),
+  );
   let settled = false;
   let remaining = 0;
+  // Each tender is stamped individually: a bill split across two cashiers
+  // credits each of them with the part they actually took.
+  let partialPaymentId: string | null = null;
 
   try {
     await tenantDb(staff.restaurantId, async (tx) => {
@@ -533,9 +561,11 @@ export async function recordPartialPayment(
       if (owed <= 0) throw new Error("This order is already fully paid.");
 
       const amount = Math.min(requested, owed);
-      await tx.payment.create({
+      const p = await tx.payment.create({
         data: { orderId, amount, method, gateway: "manual", status: "paid" },
+        select: { id: true },
       });
+      partialPaymentId = p.id;
       remaining = owed - amount;
       if (remaining <= 0) {
         settled = true;
@@ -547,6 +577,10 @@ export async function recordPartialPayment(
     });
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Couldn't record the payment." };
+  }
+
+  if (partialPaymentId) {
+    await stampPaymentShift(partialPaymentId, shift?.id ?? null, staff.staffUserId);
   }
 
   let printTicket = false;
@@ -1238,6 +1272,20 @@ export async function createCashierOrder(input: {
       });
     });
     orderId = order.id;
+    // Who rang it up, shown on the floor so a table traces back to a person.
+    // Best-effort and written separately: attribution must never be the reason
+    // an order fails to open, and these columns may not be migrated yet.
+    try {
+      const name = await staffLabel(staff.restaurantId, staff.staffUserId);
+      await tenantDb(staff.restaurantId, (tx) =>
+        tx.order.updateMany({
+          where: { id: order.id },
+          data: { openedByStaffId: staff.staffUserId, openedByName: name },
+        }),
+      );
+    } catch {
+      /* columns not migrated yet */
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Could not create the order.";
     if (/orderType|customer|column/i.test(msg)) {
