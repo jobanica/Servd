@@ -19,6 +19,13 @@ import {
 } from "@/server/orders/cashier";
 import { printKitchenTicket } from "@/server/printing/print";
 import { runPrintDispatch } from "@/lib/print/run-dispatch";
+import {
+  ORDER_TYPES,
+  ORDER_TYPE_LABEL,
+  ORDER_TYPE_HINT,
+  needsAddress,
+  type OrderTypeKey,
+} from "@/lib/orders/order-type";
 import { PosItemTile } from "./PosItemTile";
 
 export function lineId(): string {
@@ -227,7 +234,7 @@ export function NewOrderModal({
   const [menu, setMenu] = useState<DinerCategory[] | null>(null);
   const [tables, setTables] = useState<{ id: string; tableNumber: string }[]>([]);
   const [tableId, setTableId] = useState("");
-  const [orderType, setOrderType] = useState<"dine_in" | "takeout" | "delivery">("dine_in");
+  const [orderType, setOrderType] = useState<OrderTypeKey>("dine_in");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
@@ -307,7 +314,7 @@ export function NewOrderModal({
       tableId: orderType === "dine_in" ? tableId : undefined,
       customerName: orderType === "dine_in" ? undefined : customerName,
       customerPhone: orderType === "dine_in" ? undefined : customerPhone,
-      customerAddress: orderType === "delivery" ? customerAddress : undefined,
+      customerAddress: needsAddress(orderType) ? customerAddress : undefined,
       lines: lines.map((l) => ({
         itemId: l.itemId,
         quantity: l.quantity,
@@ -389,19 +396,18 @@ export function NewOrderModal({
               <div className="space-y-3 border-b border-plum-ink/10 p-4">
                 {/* Order type */}
                 <div className="grid grid-cols-3 gap-1 rounded-lg bg-cream/60 p-1">
-                  {([
-                    ["dine_in", "Dine-in"],
-                    ["takeout", "Takeout"],
-                    ["delivery", "Delivery"],
-                  ] as const).map(([k, label]) => (
+                  {/* All five types, named exactly as the kitchen display and
+                      the receipt will name them. */}
+                  {ORDER_TYPES.map((k) => (
                     <button
                       key={k}
                       onClick={() => setOrderType(k)}
-                      className={`rounded-md py-1.5 text-xs font-semibold ${
+                      title={ORDER_TYPE_HINT[k]}
+                      className={`rounded-md py-1.5 text-[11px] font-semibold ${
                         orderType === k ? "bg-white text-brand-primary shadow-sm" : "text-plum-ink/60"
                       }`}
                     >
-                      {label}
+                      {ORDER_TYPE_LABEL[k]}
                     </button>
                   ))}
                 </div>
@@ -463,7 +469,7 @@ export function NewOrderModal({
                       placeholder="Phone (optional)"
                       className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
                     />
-                    {orderType === "delivery" && (
+                    {needsAddress(orderType) && (
                       <textarea
                         value={customerAddress}
                         onChange={(e) => setCustomerAddress(e.target.value)}
@@ -537,7 +543,7 @@ export function NewOrderModal({
                     lines.length === 0 ||
                     (orderType === "dine_in" && !tableId) ||
                     (orderType !== "dine_in" && !customerName.trim()) ||
-                    (orderType === "delivery" && !customerAddress.trim())
+                    (needsAddress(orderType) && !customerAddress.trim())
                   }
                   className="w-full rounded-full py-3 font-semibold btn-brand disabled:opacity-50"
                 >

@@ -32,7 +32,7 @@ export default async function SiteTrackOrderPage({
     <WebOrderTracker
       slug={restaurant.slug}
       orderId={orderId}
-      orderType={isDelivery ? "delivery" : "takeout"}
+      orderType={isDelivery ? "delivery" : "pickup"}
       restaurantName={restaurant.displayName || restaurant.name}
       homeHref="/"
       selfBookRider={isDelivery && !!sf?.delivery.selfBookRider}

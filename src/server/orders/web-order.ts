@@ -23,7 +23,10 @@ import { isValidPhone, normalizePhone } from "@/lib/phone";
 
 const schema = z.object({
   slug: z.string().min(1),
-  orderType: z.enum(["takeout", "delivery"]),
+  // "pickup" — ordered ahead and collected. The storefront always called this
+  // "Pickup" in words while storing "takeout", which is exactly why the same
+  // order read differently on the cashier and kitchen screens.
+  orderType: z.enum(["pickup", "delivery"]),
   customerName: z.string().trim().min(1, "Enter your name").max(80),
   customerPhone: z
     .string()

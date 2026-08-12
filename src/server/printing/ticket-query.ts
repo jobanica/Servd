@@ -1,4 +1,5 @@
 import { tenantDb } from "@/server/tenancy/scoped-db";
+import type { OrderTypeKey } from "@/lib/orders/order-type";
 import { buildTicket, type Ticket, type TicketKind } from "@/lib/printing/ticket";
 import { restaurantSiteUrl } from "@/lib/qr";
 
@@ -58,7 +59,7 @@ export async function getOrderTicket(
     // Discount + order-type columns may not exist on a lagging DB — best-effort.
     let discountAmount = 0;
     let discountLabel: string | null = null;
-    let orderType: "dine_in" | "takeout" | "delivery" = "dine_in";
+    let orderType: OrderTypeKey = "dine_in";
     let customerName: string | null = null;
     let customerAddress: string | null = null;
     try {

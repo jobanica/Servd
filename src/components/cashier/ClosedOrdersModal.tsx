@@ -5,11 +5,13 @@ import {
   getClosedOrders,
   getVoidedOrders,
   reopenOrder,
+  voidClosedOrder,
   type ClosedOrder,
   type VoidedOrder,
   type CashierTable,
 } from "@/server/orders/cashier";
 import { formatPeso } from "@/lib/money";
+import { VOID_REASONS } from "@/lib/orders/void-reasons";
 
 /** Lists today's closed orders and lets the cashier re-open any of them. */
 export function ClosedOrdersModal({
@@ -22,6 +24,34 @@ export function ClosedOrdersModal({
   const [orders, setOrders] = useState<ClosedOrder[] | null>(null);
   const [voided, setVoided] = useState<VoidedOrder[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  // Voiding a settled order needs the PIN and a reason, same as voiding a live
+  // one — this is reversing money that was already taken.
+  const [voidTarget, setVoidTarget] = useState<ClosedOrder | null>(null);
+  const [pin, setPin] = useState("");
+  const [reason, setReason] = useState("");
+  const [voidError, setVoidError] = useState<string | null>(null);
+
+  async function confirmVoid() {
+    if (!voidTarget) return;
+    setBusy(voidTarget.id);
+    setVoidError(null);
+    try {
+      const res = await voidClosedOrder(voidTarget.id, pin, reason);
+      if (res.ok) {
+        setOrders(res.closed ?? null);
+        setVoided(await getVoidedOrders());
+        setVoidTarget(null);
+        setPin("");
+        setReason("");
+      } else {
+        setVoidError(res.error ?? "Could not void that order.");
+      }
+    } catch {
+      setVoidError("Something went wrong. Please try again.");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   useEffect(() => {
     getClosedOrders().then(setOrders).catch(() => setOrders([]));
@@ -66,13 +96,22 @@ export function ClosedOrdersModal({
                       {new Date(o.closedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </p>
                   </div>
-                  <button
-                    onClick={() => reopen(o.id)}
-                    disabled={busy === o.id}
-                    className="rounded-full border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold hover:bg-cream disabled:opacity-60"
-                  >
-                    {busy === o.id ? "…" : "Re-open"}
-                  </button>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      onClick={() => reopen(o.id)}
+                      disabled={busy === o.id}
+                      className="rounded-full border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold hover:bg-cream disabled:opacity-60"
+                    >
+                      {busy === o.id ? "…" : "Re-open"}
+                    </button>
+                    <button
+                      onClick={() => { setVoidTarget(o); setVoidError(null); }}
+                      disabled={busy === o.id}
+                      className="rounded-full border border-guava/40 px-3 py-1.5 text-xs font-semibold text-guava hover:bg-guava/5 disabled:opacity-60"
+                    >
+                      Void
+                    </button>
+                  </div>
                 </div>
               ))
             )}
@@ -104,6 +143,60 @@ export function ClosedOrdersModal({
           )}
         </div>
       </div>
+
+      {voidTarget && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="w-full max-w-sm rounded-tile bg-white p-5 shadow-xl">
+            <h3 className="font-heading text-lg font-bold">Void {voidTarget.label}?</h3>
+            <p className="mt-1 text-sm text-plum-ink/60">
+              This reverses {formatPeso(voidTarget.total)} that was already recorded as paid. It
+              stops counting as a sale and stays in the audit log.
+            </p>
+
+            <select
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              className="mt-4 w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+            >
+              <option value="">Reason for the void…</option>
+              {VOID_REASONS.map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+
+            <input
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              type="password"
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="Void PIN"
+              className="mt-2 w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+            />
+
+            {voidError && <p className="mt-2 text-sm text-guava">{voidError}</p>}
+
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={confirmVoid}
+                disabled={!!busy || !pin.trim() || !reason}
+                className="flex-1 rounded-full bg-guava px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+              >
+                {busy ? "Voiding…" : "Void order"}
+              </button>
+              <button
+                onClick={() => { setVoidTarget(null); setVoidError(null); }}
+                className="rounded-full border border-plum-ink/15 px-4 py-2 text-sm font-semibold"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { formatPeso } from "@/lib/money";
 import { printKitchenTicket } from "@/server/printing/print";
 import { runPrintDispatch } from "@/lib/print/run-dispatch";
+import { orderTypeLabelWithEmoji } from "@/lib/orders/order-type";
 import {
   getMerchantOrders,
   acceptMerchantOrder,
@@ -33,7 +34,7 @@ const REJECT_LABELS: { key: RejectReason; label: string }[] = [
 
 function typeBadge(o: MerchantOrder): string {
   if (o.orderType === "delivery") return "🛵 Delivery";
-  if (o.orderType === "takeout") return "🥡 Pickup";
+  if (o.orderType) return orderTypeLabelWithEmoji(o.orderType);
   return "🍽️ Dine-in";
 }
 

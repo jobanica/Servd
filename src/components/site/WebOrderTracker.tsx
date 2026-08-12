@@ -106,7 +106,7 @@ export function WebOrderTracker({
 }: {
   slug: string;
   orderId: string;
-  orderType: "takeout" | "delivery";
+  orderType: "pickup" | "delivery";
   restaurantName: string;
   phone?: string;
   homeHref: string;

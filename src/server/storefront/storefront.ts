@@ -165,7 +165,7 @@ function normalizePaymentConfig(raw: unknown): PaymentConfig {
  */
 export function computePackagingFee(
   cfg: PaymentConfig,
-  orderType: "takeout" | "delivery",
+  orderType: "pickup" | "delivery",
   itemCount = 1,
 ): number {
   if (!cfg.packagingFeeEnabled || cfg.packagingFee <= 0) return 0;

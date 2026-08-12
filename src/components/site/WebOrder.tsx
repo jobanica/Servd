@@ -344,8 +344,8 @@ export function WebOrder(props: WebOrderProps) {
   const [configItem, setConfigItem] = useState<DinerItem | null>(null);
   // What the online store offers (pick-up only / delivery only / both).
   const fulfillment = props.delivery?.fulfillment ?? "both";
-  const [orderType, setOrderType] = useState<"takeout" | "delivery">(
-    fulfillment === "delivery" ? "delivery" : "takeout",
+  const [orderType, setOrderType] = useState<"pickup" | "delivery">(
+    fulfillment === "delivery" ? "delivery" : "pickup",
   );
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -748,7 +748,7 @@ export function WebOrder(props: WebOrderProps) {
             {/* Only offer the order types this store actually accepts. */}
             {fulfillment === "both" ? (
               <div className="grid grid-cols-2 gap-1 rounded-lg bg-gray-100 p-1">
-                {(([["takeout", "🥡 Pickup"], ["delivery", dcfg?.mode === "shipping" ? "🚚 Ship to me" : "🛵 Delivery"]]) as ["takeout" | "delivery", string][]).map(([k, label]) => (
+                {(([["pickup", "🛍️ Pickup"], ["delivery", dcfg?.mode === "shipping" ? "🚚 Ship to me" : "🛵 Delivery"]]) as ["pickup" | "delivery", string][]).map(([k, label]) => (
                   <button key={k} onClick={() => setOrderType(k)} className={`rounded-md py-2 text-sm font-semibold ${orderType === k ? "bg-white text-red-600 shadow-sm" : "text-plum-ink/60"}`}>{label}</button>
                 ))}
               </div>
@@ -756,7 +756,7 @@ export function WebOrder(props: WebOrderProps) {
               <div className="rounded-lg bg-gray-100 p-2 text-center text-sm font-semibold text-plum-ink">
                 {fulfillment === "delivery"
                   ? dcfg?.mode === "shipping" ? "🚚 Ship to me" : "🛵 Delivery"
-                  : "🥡 Pickup"}
+                  : "🛍️ Pickup"}
               </div>
             )}
 
@@ -1178,8 +1178,8 @@ export function WebOrder(props: WebOrderProps) {
               </button>
               <button
                 type="button"
-                onClick={() => setOrderType("takeout")}
-                className={`flex-1 rounded-full py-2 transition ${orderType === "takeout" ? "bg-white text-plum-ink shadow" : "text-plum-ink/50"}`}
+                onClick={() => setOrderType("pickup")}
+                className={`flex-1 rounded-full py-2 transition ${orderType === "pickup" ? "bg-white text-plum-ink shadow" : "text-plum-ink/50"}`}
               >
                 🥡 Pick-up
               </button>

@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { getKitchenOrders, advanceOrderStatus } from "@/server/orders/kitchen";
+import {
+  getKitchenOrders,
+  advanceOrderStatus,
+  getKitchenHistory,
+  reopenKitchenOrder,
+} from "@/server/orders/kitchen";
 import type { KitchenOrder } from "@/lib/orders/types";
 import { useOnline } from "@/lib/offline/useOnline";
 import { kvGet, kvSet, outboxAdd, outboxAll, outboxRemove, type OutboxOp } from "@/lib/offline/idb";
@@ -256,6 +261,9 @@ export function KitchenBoard({
     }
   }
 
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<KitchenOrder[] | null>(null);
+
   // One clock for the whole board — each card derives its own elapsed time,
   // so the timers stay in sync and we only re-render once a second.
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -267,6 +275,42 @@ export function KitchenBoard({
   const incoming = orders.filter((o) => o.status === "new");
   const preparing = orders.filter((o) => o.status === "preparing");
 
+  /**
+   * Today's finished tickets, with a way back.
+   *
+   * A stray tap on a busy screen used to send a ticket away for good and the
+   * food never got made. Loaded on demand rather than kept live: it's a
+   * recovery tool, not part of the queue, and it must never compete for
+   * attention with the orders still to cook.
+   */
+  async function openHistory() {
+    setHistoryOpen(true);
+    setHistory(null);
+    try {
+      setHistory(await getKitchenHistory());
+    } catch {
+      setHistory([]);
+    }
+  }
+
+  async function bringBack(id: string) {
+    setBusyId(id);
+    try {
+      const res = await reopenKitchenOrder(id);
+      if (res.ok && res.orders) {
+        setOrders(res.orders);
+        if (offlineEnabled) kvSet(CACHE_KEY, res.orders);
+        setHistory((h) => h?.filter((o) => o.id !== id) ?? null);
+      } else if (res.error) {
+        setError(res.error);
+      }
+    } catch {
+      setError("Couldn't bring that ticket back.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   return (
     <div>
       <div className="mb-4 flex items-center gap-3 text-xs text-plum-ink/50">
@@ -277,13 +321,81 @@ export function KitchenBoard({
         {offlineEnabled && <ConnectivityPill online={online} pending={pending} />}
         <button
           type="button"
-          onClick={toggleSound}
+          onClick={openHistory}
           className="ml-auto rounded-full border border-plum-ink/15 px-3 py-1 text-xs font-semibold text-plum-ink/70"
+          title="Tickets finished today — bring one back if it was tapped by mistake"
+        >
+          🕘 History
+        </button>
+        <button
+          type="button"
+          onClick={toggleSound}
+          className="rounded-full border border-plum-ink/15 px-3 py-1 text-xs font-semibold text-plum-ink/70"
           title={soundEnabled ? "Mute the new-order chime" : "Turn the new-order chime on"}
         >
           {soundEnabled ? "🔔 Sound on" : "🔕 Sound off"}
         </button>
       </div>
+
+      {historyOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4"
+          onClick={() => setHistoryOpen(false)}
+        >
+          <div
+            className="mt-10 flex max-h-[80vh] w-full max-w-2xl flex-col rounded-tile bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h2 className="font-heading text-lg font-bold">Finished today</h2>
+                <p className="text-xs text-plum-ink/50">
+                  Tapped one by mistake? Bring it back and it returns to Preparing.
+                </p>
+              </div>
+              <button
+                onClick={() => setHistoryOpen(false)}
+                className="text-plum-ink/40 hover:text-plum-ink"
+              >
+                ✕
+              </button>
+            </div>
+
+            {history === null ? (
+              <p className="py-6 text-center text-sm text-plum-ink/50">Loading…</p>
+            ) : history.length === 0 ? (
+              <p className="py-6 text-center text-sm text-plum-ink/50">
+                Nothing finished yet today.
+              </p>
+            ) : (
+              <ul className="divide-y divide-plum-ink/5 overflow-y-auto">
+                {history.map((o) => (
+                  <li key={o.id} className="flex items-center gap-3 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-heading text-sm font-bold">
+                        {o.tableNumber}
+                        <span className="ml-2 text-xs font-medium text-plum-ink/45">
+                          {o.typeLabel}
+                        </span>
+                      </p>
+                      <p className="truncate text-xs text-plum-ink/55">
+                        {o.items.map((i) => `${i.quantity}× ${i.name}`).join(", ")}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => bringBack(o.id)}
+                      disabled={busyId === o.id}
+                      className="shrink-0 rounded-full border border-plum-ink/15 px-3 py-1.5 text-xs font-bold hover:border-brand-primary disabled:opacity-60"
+                    >
+                      {busyId === o.id ? "…" : "↩ Bring back"}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 rounded-lg border border-guava/40 bg-guava/10 px-4 py-2 text-sm text-guava">

@@ -1669,8 +1669,10 @@ model LeaveBalance {
 
 enum OrderType {
   dine_in
-  takeout
+  takeout // ordered at the counter, taking it away
+  pickup // ordered ahead, collecting it
   delivery
+  third_party // Grab / Foodpanda and similar
 }
 
 model Order {

@@ -38,7 +38,7 @@ export default async function TrackOrderPage({
     <WebOrderTracker
       slug={slug}
       orderId={orderId}
-      orderType={isDelivery ? "delivery" : "takeout"}
+      orderType={isDelivery ? "delivery" : "pickup"}
       restaurantName={restaurant.displayName || restaurant.name}
       homeHref={`/r/${slug}`}
       selfBookRider={isDelivery && !!sf?.delivery.selfBookRider}

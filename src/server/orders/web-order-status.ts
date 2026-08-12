@@ -103,14 +103,15 @@ export async function getWebOrderStatus(
 
     // orderType / deliveryStatus / prepMinutes columns may lag on prod — read
     // them best-effort so the tracker never breaks before a migration runs.
-    let orderType = "takeout";
+    // Web orders are collected, not counter takeout — see lib/orders/order-type.
+    let orderType = "pickup";
     let deliveryStatus: string | null = null;
     try {
       const extra = await tx.order.findFirst({
         where: { id: orderId },
         select: { orderType: true, deliveryStatus: true },
       });
-      orderType = extra?.orderType ?? "takeout";
+      orderType = extra?.orderType ?? "pickup";
       deliveryStatus = extra?.deliveryStatus ?? null;
     } catch {
       /* columns not migrated yet */

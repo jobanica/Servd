@@ -19,6 +19,7 @@ import type { DinerCategory } from "@/lib/cart/types";
 import { computeDiscount, netTotal, type DiscountKind } from "@/lib/discount";
 import { pesosToCentavos } from "@/lib/money";
 import { formatOrderNumber } from "@/lib/orders/order-number";
+import { orderTypeLabel, orderTypeLabelWithEmoji, type OrderTypeKey } from "@/lib/orders/order-type";
 import { isVoidReason } from "@/lib/orders/void-reasons";
 import { writeAudit } from "@/server/audit/log";
 import { awardPointsForOrder, getBalance, getLoyaltyConfig, redeemPoints, enrollAccount } from "@/server/loyalty/loyalty";
@@ -81,7 +82,7 @@ async function creditMap(restaurantId: string, ids: string[]): Promise<Map<strin
 export interface CashierTable {
   tableId: string; // group key (table id, or "order:<id>" for pickup/delivery)
   tableNumber: string; // dine-in table label
-  kind: "dine_in" | "takeout" | "delivery";
+  kind: OrderTypeKey;
   label: string; // header label ("Table 5", "Pickup — Juan", "Delivery — Ana")
   customerPhone: string | null;
   customerAddress: string | null;
@@ -245,9 +246,8 @@ export async function getCashierTables(): Promise<CashierTable[]> {
       ? `Table ${o.table?.tableNumber ?? "—"}`
       : isCounter
         ? `🧾 Order ${formatOrderNumber(m!.orderNumber!)}`
-        : kind === "delivery"
-          ? `🛵 Delivery — ${customerName ?? "Customer"}`
-          : `🥡 Pickup — ${customerName ?? "Customer"}`;
+        // One word per type, shared with the kitchen display and the receipt.
+        : `${orderTypeLabelWithEmoji(kind)} — ${customerName ?? "Customer"}`;
 
     if (!byTable.has(key)) {
       byTable.set(key, {
@@ -466,19 +466,30 @@ export async function markOrderPaid(
 
   try {
     await tenantDb(staff.restaurantId, async (tx) => {
-      const order = await tx.order.findFirst({ where: { id: orderId }, select: { total: true } });
+      const order = await tx.order.findFirst({
+        where: { id: orderId },
+        select: { total: true, status: true },
+      });
       if (!order) throw new Error("Order not found");
       const net = netTotal(order.total, disc?.amount ?? 0, credit);
       // Settle only what's still owed after any prior split/partial tenders.
       const agg = await tx.payment.aggregate({ where: { orderId, status: "paid" }, _sum: { amount: true } });
       const amount = Math.max(0, net - (agg._sum.amount ?? 0));
       netPaid = net;
+      // An order leaves the boards when it is BOTH paid and cooked — never on
+      // payment alone. A takeout customer pays the moment they order, and
+      // closing there used to wipe the ticket off the kitchen display before
+      // anyone had made the food.
+      const cooked = order.status === "done" || order.status === "closed";
       // updateMany (not update) so it doesn't read the whole row back — keeps
       // working even if the prod schema lags (e.g. missing newer columns).
       await tx.order.updateMany({
         where: { id: orderId },
-        // Paying in person settles the order: mark paid AND close it.
-        data: { paymentStatus: "paid", billRequested: false, status: "closed" },
+        data: {
+          paymentStatus: "paid",
+          billRequested: false,
+          ...(cooked ? { status: "closed" as const } : {}),
+        },
       });
       if (amount > 0) {
         const p = await tx.payment.create({
@@ -569,9 +580,19 @@ export async function recordPartialPayment(
       remaining = owed - amount;
       if (remaining <= 0) {
         settled = true;
+        // Paid in full, but it still only leaves the boards once it's cooked.
+        const current = await tx.order.findFirst({
+          where: { id: orderId },
+          select: { status: true },
+        });
+        const cooked = current?.status === "done" || current?.status === "closed";
         await tx.order.updateMany({
           where: { id: orderId },
-          data: { paymentStatus: "paid", billRequested: false, status: "closed" },
+          data: {
+            paymentStatus: "paid",
+            billRequested: false,
+            ...(cooked ? { status: "closed" as const } : {}),
+          },
         });
       }
     });
@@ -663,7 +684,7 @@ export async function getClosedOrders(): Promise<ClosedOrder[]> {
     label:
       o.table?.tableNumber
         ? `Table ${o.table.tableNumber}`
-        : o.customerName || (o.orderType === "delivery" ? "Delivery" : o.orderType === "takeout" ? "Pickup" : "Order"),
+        : o.customerName || orderTypeLabel(o.orderType),
     total: o.total,
     paymentStatus: o.paymentStatus,
     closedAt: o.updatedAt.toISOString(),
@@ -948,7 +969,7 @@ export async function getVoidedOrders(): Promise<VoidedOrder[]> {
       id: o.id,
       label: o.table?.tableNumber
         ? `Table ${o.table.tableNumber}`
-        : o.customerName || (o.orderType === "delivery" ? "Delivery" : o.orderType === "takeout" ? "Pickup" : "Order"),
+        : o.customerName || orderTypeLabel(o.orderType),
       total: o.total,
       voidedAt: (o.voidedAt ?? new Date()).toISOString(),
     }));
@@ -1207,7 +1228,7 @@ export async function addItemsToOrder(
  * accepted, so they go straight to the kitchen (status "new") and print.
  */
 export async function createCashierOrder(input: {
-  orderType?: "dine_in" | "takeout" | "delivery";
+  orderType?: OrderTypeKey;
   tableId?: string;
   customerName?: string;
   customerPhone?: string;
@@ -1324,4 +1345,83 @@ export async function createCashierOrder(input: {
     printKitchen: kitchen.clientPrintNeeded,
     printOrderId: kitchen.clientPrintNeeded ? orderId : undefined,
   };
+}
+
+/**
+ * Void an order that has already been settled — a reversal, not a dismissal.
+ *
+ * Kept separate from voidOrder on purpose. That one refuses anything paid,
+ * which is right for a live bill: cancelling money someone has handed over
+ * shouldn't be one tap away on a busy till. But a test order, or a genuine
+ * mistake rung up and closed, otherwise stays in the sales figures forever with
+ * no way to take it out.
+ *
+ * The reversal marks the payments `refunded` rather than deleting them, so the
+ * money that was recorded is still visible in the audit trail — it just stops
+ * counting as a sale, which is what every report keys on.
+ */
+export async function voidClosedOrder(
+  orderId: string,
+  pin: string,
+  reason?: string,
+): Promise<{ ok: boolean; closed?: ClosedOrder[]; error?: string }> {
+  let staff;
+  try {
+    staff = await requireStaff(["cashier", "admin"]);
+  } catch {
+    return { ok: false, error: "Not allowed." };
+  }
+
+  const entered = (pin ?? "").trim();
+  if (!entered) return { ok: false, error: "Enter the void PIN." };
+  const reasonText = (reason ?? "").trim();
+  if (!reasonText || !isVoidReason(reasonText)) {
+    return { ok: false, error: "Select a reason for the void." };
+  }
+  const pinCheck = await checkVoidPin(staff.restaurantId, entered);
+  if (!pinCheck.ok) return { ok: false, error: pinCheck.error };
+
+  try {
+    await tenantDb(staff.restaurantId, async (tx) => {
+      const before = await tx.order.findFirst({
+        where: { id: orderId, status: "closed" },
+        select: { id: true, status: true, total: true, paymentStatus: true },
+      });
+      if (!before) throw new Error("That order isn't closed — void it from the board instead.");
+
+      // Reverse the money first: if anything below fails, a half-voided order
+      // that still counts as a sale is the safer of the two wrong states.
+      const reversed = await tx.payment.updateMany({
+        where: { orderId, status: "paid" },
+        data: { status: "refunded" },
+      });
+
+      await tx.order.updateMany({
+        where: { id: orderId },
+        data: {
+          status: "cancelled",
+          paymentStatus: "refunded",
+          billRequested: false,
+          voidedAt: new Date(),
+        },
+      });
+
+      await writeAudit(tx, staff.restaurantId, {
+        actorStaffId: staff.staffUserId,
+        actorEmail: staff.email,
+        action: "order.void_closed",
+        entityType: "order",
+        entityId: orderId,
+        reason: reasonText,
+        before: { status: before.status, total: before.total, paymentStatus: before.paymentStatus },
+        after: { status: "cancelled", paymentStatus: "refunded", paymentsReversed: reversed.count },
+      });
+    });
+  } catch (e) {
+    console.error("voidClosedOrder failed", e);
+    return { ok: false, error: e instanceof Error ? e.message : "Could not void that order." };
+  }
+
+  await notifyOrdersChanged(staff.restaurantId);
+  return { ok: true, closed: await getClosedOrders() };
 }

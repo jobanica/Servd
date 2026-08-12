@@ -8,6 +8,7 @@ import { CashierBoard } from "@/components/cashier/CashierBoard";
 import { ServiceWorkerRegister } from "@/components/offline/ServiceWorkerRegister";
 import { StaffDataError } from "@/components/StaffDataError";
 import { hasTutorials } from "@/server/tutorials/tutorials";
+import { staffLabel } from "@/server/tenancy/staff-name";
 
 export default async function CashierHome() {
   const user = await getCurrentUser();
@@ -40,6 +41,8 @@ export default async function CashierHome() {
     );
   }
 
+  const cashierName = await staffLabel(user.restaurantId, user.staffUserId);
+
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       {user.role === "admin" && (
@@ -47,7 +50,19 @@ export default async function CashierHome() {
           ← Dashboard
         </Link>
       )}
-      <h1 className="font-heading text-2xl font-bold">Cashier</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="font-heading text-2xl font-bold">Cashier</h1>
+        {/* Whose account this is. Sales are recorded against it, so the person
+            at the till needs to see at a glance that it's theirs — and not the
+            shift they took over from. */}
+        <span className="inline-flex items-center gap-2 rounded-full border border-plum-ink/10 bg-white px-3 py-1.5 text-sm">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-gradient text-xs font-bold text-white">
+            {cashierName.charAt(0).toUpperCase()}
+          </span>
+          <span className="font-semibold">{cashierName}</span>
+          <span className="text-xs text-plum-ink/45">{user.role}</span>
+        </span>
+      </div>
       <p className="mb-6 text-sm text-plum-ink/60">
         Open tables, payments, bill requests, and ticket printing.
       </p>

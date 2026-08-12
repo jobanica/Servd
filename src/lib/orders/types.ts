@@ -10,9 +10,10 @@ export interface KitchenOrderItem {
 export interface KitchenOrder {
   id: string;
   tableNumber: string;
-  /** "Dine in" | "Takeaway" | "Delivery" — shown under the card title. */
+  /** "🥡 Takeout" etc — from lib/orders/order-type, shown under the title. */
   typeLabel?: string;
-  status: "new" | "preparing" | "done";
+  /** "closed" only appears in the kitchen history, never in the live queue. */
+  status: "new" | "preparing" | "done" | "closed";
   createdAt: string; // ISO string (serializable across the server boundary)
   total: number; // centavos
   items: KitchenOrderItem[];

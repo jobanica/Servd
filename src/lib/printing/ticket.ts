@@ -5,6 +5,8 @@
  * an itemized, VAT-inclusive receipt and the QR points to the restaurant's site.
  */
 
+import { orderTypeLabel, type OrderTypeKey } from "@/lib/orders/order-type";
+
 const VAT_RATE = 0.12;
 export const WIDTH = 32; // characters per line (58mm thermal; 80mm just has slack)
 
@@ -58,7 +60,7 @@ export interface Ticket {
   footer: string | null;
   showVat: boolean;
   tableNumber: string;
-  orderType: "dine_in" | "takeout" | "delivery";
+  orderType: OrderTypeKey;
   customerName: string | null;
   customerAddress: string | null;
   orderRef: string;
@@ -76,7 +78,7 @@ export interface TicketSource extends ReceiptBranding {
   kind?: TicketKind;
   restaurantName: string;
   tableNumber: string;
-  orderType?: "dine_in" | "takeout" | "delivery";
+  orderType?: OrderTypeKey;
   customerName?: string | null;
   customerAddress?: string | null;
   orderId: string;
@@ -139,9 +141,9 @@ export function ticketTotals(t: Ticket) {
 
 /** The big heading line: table number, or PICKUP/DELIVERY + customer. */
 export function ticketHeading(t: Ticket): string {
-  if (t.orderType === "takeout") return `PICKUP - ${t.customerName ?? ""}`.trim();
-  if (t.orderType === "delivery") return `DELIVERY - ${t.customerName ?? ""}`.trim();
-  return `TABLE ${t.tableNumber}`;
+  if (t.orderType === "dine_in") return `TABLE ${t.tableNumber}`;
+  // Same word as the cashier screen and the kitchen display, in caps for paper.
+  return `${orderTypeLabel(t.orderType).toUpperCase()} - ${t.customerName ?? ""}`.trim();
 }
 
 /** Centered header: restaurant name + any contact lines. */

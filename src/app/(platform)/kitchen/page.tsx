@@ -7,6 +7,7 @@ import { KitchenBoard } from "@/components/kitchen/KitchenBoard";
 import { ServiceWorkerRegister } from "@/components/offline/ServiceWorkerRegister";
 import { StaffDataError } from "@/components/StaffDataError";
 import { hasTutorials } from "@/server/tutorials/tutorials";
+import { staffLabel } from "@/server/tenancy/staff-name";
 import { signOut } from "../login/actions";
 
 export default async function KitchenHome() {
@@ -40,7 +41,15 @@ export default async function KitchenHome() {
   return (
     <div className="mx-auto max-w-[1700px] px-6 py-8">
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-2xl font-bold">Kitchen display</h1>
+        <div>
+          <h1 className="font-heading text-2xl font-bold">Kitchen display</h1>
+          <p className="text-xs text-plum-ink/45">
+            Signed in as{" "}
+            <span className="font-semibold text-plum-ink/70">
+              {await staffLabel(user.restaurantId, user.staffUserId)}
+            </span>
+          </p>
+        </div>
         <div className="flex items-center gap-3">
           {user.role === "admin" && (
             <a href="/admin" className="rounded-full border border-plum-ink/15 px-4 py-2 text-sm font-semibold">

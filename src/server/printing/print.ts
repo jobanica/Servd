@@ -1,6 +1,7 @@
 "use server";
 
 import { tenantDb, systemDb } from "@/server/tenancy/scoped-db";
+import type { OrderTypeKey } from "@/lib/orders/order-type";
 import { requireStaff } from "@/server/tenancy/current-user";
 import { buildTicket, type Ticket, type TicketKind } from "@/lib/printing/ticket";
 import { encodeTicketBase64, encodeReportBase64 } from "@/lib/printing/escpos";
@@ -94,7 +95,7 @@ async function loadTicket(restaurantId: string, orderId: string) {
     let meta: {
       discountAmount: number;
       discountLabel: string | null;
-      orderType: "dine_in" | "takeout" | "delivery";
+      orderType: OrderTypeKey;
       customerName: string | null;
       customerAddress: string | null;
     } = { discountAmount: 0, discountLabel: null, orderType: "dine_in", customerName: null, customerAddress: null };
