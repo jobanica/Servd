@@ -6,15 +6,15 @@
  */
 
 const VAT_RATE = 0.12;
-const WIDTH = 32; // characters per line (58mm thermal; 80mm just has slack)
+export const WIDTH = 32; // characters per line (58mm thermal; 80mm just has slack)
 
 /** Right-align `right` against `left` within WIDTH characters. */
-function pad(left: string, right: string, width = WIDTH): string {
+export function pad(left: string, right: string, width = WIDTH): string {
   const space = width - left.length - right.length;
   return space >= 1 ? left + " ".repeat(space) + right : `${left} ${right}`;
 }
 /** Plain decimal (no currency glyph — thermal printers can't render ₱). */
-function amt(centavos: number): string {
+export function amt(centavos: number): string {
   return (centavos / 100).toFixed(2);
 }
 

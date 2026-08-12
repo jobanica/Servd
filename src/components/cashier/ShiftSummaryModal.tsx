@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { getShiftSummary, type ShiftSummary } from "@/server/orders/shift-summary";
+import { printShiftSummaryTicket } from "@/server/printing/print";
+import { runReportDispatch } from "@/lib/print/run-dispatch";
 import { formatPeso } from "@/lib/money";
 
 /**
@@ -10,10 +12,33 @@ import { formatPeso } from "@/lib/money";
  */
 export function ShiftSummaryModal({ onClose }: { onClose: () => void }) {
   const [s, setS] = useState<ShiftSummary | null | "loading">("loading");
+  const [printing, setPrinting] = useState(false);
+  const [printMsg, setPrintMsg] = useState<string | null>(null);
 
   useEffect(() => {
     getShiftSummary().then(setS).catch(() => setS(null));
   }, []);
+
+  /**
+   * Prints on the RECEIPT PRINTER, through the same dispatch a bill or receipt
+   * uses. The old button was a link to a printable page that called
+   * window.print() — which does nothing on a network, cloud or Bluetooth
+   * printer, i.e. on most tills. The page is still the fallback for the
+   * OS-dialog / AirPrint setups where it genuinely is the right answer.
+   */
+  async function handlePrint() {
+    setPrinting(true);
+    setPrintMsg(null);
+    try {
+      const res = await printShiftSummaryTicket();
+      const m = await runReportDispatch(res, "/cashier/shift-summary");
+      if (m) setPrintMsg(m);
+    } catch (e) {
+      setPrintMsg(e instanceof Error ? e.message : "Print failed.");
+    } finally {
+      setPrinting(false);
+    }
+  }
 
   const row = "flex justify-between py-1 text-sm";
 
@@ -82,15 +107,17 @@ export function ShiftSummaryModal({ onClose }: { onClose: () => void }) {
               <span className="font-heading text-lg font-extrabold text-brand-primary">{formatPeso(s.net)}</span>
             </div>
 
-            <div className="mt-4 flex gap-2">
-              <a
-                href="/cashier/shift-summary"
-                target="_blank"
-                rel="noopener"
-                className="flex-1 rounded-full px-4 py-2.5 text-center text-sm font-semibold btn-brand"
+            <div className="mt-4">
+              <button
+                onClick={handlePrint}
+                disabled={printing}
+                className="w-full rounded-full px-4 py-2.5 text-center text-sm font-semibold btn-brand disabled:opacity-60"
               >
-                🖨 Print summary
-              </a>
+                {printing ? "Printing…" : "🖨 Print summary"}
+              </button>
+              {printMsg && (
+                <p className="mt-2 text-center text-xs text-plum-ink/55">{printMsg}</p>
+              )}
             </div>
           </div>
         )}

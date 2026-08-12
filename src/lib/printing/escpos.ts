@@ -6,6 +6,7 @@ import {
   ticketBodyLines,
   ticketFooterLines,
 } from "./ticket";
+import type { ShiftReport } from "./report";
 
 /**
  * Minimal ESC/POS encoder — the de-facto command language of thermal receipt
@@ -123,4 +124,32 @@ export function encodeTicket(ticket: Ticket): Uint8Array {
 /** Base64 of the ESC/POS stream — convenient for transport over JSON/HTTP. */
 export function encodeTicketBase64(ticket: Ticket): string {
   return Buffer.from(encodeTicket(ticket)).toString("base64");
+}
+
+/**
+ * Encodes a non-order report (the end-of-shift Z-report) the same way a receipt
+ * is encoded, so it reaches the thermal printer through the identical transport
+ * rather than through the browser's print dialog.
+ */
+export function encodeReport(report: ShiftReport): Uint8Array {
+  const b = new EscPosBuilder().init().align("center");
+
+  b.bold(true).line(report.headerLines[0] ?? "").bold(false);
+  for (const line of report.headerLines.slice(1)) b.line(line);
+  b.size(true).line("SHIFT SUMMARY").size(false);
+
+  b.align("left");
+  for (const line of report.bodyLines) b.line(line);
+
+  if (report.footerLines.length) {
+    b.align("center").line();
+    for (const line of report.footerLines) b.line(line);
+  }
+
+  b.line().line().cut();
+  return b.build();
+}
+
+export function encodeReportBase64(report: ShiftReport): string {
+  return Buffer.from(encodeReport(report)).toString("base64");
 }

@@ -3,8 +3,9 @@
 import { tenantDb, systemDb } from "@/server/tenancy/scoped-db";
 import { requireStaff } from "@/server/tenancy/current-user";
 import { buildTicket, type Ticket, type TicketKind } from "@/lib/printing/ticket";
-import { encodeTicketBase64 } from "@/lib/printing/escpos";
+import { encodeTicketBase64, encodeReportBase64 } from "@/lib/printing/escpos";
 import { restaurantSiteUrl } from "@/lib/qr";
+import { getShiftReport } from "./shift-report";
 
 /**
  * PLUGGABLE PRINTING
@@ -180,8 +181,28 @@ async function dispatch(
   if (!ticket) return { ok: false, handledOnServer: false, message: "Order not found." };
   const config = (restaurant.printerConfig as PrinterConfig | null) ?? {};
   const base64 = encodeTicketBase64(ticket);
+  return dispatchBytes(restaurantId, restaurant.printMethod, config, base64, orderId, ticket);
+}
 
-  switch (restaurant.printMethod) {
+/**
+ * Send an already-encoded ESC/POS payload out over whichever transport this
+ * restaurant uses.
+ *
+ * Split out of `dispatch` so documents that aren't orders — the end-of-shift
+ * report — reach the printer exactly the same way a receipt does. Anything that
+ * routes around this ends up as a browser print dialog talking to a printer
+ * that was never connected to the browser, which is precisely the bug this
+ * exists to prevent.
+ */
+async function dispatchBytes(
+  restaurantId: string,
+  printMethod: string,
+  config: PrinterConfig,
+  base64: string,
+  orderId: string | null,
+  ticket?: Ticket,
+): Promise<PrintDispatch> {
+  switch (printMethod) {
     case "network": {
       if (!config.bridgeUrl) {
         return { ok: false, handledOnServer: true, message: "No print-bridge URL configured." };
@@ -225,6 +246,28 @@ async function dispatch(
       // even when the configured method is the OS dialog.
       return { ok: true, handledOnServer: false, clientAction: "os_dialog", ticket, ticketBase64: base64, message: "" };
   }
+}
+
+/**
+ * Print the END-OF-SHIFT report on the receipt printer.
+ *
+ * Previously this was a browser tab that fired window.print(), which only ever
+ * worked if the till happened to have an OS-level printer — for the network,
+ * cloud and Bluetooth setups (which is most of them) nothing came out at all.
+ * It now takes exactly the same path as a receipt.
+ */
+export async function printShiftSummaryTicket(): Promise<PrintDispatch> {
+  const bundle = await getShiftReport();
+  if (!bundle) {
+    return { ok: false, handledOnServer: false, message: "Couldn't load the shift summary." };
+  }
+  return dispatchBytes(
+    bundle.restaurantId,
+    bundle.printMethod,
+    bundle.printerConfig,
+    encodeReportBase64(bundle.report),
+    null, // not tied to an order
+  );
 }
 
 /** Cashier-triggered print — a BILL (amount the customer must pay). */

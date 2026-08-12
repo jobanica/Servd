@@ -22,7 +22,29 @@ export async function runPrintDispatch(
   orderId: string,
   doc: "bill" | "receipt" | "kitchen",
 ): Promise<string | null> {
+  return finishDispatch(res, () => openTicketForPrint(orderId, doc));
+}
+
+/**
+ * The same finish for a document that isn't an order — the end-of-shift report.
+ * Only the OS-dialog fallback differs, because there's no ticket page to open;
+ * every other transport is byte-identical to a receipt, which is the point.
+ */
+export async function runReportDispatch(
+  res: PrintDispatch,
+  printUrl: string,
+): Promise<string | null> {
+  return finishDispatch(res, () => {
+    window.open(printUrl, "_blank", "noopener");
+  });
+}
+
+async function finishDispatch(
+  res: PrintDispatch,
+  fallback: () => void,
+): Promise<string | null> {
   if (res.handledOnServer) return res.message || null;
+  if (!res.ok && res.message) return res.message;
 
   // A paired Web Bluetooth printer prints the exact bytes we got back.
   // printBytes silently reconnects if the BLE link dropped while idle, so we
@@ -36,6 +58,6 @@ export async function runPrintDispatch(
     return "Printed.";
   }
   // OS dialog / AirPrint fallback.
-  openTicketForPrint(orderId, doc);
+  fallback();
   return null;
 }
