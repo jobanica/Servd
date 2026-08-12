@@ -64,6 +64,7 @@ enum PaymentMethod {
   card_terminal
   gcash // scanned at the counter (in person)
   maya // scanned at the counter (in person)
+  bank_transfer // customer transferred to the restaurant's bank account
 }
 
 enum Gateway {
@@ -1709,6 +1710,10 @@ model Order {
   paymentChoice       String? // website order's chosen method: "cod" | "gcash" (null = not set)
   paymentRef          String? // customer's GCash reference for the full payment
   paymentReceiptUrl   String? // uploaded screenshot of the customer's online payment
+  /// What the customer says they'll hand over, on a cash order — so the
+  /// cashier can count the change before the rider or the customer arrives
+  /// instead of asking at the door. Centavos.
+  cashTendered        Int?
   customerNote        String? // customer's note to the rider / kitchen (online orders)
   source              String? // where the order came from: "web" (online site) | null (dine-in/POS)
   /// The cashier who opened this order, shown on the floor so a table can be

@@ -40,6 +40,10 @@ const schema = z.object({
   downpaymentRef: z.string().trim().max(120).optional(), // customer's payment reference
   paymentChoice: z.enum(["cod", "gcash", "maya", "bank"]).optional(), // chosen payment method
   paymentRef: z.string().trim().max(120).optional(), // reference no. for an online payment
+  // What the customer says they'll hand over on a cash order, in centavos, so
+  // the counter can count the change before they arrive. Capped generously —
+  // it is a hint for staff, never money that gets recorded as taken.
+  cashTendered: z.number().int().min(0).max(10_000_000).optional(),
   paymentReceipt: z.string().max(8_000_000).optional(), // data-URL screenshot of the payment
   customerNote: z.string().trim().max(500).optional(), // note to the rider / kitchen
   couponCode: z.string().trim().max(40).optional(), // promo/coupon code
@@ -243,7 +247,13 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
         downpaymentRef: d.downpaymentRef?.trim() || null,
       }
     : null;
-  const pay = { paymentChoice: choice, paymentRef: choice !== "cod" ? d.paymentRef?.trim() || null : null };
+  const pay = {
+    paymentChoice: choice,
+    paymentRef: choice !== "cod" ? d.paymentRef?.trim() || null : null,
+    // Only meaningful on a cash order — and only ever a note for the counter,
+    // never treated as money received.
+    cashTendered: choice === "cod" && d.cashTendered ? d.cashTendered : null,
+  };
 
   // Online-payment receipt screenshot (best-effort). The customer sends a
   // data-URL; we upload the bytes to storage and keep the public URL. Never
@@ -275,12 +285,22 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
   // because an unrelated column hasn't been migrated yet.
   const createWith = (data: typeof base) =>
     tenantDb(restaurant.id, (tx) => tx.order.create({ data, select: { id: true } }));
-  const extraNoSource = { ...extra };
+
+  // Each rung drops only the NEWEST column, so one unmigrated field can't take
+  // the older ones down with it — losing the payment screenshot because
+  // `cashTendered` isn't there yet would be a bad trade.
+  const withoutTendered = { ...extra };
+  delete (withoutTendered as { cashTendered?: number | null }).cashTendered;
+  const extraNoSource = { ...withoutTendered };
   delete (extraNoSource as { source?: string }).source;
+
   let order;
   try {
     order = await createWith({ ...base, ...extra } as typeof base);
   } catch {
+    try {
+      order = await createWith({ ...base, ...withoutTendered } as typeof base);
+    } catch {
     try {
       order = await createWith({ ...base, ...extraNoSource } as typeof base);
     } catch {
@@ -290,6 +310,7 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
         console.error("placeWebOrder failed", e2);
         return { ok: false, error: "We couldn't place your order. Please try again." };
       }
+    }
     }
   }
 

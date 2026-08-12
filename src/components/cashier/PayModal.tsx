@@ -9,6 +9,10 @@ const METHODS: { key: CounterMethod; label: string }[] = [
   { key: "gcash", label: "📱 GCash" },
   { key: "maya", label: "🟢 Maya" },
   { key: "card_terminal", label: "💳 Card" },
+  // The storefront already accepted bank transfers; the till had no way to
+  // record a walk-in who paid the same way, so those were rung up as something
+  // they weren't and the day's method split was wrong.
+  { key: "bank_transfer", label: "🏦 Bank" },
 ];
 
 /** Handy notes so the cashier can tap instead of typing. */

@@ -39,6 +39,15 @@ export interface CashierOrder {
   billRequested: boolean;
   paidOnline: boolean; // a confirmed gateway (PayMongo) payment exists
   served: boolean; // cashier confirmed the food was served
+  /**
+   * How the customer said they'd pay, and their proof. Kept on the card AFTER
+   * acceptance: with ten orders open, "Payment: unpaid" alone tells a cashier
+   * nothing about which of them owes cash and which already sent a transfer.
+   */
+  paymentChoice: string | null;
+  paymentRef: string | null;
+  paymentReceiptUrl: string | null;
+  cashTendered: number | null;
   createdAt: string;
   itemCount: number;
   items: { name: string; quantity: number; note: string | null; modifiers: string[] }[];
@@ -103,14 +112,14 @@ async function orderMetaMap(
   restaurantId: string,
   ids: string[],
 ): Promise<
-  Map<string, { orderType: string; customerName: string | null; customerPhone: string | null; customerAddress: string | null; mapUrl: string | null; orderNumber: number | null; openedByName: string | null }>
+  Map<string, { orderType: string; customerName: string | null; customerPhone: string | null; customerAddress: string | null; mapUrl: string | null; orderNumber: number | null; openedByName: string | null; paymentChoice: string | null; paymentRef: string | null; paymentReceiptUrl: string | null; cashTendered: number | null }>
 > {
   if (ids.length === 0) return new Map();
   try {
     const rows = await tenantDb(restaurantId, (tx) =>
       tx.order.findMany({
         where: { id: { in: ids } },
-        select: { id: true, orderType: true, customerName: true, customerPhone: true, customerAddress: true, customerLat: true, customerLng: true, orderNumber: true, openedByName: true },
+        select: { id: true, orderType: true, customerName: true, customerPhone: true, customerAddress: true, customerLat: true, customerLng: true, orderNumber: true, openedByName: true, paymentChoice: true, paymentRef: true, paymentReceiptUrl: true, cashTendered: true },
       }),
     );
     return new Map(
@@ -124,6 +133,10 @@ async function orderMetaMap(
           mapUrl: o.customerLat != null && o.customerLng != null ? `https://maps.google.com/?q=${o.customerLat},${o.customerLng}` : null,
           orderNumber: o.orderNumber,
           openedByName: o.openedByName,
+          paymentChoice: o.paymentChoice,
+          paymentRef: o.paymentRef,
+          paymentReceiptUrl: o.paymentReceiptUrl,
+          cashTendered: o.cashTendered,
         },
       ]),
     );
@@ -148,14 +161,54 @@ async function scheduledForMap(restaurantId: string, ids: string[]): Promise<Map
 }
 
 /** Best-effort payment method + GCash reference (paymentChoice/Ref may lag on prod). */
-async function paymentMap(restaurantId: string, ids: string[]): Promise<Map<string, { choice: string | null; ref: string | null }>> {
-  const map = new Map<string, { choice: string | null; ref: string | null }>();
+type PayMeta = {
+  choice: string | null;
+  ref: string | null;
+  receiptUrl: string | null;
+  cashTendered: number | null;
+};
+
+async function paymentMap(restaurantId: string, ids: string[]): Promise<Map<string, PayMeta>> {
+  const map = new Map<string, PayMeta>();
   if (ids.length === 0) return map;
+  const put = (
+    id: string,
+    choice: string | null,
+    ref: string | null,
+    receiptUrl: string | null,
+    cashTendered: number | null,
+  ) => map.set(id, { choice, ref, receiptUrl, cashTendered });
   try {
     const rows = await tenantDb(restaurantId, (tx) =>
-      tx.order.findMany({ where: { id: { in: ids } }, select: { id: true, paymentChoice: true, paymentRef: true } }),
+      tx.order.findMany({
+        where: { id: { in: ids } },
+        select: {
+          id: true,
+          paymentChoice: true,
+          paymentRef: true,
+          paymentReceiptUrl: true,
+          cashTendered: true,
+        },
+      }),
     );
-    for (const o of rows) map.set(o.id, { choice: o.paymentChoice ?? null, ref: o.paymentRef ?? null });
+    for (const o of rows) {
+      put(o.id, o.paymentChoice ?? null, o.paymentRef ?? null, o.paymentReceiptUrl ?? null, o.cashTendered ?? null);
+    }
+    return map;
+  } catch {
+    /* cashTendered not migrated yet — retry without it rather than losing the
+       payment method entirely, which is the part the cashier actually needs */
+  }
+  try {
+    const rows = await tenantDb(restaurantId, (tx) =>
+      tx.order.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, paymentChoice: true, paymentRef: true, paymentReceiptUrl: true },
+      }),
+    );
+    for (const o of rows) {
+      put(o.id, o.paymentChoice ?? null, o.paymentRef ?? null, o.paymentReceiptUrl ?? null, null);
+    }
   } catch {
     /* payment columns not migrated yet */
   }
@@ -172,8 +225,12 @@ export interface IncomingOrder {
   customerAddress: string | null;
   mapUrl: string | null;
   scheduledFor: string | null; // ISO — advance order requested time (null = ASAP)
-  paymentChoice: string | null; // "cod" | "gcash"
+  paymentChoice: string | null; // "cod" | "gcash" | "maya" | "bank"
   paymentRef: string | null; // customer's GCash reference
+  /// Screenshot the customer uploaded as proof. The cashier has to be able to
+  /// LOOK at it — "verify before accepting" is not a verification.
+  paymentReceiptUrl: string | null;
+  cashTendered: number | null; // what they say they'll hand over, on a cash order
   total: number;
   paymentStatus: string;
   createdAt: string;
@@ -283,6 +340,10 @@ export async function getCashierTables(): Promise<CashierTable[]> {
       billRequested: o.billRequested,
       paidOnline: o.payments.some((p) => p.gateway === "paymongo"),
       served: servedIds.has(o.id),
+      paymentChoice: m?.paymentChoice ?? null,
+      paymentRef: m?.paymentRef ?? null,
+      paymentReceiptUrl: m?.paymentReceiptUrl ?? null,
+      cashTendered: m?.cashTendered ?? null,
       createdAt: o.createdAt.toISOString(),
       itemCount: o._count.items,
       items: o.items.map((it) => ({
@@ -352,6 +413,8 @@ export async function getIncomingOrders(): Promise<IncomingOrder[]> {
       scheduledFor: sched.get(o.id) ?? null,
       paymentChoice: payments.get(o.id)?.choice ?? null,
       paymentRef: payments.get(o.id)?.ref ?? null,
+      paymentReceiptUrl: payments.get(o.id)?.receiptUrl ?? null,
+      cashTendered: payments.get(o.id)?.cashTendered ?? null,
       total: o.total,
       paymentStatus: o.paymentStatus,
       createdAt: o.createdAt.toISOString(),
@@ -438,7 +501,12 @@ export async function declineOrder(orderId: string): Promise<CashierState> {
 }
 
 /** Payment methods a cashier can record in person. */
-export type CounterMethod = "cash" | "card_terminal" | "gcash" | "maya";
+export type CounterMethod =
+  | "cash"
+  | "card_terminal"
+  | "gcash"
+  | "maya"
+  | "bank_transfer";
 
 /** Record an in-person payment (cash/card/e-wallet). Marks paid AND closes the order. */
 export async function markOrderPaid(

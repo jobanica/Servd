@@ -43,6 +43,7 @@ const METHOD_LABEL: Record<string, string> = {
   maya: "Maya",
   online_gcash: "GCash",
   online_card: "Card (online)",
+  bank_transfer: "Bank transfer",
 };
 
 /**

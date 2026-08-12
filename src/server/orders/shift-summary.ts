@@ -17,6 +17,7 @@ const METHOD_LABEL: Record<string, string> = {
   maya: "Maya",
   online_gcash: "GCash (online)",
   online_card: "Card (online)",
+  bank_transfer: "Bank transfer",
 };
 
 export interface ShiftSummary {

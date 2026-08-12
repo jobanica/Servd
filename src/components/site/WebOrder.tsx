@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatPeso, formatDelta } from "@/lib/money";
+import { formatPeso, formatDelta, pesosToCentavos, cashSuggestions } from "@/lib/money";
 import {
   unitPrice,
   validateSelection,
@@ -443,6 +443,10 @@ export function WebOrder(props: WebOrderProps) {
     pay && pay.codEnabled === false && hasOnline ? onlineMethods[0].key : "cod",
   );
   const [gcashRef, setGcashRef] = useState(""); // reference no. for the chosen online method
+  // What the customer will hand over in cash, so the counter can count the
+  // change before they arrive. It used to be left to the free-text
+  // instructions box, where in practice nobody wrote it.
+  const [cashWith, setCashWith] = useState("");
   const [receipt, setReceipt] = useState<string | null>(null); // uploaded payment screenshot (data URL)
   const [receiptBusy, setReceiptBusy] = useState(false);
   const [riderNote, setRiderNote] = useState(""); // customer's note to the rider
@@ -513,6 +517,7 @@ export function WebOrder(props: WebOrderProps) {
   const deliveryFee = collectDeliveryFee ? deliveryFeeEstimate : 0; // added to the total
   // COD fee — an extra charge on cash-on-delivery orders (delivery paid by cash).
   const isCod = orderType === "delivery" && payMethod === "cod";
+  const cashTenderedCentavos = pesosToCentavos(Number(cashWith) || 0);
   const codFee = isCod && props.payment?.codFeeEnabled ? props.payment.codFee ?? 0 : 0;
   // Packaging fee for food packaging (tubs/containers) on to-go orders. Delivery
   // only, or pickup + delivery, per config — charged once per order, or per item
@@ -524,6 +529,8 @@ export function WebOrder(props: WebOrderProps) {
       : 0;
   const discount = appliedPromo?.amount ?? 0;
   const total = Math.max(0, subtotal + deliveryFee + codFee + packagingFee - discount);
+  // Change preview, shown live so the customer picks a note that actually works.
+  const changePreview = cashTenderedCentavos > 0 ? cashTenderedCentavos - total : null;
 
   // A coupon's value can depend on the cart, delivery fee and order type — clear
   // it when any of those change so the customer re-applies (and the server stays
@@ -638,6 +645,7 @@ export function WebOrder(props: WebOrderProps) {
       scheduledFor: scheduledIso,
       downpaymentRef: schedulingLater && downpaymentDue > 0 ? downpaymentRef || undefined : undefined,
       paymentChoice: payMethod,
+      cashTendered: payMethod === "cod" && cashTenderedCentavos > 0 ? cashTenderedCentavos : undefined,
       paymentRef: payMethod !== "cod" ? gcashRef || undefined : undefined,
       paymentReceipt: payMethod !== "cod" ? receipt || undefined : undefined,
       customerNote: [
@@ -929,6 +937,49 @@ export function WebOrder(props: WebOrderProps) {
                     </button>
                   ))}
                 </div>
+                {/* Cash: ask what they'll pay with, so the change is counted
+                    before they get to the counter or the door. */}
+                {payMethod === "cod" && (
+                  <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50/70 p-3">
+                    <label className="block text-xs font-semibold text-plum-ink/70">
+                      Magkano ang ibabayad mo? <span className="font-normal">(optional)</span>
+                    </label>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {cashSuggestions(total).map((amount) => (
+                        <button
+                          key={amount}
+                          type="button"
+                          onClick={() => setCashWith(String(amount / 100))}
+                          className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${
+                            cashWith === String(amount / 100)
+                              ? "border-plum-ink bg-plum-ink text-white"
+                              : "border-plum-ink/15 bg-white text-plum-ink/70"
+                          }`}
+                        >
+                          {formatPeso(amount)}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      value={cashWith}
+                      onChange={(e) => setCashWith(e.target.value.replace(/[^0-9.]/g, ""))}
+                      inputMode="decimal"
+                      placeholder="Or type the amount"
+                      className="mt-2 w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+                    />
+                    {changePreview !== null && (
+                      <p className="mt-1.5 text-xs font-semibold text-plum-ink/70">
+                        {changePreview >= 0
+                          ? `Sukli mo: ${formatPeso(changePreview)}`
+                          : `Kulang pa ng ${formatPeso(-changePreview)}`}
+                      </p>
+                    )}
+                    <p className="mt-1 text-[11px] text-plum-ink/45">
+                      Para handa na ang sukli mo pagdating mo.
+                    </p>
+                  </div>
+                )}
+
                 {selectedOnline && (
                   <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50/60 p-3 text-center">
                     <p className="text-xs font-semibold text-plum-ink/70">Scan to pay {formatPeso(total)}</p>

@@ -36,6 +36,8 @@ import { removeGiftCard } from "@/server/gift-cards/gift-cards";
 import { useOnline } from "@/lib/offline/useOnline";
 import { ConnectivityPill } from "@/components/offline/ConnectivityPill";
 import { CashOutModal } from "./CashOutModal";
+import { PaymentBadge } from "./PaymentBadge";
+import { orderTypeLabelWithEmoji } from "@/lib/orders/order-type";
 import { BluetoothPrinterButton } from "./BluetoothPrinterButton";
 import { printPaidTicket, printKitchenTicket } from "@/server/printing/print";
 import { runPrintDispatch } from "@/lib/print/run-dispatch";
@@ -113,13 +115,33 @@ export function CashierBoard({
   const seenIncoming = useRef<Set<string>>(new Set(initialIncoming.map((o) => o.id)));
   const seenOnlinePaid = useRef<Set<string>>(new Set());
   const seenReady = useRef<Set<string>>(new Set());
+  // Fetch de-duplication + change detection — see refresh() below.
+  const refreshing = useRef(false);
+  const refreshQueued = useRef(false);
+  const lastTables = useRef<string>("");
+  const lastIncoming = useRef<string>("");
 
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast((t) => (t === msg ? null : t)), 6000);
   }
 
+  /**
+   * Refetch the board.
+   *
+   * Two guards, both about the tablet this runs on. Overlapping fetches are
+   * collapsed, because every order change broadcasts and punching ten orders
+   * used to fire ten near-simultaneous refreshes. And the state is only
+   * replaced when the data actually CHANGED — the 15-second poll otherwise
+   * handed React a brand-new object graph every 15 seconds, re-rendering the
+   * whole board over and over, which on Chrome for Android is the flicker.
+   */
   const refresh = useCallback(async () => {
+    if (refreshing.current) {
+      refreshQueued.current = true;
+      return;
+    }
+    refreshing.current = true;
     try {
       const [t, inc] = await Promise.all([getCashierTables(), getIncomingOrders()]);
 
@@ -155,15 +177,34 @@ export function CashierBoard({
       }
       if (freshReady) setReadyDismissed(false);
 
-      setTables(t);
-      setIncoming(inc);
+      // Only re-render when something is genuinely different.
+      const sigT = JSON.stringify(t);
+      if (sigT !== lastTables.current) {
+        lastTables.current = sigT;
+        setTables(t);
+      }
+      const sigI = JSON.stringify(inc);
+      if (sigI !== lastIncoming.current) {
+        lastIncoming.current = sigI;
+        setIncoming(inc);
+      }
     } catch {
       /* ignore transient */
+    } finally {
+      refreshing.current = false;
+      if (refreshQueued.current) {
+        refreshQueued.current = false;
+        // One catch-up pass for everything that arrived while we were busy.
+        void refresh();
+      }
     }
   }, []);
 
   useEffect(() => {
     // Seed the seen sets from the initial data (don't alert on first load).
+    // The signature is seeded too, so the very first poll doesn't count the
+    // server-rendered board as a change and repaint it for no reason.
+    lastTables.current = JSON.stringify(initialTables);
     for (const tbl of initialTables) {
       for (const o of tbl.orders) {
         if (o.paidOnline) seenOnlinePaid.current.add(o.id);
@@ -582,6 +623,19 @@ export function CashierBoard({
                     )}
                   </div>
 
+                  {/* The method the customer chose, still here after the order
+                      was accepted. "Payment: unpaid" on ten cards says nothing
+                      about which of them owes cash and which already sent a
+                      transfer with a screenshot attached. */}
+                  <PaymentBadge
+                    choice={o.paymentChoice}
+                    reference={o.paymentRef}
+                    receiptUrl={o.paymentReceiptUrl}
+                    cashTendered={o.cashTendered}
+                    total={o.net}
+                    paid={o.paymentStatus === "paid"}
+                  />
+
                   {/* Actions — keep the two most-used inline (Print bill, Paid
                       cash); everything else lives in the "⋯ more" menu but stays
                       one tap away. */}
@@ -720,15 +774,17 @@ export function CashierBoard({
                       {new Date(o.scheduledFor).toLocaleString("en-PH", { timeZone: "Asia/Manila", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
                     </p>
                   )}
-                  {o.paymentChoice && o.paymentChoice !== "cod" && (
-                    <p className="mt-1 rounded-md bg-blue-100 px-2 py-1 text-xs font-bold text-blue-700">
-                      {o.paymentChoice === "maya" ? "🟢 Maya" : o.paymentChoice === "bank" ? "🏦 Bank" : "📱 GCash"}
-                      {o.paymentRef ? ` — Ref: ${o.paymentRef}` : ""} (verify before accepting)
-                    </p>
-                  )}
+                  <PaymentBadge
+                    choice={o.paymentChoice}
+                    reference={o.paymentRef}
+                    receiptUrl={o.paymentReceiptUrl}
+                    cashTendered={o.cashTendered}
+                    total={o.total}
+                    paid={o.paymentStatus === "paid"}
+                  />
                   {o.channel !== "dine_in" && (
                     <p className="mt-0.5 text-xs text-plum-ink/55">
-                      {o.channel === "delivery" ? "🛵 Delivery" : "🥡 Pickup"}
+                      {orderTypeLabelWithEmoji(o.channel)}
                       {o.customerPhone ? ` · ${o.customerPhone}` : ""}
                       {o.customerAddress ? ` · ${o.customerAddress}` : ""}
                       {o.mapUrl && (

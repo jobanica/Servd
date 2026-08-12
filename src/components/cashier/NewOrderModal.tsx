@@ -356,9 +356,9 @@ export function NewOrderModal({
         ) : !menu ? (
           <p className="p-6 text-sm text-plum-ink/50">Loading menu…</p>
         ) : (
-          <div className={`grid flex-1 grid-cols-1 gap-0 overflow-hidden ${lines.length > 0 ? "md:grid-cols-[1fr_320px]" : ""}`}>
+          <div className={`grid min-h-0 flex-1 grid-cols-1 gap-0 overflow-hidden ${lines.length > 0 ? "md:grid-cols-[1fr_320px]" : ""}`}>
             {/* Menu */}
-            <div className="overflow-y-auto p-4">
+            <div className="min-h-0 overflow-y-auto p-4">
               {nonEmpty.length === 0 && (
                 <p className="text-sm text-plum-ink/50">No menu items yet.</p>
               )}
@@ -390,10 +390,15 @@ export function NewOrderModal({
             </div>
 
             {/* Order summary — hidden until the first item is added, so the
-                cashier browses the menu first. */}
+                cashier browses the menu first.
+
+                min-h-0 throughout: without it a flex child won't shrink below
+                its content, so a long order pushes the footer past the bottom
+                of the overflow-hidden grid and Send to kitchen becomes
+                unreachable — exactly when the order is big enough to matter. */}
             {lines.length > 0 && (
-            <div className="flex flex-col border-t border-plum-ink/10 md:border-l md:border-t-0">
-              <div className="space-y-3 border-b border-plum-ink/10 p-4">
+            <div className="flex min-h-0 flex-col border-t border-plum-ink/10 md:border-l md:border-t-0">
+              <div className="shrink-0 space-y-3 border-b border-plum-ink/10 p-4">
                 {/* Order type */}
                 <div className="grid grid-cols-3 gap-1 rounded-lg bg-cream/60 p-1">
                   {/* All five types, named exactly as the kitchen display and
@@ -482,7 +487,7 @@ export function NewOrderModal({
                 )}
               </div>
 
-              <div className="flex-1 overflow-y-auto p-4">
+              <div className="min-h-0 flex-1 overflow-y-auto p-4">
                 {lines.length === 0 ? (
                   <p className="text-sm text-plum-ink/40">No items yet. Tap menu items to add.</p>
                 ) : (
@@ -530,7 +535,7 @@ export function NewOrderModal({
                 )}
               </div>
 
-              <div className="border-t border-plum-ink/10 p-4">
+              <div className="shrink-0 border-t border-plum-ink/10 bg-white p-4">
                 {submitError && <p className="mb-2 text-sm text-guava">{submitError}</p>}
                 <div className="mb-3 flex justify-between font-heading text-lg font-bold">
                   <span>Total</span>
