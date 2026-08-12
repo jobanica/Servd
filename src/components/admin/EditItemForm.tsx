@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { updateItem, type FormState } from "@/server/menu/actions";
 import { DIETARY_TAGS } from "@/lib/menu/dietary";
 import { SubmitButton } from "./SubmitButton";
+import { ImageField } from "./ImageField";
 
 type Category = { id: string; name: string };
 type Item = {
@@ -145,27 +146,11 @@ export function EditItemForm({
         </span>
       </fieldset>
 
-      <div className="flex items-center gap-4">
-        {item.imageUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={item.imageUrl}
-            alt={item.name}
-            className="h-16 w-16 rounded-lg object-cover"
-          />
-        )}
-        <label className="text-sm">
-          <span className="mr-2 text-plum-ink/60">
-            {item.imageUrl ? "Replace photo" : "Add photo"}
-          </span>
-          <input
-            type="file"
-            name="image"
-            accept="image/jpeg,image/png,image/webp"
-            className="text-xs"
-          />
-        </label>
-      </div>
+      <ImageField
+        name="image"
+        label={item.imageUrl ? "Replace photo" : "Add photo"}
+        currentUrl={item.imageUrl}
+      />
 
       <div className="rounded-lg border border-plum-ink/10 p-3">
         <p className="text-sm font-medium">Video (optional)</p>

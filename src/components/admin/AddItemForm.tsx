@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { createItem, type FormState } from "@/server/menu/actions";
 import { SubmitButton } from "./SubmitButton";
+import { ImageField } from "./ImageField";
 
 /** Inline "add item" form, pre-scoped to a single category. */
 export function AddItemForm({ categoryId }: { categoryId: string }) {
@@ -63,15 +64,7 @@ export function AddItemForm({ categoryId }: { categoryId: string }) {
           <input type="checkbox" name="isAvailable" defaultChecked />
           Available
         </label>
-        <label className="text-sm">
-          <span className="mr-2 text-plum-ink/60">Photo</span>
-          <input
-            type="file"
-            name="image"
-            accept="image/jpeg,image/png,image/webp"
-            className="text-xs"
-          />
-        </label>
+        <ImageField name="image" className="w-full sm:w-auto sm:min-w-[16rem]" />
       </div>
       {state?.error && <p className="text-sm text-guava">{state.error}</p>}
       <div className="flex gap-2">

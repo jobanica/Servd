@@ -32,7 +32,7 @@ export async function uploadMenuImage(
     throw new Error("Unsupported image type. Use JPEG, PNG, or WebP.");
   }
   if (file.size > MAX_IMAGE_BYTES) {
-    throw new Error("Image too large. Max 5 MB.");
+    throw new Error("Image too large. Please use a photo under 4 MB.");
   }
 
   const supabase = createSupabaseAdminClient();

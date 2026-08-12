@@ -504,7 +504,7 @@ export function StorefrontForm({
           nameLabel="GCash account name"
           numberLabel="GCash number"
           numberPlaceholder="09XX XXX XXXX"
-          hint="Upload a screenshot of your GCash “Receive money” QR. Max 5 MB."
+          hint="Upload a screenshot of your GCash “Receive money” QR. Max 4 MB."
           enabled={gcashOn}
           setEnabled={setGcashOn}
           initial={{ name: initial.payment.gcashName, number: initial.payment.gcashNumber, qrUrl: initial.payment.gcashQrUrl }}
@@ -515,7 +515,7 @@ export function StorefrontForm({
           nameLabel="Maya account name"
           numberLabel="Maya number"
           numberPlaceholder="09XX XXX XXXX"
-          hint="Upload a screenshot of your Maya “Receive money” QR. Max 5 MB."
+          hint="Upload a screenshot of your Maya “Receive money” QR. Max 4 MB."
           enabled={mayaOn}
           setEnabled={setMayaOn}
           initial={{ name: initial.payment.mayaName, number: initial.payment.mayaNumber, qrUrl: initial.payment.mayaQrUrl }}
@@ -526,7 +526,7 @@ export function StorefrontForm({
           nameLabel="Bank & account name"
           numberLabel="Account number"
           numberPlaceholder="e.g. BPI 1234-5678-90"
-          hint="Upload your bank / InstaPay / QR Ph code. Max 5 MB."
+          hint="Upload your bank / InstaPay / QR Ph code. Max 4 MB."
           enabled={bankOn}
           setEnabled={setBankOn}
           initial={{ name: initial.payment.bankName, number: initial.payment.bankNumber, qrUrl: initial.payment.bankQrUrl }}

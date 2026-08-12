@@ -7,6 +7,8 @@ import { requestActivation } from "@/server/build/activate-action";
 import type { BuildState } from "@/server/build/queries";
 import { MenuScanPanel } from "./MenuScanPanel";
 import { LazyVideo } from "@/components/media/LazyVideo";
+import { ImageField } from "@/components/admin/ImageField";
+import { compressImageFile, replaceInputFile } from "@/lib/images/compress";
 
 /** Bundled demo reel shown on the preview step. Square, ~95 seconds. */
 const DEMO_VIDEO = "/demo/servd-demo.mp4";
@@ -178,12 +180,23 @@ function BusinessStep({
         <input
           type="file"
           name="logo"
-          accept="image/png,image/jpeg,image/webp"
+          accept="image/png,image/jpeg,image/webp,image/heic,image/heif,image/*"
           onChange={(e) => {
-            const f = e.target.files?.[0];
+            const input = e.target;
+            const f = input.files?.[0];
             if (f) {
+              // Preview immediately from the original — waiting on compression
+              // would leave the tile blank for a beat and read as a failure.
               setLogoPreview(URL.createObjectURL(f));
               setHasNewLogo(true);
+              // Then quietly swap in the smaller file for the actual upload.
+              void compressImageFile(f)
+                .then((res) => {
+                  if (res.compressed) replaceInputFile(input, res.file);
+                })
+                .catch(() => {
+                  /* leave the original; the server still validates it */
+                });
             }
           }}
           className="text-sm"
@@ -332,12 +345,10 @@ function MenuStep({
               <option key={c} value={c} />
             ))}
           </datalist>
-          <input
-            type="file"
-            name="photo"
-            accept="image/png,image/jpeg,image/webp"
-            className="w-40 text-xs"
-          />
+          {/* Compressed in the browser: a raw camera photo exceeds the
+              platform's request-body cap and the upload fails before any of
+              our code can explain why. */}
+          <ImageField name="photo" label="Photo (optional)" className="w-full" />
         </div>
         <button
           type="submit"

@@ -58,7 +58,17 @@ export const ALLOWED_IMAGE_TYPES = [
   "image/png",
   "image/webp",
 ] as const;
-export const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
+/**
+ * 4 MB, NOT 5. The hosting platform caps a Server Action request body at
+ * roughly 4.5 MB, so a 5 MB file was rejected by the platform before this
+ * check ever ran — which is why an oversized photo crashed the page instead of
+ * returning the friendly "Image too large" below. Keeping our limit under the
+ * platform's means the failure lands somewhere we can talk about it.
+ *
+ * In practice uploads arrive a few hundred KB: the browser compresses first
+ * (lib/images/compress.ts). This is the backstop for when that can't run.
+ */
+export const MAX_IMAGE_BYTES = 4 * 1024 * 1024; // 4 MB
 
 // Menu item videos (short clips).
 export const ALLOWED_VIDEO_TYPES = ["video/mp4", "video/webm"] as const;
