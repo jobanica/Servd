@@ -9,8 +9,14 @@ import { PhoneMock } from "@/components/create/PhoneMock";
 import { getLandingConfig } from "@/server/landing/settings";
 
 /**
- * The Facebook-ad landing page. One job: get a restaurant owner, on a phone,
- * inside the Facebook in-app browser, to tap through into /build.
+ * The Facebook-ad landing page. One job: get a food-business owner anywhere in
+ * the Philippines, on a phone, inside the Facebook in-app browser, to tap
+ * through into /build.
+ *
+ * The audience is every kind of food business — restaurants, cafés, milk tea
+ * shops, carinderias, cloud kitchens — so the copy names them rather than
+ * assuming "restaurant" covers it. Someone running a milk tea shop reads
+ * "restaurant" and decides the page isn't for them.
  *
  * Three things are deliberate and worth keeping:
  *
@@ -208,18 +214,18 @@ export default async function CreatePage() {
       </section>
 
       {/* --------------------------------------------------- SOCIAL PROOF */}
-      {/* TODO: real testimonial. Swap this for one named restaurant and one real
-          number the moment there is one ("This Davao ramen spot saved ₱14k in
+      {/* TODO: real testimonial. Swap this for one named business and one real
+          number the moment there is one ("This ramen shop saved ₱14k in
           commissions last month") — a named result outsells any generic claim,
           and an invented one isn't worth having. */}
       <section className="bg-plum-ink px-5 py-12 text-cream">
         <div className="mx-auto max-w-2xl text-center">
           <p className="text-xs font-bold uppercase tracking-widest text-mango">
-            Built in Davao, for Davao
+            Para sa lahat ng food business sa Pilipinas
           </p>
           <p className="mt-4 font-heading text-xl font-bold leading-snug sm:text-2xl">
-            Made for casual-dining owners who are tired of handing a quarter of every order to
-            a delivery app.
+            Restaurant, café, milk tea shop, carinderia, bakery, cloud kitchen — kung nagbebenta
+            ka ng pagkain, para sa&apos;yo ito.
           </p>
           <p className="mt-4 text-sm text-cream/60">
             Build your preview and see exactly what your customers would see — before you decide

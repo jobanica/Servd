@@ -78,11 +78,15 @@ ${BUTTON_TAG}`,
 
 ${BUTTON_TAG}`,
   },
+  // Social proof. NOTE: this is the one step that makes a claim about other
+  // businesses rather than about the product, so keep it honest — swap in a
+  // real named result once there is one, and pause the step until then if you'd
+  // rather say nothing at all.
   B_day5: {
-    subject: "Ginagamit na ito ng ibang Davao restaurants",
-    body: `May mga restaurant na dito sa Davao, ginagamit na ang Servd para sa direct orders nila — walang commission, diretso sa kanila ang bayad.
+    subject: "Bakit direct orders ang pinipili ng ibang food business",
+    body: `Restaurant, café, milk tea shop, carinderia — kahit anong klaseng food business, pareho ang problema: 20–25% ng bawat order, napupunta sa delivery app.
 
-Sumali ka na.
+Sa sariling ordering page, diretso sa'yo ang bayad at sa'yo rin ang customer.
 
 ${BUTTON_TAG}`,
   },
