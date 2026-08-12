@@ -6,6 +6,10 @@ import { saveBusiness, addBuildItem, deleteBuildItem, type BuildResult } from "@
 import { requestActivation } from "@/server/build/activate-action";
 import type { BuildState } from "@/server/build/queries";
 import { MenuScanPanel } from "./MenuScanPanel";
+import { LazyVideo } from "@/components/media/LazyVideo";
+
+/** Bundled demo reel shown on the preview step. Square, ~95 seconds. */
+const DEMO_VIDEO = "/demo/servd-demo.mp4";
 
 const MIN_ITEMS = 3;
 const STEPS = ["Business", "Menu", "Preview", "Activate"] as const;
@@ -399,6 +403,31 @@ function PreviewStep({
         <button onClick={onNext} className="flex-1 rounded-full border border-plum-ink/15 py-3 text-sm font-semibold">
           Go live →
         </button>
+      </div>
+
+      {/* What activating actually buys them.
+          BELOW the buttons on purpose: they've just built something and the
+          next thing they should do is open it. A video above the CTA would be
+          a two-minute detour placed in front of the moment the whole builder
+          exists to reach.
+          Click-to-load, so nobody on mobile data pays for five megabytes they
+          didn't ask for. */}
+      <div className="mt-6 border-t border-plum-ink/10 pt-5 text-left">
+        <h2 className="font-heading text-base font-bold text-plum-ink">
+          What you get when you activate
+        </h2>
+        <p className="mt-1 text-sm text-plum-ink/55">
+          Orders straight to your kitchen, your own QR codes, and the takings in
+          your own account — no commission to anyone.
+        </p>
+        <div className="mt-3">
+          <LazyVideo
+            src={DEMO_VIDEO}
+            aspect="square"
+            title="How Servd works once your restaurant is live"
+            playLabel="See it in action"
+          />
+        </div>
       </div>
     </div>
   );

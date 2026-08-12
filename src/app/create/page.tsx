@@ -3,7 +3,7 @@ import Link from "next/link";
 import { AppIcon, Wordmark } from "@/components/Wordmark";
 import { Cta, CtaNote } from "@/components/create/Cta";
 import { StickyCta } from "@/components/create/StickyCta";
-import { LazyVideo } from "@/components/create/LazyVideo";
+import { LazyVideo } from "@/components/media/LazyVideo";
 import { Pixel, LandingView } from "@/components/create/Pixel";
 import { PhoneMock } from "@/components/create/PhoneMock";
 import { getLandingConfig } from "@/server/landing/settings";
