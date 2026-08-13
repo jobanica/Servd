@@ -5,6 +5,7 @@ import { getTableBill, requestBill, type TableBill } from "@/server/orders/reque
 import { applyBillPromo, clearBillPromo, listRedeemableCodes, type RedeemableCode } from "@/server/promotions/apply-bill";
 import { createTableCheckout } from "@/server/payments/checkout";
 import { getDineInGcash, type DineInGcash } from "@/server/tables/dine-in-gcash";
+import { prepareReceipt } from "@/lib/images/receipt";
 
 function peso(centavos: number) {
   return `₱${(centavos / 100).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
@@ -32,6 +33,12 @@ export function BillSheet({
   const [bill, setBill] = useState<TableBill | null | "loading">("loading");
   const [phase, setPhase] = useState<"choose" | "cash" | "gcash" | "redirecting">("choose");
   const [gcash, setGcash] = useState<DineInGcash | null>(null);
+  // Proof of payment the diner sends to the cashier from this screen.
+  const [gcashRef, setGcashRef] = useState("");
+  const [receipt, setReceipt] = useState<string | null>(null);
+  const [receiptBusy, setReceiptBusy] = useState(false);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [code, setCode] = useState("");
@@ -104,6 +111,38 @@ export function BillSheet({
     setBusy(false);
     if (res.ok) setPhase("gcash");
     else setError(res.error ?? "Couldn't notify the cashier.");
+  }
+
+  async function pickReceipt(file: File | undefined) {
+    if (!file) return;
+    setReceiptBusy(true);
+    setReceiptError(null);
+    const { dataUrl, error } = await prepareReceipt(file);
+    setReceipt(dataUrl);
+    setReceiptError(error);
+    setReceiptBusy(false);
+  }
+
+  /**
+   * Send the reference and screenshot to the cashier.
+   *
+   * Deliberately not "Paid": the diner is telling staff what they sent, and a
+   * person still confirms it against the GCash account. A button here that
+   * settled the bill would let anyone close their own tab with a screenshot.
+   */
+  async function sendProof() {
+    setBusy(true);
+    setError(null);
+    const res = await requestBill({
+      slug,
+      tableToken,
+      method: "gcash_qr",
+      reference: gcashRef.trim() || undefined,
+      receipt: receipt ?? undefined,
+    });
+    setBusy(false);
+    if (res.ok) setSent(true);
+    else setError(res.error ?? "Couldn't send that to the cashier.");
   }
 
   // Gratuity the diner chose (custom pesos override the percentage chips).
@@ -183,10 +222,61 @@ export function BillSheet({
             )}
 
             <p className="mt-3 text-xs text-brand-ink/50">
-              Send the exact amount, then show your GCash confirmation to the staff so they can
-              close your bill.
+              Send the exact amount, then send your confirmation below so the cashier can close
+              your bill without coming back to ask.
             </p>
-            <button onClick={onClose} className="mt-5 w-full rounded-full py-3 font-semibold btn-brand">
+
+            {sent ? (
+              <p className="mt-4 rounded-xl bg-green-50 px-3 py-2 text-sm font-semibold text-green-700">
+                Sent to the cashier ✓ They&apos;ll confirm it and close your bill.
+              </p>
+            ) : (
+              <div className="mt-4 text-left">
+                <input
+                  value={gcashRef}
+                  onChange={(e) => setGcashRef(e.target.value)}
+                  placeholder="GCash reference no. (optional)"
+                  className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+                />
+                {receipt ? (
+                  <div className="mt-2 flex items-center gap-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={receipt} alt="Your payment screenshot" className="h-14 w-14 rounded-lg border border-plum-ink/10 object-cover" />
+                    <span className="text-xs font-semibold text-green-700">Screenshot attached ✓</span>
+                    <button type="button" onClick={() => setReceipt(null)} className="text-xs text-brand-ink/50 underline">
+                      remove
+                    </button>
+                  </div>
+                ) : (
+                  <label className="mt-2 block cursor-pointer rounded-lg border border-dashed border-plum-ink/25 px-3 py-2 text-center text-xs font-semibold text-brand-ink/60">
+                    {receiptBusy ? "Processing…" : "📎 Attach your GCash screenshot"}
+                    {/* Any image type — an iPhone offers HEIC, and refusing it
+                        at the picker is how a diner ends up believing they
+                        attached something they didn't. */}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => pickReceipt(e.target.files?.[0])}
+                    />
+                  </label>
+                )}
+                {receiptError && (
+                  <p className="mt-1 text-[11px] font-semibold text-guava">{receiptError}</p>
+                )}
+                <button
+                  onClick={sendProof}
+                  disabled={busy || (!receipt && !gcashRef.trim())}
+                  className="mt-3 w-full rounded-full py-3 font-semibold btn-brand disabled:opacity-50"
+                >
+                  {busy ? "Sending…" : "Send to cashier"}
+                </button>
+              </div>
+            )}
+
+            {error && <p className="mt-2 text-sm text-guava">{error}</p>}
+
+            <button onClick={onClose} className="mt-3 w-full rounded-full border border-plum-ink/15 py-3 font-semibold text-brand-ink">
               Done
             </button>
           </div>

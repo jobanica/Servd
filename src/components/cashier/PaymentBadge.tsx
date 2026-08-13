@@ -57,7 +57,7 @@ export function PaymentBadge({
           {reference && <span className="font-mono font-semibold">Ref: {reference}</span>}
           {!paid && !isCash && <span className="font-normal opacity-80">· verify first</span>}
 
-          {receiptUrl && (
+          {receiptUrl ? (
             <button
               type="button"
               onClick={() => setViewing(true)}
@@ -65,6 +65,16 @@ export function PaymentBadge({
             >
               🧾 View proof
             </button>
+          ) : (
+            // Say it rather than showing nothing. "Verify first" beside an
+            // empty space reads as a missing button, and a cashier hunts for
+            // it instead of doing the one thing that works: asking the
+            // customer to show the payment on their phone.
+            !isCash && (
+              <span className="font-normal opacity-70">
+                · {reference ? "reference only, no screenshot" : "no proof attached"}
+              </span>
+            )
           )}
         </div>
 

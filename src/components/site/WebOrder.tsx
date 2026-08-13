@@ -12,6 +12,7 @@ import {
 import type { CartLine, DinerCategory, DinerItem, Selection } from "@/lib/cart/types";
 import { placeWebOrder } from "@/server/orders/web-order";
 import { isValidPhone, phoneError } from "@/lib/phone";
+import { prepareReceipt } from "@/lib/images/receipt";
 import { getWebOrderStatus } from "@/server/orders/web-order-status";
 import { previewPromoCode } from "@/server/promotions/redeem";
 import { CartThumb } from "@/components/diner/CartThumb";
@@ -451,6 +452,7 @@ export function WebOrder(props: WebOrderProps) {
   const [cashWith, setCashWith] = useState("");
   const [receipt, setReceipt] = useState<string | null>(null); // uploaded payment screenshot (data URL)
   const [receiptBusy, setReceiptBusy] = useState(false);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
   const [riderNote, setRiderNote] = useState(""); // customer's note to the rider
   const [cutlery, setCutlery] = useState(true); // include cutlery/utensils (default yes)
   const selectedOnline = onlineMethods.find((m) => m.key === payMethod) ?? null;
@@ -459,25 +461,23 @@ export function WebOrder(props: WebOrderProps) {
   const receiptMissing = receiptRequired && !receipt;
   const phoneErr = phoneError(phone);
 
-  // Compress the chosen receipt image in the browser so the upload stays small.
+  /**
+   * Prepare the receipt for sending.
+   *
+   * This used to swallow any failure and leave the receipt null, so a customer
+   * whose phone produced an image the browser couldn't decode — HEIC, on every
+   * iPhone — saw nothing happen, ordered anyway, and left the cashier with
+   * "verify first" and nothing to verify. It now falls back to the original
+   * bytes and says so out loud when it truly can't.
+   */
   async function pickReceipt(file: File | undefined) {
     if (!file) return;
     setReceiptBusy(true);
-    try {
-      const bitmap = await createImageBitmap(file);
-      const scale = Math.min(1, 1200 / Math.max(bitmap.width, bitmap.height));
-      const w = Math.round(bitmap.width * scale);
-      const h = Math.round(bitmap.height * scale);
-      const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
-      canvas.getContext("2d")?.drawImage(bitmap, 0, 0, w, h);
-      setReceipt(canvas.toDataURL("image/jpeg", 0.7));
-    } catch {
-      setReceipt(null);
-    } finally {
-      setReceiptBusy(false);
-    }
+    setReceiptError(null);
+    const { dataUrl, error } = await prepareReceipt(file);
+    setReceipt(dataUrl);
+    setReceiptError(error);
+    setReceiptBusy(false);
   }
 
   const count = cartCount(lines);
@@ -1018,13 +1018,19 @@ export function WebOrder(props: WebOrderProps) {
                           : receiptRequired
                             ? "📎 Upload payment receipt (required)"
                             : "📎 Upload payment receipt (optional)"}
+                        {/* Any image type: an iPhone offers HEIC, and refusing
+                            it at the picker is how you get a customer who
+                            believes they attached something. */}
                         <input
                           type="file"
-                          accept="image/png,image/jpeg,image/webp"
+                          accept="image/*"
                           className="hidden"
                           onChange={(e) => pickReceipt(e.target.files?.[0])}
                         />
                       </label>
+                    )}
+                    {receiptError && (
+                      <p className="mt-1 text-[11px] font-semibold text-guava">{receiptError}</p>
                     )}
                     {receiptRequired ? (
                       <p className="mt-1 text-[11px] font-semibold text-guava">
