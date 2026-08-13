@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
 import { requireFeaturePage } from "@/server/billing/feature-gate";
-import { getSalesReport, getVatReport, getCogs, getExpenses } from "@/server/accounting/queries";
+import { getSalesReport, getVatReport, getCogs, getExpenses, getSalesTickets } from "@/server/accounting/queries";
 import { formatPeso } from "@/lib/money";
 import { manilaStartOfDay } from "@/lib/time/manila";
 
@@ -34,12 +34,14 @@ export default async function AccountingPage({
   const period = (sp.period === "last" ? "last" : sp.period === "today" ? "today" : "this") as Period;
   const { from, to } = range(period);
 
-  const [sales, vat, cogs, expenses] = await Promise.all([
+  const [sales, vat, cogs, expenses, ticketList] = await Promise.all([
     getSalesReport(restaurantId, from, to),
     getVatReport(restaurantId, from, to),
     getCogs(restaurantId, from, to),
     getExpenses(restaurantId, from, to),
+    getSalesTickets(restaurantId, from, to),
   ]);
+  const { tickets, voided } = ticketList;
   const expenseTotal = expenses.reduce((s, e) => s + e.amount, 0);
   const profit = sales.gross - cogs - expenseTotal;
 
@@ -63,7 +65,7 @@ export default async function AccountingPage({
 
       {/* KPIs */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Gross sales" value={formatPeso(sales.gross)} hint={`${sales.orderCount} orders`} />
+        <Kpi label="Sales collected" value={formatPeso(sales.gross)} hint={`${sales.orderCount} tickets · after discounts`} />
         <Kpi label="Discounts" value={formatPeso(sales.discounts)} />
         <Kpi label="Expenses" value={formatPeso(expenseTotal)} />
         <Kpi label="Net profit" value={formatPeso(profit)} hint="Sales − COGS − expenses" accent={profit < 0} />
@@ -106,6 +108,81 @@ export default async function AccountingPage({
         </dl>
         <p className="mt-2 text-xs text-plum-ink/45">COGS reflects recorded inventory usage; statutory taxes are not deducted here.</p>
       </Card>
+
+      {/* Every ticket behind the total. Exists so a figure that disagrees with
+          the owner's own tally can be found instead of argued about. */}
+      <Card title="Every ticket in this period">
+        {tickets.length === 0 ? <Empty /> : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="text-plum-ink/50">
+                <tr>
+                  <th className="py-1">Ticket</th>
+                  <th>Paid at</th>
+                  <th className="text-right">Ticket total</th>
+                  <th className="text-right">Discount</th>
+                  <th className="text-right">Collected</th>
+                  <th>Method</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tickets.map((t) => (
+                  <tr key={t.orderId} className="border-t border-plum-ink/5">
+                    <td className="py-1.5 font-medium">{t.label}</td>
+                    <td className="whitespace-nowrap text-plum-ink/60">{t.paidAt}</td>
+                    <td className="text-right tabular-nums text-plum-ink/60">{formatPeso(t.gross)}</td>
+                    <td className="text-right tabular-nums text-plum-ink/60">
+                      {t.discount > 0 ? `−${formatPeso(t.discount)}` : "—"}
+                    </td>
+                    <td className="text-right font-semibold tabular-nums">{formatPeso(t.paid)}</td>
+                    <td className="whitespace-nowrap text-xs text-plum-ink/55">
+                      {t.methods.map((m) => METHOD_LABEL[m] ?? m).join(" + ")}
+                    </td>
+                  </tr>
+                ))}
+                <tr className="border-t-2 border-plum-ink/15 font-bold">
+                  <td className="py-2" colSpan={4}>Total ({tickets.length} tickets)</td>
+                  <td className="text-right tabular-nums">{formatPeso(sales.gross)}</td>
+                  <td />
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="mt-2 text-xs text-plum-ink/45">
+          This adds up to Sales collected, exactly. A ticket on your own list that isn&apos;t here
+          was either voided (below) or never settled.
+        </p>
+      </Card>
+
+      {voided.length > 0 && (
+        <Card title={`Voided in this period (${voided.length})`}>
+          <table className="w-full text-left text-sm">
+            <thead className="text-plum-ink/50">
+              <tr><th className="py-1">Ticket</th><th>Voided</th><th className="text-right">Reversed</th></tr>
+            </thead>
+            <tbody>
+              {voided.map((v) => (
+                <tr key={v.orderId} className="border-t border-plum-ink/5">
+                  <td className="py-1.5 font-medium">{v.label}</td>
+                  <td className="whitespace-nowrap text-plum-ink/60">{v.at}</td>
+                  <td className="text-right tabular-nums text-guava">−{formatPeso(v.reversed)}</td>
+                </tr>
+              ))}
+              <tr className="border-t-2 border-plum-ink/15 font-bold">
+                <td className="py-2" colSpan={2}>Total reversed</td>
+                <td className="text-right tabular-nums text-guava">
+                  −{formatPeso(voided.reduce((s, v) => s + v.reversed, 0))}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <p className="mt-2 text-xs text-plum-ink/45">
+            These were rung up and then cancelled, so the money came back out. They count on a
+            hand-written list and correctly don&apos;t count here — usually the whole difference.
+          </p>
+        </Card>
+      )}
 
       {/* Z-report (daily) */}
       <Card title="Daily sales (Z-report)">
