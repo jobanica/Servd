@@ -1270,3 +1270,16 @@ begin
   end loop;
 exception when others then null;
 end $$;
+
+-- Turning RLS on without granting privileges locks the app out of the table
+-- entirely: every insert is refused before any policy is consulted. Omitting
+-- this is what made a menu item's food cost silently reset to 0.00 on save.
+-- Grants say "you may touch this table"; the policies above still decide which
+-- rows. See fix-table-grants.sql, which repairs an existing database.
+GRANT USAGE ON SCHEMA public TO app_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_user;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO app_user;

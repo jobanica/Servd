@@ -143,9 +143,9 @@ export async function createItem(
       select: { id: true },
     }),
   );
-  await saveFoodCost(restaurantId, created.id, formData.get("costPesos"));
+  const costError = await saveFoodCost(restaurantId, created.id, formData.get("costPesos"));
   await refresh();
-  return { ok: true };
+  return costError ? { error: costError } : { ok: true };
 }
 
 const bundleSchema = z.object({
@@ -301,11 +301,13 @@ export async function updateItem(
       },
     }),
   );
-  await saveFoodCost(restaurantId, id, formData.get("costPesos"));
-  await saveDailyLimit(restaurantId, id, formData.get("dailyLimit"));
+  const costError = await saveFoodCost(restaurantId, id, formData.get("costPesos"));
+  const limitError = await saveDailyLimit(restaurantId, id, formData.get("dailyLimit"));
   await refresh();
   revalidatePath(`/admin/menu/${id}`);
-  return { ok: true };
+  // The item itself saved; only the cost didn't. Say so rather than reporting
+  // a clean save the owner can see is wrong.
+  return costError || limitError ? { error: costError ?? limitError! } : { ok: true };
 }
 
 /**
@@ -317,18 +319,33 @@ async function saveDailyLimit(
   restaurantId: string,
   menuItemId: string,
   raw: FormDataEntryValue | null,
-): Promise<void> {
-  if (raw == null) return; // field not on this form → don't touch
+): Promise<string | null> {
+  if (raw == null) return null; // field not on this form → don't touch
   const s = String(raw).trim();
   const n = s === "" ? 0 : Math.floor(Number(s));
   const limit = Number.isFinite(n) && n > 0 ? n : null; // 0 / blank / invalid → no cap
-  await setDailyLimit(restaurantId, menuItemId, limit);
+  return setDailyLimit(restaurantId, menuItemId, limit);
 }
 
-/** Upsert a menu item's food cost (for accounting COGS). Best-effort. */
-async function saveFoodCost(restaurantId: string, menuItemId: string, raw: FormDataEntryValue | null): Promise<void> {
-  if (raw == null || String(raw).trim() === "") return;
-  const cost = pesosToCentavos(Number(raw) || 0);
+/**
+ * Upsert a menu item's food cost (for accounting COGS).
+ *
+ * Returns an error string instead of swallowing one. This used to catch and
+ * discard every failure, so when the write was refused — the menu_item_costs
+ * table has RLS forced on it, and a database that never got the matching
+ * GRANT denies every insert — the owner typed a cost, pressed Save, and
+ * watched it come back as 0.00 with nothing to explain why. A silent catch on
+ * a write is silent data loss.
+ */
+async function saveFoodCost(
+  restaurantId: string,
+  menuItemId: string,
+  raw: FormDataEntryValue | null,
+): Promise<string | null> {
+  if (raw == null || String(raw).trim() === "") return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return "Food cost must be a number.";
+  const cost = pesosToCentavos(n);
   try {
     await tenantDb(restaurantId, (tx) =>
       tx.menuItemCost.upsert({
@@ -337,8 +354,10 @@ async function saveFoodCost(restaurantId: string, menuItemId: string, raw: FormD
         update: { cost },
       }),
     );
-  } catch {
-    /* menu_item_costs table not migrated yet — ignore */
+    return null;
+  } catch (e) {
+    console.error("saveFoodCost failed", e);
+    return "Everything else saved, but the food cost couldn't be. Run prisma/manual/fix-table-grants.sql, then try again.";
   }
 }
 

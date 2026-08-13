@@ -51,12 +51,19 @@ export async function getServingStates(
   return map;
 }
 
-/** Set (or clear, with null) a menu item's daily servings limit. Best-effort. */
+/**
+ * Set (or clear, with null) a menu item's daily servings limit.
+ *
+ * Reports a failure rather than swallowing it. This is the field next to the
+ * food cost, and it had the identical silent catch — an owner typing a cap,
+ * saving, and finding it gone would have had no more explanation than the
+ * food-cost bug gave them. A refused write must say so.
+ */
 export async function setDailyLimit(
   restaurantId: string,
   menuItemId: string,
   limit: number | null,
-): Promise<void> {
+): Promise<string | null> {
   const today = manilaDayKey(new Date());
   try {
     await tenantDb(restaurantId, (tx) =>
@@ -66,8 +73,10 @@ export async function setDailyLimit(
         update: { dailyLimit: limit },
       }),
     );
-  } catch {
-    /* not migrated yet — ignore */
+    return null;
+  } catch (e) {
+    console.error("setDailyLimit failed", e);
+    return "Everything else saved, but the daily limit couldn't be. Run prisma/manual/fix-table-grants.sql, then try again.";
   }
 }
 
