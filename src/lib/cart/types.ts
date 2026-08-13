@@ -71,4 +71,11 @@ export interface CartLine {
   modifiers: CartLineModifier[];
   note?: string;
   variantId?: string; // chosen size, if the item has variants
+  /**
+   * The item's photo, snapshotted onto the line so the cart can show what was
+   * ordered. Display only — it is never sent with the order and never priced,
+   * and lineSig deliberately ignores it, so two lines still merge on
+   * item + size + note + modifiers regardless of the picture.
+   */
+  imageUrl?: string | null;
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CartThumb } from "./CartThumb";
 import { useTranslations } from "next-intl";
 import { formatPeso } from "@/lib/money";
 import { cartTotal } from "@/lib/cart/pricing";
@@ -176,12 +177,16 @@ export function CartDrawer({
             ) : (
               <ul className="mt-4 divide-y divide-plum-ink/5">
                 {lines.map((line) => (
-                  <li key={line.lineId} className="py-3">
-                    <div className="flex justify-between">
-                      <span className="font-medium text-brand-ink">
+                  <li key={line.lineId} className="flex gap-3 py-3">
+                    <CartThumb src={line.imageUrl} alt={line.name} />
+                    {/* min-w-0 so a long name wraps rather than pushing the
+                        price off the edge of a phone screen. */}
+                    <div className="min-w-0 flex-1">
+                    <div className="flex justify-between gap-2">
+                      <span className="min-w-0 font-medium text-brand-ink">
                         {line.name}
                       </span>
-                      <span className="font-semibold">
+                      <span className="shrink-0 font-semibold">
                         {formatPeso(line.unitPrice * line.quantity)}
                       </span>
                     </div>
@@ -221,6 +226,7 @@ export function CartDrawer({
                       >
                         {t("remove")}
                       </button>
+                    </div>
                     </div>
                   </li>
                 ))}

@@ -14,6 +14,7 @@ import { placeWebOrder } from "@/server/orders/web-order";
 import { isValidPhone, phoneError } from "@/lib/phone";
 import { getWebOrderStatus } from "@/server/orders/web-order-status";
 import { previewPromoCode } from "@/server/promotions/redeem";
+import { CartThumb } from "@/components/diner/CartThumb";
 import { captureCartLead } from "@/server/marketing/cart-recovery";
 import { LocationPicker } from "./LocationPicker";
 import { WebOrderTracker } from "./WebOrderTracker";
@@ -217,6 +218,7 @@ function ItemConfig({ item, onAdd, onCancel }: { item: DinerItem; onAdd: (l: Car
       modifiers: selectionToLineModifiers(effItem, selection),
       note: note.trim() || undefined,
       variantId: chosenVariant?.id,
+      imageUrl: item.imageUrl,
     });
   }
 
@@ -603,7 +605,7 @@ export function WebOrder(props: WebOrderProps) {
     if (!item.isAvailable) return;
     // Items with modifiers OR sizes need the picker; only plain items shortcut.
     if (item.groups.length === 0 && !(item.variants && item.variants.length > 0)) {
-      setLines((p) => addCartLine(p, { lineId: lineId(), itemId: item.id, name: item.name, basePrice: item.price, unitPrice: item.price, quantity: 1, modifiers: [] }));
+      setLines((p) => addCartLine(p, { lineId: lineId(), itemId: item.id, name: item.name, basePrice: item.price, unitPrice: item.price, quantity: 1, modifiers: [], imageUrl: item.imageUrl }));
     } else setConfigItem(item);
   }
   function setQty(id: string, delta: number) {
@@ -731,19 +733,24 @@ export function WebOrder(props: WebOrderProps) {
         ) : (
           <ul className="space-y-3">
             {lines.map((l) => (
-              <li key={l.lineId} className="text-sm">
-                <div className="flex justify-between">
-                  <span className="font-medium text-plum-ink">{l.name}</span>
-                  <span className="font-semibold">{formatPeso(l.unitPrice * l.quantity)}</span>
-                </div>
-                {l.modifiers.length > 0 && <p className="text-xs text-plum-ink/50">{l.modifiers.map((m) => m.name).join(", ")}</p>}
-                <div className="mt-1 flex items-center gap-2">
-                  <div className="flex items-center rounded-full border border-plum-ink/15">
-                    <button onClick={() => setQty(l.lineId, -1)} className="px-2 text-lg">−</button>
-                    <span className="w-6 text-center text-sm font-semibold">{l.quantity}</span>
-                    <button onClick={() => setQty(l.lineId, 1)} className="px-2 text-lg">+</button>
+              <li key={l.lineId} className="flex gap-3 text-sm">
+                <CartThumb src={l.imageUrl} alt={l.name} />
+                {/* min-w-0 so a long item name wraps instead of pushing the
+                    price off the edge of a phone screen. */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex justify-between gap-2">
+                    <span className="min-w-0 font-medium text-plum-ink">{l.name}</span>
+                    <span className="shrink-0 font-semibold">{formatPeso(l.unitPrice * l.quantity)}</span>
                   </div>
-                  <button onClick={() => setLines((p) => p.filter((x) => x.lineId !== l.lineId))} className="text-xs text-muted hover:text-guava">remove</button>
+                  {l.modifiers.length > 0 && <p className="text-xs text-plum-ink/50">{l.modifiers.map((m) => m.name).join(", ")}</p>}
+                  <div className="mt-1 flex items-center gap-2">
+                    <div className="flex items-center rounded-full border border-plum-ink/15">
+                      <button onClick={() => setQty(l.lineId, -1)} className="px-2 text-lg">−</button>
+                      <span className="w-6 text-center text-sm font-semibold">{l.quantity}</span>
+                      <button onClick={() => setQty(l.lineId, 1)} className="px-2 text-lg">+</button>
+                    </div>
+                    <button onClick={() => setLines((p) => p.filter((x) => x.lineId !== l.lineId))} className="text-xs text-muted hover:text-guava">remove</button>
+                  </div>
                 </div>
               </li>
             ))}

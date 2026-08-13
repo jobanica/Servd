@@ -93,6 +93,7 @@ export function ItemModal({
       modifiers: selectionToLineModifiers(effItem, selection),
       note: note.trim() || undefined,
       variantId: chosenVariant?.id,
+      imageUrl: item.imageUrl,
     });
   }
 
