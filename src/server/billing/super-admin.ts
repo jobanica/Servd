@@ -420,3 +420,34 @@ export async function listCustomDomainUnlocks(): Promise<Set<string>> {
     return new Set();
   }
 }
+
+/**
+ * Which accounts currently have each monthly-billed feature switched on.
+ *
+ * Read straight from the subscription rows rather than through the per-account
+ * entitlement resolver: this renders one row per subscriber, and asking the
+ * resolver per account would be a query per row for a fact one query answers.
+ */
+export async function listActiveMonthlyFeatures(): Promise<Map<string, Set<string>>> {
+  const map = new Map<string, Set<string>>();
+  try {
+    const rows = await systemDb((tx) =>
+      tx.featureSubscription.findMany({
+        where: { status: "active" },
+        select: { restaurantId: true, feature: true, currentPeriodEnd: true },
+      }),
+    );
+    const now = new Date();
+    for (const r of rows) {
+      // An "active" row whose period has run out isn't access — the renewal
+      // cron just hasn't got to it yet.
+      if (r.currentPeriodEnd && r.currentPeriodEnd <= now) continue;
+      const set = map.get(r.restaurantId) ?? new Set<string>();
+      set.add(r.feature);
+      map.set(r.restaurantId, set);
+    }
+  } catch {
+    /* table not migrated yet */
+  }
+  return map;
+}

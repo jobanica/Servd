@@ -734,3 +734,79 @@ export async function saveUploadPostKey(_prev: ActionState, formData: FormData):
   revalidatePath("/super-admin/payments");
   return { ok: true, message: "Upload-Post connected." };
 }
+
+// ------------------------------------------------- monthly-feature comping
+
+/**
+ * Switch on a feature that is sold as its own monthly subscription — today,
+ * that's the content scheduler (₱499/mo).
+ *
+ * This exists because nothing else could do it. Monthly features are
+ * deliberately excluded from plan grants AND from the trial's blanket unlock
+ * (see feature-gate.ts, which strips them from the set before re-adding only
+ * live subscriptions). So ticking the feature on a plan does nothing, buying it
+ * as a one-time add-on does nothing, and even "Grant full access" — which
+ * unlocks everything else — leaves it off. The only route in was a paid
+ * checkout, which is no use for a demo account, a partner, or anyone being
+ * comped.
+ *
+ * Complimentary access is an active subscription whose period ends in 2099.
+ * That's the same sentinel a comped plan trial uses, and it keeps the renewal
+ * cron away by construction rather than by a flag someone has to remember to
+ * check: the cron looks for subscriptions expiring soon, and this one never is.
+ * Nobody gets charged, and no invoice is raised.
+ */
+export async function grantMonthlyFeature(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    await requireSuperAdmin();
+    const restaurantId = String(formData.get("restaurantId"));
+    const feature = String(formData.get("feature"));
+    const { MONTHLY_FEATURES } = await import("@/server/billing/feature-subscriptions");
+    const meta = MONTHLY_FEATURES[feature];
+    if (!meta) return { error: "That isn't a monthly feature." };
+
+    await systemDb((tx) =>
+      tx.featureSubscription.upsert({
+        where: { restaurantId_feature: { restaurantId, feature } },
+        create: {
+          restaurantId,
+          feature,
+          status: "active",
+          // The list price is snapshotted even though nothing is charged, so
+          // reports on what a comp is worth stay honest.
+          priceMonthly: meta.priceMonthly,
+          currentPeriodEnd: COMP_FOREVER,
+        },
+        update: { status: "active", currentPeriodEnd: COMP_FOREVER, renewUrl: null },
+        select: { id: true },
+      }),
+    );
+    return { ok: true, message: `${meta.label} switched on (complimentary).` };
+  } catch (e) {
+    console.error("grantMonthlyFeature failed", e);
+    return { error: e instanceof Error ? e.message : "Couldn't switch that on." };
+  } finally {
+    refresh();
+  }
+}
+
+/** Turn a monthly feature back off. Cancels rather than deletes, so the history stays. */
+export async function revokeMonthlyFeature(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    await requireSuperAdmin();
+    const restaurantId = String(formData.get("restaurantId"));
+    const feature = String(formData.get("feature"));
+    await systemDb((tx) =>
+      tx.featureSubscription.updateMany({
+        where: { restaurantId, feature },
+        data: { status: "cancelled", renewUrl: null },
+      }),
+    );
+    return { ok: true, message: "Switched off." };
+  } catch (e) {
+    console.error("revokeMonthlyFeature failed", e);
+    return { error: e instanceof Error ? e.message : "Couldn't switch that off." };
+  } finally {
+    refresh();
+  }
+}

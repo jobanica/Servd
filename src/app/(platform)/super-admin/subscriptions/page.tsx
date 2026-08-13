@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { listSubscriptions, listAllPlans, listCustomerHealth, listCustomDomainUnlocks, type SubStatus, type SubscriptionRow, type CustomerHealth } from "@/server/billing/super-admin";
+import { listSubscriptions, listAllPlans, listCustomerHealth, listCustomDomainUnlocks, listActiveMonthlyFeatures, type SubStatus, type SubscriptionRow, type CustomerHealth } from "@/server/billing/super-admin";
 import { SubscriptionSearch } from "@/components/super-admin/SubscriptionSearch";
 import {
   assignPlan,
@@ -12,6 +12,8 @@ import {
 } from "@/server/billing/super-admin-actions";
 import { isComplimentary } from "@/lib/billing/comp";
 import { GrantAccessControl } from "@/components/super-admin/GrantAccessControl";
+import { MonthlyFeatureControl } from "@/components/super-admin/MonthlyFeatureControl";
+import { MONTHLY_FEATURES } from "@/server/billing/feature-subscriptions";
 import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
 import { TempPasswordButton } from "@/components/super-admin/TempPasswordButton";
 import { addSmsCredits, setSenderName } from "@/server/sms/admin";
@@ -123,11 +125,12 @@ export default async function SubscriptionsPage({
   searchParams: Promise<{ status?: string; access?: string; filter?: string; q?: string }>;
 }) {
   const sp = await searchParams;
-  const [allSubs, plans, health, domainUnlocked] = await Promise.all([
+  const [allSubs, plans, health, domainUnlocked, monthlyOn] = await Promise.all([
     listSubscriptions(),
     listAllPlans(),
     listCustomerHealth(),
     listCustomDomainUnlocks(),
+    listActiveMonthlyFeatures(),
   ]);
   const activePlans = plans.filter((p) => p.isActive);
   const { rows: filtered, label: filterLabel } = filterSubs(allSubs, sp);
@@ -235,6 +238,21 @@ export default async function SubscriptionsPage({
                 </p>
               </div>
               <GrantAccessControl restaurantId={s.restaurantId} />
+            </div>
+
+            {/* Monthly add-ons. Separate block, because "full access" above
+                genuinely does not include these — they're excluded from plan
+                grants and from the trial unlock by design. */}
+            <div className="border-t border-plum-ink/10 px-4 py-3">
+              <MonthlyFeatureControl
+                restaurantId={s.restaurantId}
+                features={Object.entries(MONTHLY_FEATURES).map(([key, meta]) => ({
+                  key,
+                  label: meta.label,
+                  priceMonthly: meta.priceMonthly,
+                  active: monthlyOn.get(s.restaurantId)?.has(key) ?? false,
+                }))}
+              />
             </div>
 
             <div className="grid gap-4 border-t border-plum-ink/10 px-4 py-4 sm:grid-cols-2 lg:grid-cols-3">
