@@ -110,6 +110,34 @@ describe("buildShiftReport", () => {
   });
 });
 
+describe("the today/all-shifts block", () => {
+  // The bug this exists for: a shift that opened in the evening reports ₱0.00
+  // while the closed-orders list shows a dozen paid tickets. Without this line
+  // the cashier can't tell a quiet shift from a broken report.
+  it("shows the day's trade when it differs from the shift's", () => {
+    const out = text({ ...base, gross: 0, orderCount: 0, dayGross: 458000, dayOrderCount: 12 });
+    expect(out).toContain("TODAY, ALL SHIFTS");
+    expect(out).toContain("4580.00");
+    expect(out).toContain("not your drawer");
+  });
+
+  // On a single-shift day the two numbers are the same and repeating them
+  // would just invite someone to add them together.
+  it("is omitted when the shift IS the whole day", () => {
+    const out = text({ ...base, dayGross: base.gross, dayOrderCount: base.orderCount });
+    expect(out).not.toContain("TODAY, ALL SHIFTS");
+  });
+
+  it("is omitted entirely when the day figure isn't available", () => {
+    expect(text(base)).not.toContain("TODAY, ALL SHIFTS");
+  });
+
+  it("still fits the paper", () => {
+    const r = buildShiftReport({ ...base, gross: 0, dayGross: 12345678, dayOrderCount: 999 });
+    for (const line of r.bodyLines) expect(line.length).toBeLessThanOrEqual(32);
+  });
+});
+
 describe("encodeReport", () => {
   // The whole fix: the report goes to the printer as ESC/POS, the same as a
   // receipt, instead of through the browser's print dialog.

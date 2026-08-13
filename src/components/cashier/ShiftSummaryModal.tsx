@@ -156,6 +156,29 @@ export function ShiftSummaryModal({ onClose }: { onClose: () => void }) {
               <span className="font-heading text-lg font-extrabold text-brand-primary">{formatPeso(s.net)}</span>
             </div>
 
+            {/* Today across every shift. Shown when it differs from this
+                shift's own figure, so a cashier who opened at 8 PM can see
+                that the morning's trade exists and simply wasn't theirs —
+                rather than reading ₱0.00 and assuming the report is broken. */}
+            {s.dayGross !== s.gross && (
+              <div className="mt-2 rounded-lg border border-plum-ink/10 p-3">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-plum-ink/40">
+                  Today · all shifts
+                </p>
+                <div className={row}>
+                  <span className="text-plum-ink/60">Orders paid</span>
+                  <span className="font-semibold">{s.dayOrderCount}</span>
+                </div>
+                <div className={row}>
+                  <span className="text-plum-ink/60">Counter sales</span>
+                  <span>{formatPeso(s.dayGross)}</span>
+                </div>
+                <p className="pt-1 text-xs text-plum-ink/45">
+                  For reference — not part of your drawer.
+                </p>
+              </div>
+            )}
+
             <div className="mt-4 space-y-2">
               <button
                 onClick={handlePrint}

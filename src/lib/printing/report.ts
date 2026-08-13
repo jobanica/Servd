@@ -33,6 +33,9 @@ export interface ShiftReportSource {
   cashOuts: { amount: number; note: string | null }[];
   expectedCash: number;
   net: number;
+  /** Today's counter trade across every shift — context, not drawer money. */
+  dayGross?: number;
+  dayOrderCount?: number;
 }
 
 export interface ShiftReport {
@@ -94,6 +97,17 @@ export function buildShiftReport(src: ShiftReportSource): ShiftReport {
 
   b.push(RULE);
   b.push(money("NET (PHP)", src.net));
+
+  // Context, clearly fenced off from the drawer figures above. A shift that
+  // opened this evening shows nothing for the morning's trade, and without
+  // this line a cashier can't tell a quiet shift from a broken report.
+  if (src.dayGross != null && src.dayGross !== src.gross) {
+    b.push("");
+    b.push("TODAY, ALL SHIFTS");
+    b.push(pad("Orders paid", String(src.dayOrderCount ?? 0)));
+    b.push(money("Counter sales", src.dayGross));
+    b.push("(reference - not your drawer)");
+  }
 
   // Somewhere to write the counted cash and sign off — the reason this gets
   // printed at all is so it can be checked against the drawer by hand.

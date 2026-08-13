@@ -6,7 +6,7 @@ import { getSalesReport, getExpenses } from "@/server/accounting/queries";
 import { getCashOutsToday } from "@/server/orders/cash-out";
 import { manilaStartOfDay, manilaEndOfDay } from "@/lib/time/manila";
 import { ensureShift } from "./shift-session";
-import { getShiftSales, getShiftCashOuts } from "./shift-sales";
+import { getShiftSales, getShiftCashOuts, getDayCounterSales } from "./shift-sales";
 import { expectedCash } from "@/lib/orders/shift-rollup";
 import { staffLabel } from "@/server/tenancy/staff-name";
 
@@ -39,6 +39,9 @@ export interface ShiftSummary {
   cashCollected: number; // cash payments today
   expectedCash: number; // cash collected − cash-outs (what should be in the drawer)
   net: number; // gross − expenses
+  /** Every counter sale today, across all shifts — context, not drawer money. */
+  dayGross: number;
+  dayOrderCount: number;
 }
 
 /** The restaurant's name and a human name for the cashier, for the header. */
@@ -96,8 +99,8 @@ export async function getShiftSummary(): Promise<ShiftSummary | null> {
   let from = shift?.openedAt ?? dayFrom;
   if (shift) {
     [sales, cashOuts] = await Promise.all([
-      getShiftSales(staff.restaurantId, shift.id),
-      getShiftCashOuts(staff.restaurantId, shift.id),
+      getShiftSales(staff.restaurantId, shift.id, shift.openedAt),
+      getShiftCashOuts(staff.restaurantId, shift.id, shift.openedAt),
     ]);
   } else {
     // Pre-migration fallback: the old day-wide behaviour.
@@ -110,6 +113,11 @@ export async function getShiftSummary(): Promise<ShiftSummary | null> {
     ]);
   }
   const to = dayTo;
+
+  // The day's counter trade, whoever took it. Printed as context so a shift
+  // that opened this evening doesn't read like a broken report when the
+  // morning's tickets are sitting right there in Closed orders.
+  const day = await getDayCounterSales(staff.restaurantId);
 
   const expensesTotal = expenses.reduce((s, e) => s + e.amount, 0);
   const cashOutTotal = cashOuts.reduce((s, c) => s + c.amount, 0);
@@ -137,5 +145,7 @@ export async function getShiftSummary(): Promise<ShiftSummary | null> {
     cashCollected,
     expectedCash: expectedCash(cashCollected, cashOutTotal),
     net: sales.gross - expensesTotal,
+    dayGross: day.gross,
+    dayOrderCount: day.orderCount,
   };
 }

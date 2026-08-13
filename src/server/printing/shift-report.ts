@@ -66,6 +66,8 @@ export async function getShiftReport(): Promise<ShiftReportBundle | null> {
     cashOuts: summary.cashOuts,
     expectedCash: summary.expectedCash,
     net: summary.net,
+    dayGross: summary.dayGross,
+    dayOrderCount: summary.dayOrderCount,
   });
 
   return {
