@@ -1,7 +1,7 @@
 import "server-only";
 
 import { systemDb } from "@/server/tenancy/scoped-db";
-import { manilaStartOfDay } from "@/lib/time/manila";
+import { isShiftCurrent, staleShiftCutoff, MAX_SHIFT_HOURS } from "@/lib/orders/shift-window";
 
 /**
  * One cashier's turn at the till.
@@ -64,9 +64,13 @@ export async function ensureShift(
   // is actually being opened — a cashier shouldn't pay four round-trips to ring
   // up a bill.
   const existing = await currentShift(restaurantId, staffUserId);
-  if (existing && existing.openedAt >= manilaStartOfDay()) return existing;
+  // Bounded by how long the shift has run, NOT by the calendar day. A night
+  // cashier who opened at 6 PM must still own their own shift at 12:01 AM;
+  // ending it at midnight silently moved their evening's takings into a new,
+  // empty shift and lost them from the summary they were about to print.
+  if (existing && isShiftCurrent(existing.openedAt)) return existing;
 
-  // Either nothing open, or something left open from a previous day.
+  // Either nothing open, or something someone never signed out of.
   if (existing) await autoCloseStale(restaurantId);
 
   const staffName = await resolveName();
@@ -146,18 +150,25 @@ export async function stampCashMovementShift(
 }
 
 /**
- * Close shifts left open from a previous business day.
+ * Close shifts nobody signed out of.
  *
  * Cashiers routinely don't sign out — they close the tab, or the session
  * expires. Without this the shift stays open forever and tomorrow's takings
  * pile onto yesterday's, which is the exact bug shifts were added to fix.
+ *
+ * Measured in hours open rather than "before midnight", so a shift that runs
+ * across midnight survives the night it was worked. See lib/orders/shift-window.
  */
 export async function autoCloseStale(restaurantId: string): Promise<number> {
   try {
     const res = await systemDb((tx) =>
       tx.cashierShift.updateMany({
-        where: { restaurantId, status: "open", openedAt: { lt: manilaStartOfDay() } },
-        data: { status: "closed", closedAt: new Date(), closedReason: "auto_end_of_day" },
+        where: { restaurantId, status: "open", openedAt: { lt: staleShiftCutoff() } },
+        data: {
+          status: "closed",
+          closedAt: new Date(),
+          closedReason: `auto_after_${MAX_SHIFT_HOURS}h`,
+        },
       }),
     );
     return res.count;

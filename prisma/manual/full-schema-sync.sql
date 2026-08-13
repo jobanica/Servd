@@ -212,6 +212,8 @@ ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "feedbackMode" "FeedbackMode"
 ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "printMethod" "PrintMethod" NOT NULL DEFAULT 'network';
 ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "printerConfig" JSONB;
 ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "autoPrint" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "autoPrintReceipt" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "openDrawerOn" TEXT NOT NULL DEFAULT 'cash';
 ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "paymentGateway" "Gateway";
 ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "paymentCredentialsEnc" TEXT;
 ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "paymentOnlineEnabled" BOOLEAN NOT NULL DEFAULT false;

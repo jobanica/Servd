@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { PrintSettingsForm } from "@/components/admin/PrintSettingsForm";
+import { drawerPolicy, type DrawerPolicy } from "@/lib/printing/drawer";
 
 export default async function PrintingSettingsPage() {
   const { restaurantId } = await requireAdminPage();
@@ -19,6 +20,19 @@ export default async function PrintingSettingsPage() {
       tx.restaurant.findFirst({ select: { kitchenDisplay: true } }),
     );
     kitchenDisplay = k?.kitchenDisplay ?? true;
+  } catch {
+    /* not migrated yet */
+  }
+
+  // Same treatment for the settle-time settings.
+  let autoPrintReceipt = true;
+  let openDrawerOn: DrawerPolicy = "cash";
+  try {
+    const s = await tenantDb(restaurantId, (tx) =>
+      tx.restaurant.findFirst({ select: { autoPrintReceipt: true, openDrawerOn: true } }),
+    );
+    autoPrintReceipt = s?.autoPrintReceipt ?? true;
+    openDrawerOn = drawerPolicy(s?.openDrawerOn);
   } catch {
     /* not migrated yet */
   }
@@ -60,6 +74,8 @@ export default async function PrintingSettingsPage() {
           receiptWebsite: receipt.website ?? "",
           receiptFooter: receipt.footer ?? "",
           receiptShowVat: receipt.showVat !== false, // default on
+          autoPrintReceipt,
+          openDrawerOn,
         }}
         cloudPollUrl={cloudPollUrl}
       />

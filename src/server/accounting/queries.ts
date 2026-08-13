@@ -1,9 +1,20 @@
 import "server-only";
 
 import { tenantDb } from "@/server/tenancy/scoped-db";
+import { manilaDayKey } from "@/lib/time/manila";
 
 const VAT_RATE = 0.12;
-const dayKey = (d: Date) => d.toISOString().slice(0, 10);
+
+/**
+ * Manila, not UTC.
+ *
+ * This used to be `d.toISOString().slice(0, 10)`, which buckets by the UTC day.
+ * Manila is UTC+8, so every sale taken between midnight and 8 AM was filed
+ * under the previous day — while the dashboard, which buckets in Manila, filed
+ * it under the right one. Two screens, two answers, same money. Part of why the
+ * daily totals never agreed.
+ */
+const dayKey = (d: Date) => manilaDayKey(d);
 
 export interface SalesReport {
   gross: number; // total collected (centavos)

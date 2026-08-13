@@ -4,7 +4,8 @@ import { tenantDb, systemDb } from "@/server/tenancy/scoped-db";
 import type { OrderTypeKey } from "@/lib/orders/order-type";
 import { requireStaff } from "@/server/tenancy/current-user";
 import { buildTicket, type Ticket, type TicketKind } from "@/lib/printing/ticket";
-import { encodeTicketBase64, encodeReportBase64 } from "@/lib/printing/escpos";
+import { encodeTicketBase64, encodeReportBase64, encodeDrawerKickBase64 } from "@/lib/printing/escpos";
+import { drawerPolicy, shouldOpenDrawer } from "@/lib/printing/drawer";
 import { restaurantSiteUrl } from "@/lib/qr";
 import { getShiftReport } from "./shift-report";
 
@@ -22,6 +23,17 @@ import { getShiftReport } from "./shift-report";
  * The server handles network + cloud; for the two client transports it returns
  * the ticket data and tells the UI to finish the job.
  */
+
+/**
+ * What the cashier's device still has to do after a payment settles.
+ *
+ * `drawerKickBase64` is only ever set for Bluetooth, where the printer is
+ * paired to the browser rather than reachable from the server.
+ */
+export interface SettleActions {
+  clientPrintNeeded: boolean;
+  drawerKickBase64?: string;
+}
 
 export interface PrintDispatch {
   ok: boolean;
@@ -56,6 +68,18 @@ async function loadTicket(restaurantId: string, orderId: string) {
         autoPrint: true,
       },
     });
+
+    // Newer settings — read separately so a database that hasn't run the
+    // migration keeps printing exactly as it did before.
+    let settings = { autoPrintReceipt: true, openDrawerOn: "cash" };
+    try {
+      const s = await tx.restaurant.findFirstOrThrow({
+        select: { autoPrintReceipt: true, openDrawerOn: true },
+      });
+      settings = { autoPrintReceipt: s.autoPrintReceipt, openDrawerOn: s.openDrawerOn };
+    } catch {
+      /* not migrated yet — keep the old always-print behaviour */
+    }
     // Explicit select (no SELECT *) so a lagging schema can't break printing.
     const order = await tx.order.findFirst({
       where: { id: orderId },
@@ -124,7 +148,7 @@ async function loadTicket(restaurantId: string, orderId: string) {
         /* not migrated yet */
       }
     }
-    return { restaurant, order, meta, payment };
+    return { restaurant, order, meta, payment, settings };
   });
 }
 
@@ -176,13 +200,41 @@ async function dispatch(
   restaurantId: string,
   orderId: string,
   kind: TicketKind = "receipt",
+  openDrawer = false,
 ): Promise<PrintDispatch> {
   const { restaurant } = await loadTicket(restaurantId, orderId);
   const ticket = await ticketFor(restaurantId, orderId, kind);
   if (!ticket) return { ok: false, handledOnServer: false, message: "Order not found." };
   const config = (restaurant.printerConfig as PrinterConfig | null) ?? {};
-  const base64 = encodeTicketBase64(ticket);
+  const base64 = encodeTicketBase64(ticket, openDrawer);
   return dispatchBytes(restaurantId, restaurant.printMethod, config, base64, orderId, ticket);
+}
+
+/**
+ * Open the cash drawer with nothing printed.
+ *
+ * Needed because the two settings are independent: a till can want the drawer
+ * on every cash sale and no paper at all. Only the server-driven transports can
+ * do this unattended — a Bluetooth printer is paired to the cashier's browser,
+ * so the board is told to send the pulse itself.
+ */
+async function dispatchDrawerKick(restaurantId: string): Promise<SettleActions> {
+  const restaurant = await tenantDb(restaurantId, (tx) =>
+    tx.restaurant.findFirstOrThrow({ select: { printMethod: true, printerConfig: true } }),
+  );
+  const config = (restaurant.printerConfig as PrinterConfig | null) ?? {};
+  if (restaurant.printMethod === "network" || restaurant.printMethod === "cloud") {
+    await dispatchBytes(restaurantId, restaurant.printMethod, config, encodeDrawerKickBase64(), null);
+    return { clientPrintNeeded: false };
+  }
+  // A browser print dialog sends a page, not a printer control code, so
+  // os_dialog can't reach the drawer at all. Bluetooth can — the cashier's own
+  // device holds the connection, so it sends the pulse itself.
+  return {
+    clientPrintNeeded: false,
+    drawerKickBase64:
+      restaurant.printMethod === "bluetooth" ? encodeDrawerKickBase64() : undefined,
+  };
 }
 
 /**
@@ -355,19 +407,58 @@ export async function autoPrintIfEnabled(
 }
 
 /**
- * Always print a receipt — used when the cashier explicitly settles an order
- * ("Paid cash/card"), regardless of the auto-print-on-new-order toggle. Server
- * transports print straight to the printer; browser transports tell the cashier
- * board to open the printable ticket page (which fires the print dialog).
+ * Settle-time printing: the receipt, and the cash drawer.
+ *
+ * Both are now settings rather than fixed behaviour. The receipt used to print
+ * on every settled payment with no way to stop it, which is a roll of paper a
+ * day for a till whose customers don't take one. The drawer never opened at
+ * all, so cashiers were pulling it by hand on every sale.
+ *
+ * They're independent, hence the two branches: paper with a drawer pulse in
+ * front of it, a bare pulse, or nothing. The pulse leads so the drawer is
+ * already open by the time the receipt is torn off.
  */
 export async function printReceipt(
   restaurantId: string,
   orderId: string,
-): Promise<{ clientPrintNeeded: boolean }> {
-  const { restaurant } = await loadTicket(restaurantId, orderId);
+): Promise<SettleActions> {
+  const { restaurant, settings, payment } = await loadTicket(restaurantId, orderId);
+  const openDrawer = shouldOpenDrawer(drawerPolicy(settings.openDrawerOn), payment?.method);
+
+  if (!settings.autoPrintReceipt) {
+    return openDrawer ? dispatchDrawerKick(restaurantId) : { clientPrintNeeded: false };
+  }
   if (restaurant.printMethod === "network" || restaurant.printMethod === "cloud") {
-    await dispatch(restaurantId, orderId, "receipt");
+    // One job: the pulse rides in front of the receipt.
+    await dispatch(restaurantId, orderId, "receipt", openDrawer);
     return { clientPrintNeeded: false };
   }
-  return { clientPrintNeeded: true };
+  // Browser transports print the receipt from the cashier's device, so the
+  // drawer goes as its own pulse rather than being folded into those bytes.
+  const kick = openDrawer ? await dispatchDrawerKick(restaurantId) : null;
+  return { clientPrintNeeded: true, drawerKickBase64: kick?.drawerKickBase64 };
+}
+
+/**
+ * Open the cash drawer on demand — the "no sale" button every till has.
+ *
+ * (An explicitly requested receipt still goes through printPaidTicket, which
+ * always prints: the auto-print setting decides whether to print WITHOUT being
+ * asked, so applying it to a button press would make the button do nothing.)
+ */
+export async function openCashDrawer(): Promise<
+  { ok: boolean; message: string; drawerKickBase64?: string }
+> {
+  let staff;
+  try {
+    staff = await requireStaff(["cashier", "admin"]);
+  } catch {
+    return { ok: false, message: "Not allowed." };
+  }
+  try {
+    const r = await dispatchDrawerKick(staff.restaurantId);
+    return { ok: true, message: "", drawerKickBase64: r.drawerKickBase64 };
+  } catch {
+    return { ok: false, message: "Couldn't reach the printer." };
+  }
 }

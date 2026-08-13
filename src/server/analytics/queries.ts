@@ -4,10 +4,13 @@ import { tenantDb } from "@/server/tenancy/scoped-db";
 /**
  * Per-restaurant analytics. Everything runs inside ONE tenantDb transaction, so
  * RLS scopes it to the restaurant (defense in depth) and the raw time-bucket
- * queries share the same scope. Revenue = paid orders (online OR cash recorded).
+ * queries share the same scope.
  *
- * NOTE: time buckets are in UTC (per the chosen approach); add a restaurant
- * timezone later if "peak hour" precision matters.
+ * REVENUE MEANS MONEY TAKEN: the sum of settled payments, timestamped when the
+ * payment happened, bucketed in Manila. That is deliberately the same
+ * definition the accounting report and the end-of-shift Z-report use — three
+ * screens showing three different "total sales" for the same day is worse than
+ * any one of them being slightly off, because it makes all three untrustworthy.
  */
 
 export interface AnalyticsBundle {
@@ -26,10 +29,20 @@ export async function getAnalytics(
   to: Date,
 ): Promise<AnalyticsBundle> {
   return tenantDb(restaurantId, async (tx) => {
-    const orders = await tx.order.aggregate({
-      where: { paymentStatus: "paid", createdAt: { gte: from, lte: to } },
-      _sum: { total: true },
-      _count: true,
+    // Revenue is MONEY TAKEN — the sum of settled payments — not the sum of
+    // order totals. The two disagree in two ways that made this figure argue
+    // with the accounting report and the shift summary:
+    //
+    //   - order.total is the gross before any discount or store credit, so a
+    //     senior discount showed up as revenue nobody received.
+    //   - an order created at 11:50 PM and paid at 12:10 AM belongs to the day
+    //     it was paid, not the day the ticket was opened.
+    //
+    // Payments are the same source accounting and the Z-report already use, so
+    // all three now answer the same question with the same number.
+    const paid = await tx.payment.findMany({
+      where: { status: "paid", createdAt: { gte: from, lte: to } },
+      select: { amount: true, orderId: true },
     });
     const fb = await tx.feedback.aggregate({
       where: { createdAt: { gte: from, lte: to } },
@@ -37,16 +50,19 @@ export async function getAnalytics(
       _count: true,
     });
 
-    const revenue = orders._sum.total ?? 0;
-    const orderCount = orders._count;
+    const revenue = paid.reduce((s, p) => s + p.amount, 0);
+    const orderCount = new Set(paid.map((p) => p.orderId)).size;
 
+    // Bucketed on the payment's own timestamp, in Manila — matching the summary
+    // above and the accounting report, which is the whole point.
     const revenueByDay = await tx.$queryRaw<{ day: string; revenue: number }[]>`
-      select to_char(date_trunc('day', "createdAt" at time zone 'UTC' at time zone 'Asia/Manila'), 'YYYY-MM-DD') as day,
-             sum("total")::float8 as revenue
-      from orders
-      where "restaurantId" = ${restaurantId}
-        and "paymentStatus" = 'paid'
-        and "createdAt" between ${from} and ${to}
+      select to_char(date_trunc('day', p."createdAt" at time zone 'UTC' at time zone 'Asia/Manila'), 'YYYY-MM-DD') as day,
+             sum(p.amount)::float8 as revenue
+      from payments p
+      join orders o on o.id = p."orderId"
+      where o."restaurantId" = ${restaurantId}
+        and p.status = 'paid'
+        and p."createdAt" between ${from} and ${to}
       group by 1 order by 1`;
 
     const itemsQuery = (dir: Prisma.Sql) => tx.$queryRaw<

@@ -419,6 +419,14 @@ model Restaurant {
   printMethod    PrintMethod @default(network)
   printerConfig  Json? // transport-specific details (ip, port, cloudprnt url…)
   autoPrint      Boolean     @default(false)
+  // Print a receipt automatically when a payment settles. Default on, because
+  // that was the only behaviour before this was a choice — but a till whose
+  // customers don't want paper was burning a roll a day with no way to stop it.
+  autoPrintReceipt Boolean   @default(true)
+  // When to pop the cash drawer: never | cash (cash payments only) | any.
+  // A card or GCash sale puts nothing in the drawer, so "cash" is the default —
+  // but a till that gives change for e-wallets can choose "any".
+  openDrawerOn   String      @default("cash")
   cashierVoidPin String? // PIN a cashier must enter to void an unpaid order
   // Kitchen routing: true => on-screen kitchen display; false => print a kitchen
   // ticket for the kitchen when an order is accepted/created (no screen).

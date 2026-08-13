@@ -17,7 +17,7 @@ import {
   type IncomingOrder,
 } from "@/server/orders/cashier";
 import { formatPeso } from "@/lib/money";
-import { chime } from "@/lib/sound";
+import { chime, unlockAudio } from "@/lib/sound";
 import { PrintTicketButton } from "./PrintTicketButton";
 import { PayModal } from "./PayModal";
 import { NewOrderModal } from "./NewOrderModal";
@@ -39,8 +39,8 @@ import { CashOutModal } from "./CashOutModal";
 import { PaymentBadge } from "./PaymentBadge";
 import { orderTypeLabelWithEmoji } from "@/lib/orders/order-type";
 import { BluetoothPrinterButton } from "./BluetoothPrinterButton";
-import { printPaidTicket, printKitchenTicket } from "@/server/printing/print";
-import { runPrintDispatch } from "@/lib/print/run-dispatch";
+import { printPaidTicket, printKitchenTicket, openCashDrawer } from "@/server/printing/print";
+import { runPrintDispatch, sendDrawerKick } from "@/lib/print/run-dispatch";
 
 /** One row inside an order card's "⋯ more" overflow menu. */
 function OverflowItem({
@@ -245,6 +245,19 @@ export function CashierBoard({
     };
   }, [restaurantId, refresh, initialTables]);
 
+  // Browsers only grant sound from inside a user gesture, and a new AudioContext
+  // starts suspended — so the incoming-order chime needs one tap on the page
+  // before it will ever play. Any tap counts; the cashier makes dozens.
+  useEffect(() => {
+    const unlock = () => unlockAudio();
+    window.addEventListener("pointerdown", unlock);
+    document.addEventListener("visibilitychange", unlock);
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      document.removeEventListener("visibilitychange", unlock);
+    };
+  }, []);
+
   // Print a kitchen ticket on the browser when there's no kitchen display
   // (server transports already printed; this handles bluetooth / OS print).
   async function printKitchen(orderId: string) {
@@ -294,6 +307,37 @@ export function CashierBoard({
     }
   }
 
+  /**
+   * Finish what the server couldn't do itself after a payment settles.
+   *
+   * The server decides BOTH of these from the restaurant's settings; this only
+   * carries them out for the transports it can't reach. Deciding here instead
+   * is what made "turn off the receipt" impossible: the board printed on every
+   * settle regardless of what the setting said.
+   */
+  async function finishSettle(res: { printTicket?: boolean; drawerKickBase64?: string }, orderId: string) {
+    if (res.drawerKickBase64) {
+      try {
+        await sendDrawerKick(res.drawerKickBase64);
+      } catch {
+        /* the sale is done; a stuck drawer isn't worth a scary toast */
+      }
+    }
+    if (res.printTicket) await printPaidReceipt(orderId);
+  }
+
+  /** The "no sale" button every till has — open the drawer without a sale. */
+  async function popDrawer() {
+    try {
+      const res = await openCashDrawer();
+      if (!res.ok) return showToast(res.message || "Couldn't reach the printer.");
+      if (res.drawerKickBase64) await sendDrawerKick(res.drawerKickBase64);
+      showToast("Drawer opened.");
+    } catch {
+      showToast("Couldn't open the drawer.");
+    }
+  }
+
   async function pay(orderId: string, method: CounterMethod, change = 0) {
     setBusy(orderId);
     setPayTarget(null);
@@ -304,7 +348,7 @@ export function CashierBoard({
         showToast(
           change > 0 ? `Paid — give ${formatPeso(change)} change.` : "Payment recorded — order closed.",
         );
-        await printPaidReceipt(orderId);
+        await finishSettle(res, orderId);
       } else if (!res.ok) {
         showToast(res.error ?? "Couldn't record the payment.");
         refresh();
@@ -384,6 +428,11 @@ export function CashierBoard({
         + Customer
       </button>
       <BluetoothPrinterButton />
+      {/* "No sale" — the drawer without a transaction, for giving change or
+          dropping a float in. Every till has one; this one didn't. */}
+      <button onClick={popDrawer} className={sidebarBtn}>
+        💰 Open drawer
+      </button>
 
       {incoming.length > 0 && (
         <button

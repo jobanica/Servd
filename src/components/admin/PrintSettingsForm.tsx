@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { updatePrintSettings, type FormState } from "@/server/printing/settings";
+import { DRAWER_POLICY_LABEL, type DrawerPolicy } from "@/lib/printing/drawer";
 import { SubmitButton } from "./SubmitButton";
 
 type Method = "network" | "cloud" | "bluetooth" | "os_dialog";
@@ -31,6 +32,8 @@ export function PrintSettingsForm({
     receiptWebsite: string;
     receiptFooter: string;
     receiptShowVat: boolean;
+    autoPrintReceipt: boolean;
+    openDrawerOn: DrawerPolicy;
   };
   cloudPollUrl: string | null;
 }) {
@@ -45,6 +48,8 @@ export function PrintSettingsForm({
   const [website, setWebsite] = useState(initial.receiptWebsite);
   const [footer, setFooter] = useState(initial.receiptFooter);
   const [showVat, setShowVat] = useState(initial.receiptShowVat);
+  const [autoPrintReceipt, setAutoPrintReceipt] = useState(initial.autoPrintReceipt);
+  const [openDrawerOn, setOpenDrawerOn] = useState<DrawerPolicy>(initial.openDrawerOn);
 
   return (
     <form
@@ -163,6 +168,55 @@ export function PrintSettingsForm({
             printing, use a Network/USB or Cloud printer.
           </p>
         )}
+      </div>
+
+      {/* What happens the moment a payment is settled. Both used to be fixed:
+          the receipt always printed, and the drawer never opened. */}
+      <div className="border-t border-plum-ink/10 pt-5">
+        <h2 className="font-heading text-sm font-bold uppercase tracking-wide text-plum-ink/55">
+          When a payment is taken
+        </h2>
+
+        <label className="mt-3 flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            name="autoPrintReceipt"
+            checked={autoPrintReceipt}
+            onChange={(e) => setAutoPrintReceipt(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span>
+            <span className="font-semibold">Print a receipt automatically</span>
+            <span className="mt-0.5 block text-xs text-plum-ink/55">
+              Turn this off if most customers don&apos;t take one — you can still print any
+              receipt on demand from the ticket. Saves a roll a day on a busy till.
+            </span>
+          </span>
+        </label>
+
+        <div className="mt-4">
+          <label className="block text-sm font-semibold">Open the cash drawer</label>
+          <p className="mt-0.5 text-xs text-plum-ink/55">
+            The drawer plugs into the receipt printer, so it opens when the printer is told to.
+            A card or e-wallet sale puts nothing in it, which is why cash-only is the default.
+          </p>
+          <select
+            name="openDrawerOn"
+            value={openDrawerOn}
+            onChange={(e) => setOpenDrawerOn(e.target.value as DrawerPolicy)}
+            className="mt-2 w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+          >
+            {(Object.keys(DRAWER_POLICY_LABEL) as DrawerPolicy[]).map((k) => (
+              <option key={k} value={k}>{DRAWER_POLICY_LABEL[k]}</option>
+            ))}
+          </select>
+          {openDrawerOn !== "never" && method === "os_dialog" && (
+            <p className="mt-2 rounded-lg bg-cream px-3 py-2 text-xs text-plum-ink/70">
+              Heads up: the OS print dialog can&apos;t send a drawer command — a browser print job
+              is a page, not a printer control code. Use Network/USB, Cloud or Bluetooth for this.
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Receipt design */}

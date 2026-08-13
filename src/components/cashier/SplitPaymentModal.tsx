@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { recordPartialPayment, type CashierTable } from "@/server/orders/cashier";
+import { printPaidTicket } from "@/server/printing/print";
+import { runPrintDispatch, sendDrawerKick } from "@/lib/print/run-dispatch";
 import type { CounterMethod } from "@/server/orders/cashier";
 
 function peso(centavos: number) {
@@ -44,6 +46,22 @@ export function SplitPaymentModal({
     }
     onResult(res.tables);
     if (res.settled) {
+      // The final tender settles the bill, so the drawer and the receipt are
+      // due here too — decided by the server from the restaurant's settings.
+      if (res.drawerKickBase64) {
+        try {
+          await sendDrawerKick(res.drawerKickBase64);
+        } catch {
+          /* the money is recorded; a stuck drawer isn't worth blocking on */
+        }
+      }
+      if (res.printTicket) {
+        try {
+          await runPrintDispatch(await printPaidTicket(orderId), orderId, "receipt");
+        } catch {
+          /* the sale is settled either way */
+        }
+      }
       onClose();
     } else {
       setOwed(res.remaining);

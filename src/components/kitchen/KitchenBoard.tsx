@@ -12,7 +12,7 @@ import type { KitchenOrder } from "@/lib/orders/types";
 import { useOnline } from "@/lib/offline/useOnline";
 import { kvGet, kvSet, outboxAdd, outboxAll, outboxRemove, type OutboxOp } from "@/lib/offline/idb";
 import { ConnectivityPill } from "@/components/offline/ConnectivityPill";
-import { chime } from "@/lib/sound";
+import { alertChime, audioBlocked, chime, unlockAudio } from "@/lib/sound";
 
 /** Elapsed time as mm:ss (or h:mm:ss once past an hour). */
 function elapsed(iso: string, nowMs: number): string {
@@ -115,6 +115,10 @@ export function KitchenBoard({
   const seeded = useRef(false);
   const soundOn = useRef(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  // Whether the browser is still refusing to play anything. A kitchen screen is
+  // often opened and then never touched, so this has to be visible — a silent
+  // failure here means nobody knows an order arrived.
+  const [blocked, setBlocked] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -123,7 +127,11 @@ export function KitchenBoard({
       // the seen-set, so opening the screen mid-service doesn't set it off.
       const unseen = fresh.filter((o) => !seenOrders.current.has(o.id));
       for (const o of fresh) seenOrders.current.add(o.id);
-      if (unseen.length > 0 && seeded.current && soundOn.current) chime();
+      if (unseen.length > 0 && seeded.current && soundOn.current) {
+        alertChime();
+        // If the browser swallowed it, say so — a kitchen has nobody watching.
+        setBlocked(audioBlocked());
+      }
       seeded.current = true;
       setOrders(fresh);
       if (offlineEnabled) kvSet(CACHE_KEY, fresh); // keep the offline read-cache warm
@@ -164,6 +172,31 @@ export function KitchenBoard({
     } catch { /* storage unavailable */ }
   }, []);
 
+  /**
+   * Unlock audio on the first touch anywhere on the screen.
+   *
+   * A browser only grants sound from inside a user gesture, and nobody in a
+   * kitchen thinks to press a speaker button before service — they open the
+   * board and walk away. Any tap at all now counts: bumping a ticket, scrolling
+   * the list. Until one happens the banner below asks for it outright.
+   */
+  useEffect(() => {
+    const unlock = () => {
+      unlockAudio();
+      setBlocked(audioBlocked());
+    };
+    setBlocked(audioBlocked());
+    window.addEventListener("pointerdown", unlock);
+    window.addEventListener("keydown", unlock);
+    // Tablets suspend audio when the screen sleeps; re-arm on the way back.
+    document.addEventListener("visibilitychange", unlock);
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+      document.removeEventListener("visibilitychange", unlock);
+    };
+  }, []);
+
   function toggleSound() {
     const next = !soundOn.current;
     soundOn.current = next;
@@ -171,9 +204,11 @@ export function KitchenBoard({
     try {
       localStorage.setItem(SOUND_KEY, next ? "on" : "off");
     } catch { /* ignore */ }
-    // Browsers gate audio behind a gesture — this tap unlocks it, and doubles
-    // as a way to hear what the alert sounds like.
-    if (next) chime();
+    if (next) {
+      unlockAudio();
+      chime(); // doubles as a way to hear what the alert sounds like
+      setBlocked(audioBlocked());
+    }
   }
 
   // On mount: hydrate from the cache if we loaded offline, and show the queue size.
@@ -313,6 +348,23 @@ export function KitchenBoard({
 
   return (
     <div>
+      {/* Sound is blocked until someone touches the screen. Saying so is the
+          whole fix from the kitchen's point of view — a chime that silently
+          never plays is indistinguishable from no orders coming in. */}
+      {soundEnabled && blocked && (
+        <button
+          type="button"
+          onClick={() => {
+            unlockAudio();
+            chime();
+            setBlocked(audioBlocked());
+          }}
+          className="mb-3 flex w-full items-center justify-center gap-2 rounded-tile bg-mango px-4 py-3 text-sm font-bold text-plum-ink"
+        >
+          🔇 Tap here to turn on the new-order sound
+        </button>
+      )}
+
       <div className="mb-4 flex items-center gap-3 text-xs text-plum-ink/50">
         <span className="flex items-center gap-2">
           <span className={`inline-block h-2 w-2 rounded-full ${live ? "bg-mango" : "bg-muted"}`} />

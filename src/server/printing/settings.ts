@@ -19,6 +19,8 @@ const schema = z.object({
   receiptWebsite: z.string().max(120).optional(),
   receiptFooter: z.string().max(300).optional(),
   receiptShowVat: z.coerce.boolean().default(true),
+  autoPrintReceipt: z.coerce.boolean().default(true),
+  openDrawerOn: z.enum(["never", "cash", "any"]).default("cash"),
 });
 
 export async function updatePrintSettings(
@@ -36,6 +38,8 @@ export async function updatePrintSettings(
     receiptWebsite: formData.get("receiptWebsite") ?? "",
     receiptFooter: formData.get("receiptFooter") ?? "",
     receiptShowVat: formData.get("receiptShowVat") === "on",
+    autoPrintReceipt: formData.get("autoPrintReceipt") === "on",
+    openDrawerOn: formData.get("openDrawerOn") ?? "cash",
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid settings" };
@@ -88,6 +92,23 @@ export async function updatePrintSettings(
     );
   } catch {
     /* kitchenDisplay column not migrated yet */
+  }
+
+  // Receipt-on-payment and cash-drawer behaviour. Written separately, and
+  // best-effort, so a database that hasn't run the migration still saves every
+  // other printer setting instead of rejecting the whole form.
+  try {
+    await tenantDb(restaurantId, (tx) =>
+      tx.restaurant.updateMany({
+        where: { id: restaurantId },
+        data: {
+          autoPrintReceipt: parsed.data.autoPrintReceipt,
+          openDrawerOn: parsed.data.openDrawerOn,
+        },
+      }),
+    );
+  } catch {
+    /* columns not migrated yet — see prisma/manual/add-drawer-receipt-settings.sql */
   }
 
   revalidatePath("/admin/printing");

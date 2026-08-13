@@ -35,14 +35,26 @@ export interface ShiftSales {
 
 const empty: ShiftSales = { gross: 0, orderCount: 0, discounts: 0, byMethod: [] };
 
-/** Payments belonging to a shift: stamped, or unstamped-at-the-till since it opened. */
-function shiftPaymentWhere(restaurantId: string, shiftId: string, openedAt: Date) {
+/**
+ * Payments belonging to a shift: stamped, or unstamped-at-the-till within it.
+ *
+ * `closedAt` bounds the unstamped clause. Without it a finished shift would
+ * keep absorbing every till payment taken after it ended, so reprinting last
+ * night's Z-report a week later would show a week of somebody else's takings.
+ */
+function shiftPaymentWhere(
+  restaurantId: string,
+  shiftId: string,
+  openedAt: Date,
+  closedAt?: Date | null,
+) {
+  const window = closedAt ? { gte: openedAt, lte: closedAt } : { gte: openedAt };
   return {
     status: "paid" as const,
     order: { restaurantId },
     OR: [
       { shiftId },
-      { shiftId: null, gateway: "manual" as const, createdAt: { gte: openedAt } },
+      { shiftId: null, gateway: "manual" as const, createdAt: window },
     ],
   };
 }
@@ -51,25 +63,26 @@ export async function getShiftSales(
   restaurantId: string,
   shiftId: string,
   openedAt: Date,
+  closedAt?: Date | null,
 ): Promise<ShiftSales> {
   let payments;
   try {
     payments = await systemDb((tx) =>
       tx.payment.findMany({
-        where: shiftPaymentWhere(restaurantId, shiftId, openedAt),
+        where: shiftPaymentWhere(restaurantId, shiftId, openedAt, closedAt),
         select: { amount: true, method: true, orderId: true },
       }),
     );
   } catch {
     // shiftId column not migrated yet — fall back to every counter payment
-    // since the shift opened rather than reporting nothing at all.
+    // inside the shift's window rather than reporting nothing at all.
     try {
       payments = await systemDb((tx) =>
         tx.payment.findMany({
           where: {
             status: "paid",
             gateway: "manual",
-            createdAt: { gte: openedAt },
+            createdAt: closedAt ? { gte: openedAt, lte: closedAt } : { gte: openedAt },
             order: { restaurantId },
           },
           select: { amount: true, method: true, orderId: true },
@@ -110,16 +123,18 @@ export async function getShiftCashOuts(
   restaurantId: string,
   shiftId: string,
   openedAt: Date,
+  closedAt?: Date | null,
 ): Promise<{ amount: number; note: string | null; at: string }[]> {
   const map = (rows: { amount: number; note: string | null; createdAt: Date }[]) =>
     rows.map((r) => ({ amount: r.amount, note: r.note, at: r.createdAt.toISOString() }));
+  const window = closedAt ? { gte: openedAt, lte: closedAt } : { gte: openedAt };
   try {
     const rows = await systemDb((tx) =>
       tx.cashMovement.findMany({
         where: {
           restaurantId,
           type: "cash_out",
-          OR: [{ shiftId }, { shiftId: null, createdAt: { gte: openedAt } }],
+          OR: [{ shiftId }, { shiftId: null, createdAt: window }],
         },
         orderBy: { createdAt: "desc" },
         take: 100,
@@ -131,7 +146,7 @@ export async function getShiftCashOuts(
     try {
       const rows = await systemDb((tx) =>
         tx.cashMovement.findMany({
-          where: { restaurantId, type: "cash_out", createdAt: { gte: openedAt } },
+          where: { restaurantId, type: "cash_out", createdAt: window },
           orderBy: { createdAt: "desc" },
           take: 100,
           select: { amount: true, note: true, createdAt: true },

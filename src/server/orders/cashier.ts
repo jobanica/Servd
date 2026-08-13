@@ -2,7 +2,7 @@
 
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireStaff } from "@/server/tenancy/current-user";
-import { ensureShift, stampPaymentShift } from "./shift-session";
+import { currentShift, ensureShift, stampPaymentShift } from "./shift-session";
 import { staffLabel } from "@/server/tenancy/staff-name";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
 import { autoPrintIfEnabled, printReceipt, printKitchenIfNeeded } from "@/server/printing/print";
@@ -512,7 +512,7 @@ export type CounterMethod =
 export async function markOrderPaid(
   orderId: string,
   method: CounterMethod,
-): Promise<{ ok: boolean; tables?: CashierTable[]; error?: string; printTicket?: boolean }> {
+): Promise<{ ok: boolean; tables?: CashierTable[]; error?: string; printTicket?: boolean; drawerKickBase64?: string }> {
   let staff;
   try {
     staff = await requireStaff(["cashier", "admin"]);
@@ -582,14 +582,19 @@ export async function markOrderPaid(
   // Always print the receipt on an explicit cash/card settle (independent of the
   // auto-print-on-new-order toggle). Server transports print straight to the
   // printer; client transports open the ticket page from the cashier board.
-  const { clientPrintNeeded } = await printReceipt(staff.restaurantId, orderId);
+  const settle = await printReceipt(staff.restaurantId, orderId);
 
   await notifyOrdersChanged(staff.restaurantId);
-  return { ok: true, tables: await getCashierTables(), printTicket: clientPrintNeeded };
+  return {
+    ok: true,
+    tables: await getCashierTables(),
+    printTicket: settle.clientPrintNeeded,
+    drawerKickBase64: settle.drawerKickBase64,
+  };
 }
 
 export type PartialPaymentResult =
-  | { ok: true; settled: boolean; remaining: number; tables: CashierTable[]; printTicket?: boolean }
+  | { ok: true; settled: boolean; remaining: number; tables: CashierTable[]; printTicket?: boolean; drawerKickBase64?: string }
   | { ok: false; error: string };
 
 /**
@@ -673,6 +678,7 @@ export async function recordPartialPayment(
   }
 
   let printTicket = false;
+  let drawerKickBase64: string | undefined;
   if (settled) {
     const phone = (await orderMetaMap(staff.restaurantId, [orderId])).get(orderId)?.customerPhone ?? null;
     // Award loyalty on the full net once the order is settled.
@@ -682,11 +688,13 @@ export async function recordPartialPayment(
       tx.order.findFirst({ where: { id: orderId }, select: { total: true } }),
     );
     if (order) await awardPointsForOrder(staff.restaurantId, orderId, netTotal(order.total, disc2?.amount ?? 0, credit2), phone);
-    printTicket = (await printReceipt(staff.restaurantId, orderId)).clientPrintNeeded;
+    const settle = await printReceipt(staff.restaurantId, orderId);
+    printTicket = settle.clientPrintNeeded;
+    drawerKickBase64 = settle.drawerKickBase64;
   }
 
   await notifyOrdersChanged(staff.restaurantId);
-  return { ok: true, settled, remaining, tables: await getCashierTables(), printTicket };
+  return { ok: true, settled, remaining, tables: await getCashierTables(), printTicket, drawerKickBase64 };
 }
 
 /** Close (settle) an order so it leaves the active boards. */
@@ -722,7 +730,20 @@ export interface ClosedOrder {
   closedAt: string;
 }
 
-/** Recently closed orders (today) so the cashier can re-open one if needed. */
+/**
+ * Recently closed orders so the cashier can re-open one if needed.
+ *
+ * Covers the cashier's own shift when there is one, falling back to the
+ * calendar day. Anchoring on midnight emptied this list under a night cashier
+ * at 12:00 AM — the same cut that used to wipe their shift summary — leaving
+ * them nothing to check the evening's tickets against.
+ *
+ * `total` is what was actually PAID, not order.total. The order's total is the
+ * gross before discounts and store credit, so this list added up to more than
+ * the accounting report and more than the drawer for any restaurant that gives
+ * a senior discount. Three screens disagreeing about the day's takings is how
+ * you end up trusting none of them.
+ */
 export async function getClosedOrders(): Promise<ClosedOrder[]> {
   let staff;
   try {
@@ -730,10 +751,12 @@ export async function getClosedOrders(): Promise<ClosedOrder[]> {
   } catch {
     return [];
   }
-  const startOfDay = manilaStartOfDay();
+  const shift = await currentShift(staff.restaurantId, staff.staffUserId);
+  const since = shift?.openedAt ?? manilaStartOfDay();
+
   const rows = await tenantDb(staff.restaurantId, (tx) =>
     tx.order.findMany({
-      where: { status: "closed", updatedAt: { gte: startOfDay } },
+      where: { status: "closed", updatedAt: { gte: since } },
       orderBy: { updatedAt: "desc" },
       take: 50,
       select: {
@@ -747,13 +770,31 @@ export async function getClosedOrders(): Promise<ClosedOrder[]> {
       },
     }),
   );
+
+  // What each of those tickets actually took, from its payments.
+  const paidByOrder = new Map<string, number>();
+  try {
+    const groups = await tenantDb(staff.restaurantId, (tx) =>
+      tx.payment.groupBy({
+        by: ["orderId"],
+        where: { orderId: { in: rows.map((o) => o.id) }, status: "paid" },
+        _sum: { amount: true },
+      }),
+    );
+    for (const g of groups) paidByOrder.set(g.orderId, g._sum.amount ?? 0);
+  } catch {
+    /* fall back to the order total below */
+  }
+
   return rows.map((o) => ({
     id: o.id,
     label:
       o.table?.tableNumber
         ? `Table ${o.table.tableNumber}`
         : o.customerName || orderTypeLabel(o.orderType),
-    total: o.total,
+    // An unpaid closed ticket has no payments; its total is still the figure
+    // to show, since that's what was written off rather than collected.
+    total: paidByOrder.get(o.id) ?? o.total,
     paymentStatus: o.paymentStatus,
     closedAt: o.updatedAt.toISOString(),
   }));

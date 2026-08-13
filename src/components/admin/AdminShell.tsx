@@ -84,6 +84,7 @@ const NAV: { group: string; items: Item[] }[] = [
       { label: "Kitchen", href: "/kitchen", d: I.fire },
       { label: "Cashier", href: "/cashier", d: I.cash },
       { label: "Merchant app", href: "/merchant", d: I.bell },
+      { label: "Shift history", href: "/admin/shifts", d: I.cash },
       { label: "My time clock", href: "/clock/me", d: I.receipt },
     ],
   },

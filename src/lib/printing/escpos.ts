@@ -59,6 +59,20 @@ class EscPosBuilder {
   }
 
   /**
+   * Pop the cash drawer open.
+   *
+   * The drawer isn't a separate device: it plugs into the printer's RJ-11 port
+   * and opens when the printer sends a pulse down it. So "open the drawer" is a
+   * print command, which is why it lives here.
+   *
+   * ESC p m t1 t2 — pin 2 (m=0), on for t1×2 ms then off. 25/250 is the widely
+   * compatible timing; too short a pulse and the solenoid doesn't throw.
+   */
+  kickDrawer(pin: 0 | 1 = 0): this {
+    return this.raw(ESC, 0x70, pin, 0x19, 0xfa);
+  }
+
+  /**
    * Native QR code via the GS ( k command family (model 2). Supported by the
    * vast majority of modern thermal printers, and far crisper than a bitmap.
    */
@@ -87,9 +101,30 @@ class EscPosBuilder {
   }
 }
 
-/** Encodes a Ticket into an ESC/POS byte stream ready to send to a printer. */
-export function encodeTicket(ticket: Ticket): Uint8Array {
-  const b = new EscPosBuilder().init().align("center");
+/**
+ * Just the drawer pulse, with nothing printed.
+ *
+ * For settling a sale when receipt printing is turned off: the cashier still
+ * needs the drawer, they just don't want the paper.
+ */
+export function encodeDrawerKick(): Uint8Array {
+  return new EscPosBuilder().init().kickDrawer().build();
+}
+
+export function encodeDrawerKickBase64(): string {
+  return Buffer.from(encodeDrawerKick()).toString("base64");
+}
+
+/**
+ * Encodes a Ticket into an ESC/POS byte stream ready to send to a printer.
+ *
+ * `openDrawer` fires the pulse first, before any paper moves, so the drawer is
+ * already open by the time the cashier tears the receipt off.
+ */
+export function encodeTicket(ticket: Ticket, openDrawer = false): Uint8Array {
+  const b = new EscPosBuilder().init();
+  if (openDrawer) b.kickDrawer();
+  b.align("center");
 
   // Header: restaurant name (bold) + contact lines, then a big table number.
   const header = ticketHeaderLines(ticket);
@@ -122,8 +157,8 @@ export function encodeTicket(ticket: Ticket): Uint8Array {
 }
 
 /** Base64 of the ESC/POS stream — convenient for transport over JSON/HTTP. */
-export function encodeTicketBase64(ticket: Ticket): string {
-  return Buffer.from(encodeTicket(ticket)).toString("base64");
+export function encodeTicketBase64(ticket: Ticket, openDrawer = false): string {
+  return Buffer.from(encodeTicket(ticket, openDrawer)).toString("base64");
 }
 
 /**

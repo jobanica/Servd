@@ -4,6 +4,22 @@ import type { PrintDispatch } from "@/server/printing/print";
 import { isPrinterPaired, printBytes, base64ToBytes } from "@/lib/printing/bt-printer";
 import { printViaBluetooth } from "@/lib/printing/bluetooth";
 
+/**
+ * Send a bare drawer pulse to the paired Bluetooth printer.
+ *
+ * Only Bluetooth needs this: for network and cloud the server already sent the
+ * pulse, and the OS print dialog has no way to send one at all. The drawer is
+ * wired to the printer, so whoever holds the printer connection opens it.
+ */
+export async function sendDrawerKick(base64: string): Promise<void> {
+  const bytes = base64ToBytes(base64);
+  if (isPrinterPaired()) {
+    await printBytes(bytes);
+    return;
+  }
+  await printViaBluetooth(bytes);
+}
+
 /** Open the printable ticket page (it auto-prints, then auto-closes). */
 export function openTicketForPrint(orderId: string, doc: "bill" | "receipt" | "kitchen") {
   window.open(`/cashier/ticket/${orderId}?doc=${doc}`, "_blank", "noopener");
