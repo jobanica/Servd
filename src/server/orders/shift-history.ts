@@ -2,7 +2,10 @@ import "server-only";
 
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { getShiftSales, getShiftCashOuts } from "./shift-sales";
+import { getShiftTransactions } from "./shift-transactions";
+import { summariseShift, type ShiftBreakdown, type ShiftTransaction } from "@/lib/orders/shift-breakdown";
 import { expectedCash } from "@/lib/orders/shift-rollup";
+import { shiftRetentionCutoff } from "@/lib/orders/shift-retention";
 
 /**
  * Past shifts and what each one took.
@@ -31,6 +34,10 @@ export interface ShiftHistoryRow {
   cashOutTotal: number;
   expectedCash: number;
   byMethod: { method: string; amount: number; count: number }[];
+  /** Everything that happened on the shift — counter and online, by type. */
+  breakdown: ShiftBreakdown;
+  /** Each transaction, in order. */
+  transactions: ShiftTransaction[];
 }
 
 export async function listShiftHistory(
@@ -41,7 +48,10 @@ export async function listShiftHistory(
   try {
     shifts = await systemDb((tx) =>
       tx.cashierShift.findMany({
-        where: { restaurantId },
+        // Only what's inside the retention window. Anything older has been
+        // purged, or is about to be — showing it would be a list that empties
+        // itself while somebody is reading it.
+        where: { restaurantId, openedAt: { gte: shiftRetentionCutoff() } },
         orderBy: { openedAt: "desc" },
         take: limit,
         select: {
@@ -60,9 +70,10 @@ export async function listShiftHistory(
 
   return Promise.all(
     shifts.map(async (s) => {
-      const [sales, cashOuts] = await Promise.all([
+      const [sales, cashOuts, transactions] = await Promise.all([
         getShiftSales(restaurantId, s.id, s.openedAt, s.closedAt),
         getShiftCashOuts(restaurantId, s.id, s.openedAt, s.closedAt),
+        getShiftTransactions(restaurantId, s.openedAt, s.closedAt, s.id),
       ]);
       const cashCollected = sales.byMethod.find((m) => m.method === "cash")?.amount ?? 0;
       const cashOutTotal = cashOuts.reduce((t, c) => t + c.amount, 0);
@@ -79,6 +90,8 @@ export async function listShiftHistory(
         cashOutTotal,
         expectedCash: expectedCash(cashCollected, cashOutTotal),
         byMethod: sales.byMethod,
+        breakdown: summariseShift(transactions),
+        transactions,
       };
     }),
   );
