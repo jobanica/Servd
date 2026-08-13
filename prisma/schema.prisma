@@ -1229,6 +1229,7 @@ model MenuItem {
   foodCost         MenuItemCost?
   serving          MenuItemServing?
   variants         MenuItemVariant[]
+  stock            InventoryItem? // present when this product's own units are counted
 
   @@index([restaurantId])
   @@index([categoryId])
@@ -1377,10 +1378,16 @@ model InventoryItem {
   reorderLevel      Float     @default(0)
   lowStockAlertedAt DateTime? // set when a low-stock alert was sent; cleared on restock
   supplierId        String?
+  // Set => this row IS a product's own stock, not an ingredient. A restaurant
+  // tracks flour and sells dishes made from it; a shop tracks the thing it
+  // sells. Both are stock, so both live here and share movements, costing,
+  // purchase orders and reorder alerts — the link is what tells them apart.
+  menuItemId        String?   @unique
   createdAt         DateTime  @default(now())
 
   restaurant       Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   supplier         Supplier?           @relation(fields: [supplierId], references: [id])
+  menuItem         MenuItem?           @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
   movements        StockMovement[]
   recipeComponents RecipeComponent[]
   poItems          PurchaseOrderItem[]

@@ -1,4 +1,5 @@
 import { tenantDb } from "@/server/tenancy/scoped-db";
+import type { ProductStockRow } from "@/components/admin/inventory/ProductStockTable";
 
 export interface ReorderSuggestion {
   id: string;
@@ -28,7 +29,7 @@ export async function getReorderSuggestions(restaurantId: string): Promise<Reord
     return await tenantDb(restaurantId, async (tx) => {
       const items = await tx.inventoryItem.findMany({
         orderBy: { name: "asc" },
-        include: { supplier: { select: { name: true } } },
+        select: INVENTORY_FIELDS,
       });
       const moves = await tx.stockMovement.findMany({
         where: { reason: "sale", createdAt: { gte: since } },
@@ -67,15 +68,147 @@ export async function getReorderSuggestions(restaurantId: string): Promise<Reord
   }
 }
 
-/** Inventory items with supplier name + a low-stock flag. */
+/**
+ * Inventory items with supplier name + a low-stock flag.
+ *
+ * Columns are listed explicitly rather than taken wholesale. A bare findMany
+ * asks for every column in the Prisma model, so the day this file learns about
+ * a column the database hasn't been given yet, every inventory screen 500s.
+ * Naming them keeps that failure confined to the one query that wants the new
+ * column — see listIngredients below.
+ */
+const INVENTORY_FIELDS = {
+  id: true,
+  name: true,
+  unit: true,
+  stockQty: true,
+  costPerUnit: true,
+  reorderLevel: true,
+  supplierId: true,
+  supplier: { select: { name: true } },
+} as const;
+
 export async function listInventory(restaurantId: string) {
   const items = await tenantDb(restaurantId, (tx) =>
-    tx.inventoryItem.findMany({
-      orderBy: { name: "asc" },
-      include: { supplier: { select: { name: true } } },
-    }),
+    tx.inventoryItem.findMany({ orderBy: { name: "asc" }, select: INVENTORY_FIELDS }),
   );
   return items.map((i) => ({ ...i, low: i.stockQty <= i.reorderLevel }));
+}
+
+/**
+ * Ingredients only — the stock rows that aren't a product's own units.
+ *
+ * Before the menuItemId migration runs there are no product rows, so every row
+ * is an ingredient and the unfiltered list is the right answer.
+ */
+export async function listIngredients(restaurantId: string) {
+  try {
+    const items = await tenantDb(restaurantId, (tx) =>
+      tx.inventoryItem.findMany({
+        where: { menuItemId: null },
+        orderBy: { name: "asc" },
+        select: INVENTORY_FIELDS,
+      }),
+    );
+    return items.map((i) => ({ ...i, low: i.stockQty <= i.reorderLevel }));
+  } catch {
+    return listInventory(restaurantId);
+  }
+}
+
+/**
+ * Whether the database can hold product stock yet.
+ *
+ * The link column ships in a manual migration, and until it's run every write
+ * from the Products tab fails. Asking once lets the screen say so plainly
+ * instead of letting the first click blow up into a generic app error — the
+ * failure is the same either way; only the explanation differs.
+ */
+export async function isProductStockReady(restaurantId: string): Promise<boolean> {
+  try {
+    await tenantDb(restaurantId, (tx) =>
+      tx.inventoryItem.findFirst({ where: { menuItemId: { not: null } }, select: { id: true } }),
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Every sellable product with its stock, tracked or not.
+ *
+ * Untracked products are included on purpose. A shop that has just switched
+ * this on needs to see the things it sells in order to start counting them —
+ * a screen listing only what's already tracked starts empty and stays empty.
+ *
+ * The name comes from the menu item, not the stock row, so renaming a product
+ * can't leave the inventory screen showing a name the shop stopped using.
+ */
+export async function listProductStock(restaurantId: string): Promise<ProductStockRow[]> {
+  const items = await tenantDb(restaurantId, (tx) =>
+    tx.menuItem.findMany({
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      select: {
+        id: true,
+        name: true,
+        price: true,
+        imageUrl: true,
+        isAvailable: true,
+        category: { select: { name: true } },
+      },
+    }),
+  );
+
+  // Best-effort: the menuItemId column ships in a manual migration, so before
+  // it runs every product simply reads as untracked rather than erroring.
+  type StockRow = {
+    id: string;
+    menuItemId: string | null;
+    unit: string;
+    stockQty: number;
+    reorderLevel: number;
+    costPerUnit: number;
+  };
+  let stock: StockRow[] = [];
+  try {
+    stock = await tenantDb(restaurantId, (tx) =>
+      tx.inventoryItem.findMany({
+        where: { menuItemId: { not: null } },
+        select: {
+          id: true,
+          menuItemId: true,
+          unit: true,
+          stockQty: true,
+          reorderLevel: true,
+          costPerUnit: true,
+        },
+      }),
+    );
+  } catch {
+    /* not migrated yet */
+  }
+  const byMenuItem = new Map(
+    stock.flatMap((s) => (s.menuItemId ? [[s.menuItemId, s] as const] : [])),
+  );
+
+  return items.map((m) => {
+    const s = byMenuItem.get(m.id);
+    return {
+      menuItemId: m.id,
+      name: m.name,
+      categoryName: m.category?.name ?? "",
+      price: m.price,
+      imageUrl: m.imageUrl,
+      isAvailable: m.isAvailable,
+      inventoryItemId: s?.id ?? null,
+      unit: s?.unit ?? "pc",
+      stockQty: s?.stockQty ?? 0,
+      reorderLevel: s?.reorderLevel ?? 0,
+      costPerUnit: s?.costPerUnit ?? 0,
+      low: s != null && s.stockQty <= s.reorderLevel,
+    };
+  });
 }
 
 export function listSuppliers(restaurantId: string) {

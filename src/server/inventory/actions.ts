@@ -101,6 +101,173 @@ export async function deleteInventoryItem(formData: FormData): Promise<void> {
   revalidatePath("/admin/inventory");
 }
 
+// --------------------------------------------------------- product stock
+/**
+ * Start counting a product's own units.
+ *
+ * Creates the product's stock row and links it to the menu item. It's the same
+ * kind of row an ingredient uses, so everything already built on top of stock —
+ * movements, weighted-average cost, purchase orders, reorder suggestions,
+ * low-stock alerts, COGS — works on products the moment this is switched on,
+ * with nothing written twice.
+ *
+ * The starting cost comes from the item's food cost if one is set, so a shop
+ * that already entered what a thing costs them doesn't type it again.
+ */
+export async function startTrackingProduct(formData: FormData): Promise<void> {
+  const { restaurantId } = await requireAdminAction();
+  await ensureModule(restaurantId);
+  const menuItemId = String(formData.get("menuItemId"));
+  const opening = Math.max(0, Number(formData.get("stockQty") ?? 0) || 0);
+  const reorderLevel = Math.max(0, Number(formData.get("reorderLevel") ?? 0) || 0);
+  const unit = String(formData.get("unit") ?? "").trim() || "pc";
+
+  await tenantDb(restaurantId, async (tx) => {
+    const item = await tx.menuItem.findFirstOrThrow({
+      where: { id: menuItemId },
+      select: { name: true },
+    });
+    if (await tx.inventoryItem.findFirst({ where: { menuItemId }, select: { id: true } })) return;
+
+    let costPerUnit = 0;
+    try {
+      const c = await tx.menuItemCost.findUnique({ where: { menuItemId }, select: { cost: true } });
+      costPerUnit = c?.cost ?? 0;
+    } catch {
+      /* menu_item_costs not migrated — start at zero */
+    }
+
+    const row = await tx.inventoryItem.create({
+      data: {
+        restaurantId,
+        menuItemId,
+        name: item.name,
+        unit,
+        stockQty: opening,
+        reorderLevel,
+        costPerUnit,
+      },
+    });
+    if (opening > 0) {
+      await tx.stockMovement.create({
+        data: {
+          restaurantId,
+          inventoryItemId: row.id,
+          changeQty: opening,
+          reason: "adjustment",
+          unitCost: costPerUnit,
+          note: "Opening stock",
+        },
+      });
+    }
+  });
+  revalidatePath("/admin/inventory");
+}
+
+/**
+ * Stop counting a product's units.
+ *
+ * Deletes the stock row, which takes its movement history with it — so the
+ * product is left available rather than stuck at whatever it was when the
+ * counting stopped. A shop that turns tracking off and finds the item still
+ * marked sold out would reasonably think the switch did nothing.
+ */
+export async function stopTrackingProduct(formData: FormData): Promise<void> {
+  const { restaurantId } = await requireAdminAction();
+  await ensureModule(restaurantId);
+  const menuItemId = String(formData.get("menuItemId"));
+  await tenantDb(restaurantId, async (tx) => {
+    await tx.inventoryItem.deleteMany({ where: { menuItemId } });
+    await tx.menuItem.updateMany({ where: { id: menuItemId }, data: { isAvailable: true } });
+  });
+  revalidatePath("/admin/inventory");
+  revalidatePath("/admin/menu");
+}
+
+/** Change a tracked product's reorder level without touching its stock. */
+export async function setProductReorderLevel(formData: FormData): Promise<void> {
+  const { restaurantId } = await requireAdminAction();
+  await ensureModule(restaurantId);
+  await tenantDb(restaurantId, (tx) =>
+    tx.inventoryItem.updateMany({
+      where: { id: String(formData.get("id")) },
+      data: { reorderLevel: Math.max(0, Number(formData.get("reorderLevel") ?? 0) || 0) },
+    }),
+  );
+  revalidatePath("/admin/inventory");
+}
+
+/**
+ * Receive stock without a purchase order.
+ *
+ * A shop buying a box of something and putting it on the shelf shouldn't have
+ * to raise paperwork first. Cost is optional; when given it re-averages the
+ * same way receiving a PO does, so COGS stays honest as prices move.
+ *
+ * Restocking above the reorder level re-arms the low-stock alert, otherwise the
+ * next time it runs down nobody gets told.
+ */
+export async function recordRestock(formData: FormData): Promise<void> {
+  const { restaurantId } = await requireAdminAction();
+  await ensureModule(restaurantId);
+  const id = String(formData.get("id"));
+  const qty = Number(formData.get("qty") ?? 0);
+  if (!(qty > 0)) return;
+  const rawCost = String(formData.get("unitCostPesos") ?? "").trim();
+
+  await tenantDb(restaurantId, async (tx) => {
+    const inv = await tx.inventoryItem.findFirstOrThrow({
+      where: { id },
+      select: { stockQty: true, costPerUnit: true, reorderLevel: true },
+    });
+    const newStock = inv.stockQty + qty;
+    const unitCost = rawCost === "" ? inv.costPerUnit : pesosToCentavos(Number(rawCost) || 0);
+    const newCost =
+      rawCost === "" || newStock <= 0
+        ? inv.costPerUnit
+        : Math.round((inv.stockQty * inv.costPerUnit + qty * unitCost) / newStock);
+
+    await tx.inventoryItem.update({
+      where: { id },
+      data: {
+        stockQty: newStock,
+        costPerUnit: newCost,
+        ...(newStock > inv.reorderLevel ? { lowStockAlertedAt: null } : {}),
+      },
+    });
+    await tx.stockMovement.create({
+      data: {
+        restaurantId,
+        inventoryItemId: id,
+        changeQty: qty,
+        reason: "received",
+        unitCost,
+        note: "Restocked",
+      },
+    });
+  });
+  revalidatePath("/admin/inventory");
+}
+
+/**
+ * Put a sold-out product back on sale.
+ *
+ * Auto out-of-stock hides an item the moment its count reaches zero, and the
+ * only honest way back is to say how many arrived — otherwise the shop is
+ * selling from a shelf the system believes is empty.
+ */
+export async function restockAndRelist(formData: FormData): Promise<void> {
+  await recordRestock(formData);
+  const { restaurantId } = await requireAdminAction();
+  const menuItemId = String(formData.get("menuItemId") ?? "");
+  if (!menuItemId) return;
+  await tenantDb(restaurantId, (tx) =>
+    tx.menuItem.updateMany({ where: { id: menuItemId }, data: { isAvailable: true } }),
+  );
+  revalidatePath("/admin/inventory");
+  revalidatePath("/admin/menu");
+}
+
 // ------------------------------------------------- stock movements (manual)
 async function applyMovement(
   restaurantId: string,

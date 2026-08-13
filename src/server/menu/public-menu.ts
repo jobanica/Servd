@@ -3,6 +3,7 @@ import type { DinerCategory } from "@/lib/cart/types";
 import { effectivePrice } from "@/lib/pricing/happy-hour";
 import { getActiveHappyHours } from "@/server/pricing/happy-hour";
 import { getServingStates } from "@/server/menu/servings";
+import { getProductStockStates } from "@/server/inventory/product-stock";
 import { getVariantsMap } from "@/server/menu/variants";
 import { getUnavailableModifierIds } from "@/server/menu/modifier-availability";
 
@@ -62,6 +63,10 @@ export async function getPublicMenu(
   // Add-ons the kitchen marked out — shown disabled rather than hidden, so the
   // diner can see the option exists and is just unavailable right now.
   const modsOut = await getUnavailableModifierIds(restaurantId);
+  // Counted product stock. Shown sold out as soon as the last unit is spoken
+  // for, not when it's finally handed over — otherwise the shelf reads as full
+  // to everyone who loads the page while an order is still being fulfilled.
+  const productStock = await getProductStockStates(restaurantId, itemIds);
 
   // Overlay the requested locale's translations, falling back to base text.
   return categories.map((c) => ({
@@ -72,6 +77,8 @@ export async function getPublicMenu(
       // Out of daily servings → sold out for the rest of today.
       const cap = servings.get(item.id);
       const cappedOut = cap?.remaining != null && cap.remaining <= 0;
+      // Counted units all gone (or all promised to orders in progress).
+      const stockOut = productStock.get(item.id)?.soldOut === true;
       // Sizes/variants: each priced through happy-hour like the base price.
       const rawVariants = variantsMap.get(item.id) ?? [];
       const variants = rawVariants.map((v) => ({
@@ -94,7 +101,7 @@ export async function getPublicMenu(
       imageUrl: item.imageUrl,
       videoUrl: item.videoUrl,
       videoPosterUrl: item.videoPosterUrl,
-      isAvailable: item.isAvailable && !cappedOut && !allSizesOut,
+      isAvailable: item.isAvailable && !cappedOut && !allSizesOut && !stockOut,
       dietaryTags: item.dietaryTags ?? [],
       groups: item.modifierGroups.map((link) => ({
         id: link.group.id,

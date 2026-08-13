@@ -598,6 +598,7 @@ ALTER TABLE "inventory_items" ADD COLUMN IF NOT EXISTS "stockQty" DOUBLE PRECISI
 ALTER TABLE "inventory_items" ADD COLUMN IF NOT EXISTS "costPerUnit" INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE "inventory_items" ADD COLUMN IF NOT EXISTS "reorderLevel" DOUBLE PRECISION NOT NULL DEFAULT 0;
 ALTER TABLE "inventory_items" ADD COLUMN IF NOT EXISTS "supplierId" TEXT;
+ALTER TABLE "inventory_items" ADD COLUMN IF NOT EXISTS "menuItemId" TEXT;
 ALTER TABLE "inventory_items" ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
 CREATE TABLE IF NOT EXISTS "recipe_components" (
@@ -1159,6 +1160,7 @@ CREATE INDEX IF NOT EXISTS "modifier_groups_restaurantId_idx" ON "modifier_group
 CREATE INDEX IF NOT EXISTS "modifiers_modifierGroupId_idx" ON "modifiers"("modifierGroupId");
 CREATE INDEX IF NOT EXISTS "suppliers_restaurantId_idx" ON "suppliers"("restaurantId");
 CREATE INDEX IF NOT EXISTS "inventory_items_restaurantId_idx" ON "inventory_items"("restaurantId");
+CREATE UNIQUE INDEX IF NOT EXISTS "inventory_items_menuItemId_key" ON "inventory_items"("menuItemId");
 CREATE INDEX IF NOT EXISTS "recipe_components_restaurantId_idx" ON "recipe_components"("restaurantId");
 CREATE UNIQUE INDEX IF NOT EXISTS "recipe_components_menuItemId_inventoryItemId_key" ON "recipe_components"("menuItemId", "inventoryItemId");
 CREATE INDEX IF NOT EXISTS "stock_movements_restaurantId_createdAt_idx" ON "stock_movements"("restaurantId", "createdAt");
@@ -1218,6 +1220,7 @@ DO $$ BEGIN ALTER TABLE "menu_item_modifier_groups" ADD CONSTRAINT "menu_item_mo
 DO $$ BEGIN ALTER TABLE "menu_item_modifier_groups" ADD CONSTRAINT "menu_item_modifier_groups_modifierGroupId_fkey" FOREIGN KEY ("modifierGroupId") REFERENCES "modifier_groups"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN ALTER TABLE "suppliers" ADD CONSTRAINT "suppliers_restaurantId_fkey" FOREIGN KEY ("restaurantId") REFERENCES "restaurants"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN ALTER TABLE "inventory_items" ADD CONSTRAINT "inventory_items_restaurantId_fkey" FOREIGN KEY ("restaurantId") REFERENCES "restaurants"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN ALTER TABLE "inventory_items" ADD CONSTRAINT "inventory_items_menuItemId_fkey" FOREIGN KEY ("menuItemId") REFERENCES "menu_items"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN ALTER TABLE "inventory_items" ADD CONSTRAINT "inventory_items_supplierId_fkey" FOREIGN KEY ("supplierId") REFERENCES "suppliers"("id") ON DELETE SET NULL ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN ALTER TABLE "recipe_components" ADD CONSTRAINT "recipe_components_menuItemId_fkey" FOREIGN KEY ("menuItemId") REFERENCES "menu_items"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN ALTER TABLE "recipe_components" ADD CONSTRAINT "recipe_components_inventoryItemId_fkey" FOREIGN KEY ("inventoryItemId") REFERENCES "inventory_items"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
