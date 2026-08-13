@@ -6,6 +6,7 @@ import { pesosToCentavos } from "@/lib/money";
 import { manilaStartOfDay } from "@/lib/time/manila";
 import { ensureShift, stampCashMovementShift } from "./shift-session";
 import { staffLabel } from "@/server/tenancy/staff-name";
+import { notifyOrdersChanged } from "@/server/realtime/notify";
 
 export type CashOutState = { ok?: boolean; message?: string; error?: string } | null;
 
@@ -88,5 +89,9 @@ export async function recordCashOut(_prev: CashOutState, formData: FormData): Pr
   }
   // Money out of THIS cashier's drawer, so it comes off THEIR expected cash.
   await stampCashMovementShift(movementId, shift?.id ?? null);
+  // Expected-in-drawer just changed. Every other money action broadcasts; this
+  // one didn't, so a shift summary open on another tablet kept showing the
+  // pre-cash-out figure — and that IS the number somebody counts against.
+  await notifyOrdersChanged(staff.restaurantId);
   return { ok: true, message: "Cash-out recorded." };
 }

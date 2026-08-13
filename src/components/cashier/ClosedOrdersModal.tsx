@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   getClosedOrders,
   getVoidedOrders,
@@ -12,12 +12,15 @@ import {
 } from "@/server/orders/cashier";
 import { formatPeso } from "@/lib/money";
 import { VOID_REASONS } from "@/lib/orders/void-reasons";
+import { useOrdersRefresh } from "@/lib/realtime/useOrdersRefresh";
 
 /** Lists today's closed orders and lets the cashier re-open any of them. */
 export function ClosedOrdersModal({
+  restaurantId,
   onClose,
   onReopened,
 }: {
+  restaurantId: string;
   onClose: () => void;
   onReopened: (tables: CashierTable[]) => void;
 }) {
@@ -53,10 +56,24 @@ export function ClosedOrdersModal({
     }
   }
 
-  useEffect(() => {
-    getClosedOrders().then(setOrders).catch(() => setOrders([]));
-    getVoidedOrders().then(setVoided).catch(() => setVoided([]));
+  const load = useCallback(async () => {
+    const [closed, voidedRows] = await Promise.all([
+      getClosedOrders().catch(() => [] as ClosedOrder[]),
+      getVoidedOrders().catch(() => [] as VoidedOrder[]),
+    ]);
+    setOrders(closed);
+    setVoided(voidedRows);
   }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  // This list used to load once and then sit there: a ticket settled on the
+  // other till, or voided by a manager, simply never appeared. It's the list a
+  // cashier checks the day's takings against, so being one sale behind is the
+  // difference between the drawer balancing and not.
+  useOrdersRefresh(restaurantId, () => void load());
 
   async function reopen(id: string) {
     setBusy(id);

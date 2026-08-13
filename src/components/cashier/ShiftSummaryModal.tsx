@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getShiftSummary, type ShiftSummary } from "@/server/orders/shift-summary";
 import { printShiftSummaryTicket } from "@/server/printing/print";
 import { endMyShift } from "@/server/orders/shift-actions";
@@ -8,6 +8,7 @@ import { signOut } from "@/app/(platform)/login/actions";
 import { runReportDispatch } from "@/lib/print/run-dispatch";
 import { formatPeso } from "@/lib/money";
 import { manilaTime } from "@/lib/time/manila";
+import { useOrdersRefresh } from "@/lib/realtime/useOrdersRefresh";
 
 /**
  * End-of-shift review for THIS cashier's shift: what they took, what came out
@@ -18,16 +19,42 @@ import { manilaTime } from "@/lib/time/manila";
  * counted. "End shift" prints the Z-report, closes the shift, and signs them
  * out — the next cashier starts from zero.
  */
-export function ShiftSummaryModal({ onClose }: { onClose: () => void }) {
+export function ShiftSummaryModal({
+  restaurantId,
+  onClose,
+}: {
+  restaurantId: string;
+  onClose: () => void;
+}) {
   const [s, setS] = useState<ShiftSummary | null | "loading">("loading");
+  const [stale, setStale] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [printMsg, setPrintMsg] = useState<string | null>(null);
   const [ending, setEnding] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
 
-  useEffect(() => {
-    getShiftSummary().then(setS).catch(() => setS(null));
+  const load = useCallback(async () => {
+    try {
+      const next = await getShiftSummary();
+      // Flag a figure that moved while this was open, so a cashier who has
+      // already started counting the drawer knows to look again rather than
+      // silently working from a number that changed under them.
+      setS((prev) => {
+        if (prev !== "loading" && prev && next && prev.gross !== next.gross) setStale(true);
+        return next;
+      });
+    } catch {
+      setS(null);
+    }
   }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  // Another till settling a bill changes this cashier's day too (the
+  // today/all-shifts block), and their own second window changes their drawer.
+  useOrdersRefresh(restaurantId, () => void load());
 
   /**
    * Prints on the RECEIPT PRINTER, through the same dispatch a bill or receipt
@@ -40,6 +67,10 @@ export function ShiftSummaryModal({ onClose }: { onClose: () => void }) {
     setPrinting(true);
     setPrintMsg(null);
     try {
+      // The Z-report is built server-side from a live query, so the paper is
+      // right even when the screen has drifted. Refreshing here just stops the
+      // two disagreeing in front of the cashier who is about to sign the total.
+      await load();
       const res = await printShiftSummaryTicket();
       const m = await runReportDispatch(res, "/cashier/shift-summary");
       if (m) setPrintMsg(m);
@@ -83,6 +114,14 @@ export function ShiftSummaryModal({ onClose }: { onClose: () => void }) {
           <h2 className="font-heading text-lg font-bold">End-of-shift summary</h2>
           <button onClick={onClose} className="text-plum-ink/40 hover:text-plum-ink">✕</button>
         </div>
+
+        {/* A cashier who has already counted the drawer against an older figure
+            needs telling, not a number that quietly changes while they look. */}
+        {stale && (
+          <p className="mb-2 rounded-lg bg-mango/15 px-3 py-2 text-xs font-semibold text-plum-ink">
+            ↻ Updated — another payment came in while this was open.
+          </p>
+        )}
 
         {s === "loading" ? (
           <p className="py-6 text-center text-sm text-plum-ink/50">Loading…</p>

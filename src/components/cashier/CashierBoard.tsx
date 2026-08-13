@@ -1085,10 +1085,10 @@ export function CashierBoard({
       {addCustomerOpen && <AddCustomerModal onClose={() => setAddCustomerOpen(false)} />}
 
       {closedOpen && (
-        <ClosedOrdersModal onClose={() => setClosedOpen(false)} onReopened={(t) => setTables(t)} />
+        <ClosedOrdersModal restaurantId={restaurantId} onClose={() => setClosedOpen(false)} onReopened={(t) => setTables(t)} />
       )}
 
-      {shiftOpen && <ShiftSummaryModal onClose={() => setShiftOpen(false)} />}
+      {shiftOpen && <ShiftSummaryModal restaurantId={restaurantId} onClose={() => setShiftOpen(false)} />}
 
       {cashOutOpen && <CashOutModal onClose={() => setCashOutOpen(false)} />}
 
