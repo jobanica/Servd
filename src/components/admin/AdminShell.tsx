@@ -91,6 +91,7 @@ const NAV: { group: string; items: Item[] }[] = [
   {
     group: "Grow",
     items: [
+      { label: "Order history", href: "/admin/orders", d: I.receipt },
       { label: "Analytics", href: "/admin/analytics", d: I.chart },
       { label: "Accounting", href: "/admin/accounting", d: I.receipt },
       { label: "Feedback", href: "/admin/feedback", d: I.star },

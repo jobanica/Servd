@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
 import { getAnalytics } from "@/server/analytics/queries";
-import { parseRange, rangeToDates, RANGES } from "@/lib/analytics/range";
+import { parseReportRange } from "@/lib/time/report-range";
+import { DateRangePicker } from "@/components/admin/DateRangePicker";
 import { formatPeso } from "@/lib/money";
 import {
   RevenueChart,
@@ -42,40 +43,35 @@ function ItemTable({ title, rows }: { title: string; rows: { name: string; qty: 
 export default async function AnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string }>;
+  searchParams: Promise<{ range?: string; from?: string; to?: string }>;
 }) {
   const { restaurantId } = await requireAdminPage();
-  const { range: rawRange } = await searchParams;
-  const range = parseRange(rawRange);
-  const { from, to } = rangeToDates(range);
-  const a = await getAnalytics(restaurantId, from, to);
+  const sp = await searchParams;
+  const range = parseReportRange(sp);
+  const a = await getAnalytics(restaurantId, range.from, range.to);
+  // Carry the chosen window into the CSV link, so an export matches what's on
+  // screen instead of quietly falling back to a preset.
+  const exportQuery =
+    range.preset === "custom"
+      ? `from=${range.fromKey}&to=${range.toKey}`
+      : `range=${range.preset}`;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <Link href="/admin" className="text-sm text-plum-ink/50">← Dashboard</Link>
-          <h1 className="font-heading text-2xl font-bold">Analytics</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          {RANGES.map((r) => (
-            <Link
-              key={r.key}
-              href={`/admin/analytics?range=${r.key}`}
-              className={`rounded-full px-3 py-1 text-sm font-semibold ${
-                r.key === range ? "btn-brand text-white" : "border border-plum-ink/15"
-              }`}
-            >
-              {r.label}
-            </Link>
-          ))}
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <Link href="/admin" className="text-sm text-plum-ink/50">← Dashboard</Link>
+            <h1 className="font-heading text-2xl font-bold">Analytics</h1>
+          </div>
           <a
-            href={`/admin/analytics/export?type=orders&range=${range}`}
+            href={`/admin/analytics/export?type=orders&${exportQuery}`}
             className="rounded-full border border-plum-ink/15 px-3 py-1 text-sm font-semibold"
           >
             Export CSV
           </a>
         </div>
+        <DateRangePicker range={range} basePath="/admin/analytics" />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-4">

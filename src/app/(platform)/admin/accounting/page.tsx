@@ -3,21 +3,9 @@ import { requireAdminPage } from "@/server/tenancy/require-admin";
 import { requireFeaturePage } from "@/server/billing/feature-gate";
 import { getSalesReport, getVatReport, getCogs, getExpenses, getSalesTickets } from "@/server/accounting/queries";
 import { formatPeso } from "@/lib/money";
-import { manilaStartOfDay } from "@/lib/time/manila";
+import { parseReportRange } from "@/lib/time/report-range";
+import { DateRangePicker } from "@/components/admin/DateRangePicker";
 
-type Period = "today" | "this" | "last";
-function range(p: Period) {
-  const now = new Date();
-  if (p === "today") {
-    const from = manilaStartOfDay(now);
-    return { from, to: now };
-  }
-  const y = now.getFullYear();
-  const m = now.getMonth() - (p === "last" ? 1 : 0);
-  const from = new Date(y, m, 1);
-  const to = p === "last" ? new Date(y, m + 1, 0, 23, 59, 59) : now;
-  return { from, to };
-}
 const METHOD_LABEL: Record<string, string> = {
   cash: "Cash", card_terminal: "Card (terminal)", gcash: "GCash (counter)", maya: "Maya (counter)",
   online_gcash: "GCash (online)", online_card: "Card (online)",
@@ -26,13 +14,13 @@ const METHOD_LABEL: Record<string, string> = {
 export default async function AccountingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{ range?: string; from?: string; to?: string }>;
 }) {
   const { restaurantId } = await requireAdminPage();
   await requireFeaturePage(restaurantId, "accounting");
   const sp = await searchParams;
-  const period = (sp.period === "last" ? "last" : sp.period === "today" ? "today" : "this") as Period;
-  const { from, to } = range(period);
+  const reportRange = parseReportRange(sp);
+  const { from, to } = reportRange;
 
   const [sales, vat, cogs, expenses, ticketList] = await Promise.all([
     getSalesReport(restaurantId, from, to),
@@ -45,22 +33,18 @@ export default async function AccountingPage({
   const expenseTotal = expenses.reduce((s, e) => s + e.amount, 0);
   const profit = sales.gross - cogs - expenseTotal;
 
-  const tab = (p: Period, label: string) => (
-    <Link href={`/admin/accounting?period=${p}`} className={`rounded-full px-3 py-1 text-sm font-semibold ${period === p ? "btn-brand text-white" : "border border-plum-ink/15"}`}>{label}</Link>
-  );
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <Link href="/admin" className="text-sm text-plum-ink/50">← Dashboard</Link>
-          <h1 className="font-heading text-2xl font-bold">Accounting</h1>
-          <p className="text-sm text-plum-ink/50">{from.toLocaleDateString()} – {to.toLocaleDateString()}</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {tab("today", "Today")}{tab("this", "This month")}{tab("last", "Last month")}
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <Link href="/admin" className="text-sm text-plum-ink/50">← Dashboard</Link>
+            <h1 className="font-heading text-2xl font-bold">Accounting</h1>
+          </div>
           <Link href="/admin/accounting/expenses" className="rounded-full border border-plum-ink/15 px-3 py-1 text-sm font-semibold">Expenses →</Link>
         </div>
+        <DateRangePicker range={reportRange} basePath="/admin/accounting" />
       </div>
 
       {/* KPIs */}

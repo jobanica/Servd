@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { getCurrentUser } from "@/server/tenancy/current-user";
 import { tenantDb } from "@/server/tenancy/scoped-db";
-import { parseRange, rangeToDates } from "@/lib/analytics/range";
+import { parseReportRange } from "@/lib/time/report-range";
 
 /** Minimal CSV cell escaping. */
 function cell(v: string | number): string {
@@ -13,7 +13,12 @@ function toCsv(headers: string[], rows: (string | number)[][]): string {
 }
 
 /**
- * Tenant-scoped CSV export. ?type=orders|items&range=7|30|90
+ * Tenant-scoped CSV export.
+ *
+ * ?type=orders|items, plus either &range=<preset> or &from=YYYY-MM-DD&to=…,
+ * matching the report screen exactly — an export that silently used a
+ * different window from the page it was launched from is a spreadsheet
+ * somebody trusts and shouldn't.
  */
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
@@ -22,8 +27,12 @@ export async function GET(req: NextRequest) {
   }
 
   const type = req.nextUrl.searchParams.get("type") === "items" ? "items" : "orders";
-  const range = parseRange(req.nextUrl.searchParams.get("range") ?? undefined);
-  const { from, to } = rangeToDates(range);
+  const sp = req.nextUrl.searchParams;
+  const { from, to, fromKey, toKey } = parseReportRange({
+    range: sp.get("range") ?? undefined,
+    from: sp.get("from") ?? undefined,
+    to: sp.get("to") ?? undefined,
+  });
 
   let csv: string;
   if (type === "items") {
@@ -67,7 +76,7 @@ export async function GET(req: NextRequest) {
     status: 200,
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="servd-${type}-${range}d.csv"`,
+      "Content-Disposition": `attachment; filename="servd-${type}-${fromKey}_to_${toKey}.csv"`,
     },
   });
 }
