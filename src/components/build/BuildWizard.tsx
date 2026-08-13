@@ -5,7 +5,6 @@ import { formatPeso } from "@/lib/money";
 import { saveBusiness, addBuildItem, deleteBuildItem, type BuildResult } from "@/server/build/actions";
 import { requestActivation } from "@/server/build/activate-action";
 import type { BuildState } from "@/server/build/queries";
-import { MenuScanPanel } from "./MenuScanPanel";
 import { LazyVideo } from "@/components/media/LazyVideo";
 import { ImageField } from "@/components/admin/ImageField";
 import { compressImageFile, replaceInputFile } from "@/lib/images/compress";
@@ -76,10 +75,6 @@ export function BuildWizard({
           pending={pending}
           onAdd={(fd) => start(async () => { apply(await addBuildItem(fd)); })}
           onDelete={(id) => start(async () => { apply(await deleteBuildItem(id)); })}
-          onImported={(next) => {
-            setState(next);
-            setError(null);
-          }}
           onBack={() => setStep(0)}
           onNext={() => setStep(2)}
         />
@@ -255,7 +250,6 @@ function MenuStep({
   pending,
   onAdd,
   onDelete,
-  onImported,
   onBack,
   onNext,
 }: {
@@ -263,7 +257,6 @@ function MenuStep({
   pending: boolean;
   onAdd: (fd: FormData) => void;
   onDelete: (id: string) => void;
-  onImported: (state: BuildState) => void;
   onBack: () => void;
   onNext: () => void;
 }) {
@@ -273,9 +266,11 @@ function MenuStep({
   return (
     <div className="rounded-tile border border-plum-ink/10 bg-white p-5">
       <h1 className="font-heading text-2xl font-bold text-plum-ink">Add a few dishes</h1>
+      {/* Just enough to see the page working. This is a taster, not data
+          entry — the full menu gets typed once, later, on a real account. */}
       <p className="mt-1 text-sm text-plum-ink/55">
         {left > 0
-          ? `${left} more and you can see your page. You can add the rest later.`
+          ? `Type in ${left} more and you can see your page. Your full menu comes later.`
           : "Nice — that's enough to see your page. Add more if you like."}
       </p>
 
@@ -358,10 +353,6 @@ function MenuStep({
           {pending ? "Adding…" : "+ Add item"}
         </button>
       </form>
-
-      {/* Shortcut for owners who already have a printed menu. Manual quick-add
-          above stays the primary path — this just saves the typing. */}
-      <MenuScanPanel disabled={pending} onImported={(next) => onImported(next)} />
 
       <div className="mt-5 flex gap-2">
         <button onClick={onBack} className="rounded-full border border-plum-ink/15 px-5 py-3 text-sm font-semibold">

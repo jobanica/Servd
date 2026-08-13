@@ -22,7 +22,6 @@ export type Bucket =
   | "build:create"
   | "build:write"
   | "build:upload"
-  | "build:scan"
   | "build:activate"
   | "landing:event";
 
@@ -31,9 +30,6 @@ const LIMITS: Record<Bucket, number> = {
   "build:create": 5, // new previews started
   "build:write": 300, // edits (menu rows add up fast — this is generous on purpose)
   "build:upload": 40, // logo + item photos
-  // AI menu scans cost real model tokens on an unauthenticated endpoint —
-  // this is the one bucket where the limit is about spend, not just spam.
-  "build:scan": 12,
   "build:activate": 10, // invoice attempts
   // Landing beacons: generous, because one visitor legitimately fires several
   // (a view plus a click, and they may come back). This is a graffiti guard on
