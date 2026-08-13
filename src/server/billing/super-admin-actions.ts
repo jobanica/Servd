@@ -738,6 +738,22 @@ export async function saveUploadPostKey(_prev: ActionState, formData: FormData):
 // ------------------------------------------------- monthly-feature comping
 
 /**
+ * Turn a raw database error into something the person reading it can act on.
+ *
+ * "The column `renewUrl` does not exist in the current database" is a true and
+ * completely useless thing to show somebody trying to switch a feature on. When
+ * a column is missing the fix is always the same — run the migration — so say
+ * which file rather than making them go and ask.
+ */
+function migrationHint(e: unknown, sqlFile: string): string {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (/column .* does not exist|relation .* does not exist/i.test(msg)) {
+    return `This database is missing a column. Run prisma/manual/${sqlFile} in the Supabase SQL editor, then try again. (${msg.slice(0, 120)})`;
+  }
+  return msg || "Something went wrong.";
+}
+
+/**
  * Switch on a feature that is sold as its own monthly subscription — today,
  * that's the content scheduler (₱499/mo).
  *
@@ -777,14 +793,17 @@ export async function grantMonthlyFeature(_prev: ActionState, formData: FormData
           priceMonthly: meta.priceMonthly,
           currentPeriodEnd: COMP_FOREVER,
         },
-        update: { status: "active", currentPeriodEnd: COMP_FOREVER, renewUrl: null },
+        // Only the columns this actually needs. Writing renewUrl here — which
+        // a comp never has — made the whole upsert fail on a database that
+        // hadn't run the migration adding it, for a value of null.
+        update: { status: "active", currentPeriodEnd: COMP_FOREVER },
         select: { id: true },
       }),
     );
     return { ok: true, message: `${meta.label} switched on (complimentary).` };
   } catch (e) {
     console.error("grantMonthlyFeature failed", e);
-    return { error: e instanceof Error ? e.message : "Couldn't switch that on." };
+    return { error: migrationHint(e, "add-feature-subscriptions.sql") };
   } finally {
     refresh();
   }
@@ -799,13 +818,13 @@ export async function revokeMonthlyFeature(_prev: ActionState, formData: FormDat
     await systemDb((tx) =>
       tx.featureSubscription.updateMany({
         where: { restaurantId, feature },
-        data: { status: "cancelled", renewUrl: null },
+        data: { status: "cancelled" },
       }),
     );
     return { ok: true, message: "Switched off." };
   } catch (e) {
     console.error("revokeMonthlyFeature failed", e);
-    return { error: e instanceof Error ? e.message : "Couldn't switch that off." };
+    return { error: migrationHint(e, "add-feature-subscriptions.sql") };
   } finally {
     refresh();
   }

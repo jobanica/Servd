@@ -44,19 +44,43 @@ export async function getFeatureSubscription(
     renewUrl: null,
   };
   try {
+    // Columns listed explicitly. A bare findFirst asks for every column in the
+    // Prisma model, so one column the database hasn't been given yet threw the
+    // whole query — and this function's catch turned that into "no
+    // subscription", i.e. a paid feature reading as locked. Naming them keeps a
+    // lagging column to the one field that actually needs it.
     const row = await systemDb((tx) =>
-      tx.featureSubscription.findFirst({ where: { restaurantId, feature } }),
+      tx.featureSubscription.findFirst({
+        where: { restaurantId, feature },
+        select: { status: true, currentPeriodEnd: true, priceMonthly: true },
+      }),
     );
     if (!row) return none;
     const live =
       row.status === "active" && !!row.currentPeriodEnd && row.currentPeriodEnd.getTime() > Date.now();
+
+    // The renewal link is a newer column and only matters for a pending
+    // renewal, so it's read on its own and allowed to come back empty.
+    let renewUrl: string | null = null;
+    try {
+      const r = await systemDb((tx) =>
+        tx.featureSubscription.findFirst({
+          where: { restaurantId, feature },
+          select: { renewUrl: true },
+        }),
+      );
+      renewUrl = r?.renewUrl ?? null;
+    } catch {
+      /* column not migrated yet */
+    }
+
     return {
       active: live,
       status: row.status,
       currentPeriodEnd: row.currentPeriodEnd,
       priceMonthly: row.priceMonthly || price,
       pending: row.status === "pending",
-      renewUrl: row.renewUrl,
+      renewUrl,
     };
   } catch {
     return none; // table not migrated yet → locked, nothing breaks
@@ -87,16 +111,30 @@ export async function activateFeatureSubByProviderRef(providerRef: string): Prom
   if (!providerRef) return false;
   try {
     return await systemDb(async (tx) => {
-      const row = await tx.featureSubscription.findFirst({ where: { providerRef } });
+      const row = await tx.featureSubscription.findFirst({
+        where: { providerRef },
+        select: { id: true, currentPeriodEnd: true },
+      });
       if (!row) return false;
       const now = new Date();
       // Extend from the existing period if it's still running, else from now.
       const base =
         row.currentPeriodEnd && row.currentPeriodEnd > now ? row.currentPeriodEnd : now;
+      // Activation ONLY. Clearing the stale renewal link is housekeeping, and
+      // bundling it in means a database missing that column refuses the whole
+      // update — so somebody who has just paid doesn't get their feature.
       await tx.featureSubscription.update({
         where: { id: row.id },
-        data: { status: "active", currentPeriodEnd: addMonths(base, 1), renewUrl: null },
+        data: { status: "active", currentPeriodEnd: addMonths(base, 1) },
       });
+      try {
+        await tx.featureSubscription.update({
+          where: { id: row.id },
+          data: { renewUrl: null },
+        });
+      } catch {
+        /* column not migrated — the stale link is harmless */
+      }
       return true;
     });
   } catch {
@@ -185,7 +223,10 @@ export async function renewFeatureSubscriptions(now: Date = new Date()): Promise
           await systemDb((tx) =>
             tx.featureSubscription.update({
               where: { id: sub.id },
-              data: { status: "active", currentPeriodEnd: addMonths(base, 1), renewUrl: null },
+              // renewUrl deliberately left alone — see the note in
+              // activateFeatureSubByProviderRef. A renewal that fails because of
+              // a bookkeeping field is a customer losing access they paid for.
+              data: { status: "active", currentPeriodEnd: addMonths(base, 1) },
             }),
           );
           s.renewed++;
