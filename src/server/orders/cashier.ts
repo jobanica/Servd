@@ -25,6 +25,7 @@ import { writeAudit } from "@/server/audit/log";
 import { awardPointsForOrder, getBalance, getLoyaltyConfig, redeemPoints, enrollAccount } from "@/server/loyalty/loyalty";
 import { notifyCustomer, restaurantDisplayName } from "@/server/sms/notify";
 import { manilaStartOfDay } from "@/lib/time/manila";
+import { getDishStock } from "@/server/inventory/dish-stock";
 
 export interface CashierOrder {
   id: string;
@@ -235,6 +236,14 @@ export interface IncomingOrder {
   paymentStatus: string;
   createdAt: string;
   items: { name: string; quantity: number; note: string | null; modifiers: string[] }[];
+  /**
+   * Ingredient warnings for THIS order, worked out before it's accepted.
+   *
+   * Stock comes off when the kitchen finishes, so an order sitting in the
+   * incoming queue has already promised its ingredients but not consumed them.
+   * Without this the cashier sees a full fridge and keeps saying yes.
+   */
+  stockWarnings: { name: string; makeable: number; wanted: number; soldOut: boolean }[];
 }
 
 const OPEN = ["new", "preparing", "done"] as const;
@@ -375,6 +384,7 @@ export async function getIncomingOrders(): Promise<IncomingOrder[]> {
         table: { select: { tableNumber: true } },
         items: {
           select: {
+            menuItemId: true, // needed to look up what's still makeable
             nameAtTime: true,
             quantity: true,
             note: true,
@@ -385,10 +395,14 @@ export async function getIncomingOrders(): Promise<IncomingOrder[]> {
     }),
   );
 
-  const [meta, sched, payments] = await Promise.all([
+  const itemIds = [
+    ...new Set(orders.flatMap((o) => o.items.map((i) => i.menuItemId)).filter((id): id is string => !!id)),
+  ];
+  const [meta, sched, payments, stock] = await Promise.all([
     orderMetaMap(staff.restaurantId, orders.map((o) => o.id)),
     scheduledForMap(staff.restaurantId, orders.map((o) => o.id)),
     paymentMap(staff.restaurantId, orders.map((o) => o.id)),
+    getDishStock(staff.restaurantId, itemIds).catch(() => new Map()),
   ]);
   return orders.map((o) => {
     const m = meta.get(o.id);
@@ -418,6 +432,19 @@ export async function getIncomingOrders(): Promise<IncomingOrder[]> {
       total: o.total,
       paymentStatus: o.paymentStatus,
       createdAt: o.createdAt.toISOString(),
+      // Only lines that are actually short — a clean order carries none, so an
+      // empty array means "nothing to worry about" and the card stays quiet.
+      stockWarnings: o.items.flatMap((it) => {
+        const s = it.menuItemId ? stock.get(it.menuItemId) : undefined;
+        if (!s || s.makeable == null) return [];
+        if (s.makeable >= it.quantity && !s.low) return [];
+        return [{
+          name: it.nameAtTime,
+          makeable: s.makeable,
+          wanted: it.quantity,
+          soldOut: s.makeable <= 0,
+        }];
+      }),
       items: o.items.map((it) => ({
         name: it.nameAtTime,
         quantity: it.quantity,

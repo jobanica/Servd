@@ -7,7 +7,7 @@ import { getActiveHappyHoursTenant } from "@/server/pricing/happy-hour";
 import { getServingStates } from "@/server/menu/servings";
 import { getVariantsMap } from "@/server/menu/variants";
 import { getUnavailableModifierIds } from "@/server/menu/modifier-availability";
-import { getProductStockStates } from "@/server/inventory/product-stock";
+import { getDishStock } from "@/server/inventory/dish-stock";
 import type { DinerItem, Selection } from "@/lib/cart/types";
 
 /**
@@ -85,9 +85,11 @@ export async function buildValidatedOrder(
   // Add-ons marked out by the kitchen — rejected here too, so a stale menu on
   // someone's phone can't sneak an unavailable option into a real order.
   const modsOut = await getUnavailableModifierIds(restaurantId);
-  // Products whose own units are counted — what's left after everything already
-  // promised to orders in progress. Empty for anyone not counting products.
-  const productStock = await getProductStockStates(restaurantId, itemIds);
+  // How many of each dish can still be made, counting BOTH a recipe's
+  // ingredients and a product's own units, and after subtracting everything
+  // already promised to orders in progress. Empty for anyone not tracking
+  // stock, which is how it behaved before inventory existed.
+  const dishStock = await getDishStock(restaurantId, itemIds);
 
   let total = 0;
   const items: BuiltOrderItem[] = [];
@@ -117,15 +119,20 @@ export async function buildValidatedOrder(
 
     // Enforce counted stock. Checked here rather than trusted from the menu's
     // sold-out flag, which only flips once an order is fulfilled: without this,
-    // everyone who had the page open could buy the same last unit.
-    const stock = productStock.get(dbItem.id);
-    if (stock) {
+    // everyone who had the page open could order the same last portion, and a
+    // cashier with three portions in the fridge could accept ten tickets.
+    const stock = dishStock.get(dbItem.id);
+    if (stock?.makeable != null) {
       const wanted = (usedByStock.get(dbItem.id) ?? 0) + line.quantity;
-      if (stock.available <= 0) {
-        throw new OrderValidationError(`"${dbItem.name}" is sold out.`);
+      if (stock.makeable <= 0) {
+        throw new OrderValidationError(
+          stock.limitingIngredient
+            ? `"${dbItem.name}" is sold out — no ${stock.limitingIngredient} left.`
+            : `"${dbItem.name}" is sold out.`,
+        );
       }
-      if (wanted > stock.available) {
-        throw new OrderValidationError(`Only ${stock.available} "${dbItem.name}" left in stock.`);
+      if (wanted > stock.makeable) {
+        throw new OrderValidationError(`Only ${stock.makeable} "${dbItem.name}" left.`);
       }
       usedByStock.set(dbItem.id, wanted);
     }

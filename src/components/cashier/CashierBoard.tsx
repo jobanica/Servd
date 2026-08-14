@@ -858,6 +858,31 @@ export function CashierBoard({
                   {o.paymentStatus === "paid" && (
                     <p className="mt-1 text-xs font-semibold text-mango">Already paid online</p>
                   )}
+
+                  {/* Ingredients, worked out BEFORE accepting. Stock only comes
+                      off when the kitchen finishes, so without this the cashier
+                      sees a full fridge and keeps saying yes to orders the
+                      kitchen can't cook. */}
+                  {o.stockWarnings.length > 0 && (
+                    <div
+                      className={`mt-2 rounded-lg px-3 py-2 text-xs ${
+                        o.stockWarnings.some((w) => w.soldOut)
+                          ? "bg-guava/10 text-guava"
+                          : "bg-mango/15 text-plum-ink"
+                      }`}
+                    >
+                      {o.stockWarnings.map((w) => (
+                        <p key={w.name} className="font-semibold">
+                          {w.soldOut
+                            ? `⛔ ${w.name} — out of stock, can't make any`
+                            : w.makeable < w.wanted
+                              ? `⚠️ ${w.name} — only ${w.makeable} left, this order wants ${w.wanted}`
+                              : `⚠️ ${w.name} — only ${w.makeable} left after this`}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+
                   <div className="mt-3 flex gap-2">
                     <button
                       onClick={() => accept(o.id)}
