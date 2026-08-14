@@ -93,7 +93,7 @@ export default async function InventoryPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         <Kpi label="Products tracked" value={`${tracked.length} / ${products.length}`} />
         <Kpi label="Low stock" value={String(lowItems.length)} tone={lowItems.length > 0 ? "bad" : "ok"} />
         <Kpi label="Stock value" value={formatPeso(Math.round(stockValue))} />
@@ -212,9 +212,11 @@ export default async function InventoryPage() {
 
 function Kpi({ label, value, tone = "ok" }: { label: string; value: string; tone?: "ok" | "bad" }) {
   return (
-    <div className="rounded-tile border border-plum-ink/10 bg-white p-4">
-      <p className="text-xs font-medium text-plum-ink/50">{label}</p>
-      <p className={`font-heading text-2xl font-extrabold ${tone === "bad" ? "text-guava" : "text-plum-ink"}`}>
+    // Two across on a phone: stacked, four tiles filled the entire first
+    // screen and pushed the stock list — the thing you came for — out of sight.
+    <div className="min-w-0 rounded-tile border border-plum-ink/10 bg-white p-3">
+      <p className="truncate text-[11px] font-medium text-plum-ink/50">{label}</p>
+      <p className={`font-heading text-lg font-extrabold sm:text-2xl ${tone === "bad" ? "text-guava" : "text-plum-ink"}`}>
         {value}
       </p>
     </div>

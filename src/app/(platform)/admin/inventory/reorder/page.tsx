@@ -49,43 +49,43 @@ export default async function ReorderPage() {
           const total = g.rows.reduce((s, r) => s + r.estCost, 0);
           return (
             <div key={g.supplierId ?? "none"} className="overflow-hidden rounded-tile border border-plum-ink/10 bg-white">
-              <div className="flex items-center justify-between border-b border-plum-ink/10 p-4">
-                <div>
-                  <h2 className="font-heading font-bold">{g.supplierName}</h2>
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-plum-ink/10 p-4">
+                <div className="min-w-0">
+                  <h2 className="truncate font-heading font-bold">{g.supplierName}</h2>
                   <p className="text-xs text-plum-ink/45">Est. {formatPeso(total)} · {g.rows.length} items</p>
                 </div>
-                <form action={createPoFromSuggestions}>
+                <form action={createPoFromSuggestions} className="shrink-0">
                   <input type="hidden" name="supplierId" value={g.supplierId ?? ""} />
                   <button className="rounded-full px-4 py-2 text-sm font-semibold btn-brand">Create draft PO</button>
                 </form>
               </div>
-              <table className="w-full text-left text-sm">
-                <thead className="text-xs uppercase tracking-wide text-plum-ink/45">
-                  <tr>
-                    <th className="px-4 py-2">Ingredient</th>
-                    <th className="px-4 py-2">In stock</th>
-                    <th className="px-4 py-2">Avg/day</th>
-                    <th className="px-4 py-2">Suggest</th>
-                    <th className="px-4 py-2">Est. cost</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-plum-ink/5">
-                  {g.rows.map((r) => (
-                    <tr key={r.id}>
-                      <td className="px-4 py-2.5 font-medium">{r.name}</td>
-                      <td className="px-4 py-2.5 text-plum-ink/60">
-                        {r.stockQty} {r.unit}
-                        {r.stockQty <= r.reorderLevel && (
-                          <span className="ml-2 rounded-full bg-guava/15 px-2 py-0.5 text-xs text-guava">low</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2.5 text-plum-ink/60">{r.avgDailyUse} {r.unit}</td>
-                      <td className="px-4 py-2.5 font-semibold text-brand-primary">+{r.suggestedQty} {r.unit}</td>
-                      <td className="px-4 py-2.5">{formatPeso(r.estCost)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              {/* Rows, not a table. The five columns this replaced had no
+                  overflow wrapper at all, so on a phone the whole page
+                  scrolled sideways and the suggested quantity — the only
+                  number here that matters — sat off the edge. */}
+              <ul className="divide-y divide-plum-ink/5">
+                {g.rows.map((r) => (
+                  <li key={r.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 p-3">
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-plum-ink">
+                      {r.name}
+                      {r.stockQty <= r.reorderLevel && (
+                        <span className="ml-2 rounded-full bg-guava/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-guava">
+                          low
+                        </span>
+                      )}
+                    </span>
+                    <span className="shrink-0 font-heading text-sm font-extrabold text-brand-primary">
+                      +{r.suggestedQty} {r.unit}
+                    </span>
+                    <span className="w-20 shrink-0 text-right text-sm tabular-nums text-plum-ink/60">
+                      {formatPeso(r.estCost)}
+                    </span>
+                    <span className="w-full text-[11px] text-plum-ink/45">
+                      {r.stockQty} {r.unit} in stock · using {r.avgDailyUse} {r.unit}/day
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </div>
           );
         })

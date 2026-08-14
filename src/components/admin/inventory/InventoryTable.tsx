@@ -6,6 +6,7 @@ import {
   deleteInventoryItem,
   recordWaste,
   recordCount,
+  recordRestock,
   recordWithdrawal,
 } from "@/server/inventory/actions";
 
@@ -21,9 +22,15 @@ export interface InventoryRow {
 }
 
 /**
- * Ingredient list with search + a low-stock filter. Each row's stock actions
- * (take out / log waste / set counted) live behind a single "Adjust" toggle so
- * the table stays readable instead of showing six cramped inputs per row.
+ * The ingredient list.
+ *
+ * Cards, not a table. This is counted standing at a shelf with a phone in one
+ * hand, and the six-column table this replaced pushed its most important column
+ * — the button that opens the adjustments — off the right-hand edge. You could
+ * see your stock and not reach the thing that changes it.
+ *
+ * Same shape as the Products tab next door, so the two halves of inventory
+ * behave identically.
  */
 export function InventoryTable({ items }: { items: InventoryRow[] }) {
   const [query, setQuery] = useState("");
@@ -42,19 +49,20 @@ export function InventoryTable({ items }: { items: InventoryRow[] }) {
   const lowCount = items.filter((i) => i.low).length;
 
   return (
-    <div className="rounded-tile border border-plum-ink/10 bg-white">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-plum-ink/10 p-3">
-        <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-plum-ink/15 px-3 py-2">
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-plum-ink/15 bg-white px-3 py-2">
           <span className="text-plum-ink/40" aria-hidden>🔍</span>
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search ingredients or suppliers…"
+            placeholder="Search ingredients…"
             className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-plum-ink/40"
           />
           {query && (
-            <button type="button" onClick={() => setQuery("")} className="text-plum-ink/40 hover:text-plum-ink" aria-label="Clear search">×</button>
+            <button type="button" onClick={() => setQuery("")} aria-label="Clear search" className="text-plum-ink/40">
+              ×
+            </button>
           )}
         </div>
         <div className="flex rounded-lg bg-plum-ink/5 p-1 text-xs font-semibold">
@@ -70,166 +78,182 @@ export function InventoryTable({ items }: { items: InventoryRow[] }) {
             onClick={() => setLowOnly(true)}
             className={`rounded-md px-3 py-1.5 ${lowOnly ? "bg-white text-guava shadow-sm" : "text-plum-ink/55"}`}
           >
-            Low stock ({lowCount})
+            Low ({lowCount})
           </button>
         </div>
       </div>
 
       {shown.length === 0 ? (
-        <p className="p-8 text-center text-sm text-plum-ink/45">
+        <p className="rounded-tile border border-plum-ink/10 bg-white p-8 text-center text-sm text-plum-ink/45">
           {items.length === 0
             ? "No ingredients yet — add your first one below."
             : "No ingredients match your search."}
         </p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-plum-ink/10 text-[11px] uppercase tracking-wide text-plum-ink/45">
-                <th className="px-4 py-2.5 font-semibold">Ingredient</th>
-                <th className="px-3 py-2.5 text-right font-semibold">Stock</th>
-                <th className="px-3 py-2.5 text-right font-semibold">Reorder at</th>
-                <th className="px-3 py-2.5 text-right font-semibold">Cost/unit</th>
-                <th className="px-3 py-2.5 text-right font-semibold">Value</th>
-                <th className="px-4 py-2.5 text-right font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((i) => {
-                const open = openId === i.id;
-                return (
-                  <RowGroup key={i.id} item={i} open={open} onToggle={() => setOpenId(open ? null : i.id)} />
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <ul className="grid gap-2 lg:grid-cols-2">
+          {shown.map((i) => (
+            <IngredientCard
+              key={i.id}
+              item={i}
+              open={openId === i.id}
+              onToggle={() => setOpenId(openId === i.id ? null : i.id)}
+            />
+          ))}
+        </ul>
       )}
     </div>
   );
 }
 
-function RowGroup({ item: i, open, onToggle }: { item: InventoryRow; open: boolean; onToggle: () => void }) {
+function IngredientCard({
+  item: i,
+  open,
+  onToggle,
+}: {
+  item: InventoryRow;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const out = i.stockQty <= 0;
+
   return (
-    <>
-      <tr className={`border-b border-plum-ink/[0.06] ${open ? "bg-cream/50" : ""}`}>
-        <td className="px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-plum-ink">{i.name}</span>
+    // min-w-0: a grid item won't shrink below its content without it, and a
+    // long ingredient name would push the whole page sideways.
+    <li className={`min-w-0 rounded-tile border bg-white ${i.low ? "border-guava/40" : "border-plum-ink/10"}`}>
+      <div className="flex items-center gap-3 p-3">
+        <div className="min-w-0 flex-1">
+          <p className="flex items-center gap-2 font-semibold text-plum-ink">
+            <span className="truncate">{i.name}</span>
             {i.low && (
-              <span className="rounded-full bg-guava/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-guava">
+              <span className="shrink-0 rounded-full bg-guava/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-guava">
                 Low
               </span>
             )}
-          </div>
-          <span className="text-xs text-plum-ink/45">{i.supplierName ?? "No supplier"}</span>
-        </td>
-        <td className="px-3 py-3 text-right">
-          <span className={`font-semibold tabular-nums ${i.low ? "text-guava" : "text-plum-ink"}`}>
+          </p>
+          <p className="truncate text-xs text-plum-ink/45">
+            {i.supplierName ?? "No supplier"} · {formatPeso(i.costPerUnit)}/{i.unit}
+          </p>
+        </div>
+
+        <div className="shrink-0 text-right">
+          <p className={`font-heading text-lg font-extrabold tabular-nums ${i.low ? "text-guava" : "text-plum-ink"}`}>
             {i.stockQty}
-          </span>
-          <span className="text-plum-ink/45"> {i.unit}</span>
-        </td>
-        <td className="px-3 py-3 text-right tabular-nums text-plum-ink/60">{i.reorderLevel} {i.unit}</td>
-        <td className="px-3 py-3 text-right tabular-nums text-plum-ink/70">{formatPeso(i.costPerUnit)}</td>
-        <td className="px-3 py-3 text-right font-semibold tabular-nums text-plum-ink">
-          {formatPeso(Math.round(i.stockQty * i.costPerUnit))}
-        </td>
-        <td className="px-4 py-3 text-right">
-          <button
-            type="button"
-            onClick={onToggle}
-            aria-expanded={open}
-            className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${
-              open ? "border-brand-primary text-brand-primary" : "border-plum-ink/15 text-plum-ink/70 hover:border-brand-primary hover:text-brand-primary"
-            }`}
-          >
-            {open ? "Close" : "Adjust"} {open ? "▴" : "▾"}
-          </button>
-        </td>
-      </tr>
+          </p>
+          <p className="text-[11px] text-plum-ink/45">{out ? "none left" : i.unit}</p>
+        </div>
+
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-semibold ${
+            open ? "border-brand-primary text-brand-primary" : "border-plum-ink/15 text-plum-ink/70"
+          }`}
+        >
+          Adjust {open ? "▴" : "▾"}
+        </button>
+      </div>
 
       {open && (
-        <tr className="border-b border-plum-ink/10 bg-cream/50">
-          <td colSpan={6} className="px-4 pb-4 pt-1">
-            <div className="grid gap-3 sm:grid-cols-3">
-              {/* Take out */}
-              <form action={recordWithdrawal} className="rounded-lg border border-plum-ink/10 bg-white p-3">
-                <p className="text-xs font-bold text-plum-ink">Take out</p>
-                <p className="mb-2 text-[11px] text-plum-ink/45">Deduct stock used or requested.</p>
-                <input type="hidden" name="id" value={i.id} />
-                <div className="flex gap-1.5">
-                  <input
-                    name="qty"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder={i.unit}
-                    className="w-20 rounded-lg border border-plum-ink/15 px-2 py-1.5 text-sm"
-                  />
-                  <input
-                    name="note"
-                    placeholder="What for?"
-                    className="min-w-0 flex-1 rounded-lg border border-plum-ink/15 px-2 py-1.5 text-sm"
-                  />
-                </div>
-                <button className="mt-2 w-full rounded-lg bg-brand-primary px-3 py-1.5 text-xs font-semibold text-white">
-                  Take out
-                </button>
-              </form>
+        <div className="space-y-2 border-t border-plum-ink/10 bg-cream/40 p-3">
+          <div className="grid gap-2 sm:grid-cols-2">
+            {/* Add stock — the one action that was missing from this panel
+                entirely: you could take stock out four ways and never put any
+                back without raising a purchase order. */}
+            <form action={recordRestock} className="rounded-lg border border-plum-ink/10 bg-white p-3">
+              <p className="text-xs font-bold text-plum-ink">Add stock</p>
+              <p className="mb-2 text-[11px] text-plum-ink/45">New delivery or restock.</p>
+              <input type="hidden" name="id" value={i.id} />
+              <div className="flex gap-1.5">
+                <Num name="qty" placeholder="Qty" className="w-20" />
+                <Num name="unitCostPesos" placeholder="Cost each (optional)" className="min-w-0 flex-1" />
+              </div>
+              <Submit className="bg-brand-primary text-white">Add stock</Submit>
+            </form>
 
-              {/* Waste */}
-              <form action={recordWaste} className="rounded-lg border border-plum-ink/10 bg-white p-3">
-                <p className="text-xs font-bold text-plum-ink">Log waste</p>
-                <p className="mb-2 text-[11px] text-plum-ink/45">Spoiled or discarded stock.</p>
-                <input type="hidden" name="id" value={i.id} />
+            <form action={recordWithdrawal} className="rounded-lg border border-plum-ink/10 bg-white p-3">
+              <p className="text-xs font-bold text-plum-ink">Take out</p>
+              <p className="mb-2 text-[11px] text-plum-ink/45">Prep, staff meals, transfers.</p>
+              <input type="hidden" name="id" value={i.id} />
+              <div className="flex gap-1.5">
+                <Num name="qty" placeholder={i.unit} className="w-20" />
                 <input
-                  name="qty"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder={`Qty in ${i.unit}`}
-                  className="w-full rounded-lg border border-plum-ink/15 px-2 py-1.5 text-sm"
+                  name="note"
+                  placeholder="What for?"
+                  className="min-w-0 flex-1 rounded-lg border border-plum-ink/15 px-2 py-1.5 text-sm"
                 />
-                <button className="mt-2 w-full rounded-lg border border-guava/40 px-3 py-1.5 text-xs font-semibold text-guava">
-                  Log waste
-                </button>
-              </form>
+              </div>
+              <Submit className="border border-plum-ink/20 text-plum-ink">Take out</Submit>
+            </form>
 
-              {/* Count */}
-              <form action={recordCount} className="rounded-lg border border-plum-ink/10 bg-white p-3">
-                <p className="text-xs font-bold text-plum-ink">Stock count</p>
-                <p className="mb-2 text-[11px] text-plum-ink/45">Set stock to the counted amount.</p>
-                <input type="hidden" name="id" value={i.id} />
-                <input
-                  name="counted"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder={`Actual ${i.unit} on hand`}
-                  className="w-full rounded-lg border border-plum-ink/15 px-2 py-1.5 text-sm"
-                />
-                <button className="mt-2 w-full rounded-lg border border-plum-ink/20 px-3 py-1.5 text-xs font-semibold text-plum-ink">
-                  Set count
-                </button>
-              </form>
-            </div>
+            <form action={recordCount} className="rounded-lg border border-plum-ink/10 bg-white p-3">
+              <p className="text-xs font-bold text-plum-ink">Stock count</p>
+              <p className="mb-2 text-[11px] text-plum-ink/45">Set to what you counted.</p>
+              <input type="hidden" name="id" value={i.id} />
+              <Num name="counted" placeholder={`Actual ${i.unit} on hand`} className="w-full" />
+              <Submit className="border border-plum-ink/20 text-plum-ink">Set count</Submit>
+            </form>
 
+            <form action={recordWaste} className="rounded-lg border border-plum-ink/10 bg-white p-3">
+              <p className="text-xs font-bold text-plum-ink">Log waste</p>
+              <p className="mb-2 text-[11px] text-plum-ink/45">Spoiled or discarded.</p>
+              <input type="hidden" name="id" value={i.id} />
+              <Num name="qty" placeholder={`Qty in ${i.unit}`} className="w-full" />
+              <Submit className="border border-guava/40 text-guava">Log waste</Submit>
+            </form>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px] text-plum-ink/45">
+            <span>
+              Stock value{" "}
+              <strong className="text-plum-ink/70">
+                {formatPeso(Math.round(i.stockQty * i.costPerUnit))}
+              </strong>
+            </span>
             <form
               action={deleteInventoryItem}
-              className="mt-3 flex justify-end"
               onSubmit={(e) => {
-                if (!confirm(`Delete "${i.name}" from inventory? This can't be undone.`)) e.preventDefault();
+                if (!confirm(`Delete "${i.name}" from inventory? This can't be undone.`)) {
+                  e.preventDefault();
+                }
               }}
             >
               <input type="hidden" name="id" value={i.id} />
-              <button className="text-xs font-semibold text-plum-ink/45 hover:text-guava">
-                Delete ingredient
-              </button>
+              <button className="font-semibold hover:text-guava">Delete ingredient</button>
             </form>
-          </td>
-        </tr>
+          </div>
+        </div>
       )}
-    </>
+    </li>
+  );
+}
+
+function Num({
+  name,
+  placeholder,
+  className = "",
+}: {
+  name: string;
+  placeholder?: string;
+  className?: string;
+}) {
+  return (
+    <input
+      name={name}
+      type="number"
+      step="0.01"
+      min="0"
+      inputMode="decimal"
+      placeholder={placeholder}
+      className={`rounded-lg border border-plum-ink/15 px-2 py-1.5 text-sm ${className}`}
+    />
+  );
+}
+
+function Submit({ children, className }: { children: React.ReactNode; className: string }) {
+  return (
+    <button className={`mt-2 w-full rounded-lg px-3 py-1.5 text-xs font-semibold ${className}`}>
+      {children}
+    </button>
   );
 }
