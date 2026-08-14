@@ -84,3 +84,66 @@ export async function markAddonPaidByProviderRef(providerRef: string): Promise<b
     return false;
   }
 }
+
+// ------------------------------------------------------- table / QR unlock
+
+export const UNLIMITED_TABLES_ADDON = "unlimitedTables";
+
+export interface TableQrAccess {
+  unlimited: boolean;
+  /** Non-counter tables in use right now. */
+  tableCount: number;
+  /** How many more may be created (Infinity when unlimited). */
+  remaining: number;
+  canCreate: boolean;
+  reason: "grandfathered" | "purchased" | "free-tier";
+  /** A checkout was started but hasn't settled. */
+  pending: boolean;
+}
+
+/**
+ * Whether this restaurant may create another table QR.
+ *
+ * Reads the grandfather flag best-effort: on a database that hasn't run the
+ * migration the column is missing, and the honest answer there is UNLIMITED,
+ * not locked. Getting this backwards would cap every existing customer at one
+ * table the moment the code deployed and before the migration landed — a
+ * self-inflicted outage on the busiest screen they have.
+ */
+export async function getTableQrAccess(restaurantId: string): Promise<TableQrAccess> {
+  const { tableQuota } = await import("@/lib/billing/table-quota");
+
+  let grandfathered = true; // see above: assume the generous side
+  try {
+    const r = await systemDb((tx) =>
+      tx.restaurant.findUnique({
+        where: { id: restaurantId },
+        select: { qrGrandfathered: true },
+      }),
+    );
+    grandfathered = r?.qrGrandfathered ?? false;
+  } catch {
+    /* column not migrated — everyone stays unlimited until it is */
+  }
+
+  // The counter QR is not a table and never counts against the allowance.
+  let tableCount = 0;
+  try {
+    tableCount = await systemDb((tx) =>
+      tx.table.count({ where: { restaurantId, isCounter: false } }),
+    );
+  } catch {
+    /* leave at zero rather than blocking on a count */
+  }
+
+  const purchased = await hasPaidAddon(restaurantId, UNLIMITED_TABLES_ADDON);
+  // A plan MAY include it (nothing does today), and only off-trial — a trial
+  // unlocking it would let anyone print a floor plan for free for a fortnight.
+  const access = await getPlanAccess(restaurantId);
+  const viaPlan = !access.onTrial && access.features.has("unlimitedTables");
+
+  const quota = tableQuota({ tableCount, grandfathered, unlocked: purchased || viaPlan });
+  const pending = quota.unlimited ? false : await hasPendingAddon(restaurantId, UNLIMITED_TABLES_ADDON);
+
+  return { ...quota, tableCount, pending };
+}

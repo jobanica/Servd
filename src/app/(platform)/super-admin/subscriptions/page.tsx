@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { listSubscriptions, listAllPlans, listCustomerHealth, listCustomDomainUnlocks, listActiveMonthlyFeatures, type SubStatus, type SubscriptionRow, type CustomerHealth } from "@/server/billing/super-admin";
+import { listSubscriptions, listAllPlans, listCustomerHealth, listCustomDomainUnlocks, listActiveMonthlyFeatures, listQrAccess, type SubStatus, type SubscriptionRow, type CustomerHealth } from "@/server/billing/super-admin";
 import { SubscriptionSearch } from "@/components/super-admin/SubscriptionSearch";
 import {
   assignPlan,
@@ -13,6 +13,7 @@ import {
 import { isComplimentary } from "@/lib/billing/comp";
 import { GrantAccessControl } from "@/components/super-admin/GrantAccessControl";
 import { MonthlyFeatureControl } from "@/components/super-admin/MonthlyFeatureControl";
+import { QrAccessControl } from "@/components/super-admin/QrAccessControl";
 import { MONTHLY_FEATURES } from "@/server/billing/feature-subscriptions";
 import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
 import { TempPasswordButton } from "@/components/super-admin/TempPasswordButton";
@@ -125,12 +126,13 @@ export default async function SubscriptionsPage({
   searchParams: Promise<{ status?: string; access?: string; filter?: string; q?: string }>;
 }) {
   const sp = await searchParams;
-  const [allSubs, plans, health, domainUnlocked, monthlyOn] = await Promise.all([
+  const [allSubs, plans, health, domainUnlocked, monthlyOn, qrAccess] = await Promise.all([
     listSubscriptions(),
     listAllPlans(),
     listCustomerHealth(),
     listCustomDomainUnlocks(),
     listActiveMonthlyFeatures(),
+    listQrAccess(),
   ]);
   const activePlans = plans.filter((p) => p.isActive);
   const { rows: filtered, label: filterLabel } = filterSubs(allSubs, sp);
@@ -253,6 +255,14 @@ export default async function SubscriptionsPage({
                   active: monthlyOn.get(s.restaurantId)?.has(key) ?? false,
                 }))}
               />
+
+              <div className="mt-3 border-t border-plum-ink/10 pt-3">
+                <QrAccessControl
+                  restaurantId={s.restaurantId}
+                  grandfathered={qrAccess.grandfathered.has(s.restaurantId)}
+                  unlocked={qrAccess.unlocked.has(s.restaurantId)}
+                />
+              </div>
             </div>
 
             <div className="grid gap-4 border-t border-plum-ink/10 px-4 py-4 sm:grid-cols-2 lg:grid-cols-3">

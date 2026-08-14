@@ -1,6 +1,8 @@
 import { TIERS, POPULAR_TIER, FEATURE_GROUPS, type Cell, type FeatureRow, type Tier } from "@/lib/billing/catalog";
 
 export interface TierLimits {
+  /** Kept for the plan editor; table QRs are no longer a per-plan limit —
+      every plan includes one and unlimited is a one-time unlock. */
   maxTables?: number;
   maxStaff?: number;
   smsIncluded?: number;
@@ -9,7 +11,6 @@ export interface TierLimits {
 /** Override the limit rows with live DB values when provided. */
 function liveCell(label: string, tier: Tier, limits: TierLimits | undefined, fallback: Cell): Cell {
   if (!limits) return fallback;
-  if (label === "Tables included") return limits.maxTables != null ? String(limits.maxTables) : "Unlimited";
   if (label === "Staff accounts") return limits.maxStaff != null ? String(limits.maxStaff) : "Unlimited";
   if (label === "SMS marketing credits") return limits.smsIncluded ? `${limits.smsIncluded.toLocaleString()} / mo` : "—";
   return fallback;

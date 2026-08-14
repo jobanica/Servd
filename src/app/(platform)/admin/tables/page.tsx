@@ -7,14 +7,20 @@ import { QrDownloadButton } from "@/components/admin/QrDownloadButton";
 import { createCounterTable, deleteTable, regenerateQrToken } from "@/server/tables/actions";
 import { DineInGcashForm } from "@/components/admin/DineInGcashForm";
 import { getStorefront } from "@/server/storefront/storefront";
+import { getTableQrAccess } from "@/server/billing/addons";
+import { getFeaturePrices } from "@/server/billing/feature-pricing";
+import { UnlockTablesCard } from "@/components/admin/UnlockTablesCard";
+import { formatPeso } from "@/lib/money";
 
 export default async function TablesPage() {
   const { restaurantId } = await requireAdminPage();
-  const [tables, counter, restaurant, { payment }] = await Promise.all([
+  const [tables, counter, restaurant, { payment }, qrAccess, prices] = await Promise.all([
     getTables(restaurantId),
     getCounterTable(restaurantId),
     getRestaurantBrief(restaurantId),
     getStorefront(restaurantId),
+    getTableQrAccess(restaurantId),
+    getFeaturePrices(),
   ]);
 
   const qrUrl = (qrToken: string) =>
@@ -63,9 +69,24 @@ export default async function TablesPage() {
         )}
       </div>
 
-      <div className="rounded-tile border border-plum-ink/10 bg-white p-4">
-        <AddTableForm />
-      </div>
+      {/* Add, or upsell — never both, and never a locked-looking form the
+          owner can type into and then be refused. */}
+      {qrAccess.canCreate ? (
+        <div className="rounded-tile border border-plum-ink/10 bg-white p-4">
+          <AddTableForm />
+          {!qrAccess.unlimited && (
+            <p className="mt-2 text-xs text-plum-ink/45">
+              {qrAccess.remaining} free table QR left on your plan. More is a one-time{" "}
+              {formatPeso(prices.unlimitedTables.price)} unlock.
+            </p>
+          )}
+        </div>
+      ) : (
+        <UnlockTablesCard
+          price={formatPeso(prices.unlimitedTables.price)}
+          pending={qrAccess.pending}
+        />
+      )}
 
       {tables.length === 0 ? (
         <p className="text-sm text-plum-ink/50">

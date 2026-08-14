@@ -426,7 +426,7 @@ and similar).
 - Online ordering website settings
 - **Custom domain** — connect your own domain (Growth and Business)
 - **White-label** — remove "Powered by Servd" (Business)
-- Table QR codes, printable as a sheet
+- Table QR codes, printable as a sheet (one free; unlimited is a ₱500 unlock)
 - A public restaurant page at a Servd URL
 
 ---
@@ -448,13 +448,20 @@ and similar).
 | | **Free** | **Growth** | **Business** |
 |---|---|---|---|
 | **Price** | ₱0 | ₱899/mo | ₱1,799/mo |
-| **Tables** | Unlimited | Unlimited | Unlimited |
+| **Table QR codes** | 1 | 1 | 1 |
+| **Unlimited tables & QRs** | ₱500 one-time | ₱500 one-time | ₱500 one-time |
 | **Staff** | 3 | 15 | Unlimited |
 
 **Free — everything to take orders and run service, free for life**
 QR dine-in, counter/takeout order numbers, online ordering website (pickup &
 delivery), kitchen display, cashier POS, split payments, split bills and tips,
 void/edit with manager approval, dietary tags, feedback and Google reviews.
+
+**Tables and QR codes.** Every account gets its counter/takeout QR plus one
+table QR free, on any plan. Unlimited tables and QR codes is a one-time ₱500
+unlock — bought once, kept for good, on any plan afterwards. Accounts that
+existed before this became a paid unlock are grandfathered and keep unlimited
+tables at no charge.
 
 **Growth — your brand online: ordering, payments & marketing**
 Everything in Free, plus custom domain, online payments (GCash/card), floor

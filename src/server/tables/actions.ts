@@ -2,6 +2,8 @@
 
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { getTableQrAccess } from "@/server/billing/addons";
+import { TABLE_LIMIT_MESSAGE } from "@/lib/billing/table-quota";
 import { z } from "zod";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireAdminAction } from "@/server/tenancy/require-admin";
@@ -29,8 +31,10 @@ export async function createTable(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  // Tables / QR codes are unlimited on every plan (including Free) — the goal is
-  // for every restaurant to run entirely on QR, so we don't cap table count.
+  // The free allowance is one table QR; more is a one-time unlock. Checked on
+  // the server, not just hidden in the UI — a form post is a form post.
+  const access = await getTableQrAccess(restaurantId);
+  if (!access.canCreate) return { error: TABLE_LIMIT_MESSAGE };
 
   try {
     await tenantDb(restaurantId, (tx) =>

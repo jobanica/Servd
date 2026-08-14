@@ -28,6 +28,9 @@ export const DEFAULT_FEATURE_PRICES: FeaturePriceMap = {
   sms: { price: 0, enabled: false },
   // Burns API credits per import — cheap unlock, or leave off and meter it.
   aiMenuImport: { price: 30_000, enabled: false },
+  // One-time ₱500 to lift the single free table QR. Every account keeps its
+  // counter QR and one table QR for nothing; this buys the rest, forever.
+  unlimitedTables: { price: 50_000, enabled: true },
   floorPlan: { price: 90_000, enabled: true },
   giftCards: { price: 90_000, enabled: true },
   reservations: { price: 120_000, enabled: true },

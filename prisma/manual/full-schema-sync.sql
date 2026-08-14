@@ -226,6 +226,9 @@ ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "customDomainVerifiedAt" TIME
 ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "onboardingCompletedAt" TIMESTAMP(3);
 ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "defaultLocale" TEXT NOT NULL DEFAULT 'en';
 ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "autoOutOfStock" BOOLEAN NOT NULL DEFAULT false;
+-- Defaults FALSE: a fresh install has no existing customers to grandfather.
+-- add-qr-grandfather.sql is what backfills a live database, once.
+ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "qrGrandfathered" BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "loyaltyEnabled" BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "loyaltyPesosPerPoint" INTEGER NOT NULL DEFAULT 20;
 ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "loyaltyPointValue" INTEGER NOT NULL DEFAULT 100;

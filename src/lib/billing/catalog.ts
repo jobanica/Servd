@@ -25,7 +25,7 @@ export const TIER_INFO: Record<Tier, TierInfo> = {
     pricePesos: 0,
     tagline: "Everything to take orders and run service — free for life.",
     highlights: [
-      "Unlimited dine-in table QR codes & 3 staff",
+      "Counter QR + 1 table QR (unlimited for a one-time ₱500)",
       "QR dine-in + counter/takeout order numbers",
       "Online ordering website — pickup & delivery",
       "Kitchen display & cashier POS",
@@ -39,7 +39,7 @@ export const TIER_INFO: Record<Tier, TierInfo> = {
     pricePesos: 899,
     tagline: "Your brand online — ordering, payments & marketing.",
     highlights: [
-      "Unlimited tables & 15 staff",
+      "15 staff accounts",
       "Everything in Free, plus:",
       "Your own custom domain",
       "Online payments (GCash / card)",
@@ -53,7 +53,7 @@ export const TIER_INFO: Record<Tier, TierInfo> = {
     pricePesos: 1799,
     tagline: "The complete suite — every feature included.",
     highlights: [
-      "Unlimited tables & staff",
+      "Unlimited staff accounts",
       "Everything in Growth, plus:",
       "Accounting (sales, VAT, P&L)",
       "Inventory, food COGS & auto-reorder",
@@ -98,7 +98,9 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
       { label: "Reservations & waitlist", Free: false, Growth: true, Business: true },
       { label: "Online ordering website", Free: true, Growth: true, Business: true },
       { label: "Pickup & delivery orders", Free: true, Growth: true, Business: true },
-      { label: "Tables included", Free: "1", Growth: "20", Business: "Unlimited" },
+      { label: "Counter / takeout QR", Free: true, Growth: true, Business: true },
+      { label: "Table QR codes included", Free: "1", Growth: "1", Business: "1" },
+      { label: "Unlimited tables & QR codes", Free: "₱500 one-time", Growth: "₱500 one-time", Business: "₱500 one-time" },
       { label: "Staff accounts", Free: "3", Growth: "15", Business: "Unlimited" },
     ],
   },

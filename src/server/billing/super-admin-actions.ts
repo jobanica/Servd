@@ -829,3 +829,77 @@ export async function revokeMonthlyFeature(_prev: ActionState, formData: FormDat
     refresh();
   }
 }
+
+/**
+ * Grandfather (or un-grandfather) an account's unlimited table QRs.
+ *
+ * The migration sets this for everyone who predates the change; this is for the
+ * cases it can't know about — a customer who was promised unlimited during a
+ * sales conversation, an account created in the window between the deploy and
+ * the migration, a partner's demo. Separate from the one-time unlock on
+ * purpose: that records a sale, this records a promise.
+ */
+export async function setQrGrandfathered(formData: FormData): Promise<void> {
+  await requireSuperAdmin();
+  const restaurantId = String(formData.get("restaurantId"));
+  const grant = String(formData.get("grant")) === "1";
+  if (!restaurantId) return;
+  try {
+    await systemDb((tx) =>
+      tx.restaurant.updateMany({ where: { id: restaurantId }, data: { qrGrandfathered: grant } }),
+    );
+  } catch (e) {
+    console.error("setQrGrandfathered failed", e);
+  }
+  revalidatePath("/admin/tables");
+  refresh();
+}
+
+/**
+ * Grant or revoke a one-time feature unlock without payment.
+ *
+ * Generalised from the custom-domain version, which was the same twenty lines
+ * hard-coded to one addon key — and there are now two of them.
+ */
+export async function setAddonUnlock(formData: FormData): Promise<void> {
+  await requireSuperAdmin();
+  const restaurantId = String(formData.get("restaurantId"));
+  const addon = String(formData.get("addon"));
+  const amount = Number(formData.get("amount") ?? 0) || 0;
+  const grant = String(formData.get("grant")) === "1";
+  if (!restaurantId || !addon) return;
+
+  await systemDb(async (tx) => {
+    const existing = await tx.addonPurchase.findFirst({
+      where: { restaurantId, addon },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!grant) {
+      // Revoke: a settled row becomes void, so access goes but the record of
+      // the sale stays. Deleting it would lose the fact that money changed hands.
+      if (existing) {
+        await tx.addonPurchase.updateMany({
+          where: { restaurantId, addon, status: "paid" },
+          data: { status: "void" },
+        });
+      }
+      return;
+    }
+    if (existing && existing.status !== "paid") {
+      await tx.addonPurchase.update({
+        where: { id: existing.id },
+        data: { status: "paid", paidAt: new Date() },
+      });
+      return;
+    }
+    if (!existing) {
+      await tx.addonPurchase.create({
+        data: { restaurantId, addon, amount, status: "paid", paidAt: new Date() },
+      });
+    }
+  });
+  revalidatePath("/admin/tables");
+  revalidatePath("/admin/domains");
+  refresh();
+}

@@ -30,7 +30,8 @@ export type Feature =
   | "hr"
   | "customDomain"
   | "whiteLabel"
-  | "contentScheduler";
+  | "contentScheduler"
+  | "unlimitedTables";
 
 export interface FeatureMeta {
   key: Feature;
@@ -40,6 +41,7 @@ export interface FeatureMeta {
 
 /** Display metadata, grouped — drives the super-admin per-plan checkboxes. */
 export const FEATURE_META: FeatureMeta[] = [
+  { key: "unlimitedTables", label: "Unlimited tables & QR codes", group: "Ordering & service" },
   { key: "floorPlan", label: "Visual floor plan & table status", group: "Ordering & service" },
   { key: "reservations", label: "Reservations & waitlist", group: "Ordering & service" },
   { key: "onlineOrdering", label: "Online ordering website + delivery", group: "Ordering & service" },
@@ -101,6 +103,10 @@ export const FEATURE_TIERS: Record<Feature, Tier[]> = {
   whiteLabel: ["Business"],
   // Sold separately as a monthly subscription — no plan includes it.
   contentScheduler: [],
+  // Sold as a one-time ₱500 unlock, not with a plan. Every account gets its
+  // counter QR and one table QR free; more is a purchase. Accounts that
+  // predate the change are grandfathered on the restaurant row instead.
+  unlimitedTables: [],
 };
 
 /** Map a plan name to a known tier, if it is one. */

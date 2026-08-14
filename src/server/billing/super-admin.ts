@@ -451,3 +451,39 @@ export async function listActiveMonthlyFeatures(): Promise<Map<string, Set<strin
   }
   return map;
 }
+
+/**
+ * Which accounts have unlimited table QRs, and how they got them.
+ *
+ * Two lookups rather than one because the two routes mean different things —
+ * a grandfather flag is a promise kept, a settled purchase is revenue. The
+ * super-admin row shows which, so "how many people actually paid for this" has
+ * an answer.
+ */
+export async function listQrAccess(): Promise<{
+  grandfathered: Set<string>;
+  unlocked: Set<string>;
+}> {
+  const grandfathered = new Set<string>();
+  const unlocked = new Set<string>();
+  try {
+    const rows = await systemDb((tx) =>
+      tx.restaurant.findMany({ where: { qrGrandfathered: true }, select: { id: true } }),
+    );
+    for (const r of rows) grandfathered.add(r.id);
+  } catch {
+    /* column not migrated yet */
+  }
+  try {
+    const rows = await systemDb((tx) =>
+      tx.addonPurchase.findMany({
+        where: { addon: "unlimitedTables", status: "paid" },
+        select: { restaurantId: true },
+      }),
+    );
+    for (const r of rows) unlocked.add(r.restaurantId);
+  } catch {
+    /* table not migrated yet */
+  }
+  return { grandfathered, unlocked };
+}

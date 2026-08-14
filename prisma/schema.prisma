@@ -480,6 +480,11 @@ model Restaurant {
 
   // Inventory: auto-flip a menu item to out-of-stock when an ingredient hits 0.
   autoOutOfStock     Boolean @default(false)
+  /// Kept unlimited tables/QRs from before that became a paid unlock. Set once,
+  /// by the migration, for every account that already existed — never for a new
+  /// one. Changing the rules on people who already built their floor plan
+  /// around them is not a thing we do.
+  qrGrandfathered    Boolean @default(false)
   lowStockAlertPhone String? // phone to SMS when an ingredient drops to its reorder level
 
   // --- Loyalty & rewards (points per peso) ---
