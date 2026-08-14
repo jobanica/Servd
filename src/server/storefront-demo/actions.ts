@@ -9,6 +9,7 @@ import { requireSuperAdmin } from "@/server/tenancy/current-user";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { pesosToCentavos } from "@/lib/money";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { migrationHint } from "@/lib/db/migration-hint";
 import { uploadMenuImage } from "@/server/storage/menu-images";
 import { provisionDemo, receiptJson } from "./provision";
 import { scanAndSaveMenu } from "./scan-save";
@@ -65,7 +66,9 @@ export async function createDemoStorefront(_prev: FormState, formData: FormData)
       logoUrl: d.logoUrl ?? "",
     });
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Couldn't create the storefront." };
+    // A raw "The column `x` does not exist in the current database" reads like
+    // the app is broken; it only ever means this database is behind the code.
+    return { error: migrationHint(e, "full-schema-sync.sql", "Couldn't create the storefront.") };
   }
   revalidatePath(PATH);
   redirect(detailPath(id));

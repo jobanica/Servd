@@ -422,11 +422,22 @@ model Restaurant {
   // Print a receipt automatically when a payment settles. Default on, because
   // that was the only behaviour before this was a choice — but a till whose
   // customers don't want paper was burning a roll a day with no way to stop it.
-  autoPrintReceipt Boolean   @default(true)
+  //
+  // The default is dbgenerated rather than a plain `@default(true)`, and that
+  // is load-bearing for every column added after this line too. A plain default
+  // is applied by PRISMA: it puts the column into the INSERT of every
+  // restaurant.create() in the codebase, whether or not the caller mentioned
+  // it. On a live database that hasn't run the matching file in prisma/manual
+  // yet, that turns a brand-new column into "cannot create a restaurant at
+  // all" — creating a storefront died on `qrGrandfathered` exactly this way.
+  // Handing the default to the database instead means Prisma never names the
+  // column, so a create keeps working right through the migration lag and the
+  // column starts carrying its default the moment the SQL is run.
+  autoPrintReceipt Boolean   @default(dbgenerated("true"))
   // When to pop the cash drawer: never | cash (cash payments only) | any.
   // A card or GCash sale puts nothing in the drawer, so "cash" is the default —
   // but a till that gives change for e-wallets can choose "any".
-  openDrawerOn   String      @default("cash")
+  openDrawerOn   String      @default(dbgenerated("'cash'"))
   cashierVoidPin String? // PIN a cashier must enter to void an unpaid order
   // Kitchen routing: true => on-screen kitchen display; false => print a kitchen
   // ticket for the kitchen when an order is accepted/created (no screen).
@@ -484,7 +495,9 @@ model Restaurant {
   /// by the migration, for every account that already existed — never for a new
   /// one. Changing the rules on people who already built their floor plan
   /// around them is not a thing we do.
-  qrGrandfathered    Boolean @default(false)
+  ///
+  /// dbgenerated, not `@default(false)` — see the note above `autoPrintReceipt`.
+  qrGrandfathered    Boolean @default(dbgenerated("false"))
   lowStockAlertPhone String? // phone to SMS when an ingredient drops to its reorder level
 
   // --- Loyalty & rewards (points per peso) ---

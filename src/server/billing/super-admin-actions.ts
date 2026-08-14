@@ -14,6 +14,7 @@ import { COMP_FOREVER } from "@/lib/billing/comp";
 import { uniqueSlug } from "@/lib/slug";
 import { addMonths } from "@/lib/billing/period";
 import { ALL_FEATURES, type Feature } from "@/lib/billing/features";
+import { migrationHint } from "@/lib/db/migration-hint";
 import { CUSTOM_DOMAIN_ADDON, CUSTOM_DOMAIN_PRICE } from "@/server/billing/addons";
 
 export type ActionState =
@@ -625,7 +626,8 @@ export async function createRestaurantAccount(_prev: ActionState, formData: Form
       /* ignore */
     }
     const msg = e instanceof Error ? e.message : "Couldn't create the account.";
-    return { error: /unique/i.test(msg) ? "That email already has an account." : msg };
+    if (/unique/i.test(msg)) return { error: "That email already has an account." };
+    return { error: migrationHint(e, "full-schema-sync.sql", msg) };
   }
 
   refresh();
@@ -708,7 +710,8 @@ export async function createBusinessAccount(_prev: ActionState, formData: FormDa
       /* ignore */
     }
     const msg = e instanceof Error ? e.message : "Couldn't create the business.";
-    return { error: /unique/i.test(msg) ? "That username or business already exists." : msg };
+    if (/unique/i.test(msg)) return { error: "That username or business already exists." };
+    return { error: migrationHint(e, "full-schema-sync.sql", msg) };
   }
 
   refresh();
@@ -736,22 +739,6 @@ export async function saveUploadPostKey(_prev: ActionState, formData: FormData):
 }
 
 // ------------------------------------------------- monthly-feature comping
-
-/**
- * Turn a raw database error into something the person reading it can act on.
- *
- * "The column `renewUrl` does not exist in the current database" is a true and
- * completely useless thing to show somebody trying to switch a feature on. When
- * a column is missing the fix is always the same — run the migration — so say
- * which file rather than making them go and ask.
- */
-function migrationHint(e: unknown, sqlFile: string): string {
-  const msg = e instanceof Error ? e.message : String(e);
-  if (/column .* does not exist|relation .* does not exist/i.test(msg)) {
-    return `This database is missing a column. Run prisma/manual/${sqlFile} in the Supabase SQL editor, then try again. (${msg.slice(0, 120)})`;
-  }
-  return msg || "Something went wrong.";
-}
 
 /**
  * Switch on a feature that is sold as its own monthly subscription — today,
