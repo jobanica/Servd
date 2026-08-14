@@ -12,8 +12,8 @@ export default async function ReorderPage() {
       <div className="rounded-tile border border-plum-ink/10 bg-white p-5">
         <h1 className="font-heading text-2xl font-bold">Reorder suggestions</h1>
         <p className="mt-2 text-sm text-plum-ink/70">
-          Inventory is a premium module.{" "}
-          <Link href="/admin/billing" className="font-semibold text-brand-primary">Upgrade your plan</Link>.
+          Inventory is a one-time unlock.{" "}
+          <Link href="/admin/billing" className="font-semibold text-brand-primary">Unlock it once</Link>.
         </p>
       </div>
     );

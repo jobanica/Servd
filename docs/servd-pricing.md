@@ -3,87 +3,78 @@
 Every price a customer can be quoted. Written to be loaded into an AI assistant
 as source knowledge for answering pricing questions.
 
-All amounts are Philippine Pesos (₱), VAT-inclusive as listed.
+All amounts are Philippine Pesos (₱).
 
 **Last updated:** 14 August 2026
 
-> **Note for the assistant:** these are the prices configured in the product
-> today. The owner can change any of them from the admin panel without this
-> document being updated. If a customer reports seeing a different price on
-> their own billing screen, the screen is right — don't argue with it.
+> **There is no monthly subscription.** Servd is a one-time-payment product.
+> ₱499 activates a restaurant's online ordering, and every other paid feature is
+> bought once and owned for good. The only recurring charge in the whole product
+> is the content scheduler (§5).
+>
+> **Note for the assistant:** these are the prices configured today. The owner
+> can change any of them from the admin panel without this document being
+> updated. If a customer reports a different price on their own billing screen,
+> the screen is right — don't argue with it.
 
 ---
 
-## 1. Monthly plans
+## 1. The short version
 
-| | **Free** | **Growth** | **Business** |
-|---|---|---|---|
-| **Price** | ₱0 forever | **₱899 / month** | **₱1,799 / month** |
-| Staff accounts | 3 | 15 | Unlimited |
-| Table QR codes included | 1 | 1 | 1 |
-| Counter / takeout QR | ✅ | ✅ | ✅ |
-| SMS marketing credits | — | 200 / month | 1,000 / month |
+| | Price | Billing |
+|---|---|---|
+| **Get started** | ₱0 | Free forever |
+| **Activate online ordering** | **₱499** | One time |
+| **Unlimited tables & QR codes** | **₱500** | One time |
+| **Any other feature** | ₱500 – ₱3,000 | One time, per feature |
+| **Content scheduler** | ₱499 / month | The only recurring charge |
 
-**New accounts get a 30-day free trial** of the paid features. No card is
-required to start. When the trial ends the account drops to Free and keeps
-working — nothing is deleted.
-
-### What each plan includes
-
-**Free — ₱0, forever.** Everything needed to take orders and run service:
-QR dine-in, counter/takeout order numbers, the online ordering website (pickup
-and delivery), kitchen display, cashier POS, split payments, split bills, tips,
-void/edit with manager approval, dietary tags, feedback and Google reviews.
-
-**Growth — ₱899/month.** Everything in Free, plus: your own custom domain,
-online payments (GCash/card), visual floor plan, reservations and waitlist,
-gift cards, loyalty and rewards, promotions and happy hours, cart recovery,
-AI menu import, SMS marketing and data exports.
-
-**Business — ₱1,799/month.** Everything in Growth, plus: accounting (sales, VAT,
-P&L), inventory with food COGS and auto-reorder, HR/attendance/payroll, offline
-mode, audit log, full white-label (removes "Powered by Servd"), and 1,000 SMS
-credits per month.
+No monthly plan. No setup fee. No contract. No commission on sales.
 
 ---
 
-## 2. Tables and QR codes
+## 2. Free — ₱0, forever
 
-Every account, on every plan, gets:
+Not a trial. Every account keeps this at no cost, with nothing to cancel:
 
-- **1 counter / takeout QR** — free, always. This is the single code a stall or
-  takeout counter puts on the wall.
-- **1 table QR** — free, always.
-
-**Unlimited tables and QR codes: ₱500, one time.**
-
-- Paid once. Not a subscription.
-- Kept for good — it survives a downgrade, a plan change or a cancelled
-  subscription.
-- Available on any plan, including Free.
-
-**Grandfathering:** accounts that existed before this became a paid unlock keep
-unlimited tables and QR codes at no charge, however many they have. They are
-never asked to pay for it.
-
-Nothing already created is ever removed. An account at its limit keeps every QR
-code it has printed; it simply can't add more until it unlocks.
+- QR dine-in ordering
+- Counter / takeout QR and order numbers
+- Cashier POS
+- Kitchen display
+- 1 table QR code
+- Split payments, split bills and tips
+- Void / edit with manager approval
+- Dietary tags, customer feedback and Google review prompts
+- 3 staff accounts
 
 ---
 
-## 3. One-time feature unlocks
+## 3. ₱499 — activate online ordering (one time)
 
-Buy a single feature outright instead of moving up a plan. Paid once, owned for
-good — it survives a downgrade or a cancelled subscription.
+The main paid step. A restaurant builds its preview free, sees its own ordering
+page working, and pays ₱499 only when it's ready to take real orders.
 
-| Feature | One-time price |
+- **One payment. No monthly fee. Walang monthly bayad.**
+- Buys the online ordering website outright — pickup and delivery
+- The page is theirs for good; it survives any later change to what the free
+  tier includes, because the purchase is recorded against the account
+- No credit card needed to build the preview first
+
+---
+
+## 4. One-time feature unlocks
+
+Bought once, owned for good. An unlock survives everything — it can't lapse,
+expire or be cancelled, because it was bought rather than rented.
+
+| Feature | Price |
 |---|---|
 | Unlimited tables & QR codes | **₱500** |
 | Custom domain | **₱500** |
 | Data export (sales, orders, menu) | **₱500** |
 | Audit log | **₱600** |
 | Customer book + CSV export | **₱700** |
-| Visual floor plan & table status | **₱900** |
+| Visual floor plan & live table status | **₱900** |
 | Gift cards & store credit | **₱900** |
 | Promotions, promo codes & happy hours | **₱1,000** |
 | Loyalty & rewards | **₱1,200** |
@@ -92,35 +83,54 @@ good — it survives a downgrade or a cancelled subscription.
 | Offline mode | **₱1,500** |
 | Online ordering website + delivery | **₱2,500** |
 | Accounting (sales, VAT, P&L) | **₱2,500** |
-| Full white-label | **₱2,500** |
+| Full white-label (removes "Powered by Servd") | **₱2,500** |
 | Inventory, COGS & auto-reorder | **₱3,000** |
 | HR, attendance & payroll | **₱3,000** |
 
-**Not sold as one-time unlocks** (and why):
+Bought from **Admin → Billing & features**.
 
-- **SMS marketing** — every text costs real money, so it runs on credits rather
-  than a flat unlock.
-- **AI menu import** — burns API credits per import; included with Growth and
-  Business instead.
-- **Content scheduler** — sold as its own monthly subscription (below).
+**Not sold as one-time unlocks:**
 
----
-
-## 4. Monthly add-ons
-
-| Add-on | Price |
-|---|---|
-| **Content scheduler** (social posts + AI content engine) | **₱499 / month** |
-
-This one is billed separately from the plan. It is **not** included in Growth or
-Business, and **not** unlocked by the free trial — the first month has to be
-paid before it opens, and access ends when the paid period does.
+- **SMS marketing** — every text costs real money, so it runs on credits.
+- **AI menu import** — burns API credits per import.
+- **Content scheduler** — its own monthly subscription (below).
 
 ---
 
-## 5. Payment processing
+## 5. Content scheduler — ₱499 / month
 
-Servd does **not** take a cut of a restaurant's sales.
+The one recurring charge in the product. Social post scheduling with the AI
+content engine.
+
+- Billed monthly, cancel any time
+- **Not** unlocked by the free trial — the first month must be paid before it
+  opens, and access ends when the paid period does
+- Bought from **Admin → Content scheduler**
+
+---
+
+## 6. Tables and QR codes
+
+Every account, free, on any plan:
+
+- **1 counter / takeout QR** — the single code a stall or takeout counter puts
+  on the wall
+- **1 table QR**
+
+**Unlimited tables and QR codes: ₱500, one time.** Paid once, kept for good.
+
+**Grandfathering:** accounts that existed before this became a paid unlock keep
+unlimited tables and QR codes at no charge, however many they have. They are
+never asked to pay for it.
+
+Nothing already created is ever removed. An account at its limit keeps every QR
+code it printed; it simply can't add more until it unlocks.
+
+---
+
+## 7. Payment processing
+
+**Servd takes no cut of a restaurant's sales.**
 
 Each restaurant connects its **own** payment gateway account (**PayMongo** or
 **Xendit**). Customer payments go directly to the restaurant. Whatever that
@@ -129,25 +139,21 @@ Servd never holds the money and adds nothing on top.
 
 ---
 
-## 6. Referral programme (for restaurants)
+## 8. Referral programme (for restaurants)
 
-Any restaurant gets a referral code from **Admin → Refer & earn**.
-
-- **1 month of account credit** for each restaurant that signs up and stays
-  active on a paid plan.
-- Referrals are tracked for **30 days** from the first click.
+Any restaurant gets a referral code from **Admin → Refer & earn**. Referrals are
+tracked for **30 days** from the first click, and reward account credit.
 
 ---
 
-## 7. Partner programme (for resellers and agencies)
+## 9. Partner programme (for resellers and agencies)
 
 For people who sell Servd to restaurants. Apply at `/partners/apply`.
 
-- **30% commission** on everything the referred restaurant pays in their
-  **first 12 months**
+- **30% commission** on everything a referred restaurant pays in their first
+  **12 months**
 - **10% ongoing commission** for the life of the account after that
-- Referrals tracked for **30 days** from first click; **60-day** clawback window
-  on cancellations
+- Tracked for **30 days** from first click; **60-day** clawback on cancellations
 - **Minimum payout ₱500** — below that it rolls into the next payout
 
 **Milestone bonuses**, paid once as active referrals pass each level:
@@ -162,35 +168,35 @@ For people who sell Servd to restaurants. Apply at `/partners/apply`.
 
 ---
 
-## 8. Common pricing questions
+## 10. Common pricing questions
 
-**Is there a free plan?** Yes — Free is ₱0 forever and includes everything
-needed to take orders and run service. It is not a trial that expires.
+**Do I pay monthly?** No. ₱499 activates your online ordering and it's yours for
+good — walang monthly bayad. Other features are optional one-time unlocks. The
+only monthly charge in the product is the content scheduler at ₱499/month, and
+only if you want it.
 
-**Is there a free trial of the paid features?** Yes, 30 days, no card required.
-Two things are deliberately excluded from it: the content scheduler (billed
-monthly, must be paid first) and unlimited tables/QR codes (a one-time unlock).
+**Is there a free plan?** Yes, ₱0 forever, and it isn't a trial that expires. It
+includes QR ordering, the POS, the kitchen display, your counter QR and one
+table QR.
 
-**What happens when the trial ends?** The account moves to Free and keeps
-working. No data is deleted.
+**Do you take a percentage of my sales?** No. Payments go straight to your own
+PayMongo or Xendit account.
 
-**Do you take a percentage of my sales?** No. Payments go straight to the
-restaurant's own gateway account.
+**Do I need a credit card to try it?** No. Build your full preview and see your
+ordering page working for free. The ₱499 only comes when you're ready to accept
+real orders.
 
-**Do I have to upgrade my plan just for one feature?** No — most features can be
-bought outright as a one-time unlock (section 3). Once bought it's kept for
-good, even on Free.
-
-**If I cancel, do I lose the features I bought outright?** No. One-time unlocks
-are owned, not rented.
+**If I stop paying, do I lose what I bought?** There's nothing to stop paying.
+One-time unlocks are owned, not rented — they survive everything.
 
 **I already have 20 tables — do I now have to pay ₱500?** No. Accounts that
 existed before table QRs became a paid unlock are grandfathered and keep
 unlimited tables at no charge.
 
-**Is the ₱500 for tables monthly?** No, it is a single payment.
+**Is the ₱500 for tables monthly?** No, a single payment.
 
-**Are there setup fees or contracts?** No setup fee, no lock-in. Monthly plans
-can be cancelled any time.
+**Are there setup fees or contracts?** Neither. No lock-in.
 
-**Can I pay yearly?** Not currently — plans are billed monthly.
+**Do you still sell the ₱899 and ₱1,799 monthly plans?** No. Those were retired.
+Servd is one-time payments now. Any account still on an old monthly plan keeps
+what it has.

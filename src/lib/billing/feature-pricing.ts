@@ -15,7 +15,14 @@ export interface FeaturePrice {
 
 export type FeaturePriceMap = Record<Feature, FeaturePrice>;
 
-/** Starting prices — tuned against Growth (₱899/mo) and Business (₱1,799/mo). */
+/**
+ * One-time unlock prices. These ARE the product's pricing — there is no
+ * monthly plan to compare them against any more; ₱499 activates the ordering
+ * page and everything else is bought once from here.
+ *
+ * Editable per-feature under Super-admin → Feature pricing; these are the
+ * fallback a fresh install starts from.
+ */
 export const DEFAULT_FEATURE_PRICES: FeaturePriceMap = {
   onlineOrdering: { price: 250_000, enabled: true },
   onlinePayments: { price: 150_000, enabled: true },

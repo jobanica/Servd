@@ -11,8 +11,8 @@ function UpgradePrompt() {
     <div className="rounded-tile border border-plum-ink/10 bg-white p-5">
       <h1 className="font-heading text-2xl font-bold">HR</h1>
       <p className="mt-2 text-sm text-plum-ink/70">
-        HRIS is a premium module.{" "}
-        <Link href="/admin/billing" className="font-semibold text-brand-primary">Upgrade your plan</Link>{" "}
+        HR is a one-time unlock.{" "}
+        <Link href="/admin/billing" className="font-semibold text-brand-primary">Unlock it once</Link>{" "}
         to manage employees, schedules, attendance, leave, and payroll prep.
       </p>
     </div>

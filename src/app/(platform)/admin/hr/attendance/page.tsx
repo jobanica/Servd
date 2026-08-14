@@ -10,7 +10,7 @@ export default async function AttendanceDashboard() {
   if (!eligible) {
     return (
       <div className="rounded-tile border border-plum-ink/10 bg-white p-5">
-        <p className="text-sm text-plum-ink/70">HRIS is a premium module.</p>
+        <p className="text-sm text-plum-ink/70">HR is a one-time unlock.</p>
       </div>
     );
   }

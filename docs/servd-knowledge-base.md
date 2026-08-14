@@ -75,7 +75,7 @@ order paid up front stays on the kitchen display until the food is made.
 | **merchant** | The "Incoming Orders" screen only — for online-order handling without full POS access. |
 
 Staff are managed under **Admin → Staff & access**. Staff limits vary by plan
-(3 on Free, 15 on Growth, unlimited on Business).
+(3 on a free account).
 
 There is also an **employee portal** (separate from staff logins) for HR:
 employees can view their own payslips, schedule, attendance and leave.
@@ -186,7 +186,7 @@ new order. Staff tap to advance a ticket through preparing → ready.
 - Item notes and modifiers
 - Optional **kitchen ticket printing** instead of a screen, for kitchens
   without a tablet
-- Offline mode (Business plan): keeps accepting taps with no connection and
+- Offline mode (a one-time unlock): keeps accepting taps with no connection and
   syncs when it returns
 
 ---
@@ -245,7 +245,7 @@ the cash drawer figure, because nobody put that money in a till.
 - Sort order for both categories and items
 - Per-item **translations** for multi-language menus
 - **AI menu import** — upload a photo or PDF of a printed menu and it is read
-  into an editable draft you correct before saving (Growth and Business plans)
+  into an editable draft you correct before saving
 - Photos are compressed in the browser before upload
 
 ---
@@ -357,7 +357,7 @@ AI-generated insights are available on paid plans; rule-based insights on all.
 
 ## 13. HR, attendance and payroll
 
-*(Business plan)*
+*(a one-time unlock)*
 
 - **Employee records** with documents
 - **Time clock** — staff clock in and out; there is a shared clock screen, a
@@ -424,7 +424,7 @@ and similar).
 - Restaurant name, display name, logo and colours
 - Receipt branding (address, phone, website, footer)
 - Online ordering website settings
-- **Custom domain** — connect your own domain (Growth and Business)
+- **Custom domain** — connect your own domain (a ₱500 one-time unlock)
 - **White-label** — remove "Powered by Servd" (Business)
 - Table QR codes, printable as a sheet (one free; unlimited is a ₱500 unlock)
 - A public restaurant page at a Servd URL
@@ -437,49 +437,44 @@ and similar).
   card redemptions) with who, when, and the before/after
 - **Data export** — sales, orders and menu as CSV
 - **Offline mode** — the kitchen and cashier keep working without a connection
-  and sync when it returns
+  and sync when it returns (one-time unlock)
 - **Tutorials** — an in-app video hub, reachable from every dashboard
 - **Onboarding** — a guided setup checklist for new accounts
 
 ---
 
-## 18. Plans and pricing
+## 18. Pricing
 
-| | **Free** | **Growth** | **Business** |
-|---|---|---|---|
-| **Price** | ₱0 | ₱899/mo | ₱1,799/mo |
-| **Table QR codes** | 1 | 1 | 1 |
-| **Unlimited tables & QRs** | ₱500 one-time | ₱500 one-time | ₱500 one-time |
-| **Staff** | 3 | 15 | Unlimited |
+**There is no monthly subscription.** Servd is a one-time-payment product. Full
+detail is in the separate pricing document; the short version:
 
-**Free — everything to take orders and run service, free for life**
-QR dine-in, counter/takeout order numbers, online ordering website (pickup &
-delivery), kitchen display, cashier POS, split payments, split bills and tips,
-void/edit with manager approval, dietary tags, feedback and Google reviews.
+| | Price | Billing |
+|---|---|---|
+| Get started | ₱0 | Free forever |
+| Activate online ordering | **₱499** | One time |
+| Unlimited tables & QR codes | **₱500** | One time |
+| Any other feature | ₱500 – ₱3,000 | One time, per feature |
+| Content scheduler | ₱499 / month | The only recurring charge |
 
-**Tables and QR codes.** Every account gets its counter/takeout QR plus one
-table QR free, on any plan. Unlimited tables and QR codes is a one-time ₱500
-unlock — bought once, kept for good, on any plan afterwards. Accounts that
-existed before this became a paid unlock are grandfathered and keep unlimited
-tables at no charge.
+**Free forever, on every account:** QR dine-in, counter/takeout QR and order
+numbers, cashier POS, kitchen display, 1 table QR, split payments, split bills,
+tips, void/edit with manager approval, dietary tags, feedback and Google
+reviews, 3 staff accounts.
 
-**Growth — your brand online: ordering, payments & marketing**
-Everything in Free, plus custom domain, online payments (GCash/card), floor
-plan, reservations, gift cards, loyalty, promotions, happy hours, cart recovery,
-AI menu import, SMS and data exports.
+**₱499 activates online ordering** — pickup and delivery, bought outright. A
+restaurant builds its preview free and pays only when ready to take real orders.
 
-**Business — the complete suite**
-Everything in Growth, plus accounting (sales, VAT, P&L), inventory with food
-COGS and auto-reorder, HR/attendance/payroll, offline mode, audit log, full
-white-label, and 1,000 SMS credits per month.
+**Everything else is a one-time unlock** bought from Admin → Billing & features:
+accounting, inventory, HR, loyalty, promotions, reservations, floor plan, gift
+cards, online payments, offline mode, custom domain, white-label, audit log,
+data export, customer book. Bought once, owned for good — an unlock can't lapse
+or be cancelled.
 
-Never gated on any plan: QR dine-in, cashier POS, kitchen display, counter
-ordering, split payments and tips, void/edit with approval, dietary tags,
-feedback and shift notes.
+**No commission.** Servd takes no cut of sales; payments go directly to the
+restaurant's own PayMongo or Xendit account.
 
-Some features can also be bought individually as add-ons.
-
----
+The ₱899 Growth and ₱1,799 Business monthly plans were retired. Any account
+still on one keeps what it has.
 
 ## 19. Getting started
 
@@ -512,7 +507,7 @@ order — shifts decide whose money it is, never who may serve a table.
 PayMongo or Xendit account. Servd never holds it.
 
 **Does it work if the internet drops?** The kitchen and cashier screens keep
-working offline on the Business plan and sync when the connection returns.
+working offline once that unlock is bought, and sync when the connection returns.
 
 **Is my data separate from other restaurants?** Yes — enforced at the database
 level, not just in the application.
