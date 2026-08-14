@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
-import { getOrderHistory } from "@/server/orders/history";
+import { getOrderHistory, getItemsSold } from "@/server/orders/history";
 import { parseReportRange } from "@/lib/time/report-range";
 import { formatPeso } from "@/lib/money";
 import { ORDER_TYPES, ORDER_TYPE_LABEL, isOrderType, type OrderTypeKey } from "@/lib/orders/order-type";
 import { DateRangePicker } from "@/components/admin/DateRangePicker";
 import { OrderHistoryList } from "@/components/admin/OrderHistoryList";
+import { ItemsSoldPanel } from "@/components/admin/ItemsSoldPanel";
 
 /**
  * Order history, in the app.
@@ -35,14 +36,11 @@ export default async function OrdersHistoryPage({
   const state = sp.state;
   const page = Number(sp.page ?? 1) || 1;
 
-  const { orders, totals, pageCount } = await getOrderHistory(restaurantId, {
-    from: range.from,
-    to: range.to,
-    q: sp.q,
-    orderType: type,
-    state,
-    page,
-  });
+  const filter = { from: range.from, to: range.to, q: sp.q, orderType: type, state };
+  const [{ orders, totals, pageCount }, itemsSold] = await Promise.all([
+    getOrderHistory(restaurantId, { ...filter, page }),
+    getItemsSold(restaurantId, filter),
+  ]);
 
   /** Keep every other filter when one of them changes. */
   const href = (patch: Record<string, string | undefined>) => {
@@ -125,7 +123,14 @@ export default async function OrdersHistoryPage({
         <Link href={href({ state: "cancelled" })} className={chip(state === "cancelled")}>Voided</Link>
       </div>
 
-      <OrderHistoryList orders={orders} />
+      {/* What sold, before the individual tickets — it's the question most
+          owners open this screen to answer. */}
+      <ItemsSoldPanel data={itemsSold} />
+
+      <div>
+        <h2 className="mb-2 font-heading font-bold text-plum-ink">Orders</h2>
+        <OrderHistoryList orders={orders} />
+      </div>
 
       {pageCount > 1 && (
         <div className="flex items-center justify-between gap-2">

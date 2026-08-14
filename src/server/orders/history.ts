@@ -3,6 +3,7 @@ import "server-only";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { manilaShortDateTime } from "@/lib/time/manila";
 import { isOrderType, type OrderTypeKey } from "@/lib/orders/order-type";
+import { rollUpItemsSold, type ItemsSold } from "@/lib/orders/items-sold";
 
 /**
  * Order history an owner can actually read, on the phone in their pocket.
@@ -60,6 +61,36 @@ export interface HistoryFilter {
 
 const PAGE_SIZE = 25;
 
+/**
+ * The order filter, built once.
+ *
+ * Shared by the list, its count, the range totals and the items-sold summary,
+ * because near-identical where clauses in four places is how a list stops
+ * agreeing with the total printed above it.
+ */
+function historyWhere(filter: HistoryFilter): Record<string, unknown> {
+  const where: Record<string, unknown> = { createdAt: { gte: filter.from, lte: filter.to } };
+
+  if (filter.state === "paid") where.paymentStatus = "paid";
+  else if (filter.state === "unpaid") where.paymentStatus = { in: ["unpaid", "failed"] };
+  else if (filter.state === "cancelled") where.status = "cancelled";
+
+  // Newer columns are filtered best-effort: a database that hasn't caught up
+  // should show an unfiltered list, not an error page.
+  if (filter.orderType) where.orderType = filter.orderType;
+
+  const q = filter.q?.trim();
+  if (q) {
+    const asNumber = Number(q.replace(/^#/, ""));
+    where.OR = [
+      ...(Number.isFinite(asNumber) && asNumber > 0 ? [{ orderNumber: asNumber }] : []),
+      { customerName: { contains: q, mode: "insensitive" } },
+      { customerPhone: { contains: q } },
+    ];
+  }
+  return where;
+}
+
 export async function getOrderHistory(
   restaurantId: string,
   filter: HistoryFilter,
@@ -67,34 +98,7 @@ export async function getOrderHistory(
   const page = Math.max(1, Math.floor(filter.page ?? 1));
 
   return tenantDb(restaurantId, async (tx) => {
-    // Built up rather than inlined so the count, the totals and the page all
-    // run against exactly the same filter. Three near-identical where clauses
-    // is how a list stops agreeing with the total above it.
-    const where: Record<string, unknown> = { createdAt: { gte: filter.from, lte: filter.to } };
-
-    if (filter.state === "paid") where.paymentStatus = "paid";
-    else if (filter.state === "unpaid") where.paymentStatus = { in: ["unpaid", "failed"] };
-    else if (filter.state === "cancelled") where.status = "cancelled";
-
-    // Newer columns are filtered best-effort: a database that hasn't caught up
-    // should show an unfiltered list, not an error page.
-    if (filter.orderType) {
-      try {
-        where.orderType = filter.orderType;
-      } catch {
-        /* column not migrated */
-      }
-    }
-
-    const q = filter.q?.trim();
-    if (q) {
-      const asNumber = Number(q.replace(/^#/, ""));
-      where.OR = [
-        ...(Number.isFinite(asNumber) && asNumber > 0 ? [{ orderNumber: asNumber }] : []),
-        { customerName: { contains: q, mode: "insensitive" } },
-        { customerPhone: { contains: q } },
-      ];
-    }
+    const where = historyWhere(filter);
 
     let total = 0;
     let rows: {
@@ -233,4 +237,53 @@ export async function getOrderHistory(
       pageCount: Math.max(1, Math.ceil(total / PAGE_SIZE)),
     };
   });
+}
+
+/**
+ * What was sold in this window, per item.
+ *
+ * Runs against the SAME filter as the list above it, with one deliberate
+ * exception: VOIDED TICKETS NEVER COUNT AS SOLD. A cancelled order's items went
+ * back on the shelf, and counting them would tell an owner they sold forty
+ * burgers on a day they sold thirty-eight and voided two — which is exactly the
+ * number they'd then order stock against.
+ *
+ * So when the list is filtered to voided, this comes back empty. That's the
+ * honest answer to "what did we sell", not a bug.
+ */
+export async function getItemsSold(
+  restaurantId: string,
+  filter: HistoryFilter,
+): Promise<ItemsSold> {
+  const empty: ItemsSold = { items: [], totalQuantity: 0, totalRevenue: 0, distinctItems: 0 };
+  try {
+    return await tenantDb(restaurantId, async (tx) => {
+      const where = { ...historyWhere(filter), status: { not: "cancelled" as const } };
+      // Filtering to voided and excluding voided leaves nothing, by definition.
+      if (filter.state === "cancelled") return empty;
+
+      const lines = await tx.orderItem.findMany({
+        where: { order: where },
+        select: {
+          menuItemId: true,
+          nameAtTime: true,
+          quantity: true,
+          unitPrice: true,
+          modifiers: { select: { priceDeltaAtTime: true } },
+        },
+      });
+
+      return rollUpItemsSold(
+        lines.map((l) => ({
+          menuItemId: l.menuItemId,
+          nameAtTime: l.nameAtTime,
+          quantity: l.quantity,
+          unitPrice: l.unitPrice,
+          modifierDeltas: l.modifiers.map((m) => m.priceDeltaAtTime),
+        })),
+      );
+    });
+  } catch {
+    return empty;
+  }
 }
