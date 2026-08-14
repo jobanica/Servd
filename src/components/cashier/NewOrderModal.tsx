@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatPeso, formatDelta } from "@/lib/money";
 import {
   unitPrice,
@@ -19,6 +19,7 @@ import {
 } from "@/server/orders/cashier";
 import { printKitchenTicket } from "@/server/printing/print";
 import { runPrintDispatch } from "@/lib/print/run-dispatch";
+import { CategoryTabs, categorySectionId } from "@/components/menu/CategoryTabs";
 import {
   ORDER_TYPES,
   ORDER_TYPE_LABEL,
@@ -242,6 +243,9 @@ export function NewOrderModal({
   const [custQuery, setCustQuery] = useState("");
   const [custResults, setCustResults] = useState<PosCustomer[]>([]);
   const [custOpen, setCustOpen] = useState(false);
+  // Menu search + the scrolling column the category tabs observe.
+  const [itemQuery, setItemQuery] = useState("");
+  const menuScrollRef = useRef<HTMLDivElement>(null);
   const [lines, setLines] = useState<CartLine[]>([]);
   const [configItem, setConfigItem] = useState<DinerItem | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -285,6 +289,22 @@ export function NewOrderModal({
 
   const total = cartTotal(lines);
   const nonEmpty = (menu ?? []).filter((c) => c.items.length > 0);
+
+  /**
+   * Search across the whole menu, then category tabs over what's left.
+   *
+   * A till with hundreds of items was one long scroll — the cashier had to
+   * remember roughly where a dish lived and hunt for it with a customer
+   * waiting. Typing beats scrolling when you know the name, and the tabs beat
+   * both when you don't; the strip is hidden while searching because the
+   * results are already a filtered list.
+   */
+  const q = itemQuery.trim().toLowerCase();
+  const shownCats = q
+    ? nonEmpty
+        .map((c) => ({ ...c, items: c.items.filter((i) => i.name.toLowerCase().includes(q)) }))
+        .filter((c) => c.items.length > 0)
+    : nonEmpty;
 
   function pickItem(item: DinerItem) {
     if (!item.isAvailable) return;
@@ -358,12 +378,40 @@ export function NewOrderModal({
         ) : (
           <div className={`grid min-h-0 flex-1 grid-cols-1 gap-0 overflow-hidden ${lines.length > 0 ? "md:grid-cols-[1fr_320px]" : ""}`}>
             {/* Menu */}
-            <div className="min-h-0 overflow-y-auto p-4">
+            <div ref={menuScrollRef} className="min-h-0 overflow-y-auto">
+              {/* Search + tabs stay put while the items scroll under them. */}
+              <div className="sticky top-0 z-30 bg-white px-4 pt-3">
+                <input
+                  value={itemQuery}
+                  onChange={(e) => setItemQuery(e.target.value)}
+                  placeholder="🔍 Search the menu…"
+                  className="w-full rounded-lg border border-plum-ink/15 bg-cream/40 px-3 py-2 text-sm"
+                />
+              </div>
+              {!q && (
+                <CategoryTabs
+                  categories={nonEmpty.map((c) => ({ id: c.id, name: c.name }))}
+                  scrollRef={menuScrollRef}
+                  stickyOffset={104}
+                  className="top-[52px] px-4"
+                />
+              )}
+
+              <div className="p-4">
               {nonEmpty.length === 0 && (
                 <p className="text-sm text-plum-ink/50">No menu items yet.</p>
               )}
-              {nonEmpty.map((cat) => (
-                <section key={cat.id} className="mb-5">
+              {q && shownCats.length === 0 && (
+                <p className="py-6 text-center text-sm text-plum-ink/50">
+                  Nothing matches &ldquo;{itemQuery.trim()}&rdquo;.
+                </p>
+              )}
+              {shownCats.map((cat) => (
+                <section
+                  key={cat.id}
+                  id={categorySectionId(cat.id)}
+                  className="mb-5 scroll-mt-[104px]"
+                >
                   <h3 className="mb-2 font-heading text-sm font-bold uppercase tracking-wide text-plum-ink/55">
                     {cat.name}
                   </h3>
@@ -387,6 +435,7 @@ export function NewOrderModal({
                   </div>
                 </section>
               ))}
+              </div>
             </div>
 
             {/* Order summary — hidden until the first item is added, so the
