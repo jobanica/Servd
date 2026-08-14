@@ -268,3 +268,89 @@ export function getInventoryReport(restaurantId: string, from: Date, to: Date) {
       order by cogs desc`,
   );
 }
+
+// ------------------------------------------------------------------ recipes
+
+export interface RecipeRow {
+  menuItemId: string;
+  name: string;
+  categoryName: string;
+  /** Selling price, centavos. */
+  price: number;
+  components: {
+    inventoryItemId: string;
+    name: string;
+    unit: string;
+    quantity: number;
+    /** What this much of the ingredient costs, centavos. */
+    cost: number;
+  }[];
+  /** Sum of the components' costs — what one serving costs to make. */
+  recipeCost: number;
+}
+
+/**
+ * Every dish with its recipe, plus the ingredients available to add.
+ *
+ * The recipe is what makes a sale deduct stock: sell one adobo, and each
+ * ingredient listed here comes off by the quantity given. Without one, selling
+ * a dish moves nothing — which is the state every restaurant was in, because
+ * the data model and the deduction engine both existed and there was no screen
+ * to type a recipe into.
+ *
+ * Dishes with no recipe are listed too, and first: an empty recipe is the thing
+ * that needs attention, and a screen that only shows what's already set up
+ * gives an owner nowhere to start.
+ */
+export async function listRecipes(restaurantId: string): Promise<RecipeRow[]> {
+  const [items, components, ingredients] = await Promise.all([
+    tenantDb(restaurantId, (tx) =>
+      tx.menuItem.findMany({
+        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+        select: { id: true, name: true, price: true, category: { select: { name: true } } },
+      }),
+    ),
+    tenantDb(restaurantId, (tx) =>
+      tx.recipeComponent.findMany({
+        select: { menuItemId: true, inventoryItemId: true, quantity: true },
+      }),
+    ).catch(() => []),
+    listIngredients(restaurantId).catch(() => []),
+  ]);
+
+  const ingredientById = new Map(ingredients.map((i) => [i.id, i]));
+  const byItem = new Map<string, RecipeRow["components"]>();
+  for (const c of components) {
+    const ing = ingredientById.get(c.inventoryItemId);
+    // An ingredient that's since been deleted leaves a dangling component;
+    // skip it rather than rendering a blank row nobody can act on.
+    if (!ing) continue;
+    const list = byItem.get(c.menuItemId) ?? [];
+    list.push({
+      inventoryItemId: c.inventoryItemId,
+      name: ing.name,
+      unit: ing.unit,
+      quantity: c.quantity,
+      cost: Math.round(c.quantity * ing.costPerUnit),
+    });
+    byItem.set(c.menuItemId, list);
+  }
+
+  return items.map((m) => {
+    const comps = (byItem.get(m.id) ?? []).sort((a, b) => (a.name < b.name ? -1 : 1));
+    return {
+      menuItemId: m.id,
+      name: m.name,
+      categoryName: m.category?.name ?? "",
+      price: m.price,
+      components: comps,
+      recipeCost: comps.reduce((s, c) => s + c.cost, 0),
+    };
+  });
+}
+
+/** Ingredients that can go into a recipe (never a product's own stock row). */
+export async function listRecipeIngredients(restaurantId: string) {
+  const rows = await listIngredients(restaurantId).catch(() => []);
+  return rows.map((i) => ({ id: i.id, name: i.name, unit: i.unit, costPerUnit: i.costPerUnit }));
+}

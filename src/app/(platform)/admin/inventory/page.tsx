@@ -83,6 +83,9 @@ export default async function InventoryPage() {
           <Link href="/admin/inventory/reorder" className="rounded-full px-4 py-2 text-sm font-semibold btn-brand">
             🛒 Reorder suggestions →
           </Link>
+          <Link href="/admin/inventory/recipes" className="rounded-full border border-plum-ink/15 px-4 py-2 text-sm font-semibold">
+            🍳 Recipes →
+          </Link>
           <Link href="/admin/inventory/po" className="rounded-full border border-plum-ink/15 px-4 py-2 text-sm font-semibold">
             Purchase orders →
           </Link>

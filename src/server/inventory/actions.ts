@@ -457,6 +457,7 @@ export async function setRecipeComponent(formData: FormData): Promise<void> {
     });
   });
   revalidatePath(`/admin/menu/${menuItemId}`);
+  revalidatePath("/admin/inventory/recipes");
 }
 
 // -------------------------------------------------------------- settings
