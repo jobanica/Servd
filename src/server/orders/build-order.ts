@@ -9,6 +9,7 @@ import { getVariantsMap } from "@/server/menu/variants";
 import { getUnavailableModifierIds } from "@/server/menu/modifier-availability";
 import { getDishStock } from "@/server/inventory/dish-stock";
 import { getPosOnlyItemIds } from "@/server/menu/pos-only";
+import { variantPrice } from "@/lib/menu/variant-price";
 import type { DinerItem, Selection } from "@/lib/cart/types";
 
 /**
@@ -169,7 +170,10 @@ export async function buildValidatedOrder(
         variants.find((v) => v.id === line.variantId) ??
         variants.find((v) => v.stock == null || v.stock > 0) ??
         variants[0];
-      baseAmount = chosenVariant.price;
+      // A size whose price was never filled in charges the item's price, not
+      // nothing. Selling Large for ₱0 because a box was left blank is how an
+      // order ends up totalling zero and vanishing from every report.
+      baseAmount = variantPrice(chosenVariant.price, dbItem.price);
       nameAtTime = `${dbItem.name} (${chosenVariant.name})`;
       chosenVariantId = chosenVariant.id;
 

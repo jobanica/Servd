@@ -117,6 +117,16 @@ export default async function MenuPage() {
                           Counter only
                         </span>
                       )}
+                      {/* An item at ₱0 sells for nothing, and an order made
+                          entirely of them totals nothing — so no payment is
+                          recorded and the sale is invisible to revenue,
+                          accounting and the shift report. Almost always a price
+                          that was never filled in. */}
+                      {item.price === 0 && (
+                        <span className="rounded-full bg-guava/15 px-2 py-0.5 text-xs font-bold text-guava">
+                          No price set
+                        </span>
+                      )}
                       {(() => {
                         const cap = servings.get(item.id);
                         if (!cap || cap.remaining == null) return null;

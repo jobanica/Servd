@@ -7,6 +7,7 @@ import { getDishStock } from "@/server/inventory/dish-stock";
 import { getVariantsMap } from "@/server/menu/variants";
 import { getUnavailableModifierIds } from "@/server/menu/modifier-availability";
 import { getPosOnlyItemIds } from "@/server/menu/pos-only";
+import { variantPrice } from "@/lib/menu/variant-price";
 
 /**
  * Loads a restaurant's full menu for the diner page, by restaurantId. Returns
@@ -102,7 +103,13 @@ export async function getPublicMenu(
       const variants = rawVariants.map((v) => ({
         id: v.id,
         name: v.name,
-        price: effectivePrice(v.price, { id: item.id, categoryId: item.categoryId }, happyHours).price,
+        // Same fallback the order builder uses, so the price on the card is the
+        // price that gets charged.
+        price: effectivePrice(
+          variantPrice(v.price, item.price),
+          { id: item.id, categoryId: item.categoryId },
+          happyHours,
+        ).price,
         stock: v.stock,
       }));
       // For variant items, the card shows the lowest size as the "from" price.
