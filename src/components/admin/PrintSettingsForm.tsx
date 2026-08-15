@@ -32,6 +32,10 @@ export function PrintSettingsForm({
     receiptWebsite: string;
     receiptFooter: string;
     receiptShowVat: boolean;
+    receiptShowCustomer: boolean;
+    receiptShowCashTendered: boolean;
+    kitchenShowAddress: boolean;
+    cardSurchargePercent: string;
     autoPrintReceipt: boolean;
     openDrawerOn: DrawerPolicy;
   };
@@ -48,6 +52,10 @@ export function PrintSettingsForm({
   const [website, setWebsite] = useState(initial.receiptWebsite);
   const [footer, setFooter] = useState(initial.receiptFooter);
   const [showVat, setShowVat] = useState(initial.receiptShowVat);
+  const [showCustomer, setShowCustomer] = useState(initial.receiptShowCustomer);
+  const [showCashTendered, setShowCashTendered] = useState(initial.receiptShowCashTendered);
+  const [kitchenAddress, setKitchenAddress] = useState(initial.kitchenShowAddress);
+  const [surcharge, setSurcharge] = useState(initial.cardSurchargePercent);
   const [autoPrintReceipt, setAutoPrintReceipt] = useState(initial.autoPrintReceipt);
   const [openDrawerOn, setOpenDrawerOn] = useState<DrawerPolicy>(initial.openDrawerOn);
 
@@ -87,6 +95,25 @@ export function PrintSettingsForm({
               On — accepted orders show on the Kitchen screen. Off — no screen: a
               <strong> kitchen ticket prints automatically</strong> when an order is accepted or
               created, so you can hand it to the kitchen.
+            </span>
+          </span>
+        </label>
+
+        <label className="mt-3 flex items-start gap-2 border-t border-plum-ink/10 pt-3 text-sm">
+          <input
+            type="checkbox"
+            name="kitchenShowAddress"
+            checked={kitchenAddress}
+            onChange={(e) => setKitchenAddress(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span>
+            <span className="font-semibold">Show delivery addresses to the kitchen</span>
+            <span className="mt-0.5 block text-plum-ink/55">
+              For kitchens that work by zone: everything heading the same way is visible
+              together, so it can be cooked and bagged in one run instead of one ticket at a
+              time. Off by default — it puts customers&apos; home addresses on a screen the whole
+              line can read.
             </span>
           </span>
         </label>
@@ -217,6 +244,30 @@ export function PrintSettingsForm({
             </p>
           )}
         </div>
+
+        <div className="mt-4">
+          <label className="block text-sm font-semibold">Card fee</label>
+          <p className="mt-0.5 text-xs text-plum-ink/55">
+            Added on top when a customer pays by card at the counter, to cover what the
+            terminal charges you. It shows as its own line on the receipt, and on a split
+            bill it only applies to the part that goes on the card. Leave blank for none.
+          </p>
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              name="cardSurchargePercent"
+              value={surcharge}
+              onChange={(e) => setSurcharge(e.target.value)}
+              type="number"
+              step="0.01"
+              min="0"
+              max="20"
+              inputMode="decimal"
+              placeholder="3.5"
+              className="w-28 rounded-lg border border-plum-ink/15 px-3 py-2 text-sm tabular-nums"
+            />
+            <span className="text-sm font-semibold text-plum-ink/60">% of the card payment</span>
+          </div>
+        </div>
       </div>
 
       {/* Receipt design */}
@@ -286,6 +337,35 @@ export function PrintSettingsForm({
           <p className="-mt-2 text-xs text-plum-ink/50">
             Turn off if you&apos;re non-VAT registered (e.g. a percentage-tax/BMBE seller). Prices are
             unchanged — only the VAT breakdown line is hidden.
+          </p>
+
+          <label className="flex items-center gap-2 text-sm font-semibold">
+            <input
+              type="checkbox"
+              name="receiptShowCustomer"
+              checked={showCustomer}
+              onChange={(e) => setShowCustomer(e.target.checked)}
+            />
+            Print who the order is for
+          </label>
+          <p className="-mt-2 text-xs text-plum-ink/50">
+            Name, contact number, and the delivery address on delivery orders. This is what a
+            rider reads — without it they&apos;re back in Facebook or the app looking for where
+            they&apos;re going and a number to ring. Dine-in receipts are unaffected.
+          </p>
+
+          <label className="flex items-center gap-2 text-sm font-semibold">
+            <input
+              type="checkbox"
+              name="receiptShowCashTendered"
+              checked={showCashTendered}
+              onChange={(e) => setShowCashTendered(e.target.checked)}
+            />
+            Print cash received and change
+          </label>
+          <p className="-mt-2 text-xs text-plum-ink/50">
+            On cash sales only. Settles the &ldquo;I gave you a thousand&rdquo; conversation, and lets
+            the customer check their change on the way out instead of at the counter.
           </p>
         </div>
 

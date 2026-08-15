@@ -34,6 +34,9 @@ export interface ReceiptBranding {
   website?: string | null;
   footer?: string | null;
   showVat?: boolean; // print the "VAT (12% incl.)" line (default true)
+  showCustomer?: boolean; // print who the order is for, and where (default true)
+  showCashTendered?: boolean; // print cash received + change (default true)
+  kitchenShowAddress?: boolean; // put the address on kitchen tickets (default false)
 }
 
 const METHOD_LABEL: Record<string, string> = {
@@ -60,18 +63,26 @@ export interface Ticket {
   website: string | null;
   footer: string | null;
   showVat: boolean;
+  showCustomer: boolean;
+  showCashTendered: boolean;
+  kitchenShowAddress: boolean;
   tableNumber: string;
   orderType: OrderTypeKey;
   customerName: string | null;
   customerAddress: string | null;
+  customerPhone: string | null;
+  customerNote: string | null;
   orderRef: string;
   placedAt: string;
   items: TicketLine[];
   total: number; // gross items (centavos)
   discountAmount: number;
   discountLabel: string | null;
+  surchargeAmount: number; // card fee added on top (centavos)
+  surchargeLabel: string | null;
   paymentMethod: string | null;
   paymentAmount: number | null;
+  cashTendered: number | null; // what the customer actually handed over
   qrUrl: string | null; // website link encoded as a QR
 }
 
@@ -82,13 +93,18 @@ export interface TicketSource extends ReceiptBranding {
   orderType?: OrderTypeKey;
   customerName?: string | null;
   customerAddress?: string | null;
+  customerPhone?: string | null;
+  customerNote?: string | null;
   orderId: string;
   createdAt: string;
   total: number;
   discountAmount?: number;
   discountLabel?: string | null;
+  surchargeAmount?: number | null;
+  surchargeLabel?: string | null;
   paymentMethod?: string | null;
   paymentAmount?: number | null;
+  cashTendered?: number | null;
   qrUrl?: string | null;
   items: { quantity: number; name: string; modifiers: string[]; note?: string | null; lineTotal: number }[];
 }
@@ -102,10 +118,15 @@ export function buildTicket(src: TicketSource): Ticket {
     website: src.website ?? null,
     footer: src.footer ?? null,
     showVat: src.showVat !== false, // default to showing VAT
+    showCustomer: src.showCustomer !== false,
+    showCashTendered: src.showCashTendered !== false,
+    kitchenShowAddress: src.kitchenShowAddress === true,
     tableNumber: src.tableNumber,
     orderType: src.orderType ?? "dine_in",
     customerName: src.customerName ?? null,
     customerAddress: src.customerAddress ?? null,
+    customerPhone: src.customerPhone ?? null,
+    customerNote: src.customerNote ?? null,
     orderRef: src.orderId.slice(0, 8).toUpperCase(),
     placedAt: src.createdAt,
     items: src.items.map((i) => ({
@@ -118,9 +139,12 @@ export function buildTicket(src: TicketSource): Ticket {
     total: src.total,
     discountAmount: src.discountAmount ?? 0,
     discountLabel: src.discountLabel ?? null,
+    surchargeAmount: src.surchargeAmount ?? 0,
+    surchargeLabel: src.surchargeLabel ?? null,
     // Only a paid receipt shows a payment line (bills/kitchen tickets never do).
     paymentMethod: src.kind === "receipt" ? src.paymentMethod ?? null : null,
     paymentAmount: src.kind === "receipt" ? src.paymentAmount ?? null : null,
+    cashTendered: src.kind === "receipt" ? src.cashTendered ?? null : null,
     // The kitchen ticket carries no QR (it's for the cooks, not the diner).
     qrUrl: src.kind === "kitchen" ? null : src.qrUrl ?? null,
   };
@@ -135,7 +159,7 @@ export function ticketDocLabel(t: Ticket): string {
 
 /** Net payable + VAT-of-net (centavos). */
 export function ticketTotals(t: Ticket) {
-  const net = Math.max(0, t.total - t.discountAmount);
+  const net = Math.max(0, t.total - t.discountAmount + Math.max(0, t.surchargeAmount));
   const vat = Math.round(net - net / (1 + VAT_RATE));
   return { net, vat };
 }
@@ -156,6 +180,44 @@ export function ticketHeaderLines(t: Ticket): string[] {
   return lines;
 }
 
+/**
+ * Who this order is for, and where it's going.
+ *
+ * This is the block a rider reads. Before it existed the docket said "DELIVERY
+ * - Ana" and nothing else, so the address came off Facebook or the app and the
+ * number to ring when they were outside the gate came off neither. Wrapped so a
+ * long address doesn't run off the side of 58mm paper.
+ */
+export function ticketCustomerLines(t: Ticket): string[] {
+  if (!t.showCustomer) return [];
+  // A dine-in ticket already says which table; nobody is delivering to it.
+  if (t.orderType === "dine_in") return [];
+  const lines: string[] = [];
+  if (t.customerName) lines.push(`Name : ${t.customerName}`);
+  if (t.customerPhone) lines.push(`Phone: ${t.customerPhone}`);
+  if (t.orderType === "delivery" && t.customerAddress) {
+    lines.push(...wrap(t.customerAddress, "Addr : ", "       "));
+  }
+  if (t.customerNote) lines.push(...wrap(t.customerNote, "Note : ", "       "));
+  if (lines.length === 0) return [];
+  return ["--------------------------------", ...lines];
+}
+
+/** Break `text` onto WIDTH-character lines, indenting continuations. */
+function wrap(text: string, prefix: string, indent: string): string[] {
+  const out: string[] = [];
+  let line = prefix;
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    if (line.length + word.length + 1 > WIDTH && line.trim() !== prefix.trim()) {
+      out.push(line.trimEnd());
+      line = indent;
+    }
+    line += (line === prefix || line === indent ? "" : " ") + word;
+  }
+  if (line.trim()) out.push(line.trimEnd());
+  return out;
+}
+
 /** Left-aligned body: meta, itemized lines with prices, totals, payment. */
 export function ticketBodyLines(t: Ticket): string[] {
   const lines: string[] = [];
@@ -165,6 +227,11 @@ export function ticketBodyLines(t: Ticket): string[] {
   if (t.kind === "kitchen") {
     lines.push(`Order #${t.orderRef}`);
     lines.push(new Date(t.placedAt).toLocaleString());
+    // The address, when the kitchen works by zone — everything heading the same
+    // way gets cooked and bagged in one run instead of one ticket at a time.
+    if (t.kitchenShowAddress && t.orderType === "delivery" && t.customerAddress) {
+      lines.push(...wrap(t.customerAddress, "To: ", "    "));
+    }
     lines.push("--------------------------------");
     for (const item of t.items) {
       lines.push(`${item.quantity}x ${item.name}`);
@@ -185,9 +252,18 @@ export function ticketBodyLines(t: Ticket): string[] {
   }
   lines.push("--------------------------------");
   const { net, vat } = ticketTotals(t);
-  if (t.discountAmount > 0) {
+  // A subtotal only earns its line once something moves the total away from it.
+  if (t.discountAmount > 0 || t.surchargeAmount > 0) {
     lines.push(pad("Subtotal", amt(t.total)));
+  }
+  if (t.discountAmount > 0) {
     lines.push(pad(t.discountLabel ?? "Discount", `-${amt(t.discountAmount)}`));
+  }
+  // Itemised, not folded into the total: somebody paying 3.5% extra to use a
+  // card is entitled to see the 3.5% rather than a number that doesn't match
+  // the menu.
+  if (t.surchargeAmount > 0) {
+    lines.push(pad(t.surchargeLabel ?? "Card fee", amt(t.surchargeAmount)));
   }
   if (t.showVat) lines.push(pad("VAT (12% incl.)", amt(vat)));
   // Bill = amount the customer must PAY; receipt = total they paid.
@@ -198,6 +274,13 @@ export function ticketBodyLines(t: Ticket): string[] {
     lines.push("Please pay at the counter.");
   } else if (t.paymentMethod) {
     lines.push(pad(METHOD_LABEL[t.paymentMethod] ?? t.paymentMethod, amt(t.paymentAmount ?? net)));
+    // Cash handed over and change given back. Printing it settles the argument
+    // that starts when somebody says they gave a thousand, and it lets the
+    // customer check their change on the walk out rather than at the counter.
+    if (t.showCashTendered && t.paymentMethod === "cash" && t.cashTendered != null && t.cashTendered > 0) {
+      lines.push(pad("Cash received", amt(t.cashTendered)));
+      lines.push(pad("Change", amt(Math.max(0, t.cashTendered - net))));
+    }
     lines.push("*** PAID ***");
   }
   return lines;
@@ -212,13 +295,11 @@ export function ticketFooterLines(t: Ticket): string[] {
 /** Full plain-text rendering (HTML fallback / preview). */
 export function ticketLines(ticket: Ticket): string[] {
   const footer = ticketFooterLines(ticket);
-  const contact: string[] = [];
-  if (ticket.orderType === "delivery" && ticket.customerAddress) contact.push(ticket.customerAddress);
   return [
     ...ticketHeaderLines(ticket),
     ticketHeading(ticket),
     ticketDocLabel(ticket),
-    ...contact,
+    ...ticketCustomerLines(ticket),
     ...ticketBodyLines(ticket),
     ...(footer.length ? ["", ...footer] : []),
   ];

@@ -1,6 +1,7 @@
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import type { OrderTypeKey } from "@/lib/orders/order-type";
 import { buildTicket, type Ticket, type TicketKind } from "@/lib/printing/ticket";
+import { parsePrinterConfig } from "@/lib/printing/printer-config";
 import { restaurantSiteUrl } from "@/lib/qr";
 
 /** Loads an order and shapes it into a Ticket (tenant-scoped). */
@@ -13,10 +14,8 @@ export async function getOrderTicket(
     const restaurant = await tx.restaurant.findFirstOrThrow({
       select: { name: true, displayName: true, slug: true, printerConfig: true },
     });
-    const receipt =
-      ((restaurant.printerConfig as {
-        receipt?: { address?: string | null; phone?: string | null; website?: string | null; footer?: string | null; showVat?: boolean };
-      } | null)?.receipt) ?? {};
+    const cfg = parsePrinterConfig(restaurant.printerConfig);
+    const receipt = cfg.receipt;
     const order = await tx.order.findFirst({
       where: { id: orderId },
       // Explicit select (no SELECT *) so a lagging schema can't break printing.
@@ -62,6 +61,11 @@ export async function getOrderTicket(
     let orderType: OrderTypeKey = "dine_in";
     let customerName: string | null = null;
     let customerAddress: string | null = null;
+    let customerPhone: string | null = null;
+    let customerNote: string | null = null;
+    let cashTendered: number | null = null;
+    let surchargeAmount = 0;
+    let surchargeLabel: string | null = null;
     try {
       const disc = await tx.order.findFirst({
         where: { id: orderId },
@@ -75,11 +79,35 @@ export async function getOrderTicket(
     try {
       const meta = await tx.order.findFirst({
         where: { id: orderId },
-        select: { orderType: true, customerName: true, customerAddress: true },
+        select: {
+          orderType: true,
+          customerName: true,
+          customerAddress: true,
+          customerPhone: true,
+          customerNote: true,
+          cashTendered: true,
+        },
       });
       orderType = (meta?.orderType ?? "dine_in") as typeof orderType;
       customerName = meta?.customerName ?? null;
       customerAddress = meta?.customerAddress ?? null;
+      customerPhone = meta?.customerPhone ?? null;
+      customerNote = meta?.customerNote ?? null;
+      cashTendered = meta?.cashTendered ?? null;
+    } catch {
+      /* not migrated yet */
+    }
+
+    // The card fee, read on its own so the whole receipt doesn't disappear on a
+    // database that hasn't run add-pos-only-and-surcharge.sql. No column means
+    // no surcharge was ever charged, which prints exactly right.
+    try {
+      const s = await tx.order.findFirst({
+        where: { id: orderId },
+        select: { surchargeAmount: true, surchargeLabel: true },
+      });
+      surchargeAmount = s?.surchargeAmount ?? 0;
+      surchargeLabel = s?.surchargeLabel ?? null;
     } catch {
       /* not migrated yet */
     }
@@ -92,17 +120,25 @@ export async function getOrderTicket(
       website: receipt.website,
       footer: receipt.footer,
       showVat: receipt.showVat,
+      showCustomer: receipt.showCustomer,
+      showCashTendered: receipt.showCashTendered,
+      kitchenShowAddress: cfg.kitchen.showAddress,
       tableNumber: order.table?.tableNumber ?? "—",
       orderType,
       customerName,
       customerAddress,
+      customerPhone,
+      customerNote,
       orderId: order.id,
       createdAt: order.createdAt.toISOString(),
       total: order.total,
       discountAmount,
       discountLabel,
+      surchargeAmount,
+      surchargeLabel,
       paymentMethod,
       paymentAmount,
+      cashTendered,
       qrUrl: restaurantSiteUrl(restaurant.slug),
       items: order.items.map((i) => {
         const unit = i.unitPrice + i.modifiers.reduce((s, m) => s + m.priceDeltaAtTime, 0);

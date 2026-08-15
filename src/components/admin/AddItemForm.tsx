@@ -64,6 +64,13 @@ export function AddItemForm({ categoryId }: { categoryId: string }) {
           <input type="checkbox" name="isAvailable" defaultChecked />
           Available
         </label>
+        {/* Counter-only. The hidden marker lets the server tell "off" from
+            "this form has no such field" — an unchecked box submits nothing. */}
+        <label className="flex items-center gap-2 text-sm">
+          <input type="hidden" name="posOnlyField" value="1" />
+          <input type="checkbox" name="posOnly" />
+          Counter only
+        </label>
         <ImageField name="image" className="w-full sm:w-auto sm:min-w-[16rem]" />
       </div>
       {state?.error && <p className="text-sm text-guava">{state.error}</p>}

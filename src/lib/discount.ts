@@ -38,7 +38,21 @@ export function computeDiscount(
   }
 }
 
-/** Net payable after discount + any redeemed store credit (never below zero). */
-export function netTotal(total: number, discountAmount: number, creditApplied = 0): number {
-  return Math.max(0, total - discountAmount - creditApplied);
+/**
+ * Net payable after discount + any redeemed store credit, plus anything added
+ * on top (today, a card surcharge). Never below zero.
+ *
+ * The surcharge belongs in here rather than being bolted on at the till,
+ * because "what this order comes to" has to give the same answer to the
+ * cashier screen, the settle, the receipt and the day's takings. That number
+ * disagreeing with itself across four screens is a bug this app has already
+ * had once.
+ */
+export function netTotal(
+  total: number,
+  discountAmount: number,
+  creditApplied = 0,
+  surchargeAmount = 0,
+): number {
+  return Math.max(0, total - discountAmount - creditApplied + Math.max(0, surchargeAmount));
 }

@@ -73,6 +73,7 @@ export function CashierBoard({
   isAdmin = false,
   offlineEnabled = false,
   showTutorials = false,
+  cardSurchargeBp = 0,
 }: {
   restaurantId: string;
   initialTables: CashierTable[];
@@ -81,6 +82,8 @@ export function CashierBoard({
   offlineEnabled?: boolean;
   /** False when the tutorials hub has no videos yet. */
   showTutorials?: boolean;
+  /** Card fee in basis points, so the till can show it before the tap. */
+  cardSurchargeBp?: number;
 }) {
   const [tables, setTables] = useState<CashierTable[]>(initialTables);
   const [incoming, setIncoming] = useState<IncomingOrder[]>(initialIncoming);
@@ -338,11 +341,11 @@ export function CashierBoard({
     }
   }
 
-  async function pay(orderId: string, method: CounterMethod, change = 0) {
+  async function pay(orderId: string, method: CounterMethod, change = 0, tendered = 0) {
     setBusy(orderId);
     setPayTarget(null);
     try {
-      const res = await markOrderPaid(orderId, method);
+      const res = await markOrderPaid(orderId, method, tendered);
       if (res.ok && res.tables) {
         setTables(res.tables);
         showToast(
@@ -1086,7 +1089,8 @@ export function CashierBoard({
           due={payTarget.due}
           busy={busy === payTarget.id}
           initialMethod={payTarget.method}
-          onConfirm={(method, change) => pay(payTarget.id, method, change)}
+          cardSurchargeBp={cardSurchargeBp}
+          onConfirm={(method, change, tendered) => pay(payTarget.id, method, change, tendered)}
           onCancel={() => setPayTarget(null)}
         />
       )}
@@ -1160,6 +1164,7 @@ export function CashierBoard({
           orderId={splitTarget.id}
           label={splitTarget.label}
           remaining={splitTarget.remaining}
+          cardSurchargeBp={cardSurchargeBp}
           onClose={() => setSplitTarget(null)}
           onResult={(t) => setTables(t)}
         />

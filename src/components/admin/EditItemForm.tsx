@@ -19,6 +19,7 @@ type Item = {
   videoUrl: string | null;
   dietaryTags?: string[];
   dailyLimit?: number | null;
+  posOnly?: boolean;
 };
 
 export function EditItemForm({
@@ -92,6 +93,21 @@ export function EditItemForm({
             defaultChecked={item.isAvailable}
           />
           Available (in stock)
+        </label>
+        {/* Counter-only. The marker rides alongside because an unchecked box
+            submits nothing at all, and the server has to be able to tell "off"
+            from "this form doesn't have the field". */}
+        <label className="flex items-start gap-2 text-sm sm:col-span-2">
+          <input type="hidden" name="posOnlyField" value="1" />
+          <input type="checkbox" name="posOnly" defaultChecked={item.posOnly === true} className="mt-1" />
+          <span>
+            Counter only — hide from the online menu
+            <span className="mt-0.5 block text-xs font-normal text-plum-ink/50">
+              The cashier can still punch it; customers never see it. For takeaway
+              boxes, add-ons somebody wants three of, staff meals, and anything
+              that doesn&apos;t travel well.
+            </span>
+          </span>
         </label>
         <label className="block text-sm sm:col-span-2">
           <span className="font-medium">Daily servings limit</span>

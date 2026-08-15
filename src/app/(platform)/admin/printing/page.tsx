@@ -3,6 +3,7 @@ import { requireAdminPage } from "@/server/tenancy/require-admin";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { PrintSettingsForm } from "@/components/admin/PrintSettingsForm";
 import { drawerPolicy, type DrawerPolicy } from "@/lib/printing/drawer";
+import { bpToPercentString, parsePrinterConfig } from "@/lib/printing/printer-config";
 
 export default async function PrintingSettingsPage() {
   const { restaurantId } = await requireAdminPage();
@@ -37,14 +38,8 @@ export default async function PrintingSettingsPage() {
     /* not migrated yet */
   }
 
-  const cfg = (restaurant.printerConfig as
-    | {
-        bridgeUrl?: string;
-        pollToken?: string;
-        receipt?: { address?: string | null; phone?: string | null; website?: string | null; footer?: string | null; showVat?: boolean };
-      }
-    | null) ?? {};
-  const receipt = cfg.receipt ?? {};
+  const cfg = parsePrinterConfig(restaurant.printerConfig);
+  const receipt = cfg.receipt;
   const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const cloudPollUrl = cfg.pollToken
     ? `${base}/api/print/cloud/${restaurant.id}?token=${cfg.pollToken}`
@@ -73,7 +68,11 @@ export default async function PrintingSettingsPage() {
           receiptPhone: receipt.phone ?? "",
           receiptWebsite: receipt.website ?? "",
           receiptFooter: receipt.footer ?? "",
-          receiptShowVat: receipt.showVat !== false, // default on
+          receiptShowVat: receipt.showVat,
+          receiptShowCustomer: receipt.showCustomer,
+          receiptShowCashTendered: receipt.showCashTendered,
+          kitchenShowAddress: cfg.kitchen.showAddress,
+          cardSurchargePercent: bpToPercentString(cfg.payments.cardSurchargeBp),
           autoPrintReceipt,
           openDrawerOn,
         }}

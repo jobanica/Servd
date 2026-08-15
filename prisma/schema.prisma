@@ -1242,6 +1242,16 @@ model MenuItem {
   videoUrl       String? // uploaded file URL or a YouTube/Vimeo/direct link
   videoPosterUrl String? // optional poster; UI falls back to imageUrl
   isAvailable    Boolean  @default(true) // false => out of stock
+  /// Counter-only: the cashier can punch it, the website never shows it and
+  /// the diner order builder refuses it. For the things a menu shouldn't
+  /// advertise but a till still has to ring up — a takeaway box charged by
+  /// size, an add-on somebody wants three of, a staff meal, a dessert that
+  /// doesn't survive a delivery ride.
+  ///
+  /// Nullable with no default: it ships as a hand-run migration, and a
+  /// defaulted column would go into the INSERT of every menu item created
+  /// before that migration is run. Treat null as false.
+  posOnly        Boolean?
   dietaryTags    String[] @default([]) // diet/allergen tag keys (see src/lib/menu/dietary.ts)
   sortOrder      Int      @default(0)
   createdAt      DateTime @default(now())
@@ -1730,6 +1740,15 @@ model Order {
   creditApplied       Int           @default(0) // centavos paid by a redeemed gift card / store credit
   giftCardId          String? // the gift card credit was redeemed from
   tipAmount           Int           @default(0) // centavos gratuity added at online checkout
+  /// Fee added on top for paying by card, in centavos, and what to call it on
+  /// the receipt. Written when the card tender is taken, so it reflects the
+  /// rate in force at that moment rather than whatever the settings say later.
+  ///
+  /// Nullable with no default on purpose: a defaulted column is one Prisma
+  /// writes into the INSERT of every order, and this ships as a hand-run
+  /// migration. Treat null as zero.
+  surchargeAmount     Int?
+  surchargeLabel      String?
   inventoryDeductedAt DateTime? // set once stock is deducted (idempotency)
   servedAt            DateTime? // set when the cashier confirms the food was served
   voidedAt            DateTime? // set when a cashier voids the (unpaid) order

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
 import { getMenu } from "@/server/menu/queries";
 import { getServingStates } from "@/server/menu/servings";
+import { getPosOnlyItemIds } from "@/server/menu/pos-only";
 import { formatPeso } from "@/lib/money";
 import { AddCategoryForm } from "@/components/admin/AddCategoryForm";
 import { AddItemForm } from "@/components/admin/AddItemForm";
@@ -25,6 +26,10 @@ export default async function MenuPage() {
   const { restaurantId } = await requireAdminPage();
   const categories = await getMenu(restaurantId);
   const servings = await getServingStates(restaurantId);
+  // Counter-only items look identical to every other item in this list, so
+  // without a badge an owner has no way to see which ones customers can't
+  // actually find.
+  const posOnly = await getPosOnlyItemIds(restaurantId);
   // AI menu import is a paid feature (Growth & Business). Gate on both the API
   // key being configured AND the restaurant's plan including it.
   const aiImportEnabled =
@@ -105,6 +110,11 @@ export default async function MenuPage() {
                       {!item.isAvailable && (
                         <span className="rounded-full bg-muted/20 px-2 py-0.5 text-xs text-muted">
                           Out of stock
+                        </span>
+                      )}
+                      {posOnly.has(item.id) && (
+                        <span className="rounded-full bg-plum-ink/10 px-2 py-0.5 text-xs font-medium text-plum-ink/70">
+                          Counter only
                         </span>
                       )}
                       {(() => {

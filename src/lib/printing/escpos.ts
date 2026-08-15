@@ -4,6 +4,7 @@ import {
   ticketHeading,
   ticketDocLabel,
   ticketBodyLines,
+  ticketCustomerLines,
   ticketFooterLines,
 } from "./ticket";
 import type { ShiftReport } from "./report";
@@ -132,12 +133,18 @@ export function encodeTicket(ticket: Ticket, openDrawer = false): Uint8Array {
   for (const line of header.slice(1)) b.line(line);
   b.size(true).line(ticketHeading(ticket)).size(false);
   b.bold(true).line(ticketDocLabel(ticket)).bold(false);
-  if (ticket.orderType === "delivery" && ticket.customerAddress) {
-    b.line(ticket.customerAddress);
+
+  // Who it's for and where it's going — left-aligned and bold, because this is
+  // the block a rider reads at a gate in the dark.
+  b.align("left");
+  const customer = ticketCustomerLines(ticket);
+  if (customer.length) {
+    b.bold(true);
+    for (const line of customer) b.line(line);
+    b.bold(false);
   }
 
   // Body — order meta, items, totals.
-  b.align("left");
   for (const line of ticketBodyLines(ticket)) b.line(line);
 
   // Footer — custom thank-you message, centered.

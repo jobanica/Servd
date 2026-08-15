@@ -143,6 +143,7 @@ export async function createItem(
       select: { id: true },
     }),
   );
+  await savePosOnly(restaurantId, created.id, formData);
   const costError = await saveFoodCost(restaurantId, created.id, formData.get("costPesos"));
   await refresh();
   return costError ? { error: costError } : { ok: true };
@@ -301,6 +302,7 @@ export async function updateItem(
       },
     }),
   );
+  await savePosOnly(restaurantId, id, formData);
   const costError = await saveFoodCost(restaurantId, id, formData.get("costPesos"));
   const limitError = await saveDailyLimit(restaurantId, id, formData.get("dailyLimit"));
   await refresh();
@@ -315,6 +317,35 @@ export async function updateItem(
  * clears the cap (unlimited). The field is absent on some forms (null) → leave
  * the existing setting untouched. Best-effort.
  */
+/**
+ * Counter-only, written on its own and best-effort.
+ *
+ * It ships as a hand-run migration (prisma/manual/add-pos-only-and-surcharge.sql),
+ * so writing it inline with the rest of the item would mean a database that
+ * hasn't run the file yet can't save a menu item at all. Failing quietly here
+ * costs one checkbox; failing loudly costs the whole menu editor.
+ */
+async function savePosOnly(
+  restaurantId: string,
+  menuItemId: string,
+  formData: FormData,
+): Promise<void> {
+  // An unchecked checkbox submits nothing, so a hidden marker distinguishes
+  // "the form offered this and it's off" from "this form has no such field" —
+  // otherwise every save from a form without the checkbox would clear it.
+  if (!formData.has("posOnlyField")) return;
+  try {
+    await tenantDb(restaurantId, (tx) =>
+      tx.menuItem.updateMany({
+        where: { id: menuItemId },
+        data: { posOnly: formData.get("posOnly") === "on" },
+      }),
+    );
+  } catch {
+    /* posOnly column not migrated yet */
+  }
+}
+
 async function saveDailyLimit(
   restaurantId: string,
   menuItemId: string,

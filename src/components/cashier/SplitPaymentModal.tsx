@@ -5,6 +5,7 @@ import { recordPartialPayment, type CashierTable } from "@/server/orders/cashier
 import { printPaidTicket } from "@/server/printing/print";
 import { runPrintDispatch, sendDrawerKick } from "@/lib/print/run-dispatch";
 import type { CounterMethod } from "@/server/orders/cashier";
+import { surchargeFor, surchargeLabel } from "@/lib/orders/surcharge";
 
 function peso(centavos: number) {
   return `₱${(centavos / 100).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
@@ -15,12 +16,15 @@ export function SplitPaymentModal({
   orderId,
   label,
   remaining,
+  cardSurchargeBp = 0,
   onClose,
   onResult,
 }: {
   orderId: string;
   label: string;
   remaining: number; // centavos still owed
+  /** Card fee in basis points. The server charges it; this just shows it. */
+  cardSurchargeBp?: number;
   onClose: () => void;
   onResult: (tables: CashierTable[]) => void;
 }) {
@@ -107,6 +111,20 @@ export function SplitPaymentModal({
             </select>
           </label>
         </div>
+
+        {/* The fee lands on the card portion only, so a split bill isn't
+            charged 3.5% of the whole thing. */}
+        {(() => {
+          const value = Number(amount);
+          const base = Number.isFinite(value) && value > 0 ? Math.round(value * 100) : 0;
+          const fee = surchargeFor(method, Math.min(base, owed), cardSurchargeBp);
+          return fee > 0 ? (
+            <p className="mt-2 rounded-lg bg-cream/60 px-3 py-2 text-sm text-plum-ink/70">
+              {surchargeLabel(cardSurchargeBp)} {peso(fee)} — charge{" "}
+              <strong className="text-plum-ink">{peso(Math.min(base, owed) + fee)}</strong> on the terminal.
+            </p>
+          ) : null;
+        })()}
 
         {error && <p className="mt-2 text-sm text-guava">{error}</p>}
 

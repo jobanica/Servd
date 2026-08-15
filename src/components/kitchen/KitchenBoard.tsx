@@ -65,6 +65,15 @@ function OrderCard({
         {order.typeLabel ?? "Dine in"}
       </p>
 
+      {/* Where it's going, for a kitchen that batches by zone: everything for
+          the same area gets cooked and bagged together instead of one ticket at
+          a time. Only present when the setting is on. */}
+      {order.customerAddress && (
+        <p className="border-b border-plum-ink/10 bg-cream/50 px-3 py-2 text-sm font-semibold leading-snug text-plum-ink/75">
+          📍 {order.customerAddress}
+        </p>
+      )}
+
       <ul className="flex-1 space-y-3 px-3 py-3">
         {order.items.map((it) => (
           <li key={it.id}>

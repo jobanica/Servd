@@ -26,6 +26,12 @@ import { awardPointsForOrder, getBalance, getLoyaltyConfig, redeemPoints, enroll
 import { notifyCustomer, restaurantDisplayName } from "@/server/sms/notify";
 import { manilaStartOfDay } from "@/lib/time/manila";
 import { getDishStock } from "@/server/inventory/dish-stock";
+import {
+  applyCardSurcharge,
+  revertCardSurcharge,
+  surchargeMap,
+  surchargeOnOrder,
+} from "@/server/orders/surcharge";
 
 export interface CashierOrder {
   id: string;
@@ -295,6 +301,9 @@ export async function getCashierTables(): Promise<CashierTable[]> {
 
   const discounts = await discountMap(staff.restaurantId, orders.map((o) => o.id));
   const credits = await creditMap(staff.restaurantId, orders.map((o) => o.id));
+  // Card fees already added — so a bill half-settled on a card still shows the
+  // right amount outstanding on the floor.
+  const surcharges = await surchargeMap(staff.restaurantId, orders.map((o) => o.id));
   const meta = await orderMetaMap(staff.restaurantId, orders.map((o) => o.id));
 
   const byTable = new Map<string, CashierTable>();
@@ -334,7 +343,7 @@ export async function getCashierTables(): Promise<CashierTable[]> {
     const disc = discounts.get(o.id);
     const discountAmount = disc?.amount ?? 0;
     const creditApplied = credits.get(o.id) ?? 0;
-    const net = netTotal(o.total, discountAmount, creditApplied);
+    const net = netTotal(o.total, discountAmount, creditApplied, surcharges.get(o.id) ?? 0);
     const paid = o.payments.reduce((s, p) => s + (p.amount ?? 0), 0);
     t.orders.push({
       id: o.id,
@@ -527,6 +536,56 @@ export async function declineOrder(orderId: string): Promise<CashierState> {
   return { ok: true, incoming: await getIncomingOrders(), tables: await getCashierTables() };
 }
 
+/**
+ * What's left on an order after everything already tendered against it.
+ *
+ * Its own function because the card fee has to be worked out on this number
+ * before the settle transaction opens — charging 3.5% of the full bill on a
+ * table that already paid half in cash would be quietly wrong.
+ */
+async function amountStillOwed(
+  restaurantId: string,
+  orderId: string,
+  discountAmount: number,
+  credit: number,
+  surcharge: number,
+): Promise<number> {
+  return tenantDb(restaurantId, async (tx) => {
+    const order = await tx.order.findFirst({ where: { id: orderId }, select: { total: true } });
+    if (!order) return 0;
+    const agg = await tx.payment.aggregate({
+      where: { orderId, status: "paid" },
+      _sum: { amount: true },
+    });
+    const net = netTotal(order.total, discountAmount, credit, surcharge);
+    return Math.max(0, net - (agg._sum.amount ?? 0));
+  });
+}
+
+/**
+ * Remember what the customer handed over, so the receipt can show the change.
+ *
+ * Best-effort and deliberately not part of the settle transaction: a receipt
+ * detail must never be the reason a payment fails to record.
+ */
+async function recordCashTendered(
+  restaurantId: string,
+  orderId: string,
+  method: string,
+  tenderedCentavos: number | undefined,
+): Promise<void> {
+  if (method !== "cash") return;
+  const tendered = Math.round(Number(tenderedCentavos) || 0);
+  if (tendered <= 0) return;
+  try {
+    await tenantDb(restaurantId, (tx) =>
+      tx.order.updateMany({ where: { id: orderId }, data: { cashTendered: tendered } }),
+    );
+  } catch {
+    /* cashTendered column not migrated yet — the receipt just omits the line */
+  }
+}
+
 /** Payment methods a cashier can record in person. */
 export type CounterMethod =
   | "cash"
@@ -535,10 +594,17 @@ export type CounterMethod =
   | "maya"
   | "bank_transfer";
 
-/** Record an in-person payment (cash/card/e-wallet). Marks paid AND closes the order. */
+/**
+ * Record an in-person payment (cash/card/e-wallet). Marks paid AND closes the order.
+ *
+ * `tenderedCentavos` is what the customer physically handed over on a cash
+ * sale. It changes nothing about what is charged — it's recorded so the receipt
+ * can print the cash received and the change given back.
+ */
 export async function markOrderPaid(
   orderId: string,
   method: CounterMethod,
+  tenderedCentavos?: number,
 ): Promise<{ ok: boolean; tables?: CashierTable[]; error?: string; printTicket?: boolean; drawerKickBase64?: string }> {
   let staff;
   try {
@@ -551,6 +617,13 @@ export async function markOrderPaid(
   const disc = (await discountMap(staff.restaurantId, [orderId])).get(orderId);
   const credit = (await creditMap(staff.restaurantId, [orderId])).get(orderId) ?? 0;
   let netPaid = 0;
+
+  // The card fee, charged on whatever is still owed. Worked out and written to
+  // the order BEFORE the tender is recorded, so a payment can only ever include
+  // a fee the order actually carries — see applyCardSurcharge for why.
+  const surcharge = await surchargeOnOrder(staff.restaurantId, orderId);
+  const owedBefore = await amountStillOwed(staff.restaurantId, orderId, disc?.amount ?? 0, credit, surcharge);
+  const { fee } = await applyCardSurcharge(staff.restaurantId, orderId, method, owedBefore);
 
   // Whose drawer this money lands in. Resolved before the transaction so a
   // shift lookup can never hold a settle open.
@@ -566,11 +639,13 @@ export async function markOrderPaid(
         select: { total: true, status: true },
       });
       if (!order) throw new Error("Order not found");
-      const net = netTotal(order.total, disc?.amount ?? 0, credit);
+      const net = netTotal(order.total, disc?.amount ?? 0, credit, surcharge + fee);
       // Settle only what's still owed after any prior split/partial tenders.
       const agg = await tx.payment.aggregate({ where: { orderId, status: "paid" }, _sum: { amount: true } });
       const amount = Math.max(0, net - (agg._sum.amount ?? 0));
-      netPaid = net;
+      // Loyalty earns on what the customer spent with the restaurant, not on
+      // the card fee passed through on top of it.
+      netPaid = Math.max(0, net - (surcharge + fee));
       // An order leaves the boards when it is BOTH paid and cooked — never on
       // payment alone. A takeout customer pays the moment they order, and
       // closing there used to wipe the ticket off the kitchen display before
@@ -596,11 +671,18 @@ export async function markOrderPaid(
     });
   } catch (e) {
     console.error("markOrderPaid failed", e);
+    // The fee was written before the tender; the tender didn't happen. Put it
+    // back, or a retry would charge the fee on top of itself.
+    await revertCardSurcharge(staff.restaurantId, orderId, fee);
     return { ok: false, error: e instanceof Error ? e.message : "Could not record the payment." };
   }
 
   // Credit the takings to this cashier's shift (best-effort — see the helper).
   if (paymentId) await stampPaymentShift(paymentId, shift?.id ?? null, staff.staffUserId);
+
+  // Written before the receipt is built, so the change prints on the copy the
+  // customer is handed rather than only on a reprint.
+  await recordCashTendered(staff.restaurantId, orderId, method, tenderedCentavos);
 
   // Award loyalty points (best-effort) to the order's customer phone.
   const phone = (await orderMetaMap(staff.restaurantId, [orderId])).get(orderId)?.customerPhone ?? null;
@@ -646,6 +728,22 @@ export async function recordPartialPayment(
 
   const disc = (await discountMap(staff.restaurantId, [orderId])).get(orderId);
   const credit = (await creditMap(staff.restaurantId, [orderId])).get(orderId) ?? 0;
+
+  // Split bills carry the card fee only on the part that goes on the card: pay
+  // half in cash and half by card and you're charged 3.5% of the half, not of
+  // the bill. That falls out of charging the fee on the tender rather than on
+  // the order.
+  const surchargeBefore = await surchargeOnOrder(staff.restaurantId, orderId);
+  const owedBefore = await amountStillOwed(
+    staff.restaurantId,
+    orderId,
+    disc?.amount ?? 0,
+    credit,
+    surchargeBefore,
+  );
+  const base = Math.min(requested, owedBefore);
+  const { fee } = await applyCardSurcharge(staff.restaurantId, orderId, method, base);
+
   const shift = await ensureShift(staff.restaurantId, staff.staffUserId, () =>
     staffLabel(staff.restaurantId, staff.staffUserId),
   );
@@ -662,7 +760,7 @@ export async function recordPartialPayment(
         select: { total: true },
       });
       if (!order) throw new Error("This order is already settled.");
-      const net = netTotal(order.total, disc?.amount ?? 0, credit);
+      const net = netTotal(order.total, disc?.amount ?? 0, credit, surchargeBefore + fee);
       const agg = await tx.payment.aggregate({
         where: { orderId, status: "paid" },
         _sum: { amount: true },
@@ -671,7 +769,10 @@ export async function recordPartialPayment(
       const owed = Math.max(0, net - paidSoFar);
       if (owed <= 0) throw new Error("This order is already fully paid.");
 
-      const amount = Math.min(requested, owed);
+      // The fee rides along with the tender it belongs to: the customer taps
+      // for the amount they chose plus the fee on it, and the remaining balance
+      // moves by the amount alone.
+      const amount = Math.min(base + fee, owed);
       const p = await tx.payment.create({
         data: { orderId, amount, method, gateway: "manual", status: "paid" },
         select: { id: true },
@@ -697,6 +798,7 @@ export async function recordPartialPayment(
       }
     });
   } catch (e) {
+    await revertCardSurcharge(staff.restaurantId, orderId, fee);
     return { ok: false, error: e instanceof Error ? e.message : "Couldn't record the payment." };
   }
 
@@ -714,6 +816,9 @@ export async function recordPartialPayment(
     const order = await tenantDb(staff.restaurantId, (tx) =>
       tx.order.findFirst({ where: { id: orderId }, select: { total: true } }),
     );
+    // No surcharge in the points base: the card fee is a cost passed through,
+    // not something the customer spent with the restaurant, and earning points
+    // on it would reward paying the more expensive way.
     if (order) await awardPointsForOrder(staff.restaurantId, orderId, netTotal(order.total, disc2?.amount ?? 0, credit2), phone);
     const settle = await printReceipt(staff.restaurantId, orderId);
     printTicket = settle.clientPrintNeeded;
@@ -1238,7 +1343,9 @@ export async function redeemLoyalty(
 /** Menu (categories → items → modifiers) for the cashier's restaurant. */
 export async function getPosMenu(): Promise<DinerCategory[]> {
   const staff = await requireStaff(["cashier", "admin"]);
-  return getPublicMenu(staff.restaurantId);
+  // The one caller that sees counter-only items: boxes, repeat add-ons, staff
+  // meals, and anything that doesn't survive a delivery ride.
+  return getPublicMenu(staff.restaurantId, "en", { includePosOnly: true });
 }
 
 export interface PosCustomer {
@@ -1315,7 +1422,7 @@ export async function addItemsToOrder(
 
   let built;
   try {
-    built = await buildValidatedOrder(staff.restaurantId, lines);
+    built = await buildValidatedOrder(staff.restaurantId, lines, { channel: "pos" });
   } catch (e) {
     if (e instanceof OrderValidationError) return { ok: false, error: e.message };
     return { ok: false, error: "Could not add the items." };
@@ -1389,7 +1496,7 @@ export async function createCashierOrder(input: {
 
   let built;
   try {
-    built = await buildValidatedOrder(staff.restaurantId, input.lines);
+    built = await buildValidatedOrder(staff.restaurantId, input.lines, { channel: "pos" });
   } catch (e) {
     if (e instanceof OrderValidationError) return { ok: false, error: e.message };
     return { ok: false, error: "Could not build the order." };

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { formatPeso, pesosToCentavos } from "@/lib/money";
+import { surchargeFor, surchargeLabel } from "@/lib/orders/surcharge";
 import type { CounterMethod } from "@/server/orders/cashier";
 
 const METHODS: { key: CounterMethod; label: string }[] = [
@@ -28,6 +29,7 @@ export function PayModal({
   due,
   busy,
   initialMethod = "cash",
+  cardSurchargeBp = 0,
   onConfirm,
   onCancel,
 }: {
@@ -35,7 +37,9 @@ export function PayModal({
   due: number; // centavos still owed
   busy: boolean;
   initialMethod?: CounterMethod;
-  onConfirm: (method: CounterMethod, change: number) => void;
+  /** Card fee in basis points (350 = 3.5%). Recomputed server-side on settle. */
+  cardSurchargeBp?: number;
+  onConfirm: (method: CounterMethod, change: number, tendered: number) => void;
   onCancel: () => void;
 }) {
   const [method, setMethod] = useState<CounterMethod>(initialMethod);
@@ -47,10 +51,15 @@ export function PayModal({
   }, [tendered]);
 
   const isCash = method === "cash";
-  const change = tenderedCentavos - due;
+  // Shown so the cashier can say the number out loud before the customer taps.
+  // The server works the fee out again from the saved rate and ignores this —
+  // what a customer is charged is never decided in a browser.
+  const fee = surchargeFor(method, due, cardSurchargeBp);
+  const charged = due + fee;
+  const change = tenderedCentavos - charged;
   const short = isCash && tenderedCentavos > 0 && change < 0;
   // Cash needs enough handed over; the other methods are already settled.
-  const canConfirm = !busy && (!isCash || tenderedCentavos >= due);
+  const canConfirm = !busy && (!isCash || tenderedCentavos >= charged);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-6">
@@ -67,7 +76,12 @@ export function PayModal({
 
         <div className="mt-4 rounded-xl bg-cream/60 p-4 text-center">
           <p className="text-xs font-semibold uppercase tracking-wide text-plum-ink/45">Amount due</p>
-          <p className="font-heading text-3xl font-extrabold text-plum-ink">{formatPeso(due)}</p>
+          <p className="font-heading text-3xl font-extrabold text-plum-ink">{formatPeso(charged)}</p>
+          {fee > 0 && (
+            <p className="mt-1 text-xs font-semibold text-plum-ink/60">
+              {formatPeso(due)} + {surchargeLabel(cardSurchargeBp)} {formatPeso(fee)}
+            </p>
+          )}
         </div>
 
         {/* Method */}
@@ -106,12 +120,12 @@ export function PayModal({
             <div className="mt-2 flex flex-wrap gap-1.5">
               <button
                 type="button"
-                onClick={() => setTendered(String(due / 100))}
+                onClick={() => setTendered(String(charged / 100))}
                 className="rounded-full border border-plum-ink/15 px-3 py-1 text-xs font-semibold"
               >
                 Exact
               </button>
-              {QUICK.filter((n) => n * 100 >= due).map((n) => (
+              {QUICK.filter((n) => n * 100 >= charged).map((n) => (
                 <button
                   key={n}
                   type="button"
@@ -143,16 +157,20 @@ export function PayModal({
           </div>
         ) : (
           <p className="mt-4 rounded-lg bg-cream/60 px-3 py-2.5 text-center text-sm text-plum-ink/70">
-            Have the customer scan or tap, then confirm once the payment shows on your side.
+            {fee > 0
+              ? `Charge ${formatPeso(charged)} on the terminal — that's the bill plus the card fee.`
+              : "Have the customer scan or tap, then confirm once the payment shows on your side."}
           </p>
         )}
 
         <button
-          onClick={() => onConfirm(method, isCash ? Math.max(0, change) : 0)}
+          onClick={() =>
+            onConfirm(method, isCash ? Math.max(0, change) : 0, isCash ? tenderedCentavos : 0)
+          }
           disabled={!canConfirm}
           className="mt-4 w-full rounded-xl py-3.5 font-heading text-base font-bold btn-brand disabled:opacity-50"
         >
-          {busy ? "Recording…" : `Confirm ${formatPeso(due)} paid`}
+          {busy ? "Recording…" : `Confirm ${formatPeso(charged)} paid`}
         </button>
       </div>
     </div>

@@ -7,6 +7,7 @@ import { deductForOrder } from "@/server/inventory/deduct";
 import { formatOrderNumber } from "@/lib/orders/order-number";
 import { orderTypeLabelWithEmoji } from "@/lib/orders/order-type";
 import { manilaStartOfDay } from "@/lib/time/manila";
+import { kitchenShowsAddress } from "@/server/printing/kitchen-options";
 import type { KitchenOrder } from "@/lib/orders/types";
 
 const ACTIVE = ["new", "preparing"] as const;
@@ -65,17 +66,30 @@ async function decorate(
   restaurantId: string,
   orders: RawKitchenOrder[],
 ): Promise<KitchenOrder[]> {
+  // Only asked for when the kitchen actually works by zone — otherwise the
+  // address isn't fetched at all, rather than fetched and hidden.
+  const showAddress = await kitchenShowsAddress(restaurantId);
+
   // Best-effort pickup/delivery/counter labels (columns may lag on prod).
   const labels = new Map<string, string>();
   const types = new Map<string, string>();
+  const addresses = new Map<string, string>();
   try {
     const meta = await tenantDb(restaurantId, (tx) =>
       tx.order.findMany({
         where: { id: { in: orders.map((o) => o.id) }, orderType: { not: "dine_in" } },
-        select: { id: true, orderType: true, customerName: true, orderNumber: true },
+        select: {
+          id: true,
+          orderType: true,
+          customerName: true,
+          orderNumber: true,
+          ...(showAddress ? { customerAddress: true as const } : {}),
+        },
       }),
     );
     for (const m of meta) {
+      const addr = (m as { customerAddress?: string | null }).customerAddress?.trim();
+      if (showAddress && m.orderType === "delivery" && addr) addresses.set(m.id, addr);
       // A counter/stall order shows its big daily ticket number to the kitchen.
       // The type reads the same word here as on the cashier screen and the
       // receipt — the kitchen assembles from all three.
@@ -100,6 +114,7 @@ async function decorate(
     status: o.status as KitchenOrder["status"],
     createdAt: o.createdAt.toISOString(),
     total: o.total,
+    customerAddress: addresses.get(o.id) ?? null,
     items: o.items.map((it) => ({
       id: it.id,
       name: it.nameAtTime,

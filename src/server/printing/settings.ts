@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireAdminAction } from "@/server/tenancy/require-admin";
+import { percentToBp } from "@/lib/printing/printer-config";
 import type { PrintMethod } from "@prisma/client";
 
 export type FormState = { ok?: boolean; error?: string } | null;
@@ -19,6 +20,11 @@ const schema = z.object({
   receiptWebsite: z.string().max(120).optional(),
   receiptFooter: z.string().max(300).optional(),
   receiptShowVat: z.coerce.boolean().default(true),
+  receiptShowCustomer: z.coerce.boolean().default(true),
+  receiptShowCashTendered: z.coerce.boolean().default(true),
+  kitchenShowAddress: z.coerce.boolean().default(false),
+  // Typed as a percentage ("3.5"); stored as basis points.
+  cardSurchargePercent: z.string().max(10).optional(),
   autoPrintReceipt: z.coerce.boolean().default(true),
   openDrawerOn: z.enum(["never", "cash", "any"]).default("cash"),
 });
@@ -38,6 +44,10 @@ export async function updatePrintSettings(
     receiptWebsite: formData.get("receiptWebsite") ?? "",
     receiptFooter: formData.get("receiptFooter") ?? "",
     receiptShowVat: formData.get("receiptShowVat") === "on",
+    receiptShowCustomer: formData.get("receiptShowCustomer") === "on",
+    receiptShowCashTendered: formData.get("receiptShowCashTendered") === "on",
+    kitchenShowAddress: formData.get("kitchenShowAddress") === "on",
+    cardSurchargePercent: String(formData.get("cardSurchargePercent") ?? ""),
     autoPrintReceipt: formData.get("autoPrintReceipt") === "on",
     openDrawerOn: formData.get("openDrawerOn") ?? "cash",
   });
@@ -68,7 +78,13 @@ export async function updatePrintSettings(
       website: trimOrNull(parsed.data.receiptWebsite),
       footer: trimOrNull(parsed.data.receiptFooter),
       showVat: parsed.data.receiptShowVat,
+      showCustomer: parsed.data.receiptShowCustomer,
+      showCashTendered: parsed.data.receiptShowCashTendered,
     };
+    cfg.kitchen = { showAddress: parsed.data.kitchenShowAddress };
+    // Everything here rides in the JSON column that already exists, so these
+    // four settings work the moment this deploys — no migration to wait on.
+    cfg.payments = { cardSurchargeBp: percentToBp(parsed.data.cardSurchargePercent) };
 
     // Mark the printer method as deliberately chosen (drives onboarding).
     cfg.configured = true;

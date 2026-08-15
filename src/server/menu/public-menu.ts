@@ -6,6 +6,7 @@ import { getServingStates } from "@/server/menu/servings";
 import { getDishStock } from "@/server/inventory/dish-stock";
 import { getVariantsMap } from "@/server/menu/variants";
 import { getUnavailableModifierIds } from "@/server/menu/modifier-availability";
+import { getPosOnlyItemIds } from "@/server/menu/pos-only";
 
 /**
  * Loads a restaurant's full menu for the diner page, by restaurantId. Returns
@@ -14,10 +15,17 @@ import { getUnavailableModifierIds } from "@/server/menu/modifier-availability";
  * Runs in the trusted system context (diners have no session) but the query is
  * tightly scoped to ONE restaurantId, and includes only diner-relevant fields.
  * Out-of-stock items are returned too (the UI shows them disabled).
+ *
+ * Counter-only items are left out unless `includePosOnly` is set, which only
+ * the cashier's own POS does. They're dropped entirely rather than returned
+ * disabled: a diner shouldn't see that a ₱30 takeaway box or a staff meal
+ * exists at all. Hiding them here is presentation — the order builder refuses
+ * them independently, so a crafted request can't order what the page won't show.
  */
 export async function getPublicMenu(
   restaurantId: string,
   locale = "en",
+  opts: { includePosOnly?: boolean } = {},
 ): Promise<DinerCategory[]> {
   const categories = await systemDb((tx) =>
     tx.category.findMany({
@@ -69,11 +77,20 @@ export async function getPublicMenu(
   // while orders are already in the kitchen.
   const dishStock = await getDishStock(restaurantId, itemIds);
 
+  // Counter-only items — hidden from every diner-facing surface.
+  const posOnly = opts.includePosOnly ? new Set<string>() : await getPosOnlyItemIds(restaurantId);
+
+  // A category emptied entirely by that filter goes with it — a "Staff meals"
+  // heading with nothing under it advertises the hidden menu it's meant to hide.
+  const visible = categories.filter(
+    (c) => c.menuItems.length === 0 || c.menuItems.some((i) => !posOnly.has(i.id)),
+  );
+
   // Overlay the requested locale's translations, falling back to base text.
-  return categories.map((c) => ({
+  return visible.map((c) => ({
     id: c.id,
     name: c.translations[0]?.name ?? c.name,
-    items: c.menuItems.map((item) => {
+    items: c.menuItems.filter((i) => !posOnly.has(i.id)).map((item) => {
       const eff = effectivePrice(item.price, { id: item.id, categoryId: item.categoryId }, happyHours);
       // Out of daily servings → sold out for the rest of today.
       const cap = servings.get(item.id);

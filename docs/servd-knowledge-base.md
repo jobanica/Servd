@@ -242,6 +242,14 @@ the cash drawer figure, because nobody put that money in a till.
 - **Daily servings limit** — cap how many of an item can be sold per day
 - **Food cost per item**, feeding COGS and profit reporting
 - Mark items available / out of stock
+- **Counter-only items** — an item can be marked "Counter only". The cashier can
+  punch it at the POS; it never appears on the online menu or the QR dine-in
+  menu, and a web order that names one is refused. Built for the things a menu
+  shouldn't advertise but a till still has to ring up: takeaway boxes charged by
+  size, an add-on a customer wants three of (punch the item 3x rather than
+  fighting a modifier that has no quantity), staff meals, and dishes that don't
+  survive a delivery ride. A category whose items are all counter-only
+  disappears from the storefront entirely.
 - Sort order for both categories and items
 - Per-item **translations** for multi-language menus
 - **AI menu import** — upload a photo or PDF of a printed menu and it is read
@@ -257,6 +265,13 @@ the cash drawer figure, because nobody put that money in a till.
 **Online:** GCash and card through a payment gateway. Each restaurant connects
 its **own** gateway account (**PayMongo** or **Xendit**); credentials are
 encrypted at rest and money goes directly to the restaurant.
+
+**Card surcharge.** A restaurant can set a card fee (e.g. 3.5%) in Printer
+settings. It is added on top when a customer pays by card at the counter, worked
+out on the server from the saved rate, shown in the pay screen before the
+customer taps, and printed as its own line on the receipt with the rate on it.
+On a split bill it applies only to the portion that goes on the card. Loyalty
+points are not earned on the fee.
 
 **Other payment capability**
 - Split payments and partial tenders
@@ -284,6 +299,17 @@ Servd supports four printing transports, set per restaurant:
 Receipts are 32-column thermal, with restaurant name, address, phone, website,
 custom footer, optional VAT breakdown, and a QR code to order online.
 
+**Optional receipt lines** (Printer settings → Receipt design)
+- **Who the order is for** — customer name, contact number, and the delivery
+  address on delivery orders, wrapped to fit the paper. This is what a rider
+  reads: without it they go back to the app or Facebook to find where they're
+  going and a number to ring on arrival. Dine-in receipts are unaffected — the
+  table number already says who it's for. On by default.
+- **Cash received and change** — on cash sales only. Settles the "I gave you a
+  thousand" conversation and lets the customer check their change on the way
+  out. On by default.
+- **VAT breakdown** — off for non-VAT-registered sellers.
+
 **Cash drawer.** The drawer plugs into the receipt printer and opens when the
 printer is sent a pulse. Configurable: never, on cash payments only (default),
 or on every payment. Not available through the OS print dialog, which cannot
@@ -293,6 +319,9 @@ send printer control codes.
 - Print a kitchen ticket automatically for every new order (for kitchens with no
   display)
 - Print a receipt automatically when a payment settles — can be turned off
+- Show delivery addresses on the kitchen display and kitchen tickets — off by
+  default. On, a kitchen that works by zone sees everything heading the same way
+  together and can cook and bag it in one run instead of one ticket at a time.
 
 ---
 

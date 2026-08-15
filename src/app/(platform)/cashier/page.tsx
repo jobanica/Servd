@@ -9,6 +9,7 @@ import { ServiceWorkerRegister } from "@/components/offline/ServiceWorkerRegiste
 import { StaffDataError } from "@/components/StaffDataError";
 import { hasTutorials } from "@/server/tutorials/tutorials";
 import { staffLabel } from "@/server/tenancy/staff-name";
+import { cardSurchargeBp } from "@/server/orders/surcharge";
 
 export default async function CashierHome() {
   const user = await getCurrentUser();
@@ -42,6 +43,9 @@ export default async function CashierHome() {
   }
 
   const cashierName = await staffLabel(user.restaurantId, user.staffUserId);
+  // Shown in the pay modal so the cashier can read the total out before the
+  // customer taps. The settle recomputes it server-side regardless.
+  const surchargeBp = await cardSurchargeBp(user.restaurantId);
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
@@ -74,6 +78,7 @@ export default async function CashierHome() {
         isAdmin={user.role === "admin"}
         offlineEnabled={offlineEnabled}
         showTutorials={await hasTutorials()}
+        cardSurchargeBp={surchargeBp}
       />
       {offlineEnabled && <ServiceWorkerRegister />}
     </div>

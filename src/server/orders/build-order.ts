@@ -8,6 +8,7 @@ import { getServingStates } from "@/server/menu/servings";
 import { getVariantsMap } from "@/server/menu/variants";
 import { getUnavailableModifierIds } from "@/server/menu/modifier-availability";
 import { getDishStock } from "@/server/inventory/dish-stock";
+import { getPosOnlyItemIds } from "@/server/menu/pos-only";
 import type { DinerItem, Selection } from "@/lib/cart/types";
 
 /**
@@ -47,11 +48,22 @@ export interface BuiltOrder {
 /** Thrown when the submitted lines fail validation (sold out, bad modifier…). */
 export class OrderValidationError extends Error {}
 
+/**
+ * Where the order is being rung up. Counter-only items are punchable at the
+ * till and refused everywhere else — the storefront hides them, and this makes
+ * hiding them irrelevant to whether they can be ordered.
+ */
+export type OrderChannel = "web" | "pos";
+
 export async function buildValidatedOrder(
   restaurantId: string,
   lines: OrderLineInput[],
+  opts: { channel?: OrderChannel } = {},
 ): Promise<BuiltOrder> {
   if (!lines.length) throw new OrderValidationError("Your order is empty.");
+  // Defaults to the diner's channel: a caller that forgets to say gets the
+  // stricter rule, never the looser one.
+  const channel = opts.channel ?? "web";
 
   const itemIds = [...new Set(lines.map((l) => l.itemId))];
   const dbItems = await tenantDb(restaurantId, (tx) =>
@@ -90,6 +102,10 @@ export async function buildValidatedOrder(
   // already promised to orders in progress. Empty for anyone not tracking
   // stock, which is how it behaved before inventory existed.
   const dishStock = await getDishStock(restaurantId, itemIds);
+  // Counter-only items. The storefront never renders them, so reaching one from
+  // the web means a stale page or a crafted request — either way it's refused
+  // here rather than trusted to have been hidden.
+  const posOnly = channel === "pos" ? new Set<string>() : await getPosOnlyItemIds(restaurantId);
 
   let total = 0;
   const items: BuiltOrderItem[] = [];
@@ -100,6 +116,9 @@ export async function buildValidatedOrder(
   for (const line of lines) {
     const dbItem = itemMap.get(line.itemId);
     if (!dbItem) throw new OrderValidationError("An item is no longer on the menu.");
+    // Same wording as a delisted item on purpose: the storefront shouldn't
+    // confirm that a counter-only item exists.
+    if (posOnly.has(dbItem.id)) throw new OrderValidationError("An item is no longer on the menu.");
     if (!dbItem.isAvailable) throw new OrderValidationError(`"${dbItem.name}" is sold out.`);
 
     // Enforce the per-day servings cap (counts every line of this item together).
