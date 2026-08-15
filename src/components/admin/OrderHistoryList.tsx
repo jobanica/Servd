@@ -62,6 +62,16 @@ export function OrderHistoryList({ orders }: { orders: HistoryOrder[] }) {
                       Unpaid
                     </span>
                   )}
+                  {/* Marked settled, but no money was ever recorded against it.
+                      Every report — dashboard, accounting, the shift Z-report —
+                      counts payments, so an order in this state is a ticket you
+                      can see here and nowhere else. Saying so beats leaving the
+                      two screens to contradict each other. */}
+                  {!cancelled && o.paymentStatus === "paid" && o.paid === 0 && o.total > 0 && (
+                    <span className="rounded-full bg-plum-ink/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-plum-ink/70">
+                      No payment recorded
+                    </span>
+                  )}
                 </p>
                 <p className="truncate text-xs text-plum-ink/50">
                   {o.at} · {o.itemCount} item{o.itemCount === 1 ? "" : "s"}

@@ -14,7 +14,23 @@ import { tenantDb } from "@/server/tenancy/scoped-db";
  */
 
 export interface AnalyticsBundle {
-  summary: { revenue: number; orders: number; aov: number; avgRating: number | null; ratingCount: number };
+  summary: {
+    revenue: number;
+    /** Orders that were PAID in the window — the figure revenue is built from. */
+    orders: number;
+    /**
+     * Orders PLACED in the window, settled or not (cancelled ones excluded).
+     *
+     * Revenue counts money taken, which is right, but it means an order taken
+     * and not yet settled contributes nothing — so a dashboard reading
+     * "Orders today: 0" next to an order plainly sitting in the history looks
+     * broken when it's just unpaid. This is the number that says so.
+     */
+    placedOrders: number;
+    aov: number;
+    avgRating: number | null;
+    ratingCount: number;
+  };
   revenueByDay: { day: string; revenue: number }[];
   topItems: { name: string; qty: number; revenue: number }[];
   worstItems: { name: string; qty: number; revenue: number }[];
@@ -52,6 +68,13 @@ export async function getAnalytics(
 
     const revenue = paid.reduce((s, p) => s + p.amount, 0);
     const orderCount = new Set(paid.map((p) => p.orderId)).size;
+
+    // Orders taken in the window, whether or not the money has landed. Counted
+    // on the order's own timestamp, so it deliberately answers a different
+    // question from revenue rather than trying to agree with it.
+    const placedOrders = await tx.order.count({
+      where: { createdAt: { gte: from, lte: to }, status: { not: "cancelled" } },
+    });
 
     // Bucketed on the payment's own timestamp, in Manila — matching the summary
     // above and the accounting report, which is the whole point.
@@ -114,6 +137,7 @@ export async function getAnalytics(
       summary: {
         revenue,
         orders: orderCount,
+        placedOrders,
         aov: orderCount > 0 ? Math.round(revenue / orderCount) : 0,
         avgRating: fb._avg.rating ? Number(fb._avg.rating.toFixed(2)) : null,
         ratingCount: fb._count,

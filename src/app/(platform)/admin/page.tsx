@@ -16,10 +16,20 @@ import { getAiInsights, aiInsightsEnabled } from "@/server/ai/insights";
 import { hasTutorials } from "@/server/tutorials/tutorials";
 
 /** Resolves a promise, returning a fallback if it throws (schema-lag safe). */
-async function safe<T>(p: Promise<T>, fallback: T): Promise<T> {
+/**
+ * Keep one failed panel from taking the whole dashboard down.
+ *
+ * It logs, and that matters. This used to swallow the error and hand back a
+ * fallback, so a query that was failing outright rendered as "₱0.00 · 0 orders"
+ * — a number indistinguishable from a quiet morning. Nobody can debug a figure
+ * that lies quietly. Callers that show money pass null and render a visible
+ * "couldn't load" instead of a zero.
+ */
+async function safe<T>(label: string, p: Promise<T>, fallback: T): Promise<T> {
   try {
     return await p;
-  } catch {
+  } catch (e) {
+    console.error(`[dashboard] ${label} failed:`, e);
     return fallback;
   }
 }
@@ -74,14 +84,15 @@ export default async function AdminHome() {
   const startOfDay = manilaStartOfDay(now);
   const weekAgo = manilaStartOfDaysAgo(7, now);
 
-  const inventoryOn = await safe(hasModule(rid, "inventory"), false);
+  const inventoryOn = await safe("inventory module", hasModule(rid, "inventory"), false);
   // Cached platform-wide, so this is not a per-dashboard query.
   const tutorialsReady = await hasTutorials();
 
   const [today, week, counts, recent, feedback, lowStock] = await Promise.all([
-    safe(getAnalytics(rid, startOfDay, now), null),
-    safe(getAnalytics(rid, weekAgo, now), null),
+    safe("today", getAnalytics(rid, startOfDay, now), null),
+    safe("week", getAnalytics(rid, weekAgo, now), null),
     safe(
+      "counts",
       tenantDb(rid, async (tx) => {
         const [pending, open, preparing, ready, tables, activeTables] = await Promise.all([
           tx.order.count({ where: { status: "pending" } }),
@@ -96,6 +107,7 @@ export default async function AdminHome() {
       { pending: 0, open: 0, preparing: 0, ready: 0, tables: 0, activeTables: 0 },
     ),
     safe(
+      "recent orders",
       tenantDb(rid, (tx) =>
         tx.order.findMany({
           orderBy: { createdAt: "desc" },
@@ -109,8 +121,8 @@ export default async function AdminHome() {
       ),
       [] as Array<{ id: string; status: string; paymentStatus: string; total: number; createdAt: Date; table: { tableNumber: string } | null; _count: { items: number } }>,
     ),
-    safe(getFeedbackList(rid), [] as Awaited<ReturnType<typeof getFeedbackList>>),
-    inventoryOn ? safe(listInventory(rid), []) : Promise.resolve([]),
+    safe("feedback", getFeedbackList(rid), [] as Awaited<ReturnType<typeof getFeedbackList>>),
+    inventoryOn ? safe("inventory", listInventory(rid), []) : Promise.resolve([]),
   ]);
 
   const lowItems = lowStock.filter((i) => i.low).slice(0, 5);
@@ -141,6 +153,7 @@ export default async function AdminHome() {
   const aiOn = aiInsightsEnabled() && aiAllowed;
   const aiInsights = aiOn
     ? await safe(
+        "AI insights",
         getAiInsights(rid, {
           restaurantName: restaurant.displayName || restaurant.name,
           week,
@@ -151,10 +164,14 @@ export default async function AdminHome() {
       )
     : null;
   const insights = aiInsights && aiInsights.length ? aiInsights : ruleInsights;
+
+  // Orders taken today that revenue can't see yet, because nothing has been
+  // collected against them.
+  const unsettledToday = Math.max(0, (today?.summary.placedOrders ?? 0) - (today?.summary.orders ?? 0));
   const insightsAreAi = !!(aiInsights && aiInsights.length);
 
   // Unified plan-status banner (trial countdown + Free-tier order cap).
-  const bannerData = await safe(getPlanBannerData(rid), null);
+  const bannerData = await safe("plan banner", getPlanBannerData(rid), null);
 
   return (
     <div className="space-y-5">
@@ -174,8 +191,29 @@ export default async function AdminHome() {
           href="/cashier"
           accent={counts.pending > 0}
         />
-        <Kpi label="Revenue today" value={formatPeso(today?.summary.revenue ?? 0)} hint="Paid orders" />
-        <Kpi label="Orders today" value={String(today?.summary.orders ?? 0)} />
+        {/* A failed query renders "—", never "₱0.00". A zero that means "the
+            figure didn't load" is worse than no figure at all: it reads as a
+            day with no sales, and there's nothing to tell the two apart. */}
+        <Kpi
+          label="Revenue today"
+          value={today ? formatPeso(today.summary.revenue) : "—"}
+          hint={today ? "Paid orders" : "Couldn't load — try reloading"}
+        />
+        <Kpi
+          label="Orders today"
+          value={today ? String(today.summary.orders) : "—"}
+          hint={
+            !today
+              ? "Couldn't load — try reloading"
+              : unsettledToday > 0
+                // The case that looks like a bug and isn't: the order was taken,
+                // the money hasn't landed, and revenue only counts money.
+                ? `Paid · ${unsettledToday} more placed, not settled yet`
+                : "Paid and settled"
+          }
+          href={unsettledToday > 0 ? "/cashier" : undefined}
+          accent={unsettledToday > 0}
+        />
         <Kpi label="Open orders" value={String(counts.open)} hint="Awaiting / cooking / to settle" />
         <Kpi label="Avg rating today" value={today?.summary.avgRating != null ? `${today.summary.avgRating} ★` : "—"} />
       </div>
