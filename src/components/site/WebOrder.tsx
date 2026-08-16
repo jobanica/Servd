@@ -18,6 +18,7 @@ import { previewPromoCode } from "@/server/promotions/redeem";
 import { CartThumb } from "@/components/diner/CartThumb";
 import { CategoryTabs, categorySectionId } from "@/components/menu/CategoryTabs";
 import { captureCartLead } from "@/server/marketing/cart-recovery";
+import { wrapsMidnight } from "@/lib/site/store-hours";
 import { LocationPicker } from "./LocationPicker";
 import { WebOrderTracker } from "./WebOrderTracker";
 import { haversineKm, computeDistanceFee } from "@/lib/geo/distance";
@@ -173,7 +174,14 @@ function groupHours(hours: DayHours[]): { label: string; value: string }[] {
     const h = hours[start];
     const range = start === i - 1 ? DAY_LABELS[start] : `${DAY_LABELS[start]}–${DAY_LABELS[i - 1]}`;
     const label = start === 0 && i === 7 ? "Every day" : range;
-    rows.push({ label, value: h.closed ? "Closed" : `${to12h(h.open)} – ${to12h(h.close)}` });
+    // "10 AM – 2:30 AM" reads as a mistake unless it says which day it means.
+    const overnight = wrapsMidnight(h);
+    rows.push({
+      label,
+      value: h.closed
+        ? "Closed"
+        : `${to12h(h.open)} – ${to12h(h.close)}${overnight ? " (next day)" : ""}`,
+    });
     start = i;
   }
   return rows;

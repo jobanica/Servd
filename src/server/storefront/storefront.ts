@@ -1,6 +1,7 @@
 import "server-only";
 
 import { tenantDb, systemDb } from "@/server/tenancy/scoped-db";
+import { isOpenAt } from "@/lib/site/store-hours";
 
 export interface DayHours {
   open: string; // "HH:MM"
@@ -283,18 +284,14 @@ export async function getPublicStorefront(restaurantId: string): Promise<Storefr
   }
 }
 
-/** Whether the store is open at the given moment (PH time, UTC+8). */
+/**
+ * Whether the store is open at the given moment (PH time, UTC+8).
+ *
+ * The rule lives in lib/site/store-hours so the storefront badge, the online
+ * order gate and its tests all read the same one. It used to consult only the
+ * current day's row, which shut a shop at 2 AM on a Sunday while Saturday's
+ * 10:00–02:30 session was still running.
+ */
 export function isOpenNow(hours: DayHours[], now = new Date()): boolean {
-  const ph = new Date(now.getTime() + 8 * 3600000); // shift to UTC+8
-  const day = ph.getUTCDay();
-  const today = hours[day];
-  if (!today || today.closed) return false;
-  const mins = ph.getUTCHours() * 60 + ph.getUTCMinutes();
-  const [oh, om] = today.open.split(":").map(Number);
-  const [ch, cm] = today.close.split(":").map(Number);
-  const openM = oh * 60 + om;
-  const closeM = ch * 60 + cm;
-  // Handle past-midnight close (e.g. 18:00–02:00).
-  if (closeM <= openM) return mins >= openM || mins < closeM;
-  return mins >= openM && mins < closeM;
+  return isOpenAt(hours, now);
 }
