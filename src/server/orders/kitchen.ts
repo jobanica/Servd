@@ -104,7 +104,14 @@ async function decorate(
   try {
     const meta = await tenantDb(restaurantId, (tx) =>
       tx.order.findMany({
-        where: { id: { in: orders.map((o) => o.id) }, orderType: { not: "dine_in" } },
+        // Dine-in is included when it carries a ticket number: a shop that
+        // rings up at the counter and seats people afterwards has dine-in
+        // orders with no table, and those are called by number. Without this
+        // they reached the kitchen labelled "—".
+        where: {
+          id: { in: orders.map((o) => o.id) },
+          OR: [{ orderType: { not: "dine_in" } }, { orderNumber: { not: null } }],
+        },
         select: {
           id: true,
           orderType: true,
@@ -128,6 +135,9 @@ async function decorate(
         types.set(m.id, label);
         continue;
       }
+      // A dine-in order only reaches here with a number; without one the
+      // table number the board already has is the right title.
+      if (m.orderType === "dine_in") continue;
       // Title = who the order is for; the type shows on its own line.
       labels.set(m.id, m.customerName?.trim() || "Customer");
       types.set(m.id, label);

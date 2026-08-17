@@ -26,6 +26,7 @@ import { awardPointsForOrder, getBalance, getLoyaltyConfig, redeemPoints, enroll
 import { notifyCustomer, restaurantDisplayName } from "@/server/sms/notify";
 import { manilaStartOfDay } from "@/lib/time/manila";
 import { getDishStock } from "@/server/inventory/dish-stock";
+import { nextOrderNumberSafe } from "@/server/orders/next-number";
 import {
   applyCardSurcharge,
   revertCardSurcharge,
@@ -1495,7 +1496,11 @@ export async function createCashierOrder(input: {
     return { ok: false, error: "Not allowed." };
   }
   const orderType = input.orderType ?? "dine_in";
-  if (orderType === "dine_in" && !input.tableId) return { ok: false, error: "Pick a table first." };
+  // No table needed. Plenty of shops take the order at the counter and seat
+  // people afterwards, or have no table plan at all — requiring one stopped
+  // them ringing up a dine-in order they were standing in front of. Without a
+  // table the ticket gets the day's next number instead, which is what the
+  // customer gets called by anyway.
   if (orderType !== "dine_in" && !input.customerName?.trim()) {
     return { ok: false, error: "Enter the customer's name." };
   }
@@ -1512,6 +1517,13 @@ export async function createCashierOrder(input: {
     return { ok: false, error: "Could not build the order." };
   }
 
+  // A dine-in order with no table is called by a number instead. Worked out
+  // here rather than inside the transaction: see nextOrderNumberSafe.
+  const ticketNumber =
+    orderType === "dine_in" && !input.tableId
+      ? await nextOrderNumberSafe(staff.restaurantId)
+      : null;
+
   let orderId: string;
   try {
     const order = await tenantDb(staff.restaurantId, async (tx) => {
@@ -1526,12 +1538,21 @@ export async function createCashierOrder(input: {
       };
 
       if (orderType === "dine_in") {
-        const table = await tx.table.findFirst({
-          where: { id: input.tableId },
+        if (input.tableId) {
+          const table = await tx.table.findFirst({
+            where: { id: input.tableId },
+            select: { id: true },
+          });
+          if (!table) throw new Error("That table doesn't exist.");
+          return tx.order.create({ data: { ...base, tableId: table.id }, select: { id: true } });
+        }
+        // No table: give it the day's next ticket number. Resolved before the
+        // transaction opened, and null when the column isn't there yet — the
+        // order still goes through, it just has no number to call out.
+        return tx.order.create({
+          data: { ...base, ...(ticketNumber != null ? { orderNumber: ticketNumber } : {}) },
           select: { id: true },
         });
-        if (!table) throw new Error("That table doesn't exist.");
-        return tx.order.create({ data: { ...base, tableId: table.id }, select: { id: true } });
       }
 
       return tx.order.create({

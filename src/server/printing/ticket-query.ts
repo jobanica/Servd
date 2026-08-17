@@ -3,6 +3,7 @@ import type { OrderTypeKey } from "@/lib/orders/order-type";
 import { buildTicket, type Ticket, type TicketKind } from "@/lib/printing/ticket";
 import { parsePrinterConfig } from "@/lib/printing/printer-config";
 import { restaurantSiteUrl } from "@/lib/qr";
+import { formatOrderNumber } from "@/lib/orders/order-number";
 
 /** Loads an order and shapes it into a Ticket (tenant-scoped). */
 export async function getOrderTicket(
@@ -65,6 +66,7 @@ export async function getOrderTicket(
     let customerNote: string | null = null;
     let cashTendered: number | null = null;
     let scheduledFor: string | null = null;
+    let ticketNumber: string | null = null;
     let surchargeAmount = 0;
     let surchargeLabel: string | null = null;
     try {
@@ -88,6 +90,7 @@ export async function getOrderTicket(
           customerNote: true,
           cashTendered: true,
           scheduledFor: true,
+          orderNumber: true,
         },
       });
       orderType = (meta?.orderType ?? "dine_in") as typeof orderType;
@@ -97,6 +100,9 @@ export async function getOrderTicket(
       customerNote = meta?.customerNote ?? null;
       cashTendered = meta?.cashTendered ?? null;
       scheduledFor = meta?.scheduledFor ? meta.scheduledFor.toISOString() : null;
+      // A counter ticket, or a dine-in order taken before anyone sat down.
+      // It's what the customer gets called by, so it's what goes on the paper.
+      if (meta?.orderNumber != null) ticketNumber = formatOrderNumber(meta.orderNumber);
     } catch {
       /* not migrated yet */
     }
@@ -126,7 +132,7 @@ export async function getOrderTicket(
       showCustomer: receipt.showCustomer,
       showCashTendered: receipt.showCashTendered,
       kitchenShowAddress: cfg.kitchen.showAddress,
-      tableNumber: order.table?.tableNumber ?? "—",
+      tableNumber: order.table?.tableNumber ?? ticketNumber ?? "—",
       orderType,
       customerName,
       customerAddress,

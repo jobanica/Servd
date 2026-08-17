@@ -169,9 +169,20 @@ export function ticketTotals(t: Ticket) {
   return { net, vat };
 }
 
-/** The big heading line: table number, or PICKUP/DELIVERY + customer. */
+/**
+ * The big heading line: table number, or PICKUP/DELIVERY + customer.
+ *
+ * A dine-in ticket with no table is called by its daily number instead — plenty
+ * of shops ring the order up at the counter and seat people afterwards, and
+ * "TABLE —" is not something anyone can shout across a room.
+ */
 export function ticketHeading(t: Ticket): string {
-  if (t.orderType === "dine_in") return `TABLE ${t.tableNumber}`;
+  if (t.orderType === "dine_in") {
+    // A "#001" here is a ticket number, not a table — it already reads as one,
+    // so it goes on the paper as-is rather than as "TABLE #001".
+    if (t.tableNumber.startsWith("#")) return `ORDER ${t.tableNumber}`;
+    return t.tableNumber && t.tableNumber !== "—" ? `TABLE ${t.tableNumber}` : "ORDER";
+  }
   // Same word as the cashier screen and the kitchen display, in caps for paper.
   return `${orderTypeLabel(t.orderType).toUpperCase()} - ${t.customerName ?? ""}`.trim();
 }

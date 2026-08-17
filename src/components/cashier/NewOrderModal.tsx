@@ -331,7 +331,8 @@ export function NewOrderModal({
     setSubmitting(true);
     const res = await createCashierOrder({
       orderType,
-      tableId: orderType === "dine_in" ? tableId : undefined,
+      // Blank means no table — the server gives the ticket a number instead.
+      tableId: orderType === "dine_in" ? tableId || undefined : undefined,
       customerName: orderType === "dine_in" ? undefined : customerName,
       customerPhone: orderType === "dine_in" ? undefined : customerPhone,
       customerAddress: needsAddress(orderType) ? customerAddress : undefined,
@@ -467,18 +468,30 @@ export function NewOrderModal({
                 </div>
 
                 {orderType === "dine_in" ? (
-                  <select
-                    value={tableId}
-                    onChange={(e) => setTableId(e.target.value)}
-                    className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
-                  >
-                    <option value="">Select a table…</option>
-                    {tables.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        Table {t.tableNumber}
-                      </option>
-                    ))}
-                  </select>
+                  <div>
+                    <select
+                      value={tableId}
+                      onChange={(e) => setTableId(e.target.value)}
+                      className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm"
+                    >
+                      {/* Optional. Plenty of shops take the order at the
+                          counter and seat people afterwards, or have no floor
+                          plan at all — requiring a table stopped them ringing
+                          up an order they were standing in front of. */}
+                      <option value="">No table — use an order number</option>
+                      {tables.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          Table {t.tableNumber}
+                        </option>
+                      ))}
+                    </select>
+                    {!tableId && (
+                      <p className="mt-1 text-xs text-plum-ink/50">
+                        This ticket gets today&apos;s next order number, and the customer is
+                        called by it.
+                      </p>
+                    )}
+                  </div>
                 ) : (
                   <div className="space-y-2">
                     {/* Search a saved customer → auto-fills the details below. */}
@@ -595,7 +608,6 @@ export function NewOrderModal({
                   disabled={
                     submitting ||
                     lines.length === 0 ||
-                    (orderType === "dine_in" && !tableId) ||
                     (orderType !== "dine_in" && !customerName.trim()) ||
                     (needsAddress(orderType) && !customerAddress.trim())
                   }
