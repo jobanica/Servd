@@ -15,10 +15,13 @@ import {
   createCashierOrder,
   searchPosCustomers,
   type CashierTable,
+  type CounterMethod,
   type PosCustomer,
 } from "@/server/orders/cashier";
-import { printKitchenTicket } from "@/server/printing/print";
-import { runPrintDispatch } from "@/lib/print/run-dispatch";
+import { printKitchenTicket, printPaidTicket } from "@/server/printing/print";
+import { PayModal } from "./PayModal";
+import { shouldPayFirst } from "@/lib/orders/pay-first";
+import { runPrintDispatch, sendDrawerKick } from "@/lib/print/run-dispatch";
 import { CategoryTabs, categorySectionId } from "@/components/menu/CategoryTabs";
 import {
   ORDER_TYPES,
@@ -228,9 +231,17 @@ export function ItemConfig({
 export function NewOrderModal({
   onClose,
   onCreated,
+  onPaymentIssue,
+  payFirst = false,
+  cardSurchargeBp = 0,
 }: {
   onClose: () => void;
   onCreated: (tables: CashierTable[]) => void;
+  /** Surfaced when the order was created but its payment didn't record. */
+  onPaymentIssue?: (message: string) => void;
+  /** The shop takes payment before the food is made (Printer settings). */
+  payFirst?: boolean;
+  cardSurchargeBp?: number;
 }) {
   const [menu, setMenu] = useState<DinerCategory[] | null>(null);
   const [tables, setTables] = useState<{ id: string; tableNumber: string }[]>([]);
@@ -248,6 +259,9 @@ export function NewOrderModal({
   const menuScrollRef = useRef<HTMLDivElement>(null);
   const [lines, setLines] = useState<CartLine[]>([]);
   const [configItem, setConfigItem] = useState<DinerItem | null>(null);
+  // The pay-before-you-sit-down step. Open, the till is taking the money as
+  // part of ringing the order up rather than settling it later off the board.
+  const [payOpen, setPayOpen] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -326,7 +340,7 @@ export function NewOrderModal({
     }
   }
 
-  async function submit() {
+  async function submit(payNow?: { method: CounterMethod; tenderedCentavos?: number }) {
     setSubmitError(null);
     setSubmitting(true);
     const res = await createCashierOrder({
@@ -336,6 +350,7 @@ export function NewOrderModal({
       customerName: orderType === "dine_in" ? undefined : customerName,
       customerPhone: orderType === "dine_in" ? undefined : customerPhone,
       customerAddress: needsAddress(orderType) ? customerAddress : undefined,
+      payNow,
       lines: lines.map((l) => ({
         itemId: l.itemId,
         quantity: l.quantity,
@@ -345,13 +360,39 @@ export function NewOrderModal({
       })),
     });
     setSubmitting(false);
+    setPayOpen(false);
     if (res.ok && res.tables) {
       onCreated(res.tables);
+      // The order went through but the money didn't. Said plainly, and the
+      // modal stays shut — the ticket is on the board waiting to be settled,
+      // and re-punching it would be a duplicate.
+      if (res.paymentError) {
+        onPaymentIssue?.(
+          `Order created, but the payment didn't record — settle it from the board. (${res.paymentError})`,
+        );
+      }
       // No kitchen display → print the kitchen ticket from the browser.
       if (res.printKitchen && res.printOrderId) {
         try {
           const k = await printKitchenTicket(res.printOrderId);
           await runPrintDispatch(k, res.printOrderId, "kitchen");
+        } catch {
+          /* non-blocking */
+        }
+      }
+      // Browser print transports: the receipt and the drawer pulse come back
+      // for the client to send, the same as settling from the board.
+      if (res.printReceipt && res.printOrderId) {
+        try {
+          const t = await printPaidTicket(res.printOrderId);
+          await runPrintDispatch(t, res.printOrderId, "receipt");
+        } catch {
+          /* non-blocking */
+        }
+      }
+      if (res.drawerKickBase64) {
+        try {
+          await sendDrawerKick(res.drawerKickBase64);
         } catch {
           /* non-blocking */
         }
@@ -603,24 +644,71 @@ export function NewOrderModal({
                   <span>Total</span>
                   <span>{formatPeso(total)}</span>
                 </div>
-                <button
-                  onClick={submit}
-                  disabled={
+                {/* Which button is the big one, and nothing more. A pay-first
+                    shop leads with the money; everyone else leads with the
+                    kitchen. Either way both routes are one tap away, because a
+                    till that can only do it one way is a till someone has to
+                    work around. */}
+                {(() => {
+                  const blocked =
                     submitting ||
                     lines.length === 0 ||
                     (orderType !== "dine_in" && !customerName.trim()) ||
-                    (needsAddress(orderType) && !customerAddress.trim())
-                  }
-                  className="w-full rounded-full py-3 font-semibold btn-brand disabled:opacity-50"
-                >
-                  {submitting ? "Sending to kitchen…" : "Send to kitchen"}
-                </button>
+                    (needsAddress(orderType) && !customerAddress.trim());
+                  const takesPaymentFirst = shouldPayFirst(orderType, payFirst);
+
+                  return (
+                    <>
+                      <button
+                        onClick={() => (takesPaymentFirst ? setPayOpen(true) : void submit())}
+                        disabled={blocked}
+                        className="w-full rounded-full py-3 font-semibold btn-brand disabled:opacity-50"
+                      >
+                        {submitting
+                          ? takesPaymentFirst
+                            ? "Recording…"
+                            : "Sending to kitchen…"
+                          : takesPaymentFirst
+                            ? `Take payment · ${formatPeso(total)}`
+                            : "Send to kitchen"}
+                      </button>
+                      <button
+                        onClick={() => (takesPaymentFirst ? void submit() : setPayOpen(true))}
+                        disabled={blocked}
+                        className="mt-2 w-full rounded-full py-2 text-xs font-semibold text-plum-ink/55 disabled:opacity-50"
+                      >
+                        {takesPaymentFirst
+                          ? "Send to kitchen without paying"
+                          : "Take payment now instead"}
+                      </button>
+                    </>
+                  );
+                })()}
               </div>
             </div>
             )}
           </div>
         )}
       </div>
+
+      {payOpen && (
+        <PayModal
+          label={
+            orderType === "dine_in"
+              ? tableId
+                ? `Table ${tables.find((t) => t.id === tableId)?.tableNumber ?? ""}`.trim()
+                : "New order"
+              : `${ORDER_TYPE_LABEL[orderType]}${customerName.trim() ? ` — ${customerName.trim()}` : ""}`
+          }
+          due={total}
+          busy={submitting}
+          cardSurchargeBp={cardSurchargeBp}
+          onConfirm={(method, _change, tendered) =>
+            void submit({ method, tenderedCentavos: tendered })
+          }
+          onCancel={() => setPayOpen(false)}
+        />
+      )}
     </div>
   );
 }

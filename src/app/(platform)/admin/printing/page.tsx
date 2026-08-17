@@ -73,6 +73,7 @@ export default async function PrintingSettingsPage() {
           receiptShowCashTendered: receipt.showCashTendered,
           kitchenShowAddress: cfg.kitchen.showAddress,
           cardSurchargePercent: bpToPercentString(cfg.payments.cardSurchargeBp),
+          payFirst: cfg.payments.payFirst,
           autoPrintReceipt,
           openDrawerOn,
         }}

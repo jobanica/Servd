@@ -623,7 +623,38 @@ export async function markOrderPaid(
   } catch {
     return { ok: false, error: "Not allowed." };
   }
+  const settled = await settleAtCounter(staff, orderId, method, tenderedCentavos);
+  if (!settled.ok) return { ok: false, error: settled.error };
+  return {
+    ok: true,
+    tables: await getCashierTables(),
+    printTicket: settled.printTicket,
+    drawerKickBase64: settled.drawerKickBase64,
+  };
+}
 
+type SettleOutcome =
+  | { ok: true; printTicket: boolean; drawerKickBase64?: string }
+  | { ok: false; error: string };
+
+/**
+ * Taking the money — the whole of it, from the card fee to the receipt.
+ *
+ * Its own function because two flows settle an order now: the cashier tapping
+ * Pay on a bill already on the floor, and a pay-first shop taking the money as
+ * part of ringing the order up. Written twice, the two would drift, and the
+ * half that drifts is always the surcharge, the shift attribution or the
+ * loyalty base — the three things nobody notices until the books disagree.
+ *
+ * Takes an already-authorised staff member: the caller has done the role check
+ * and this must never be reachable without one.
+ */
+async function settleAtCounter(
+  staff: Awaited<ReturnType<typeof requireStaff>>,
+  orderId: string,
+  method: CounterMethod,
+  tenderedCentavos?: number,
+): Promise<SettleOutcome> {
   // Charge the discounted (net) amount, less any gift-card credit already applied.
   const disc = (await discountMap(staff.restaurantId, [orderId])).get(orderId);
   const credit = (await creditMap(staff.restaurantId, [orderId])).get(orderId) ?? 0;
@@ -707,7 +738,6 @@ export async function markOrderPaid(
   await notifyOrdersChanged(staff.restaurantId);
   return {
     ok: true,
-    tables: await getCashierTables(),
     printTicket: settle.clientPrintNeeded,
     drawerKickBase64: settle.drawerKickBase64,
   };
@@ -1488,7 +1518,23 @@ export async function createCashierOrder(input: {
   customerPhone?: string;
   customerAddress?: string;
   lines: OrderLineInput[];
-}): Promise<{ ok: boolean; tables?: CashierTable[]; error?: string; printKitchen?: boolean; printOrderId?: string }> {
+  /**
+   * Take the money as part of ringing it up — the pay-before-you-sit-down
+   * flow. Omitted, the order is created unpaid exactly as it always was.
+   */
+  payNow?: { method: CounterMethod; tenderedCentavos?: number };
+}): Promise<{
+  ok: boolean;
+  tables?: CashierTable[];
+  error?: string;
+  printKitchen?: boolean;
+  printOrderId?: string;
+  /** Set when the order was created but the payment didn't record. */
+  paymentError?: string;
+  paid?: boolean;
+  printReceipt?: boolean;
+  drawerKickBase64?: string;
+}> {
   let staff;
   try {
     staff = await requireStaff(["cashier", "admin"]);
@@ -1600,6 +1646,22 @@ export async function createCashierOrder(input: {
   );
 
   await notifyOrdersChanged(staff.restaurantId);
+
+  // Money first, kitchen second, when the shop takes payment up front. A failed
+  // payment then means no kitchen ticket — which is the whole point of paying
+  // first — and the order is still on the board to be settled by hand.
+  let paymentError: string | undefined;
+  let settled: SettleOutcome | null = null;
+  if (input.payNow) {
+    settled = await settleAtCounter(
+      staff,
+      orderId,
+      input.payNow.method,
+      input.payNow.tenderedCentavos,
+    );
+    if (!settled.ok) paymentError = settled.error;
+  }
+
   await autoPrintIfEnabled(staff.restaurantId, orderId);
   // No kitchen display → print a kitchen ticket for the new order.
   const kitchen = await printKitchenIfNeeded(staff.restaurantId, orderId);
@@ -1618,6 +1680,13 @@ export async function createCashierOrder(input: {
     tables: await getCashierTables(),
     printKitchen: kitchen.clientPrintNeeded,
     printOrderId: kitchen.clientPrintNeeded ? orderId : undefined,
+    // ok:true even when the payment failed, deliberately. The ORDER exists —
+    // telling the till nothing happened would have them punch it a second time,
+    // and a duplicate ticket is worse than an unpaid one.
+    paid: settled?.ok === true,
+    paymentError,
+    printReceipt: settled?.ok === true ? settled.printTicket : undefined,
+    drawerKickBase64: settled?.ok === true ? settled.drawerKickBase64 : undefined,
   };
 }
 

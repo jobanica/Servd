@@ -25,6 +25,7 @@ const schema = z.object({
   kitchenShowAddress: z.coerce.boolean().default(false),
   // Typed as a percentage ("3.5"); stored as basis points.
   cardSurchargePercent: z.string().max(10).optional(),
+  payFirst: z.coerce.boolean().default(false),
   autoPrintReceipt: z.coerce.boolean().default(true),
   openDrawerOn: z.enum(["never", "cash", "any"]).default("cash"),
 });
@@ -48,6 +49,7 @@ export async function updatePrintSettings(
     receiptShowCashTendered: formData.get("receiptShowCashTendered") === "on",
     kitchenShowAddress: formData.get("kitchenShowAddress") === "on",
     cardSurchargePercent: String(formData.get("cardSurchargePercent") ?? ""),
+    payFirst: formData.get("payFirst") === "on",
     autoPrintReceipt: formData.get("autoPrintReceipt") === "on",
     openDrawerOn: formData.get("openDrawerOn") ?? "cash",
   });
@@ -84,7 +86,10 @@ export async function updatePrintSettings(
     cfg.kitchen = { showAddress: parsed.data.kitchenShowAddress };
     // Everything here rides in the JSON column that already exists, so these
     // four settings work the moment this deploys — no migration to wait on.
-    cfg.payments = { cardSurchargeBp: percentToBp(parsed.data.cardSurchargePercent) };
+    cfg.payments = {
+      payFirst: parsed.data.payFirst,
+      cardSurchargeBp: percentToBp(parsed.data.cardSurchargePercent),
+    };
 
     // Mark the printer method as deliberately chosen (drives onboarding).
     cfg.configured = true;

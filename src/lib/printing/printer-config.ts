@@ -46,6 +46,14 @@ export interface KitchenOptions {
 
 export interface PaymentOptions {
   /**
+   * Lead with "Take payment" at the till instead of "Send to kitchen".
+   *
+   * Off by default — it changes the shape of every order a cashier rings up,
+   * and that shouldn't arrive unannounced in an app update. On, it only moves
+   * which button is the big one; the cashier can still send an order unpaid.
+   */
+  payFirst: boolean;
+  /**
    * Card surcharge, in basis points (350 = 3.50%). Zero means no surcharge.
    *
    * Basis points rather than a float so the stored value is exact — a
@@ -127,6 +135,9 @@ export function parsePrinterConfig(raw: unknown): PrinterConfig {
       showCashTendered: boolOn(receipt.showCashTendered),
     },
     kitchen: { showAddress: boolOff(kitchen.showAddress) },
-    payments: { cardSurchargeBp: normalizeSurchargeBp(payments.cardSurchargeBp) },
+    payments: {
+      payFirst: boolOff(payments.payFirst),
+      cardSurchargeBp: normalizeSurchargeBp(payments.cardSurchargeBp),
+    },
   };
 }

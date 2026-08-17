@@ -36,6 +36,7 @@ export function PrintSettingsForm({
     receiptShowCashTendered: boolean;
     kitchenShowAddress: boolean;
     cardSurchargePercent: string;
+    payFirst: boolean;
     autoPrintReceipt: boolean;
     openDrawerOn: DrawerPolicy;
   };
@@ -56,6 +57,7 @@ export function PrintSettingsForm({
   const [showCashTendered, setShowCashTendered] = useState(initial.receiptShowCashTendered);
   const [kitchenAddress, setKitchenAddress] = useState(initial.kitchenShowAddress);
   const [surcharge, setSurcharge] = useState(initial.cardSurchargePercent);
+  const [payFirst, setPayFirst] = useState(initial.payFirst);
   const [autoPrintReceipt, setAutoPrintReceipt] = useState(initial.autoPrintReceipt);
   const [openDrawerOn, setOpenDrawerOn] = useState<DrawerPolicy>(initial.openDrawerOn);
 
@@ -244,6 +246,27 @@ export function PrintSettingsForm({
             </p>
           )}
         </div>
+
+        <label className="mt-4 flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            name="payFirst"
+            checked={payFirst}
+            onChange={(e) => setPayFirst(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span>
+            <span className="font-semibold">Take payment before the food is made</span>
+            <span className="mt-0.5 block text-xs text-plum-ink/55">
+              For counters where the customer orders, pays, and only then sits down. The
+              till leads with <strong>Take payment</strong> instead of Send to kitchen, and
+              nothing reaches the kitchen until the money is in. Applies to dine-in and
+              takeout — the two where the customer is standing at the counter. Either way
+              the cashier can still send an order unpaid, or take payment on one that
+              wasn&apos;t going to be.
+            </span>
+          </span>
+        </label>
 
         <div className="mt-4">
           <label className="block text-sm font-semibold">Card fee</label>

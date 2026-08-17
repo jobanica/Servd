@@ -77,6 +77,7 @@ export function CashierBoard({
   offlineEnabled = false,
   showTutorials = false,
   cardSurchargeBp = 0,
+  payFirst = false,
 }: {
   restaurantId: string;
   initialTables: CashierTable[];
@@ -87,6 +88,8 @@ export function CashierBoard({
   showTutorials?: boolean;
   /** Card fee in basis points, so the till can show it before the tap. */
   cardSurchargeBp?: number;
+  /** The shop takes payment before the food is made (Printer settings). */
+  payFirst?: boolean;
 }) {
   const [tables, setTables] = useState<CashierTable[]>(initialTables);
   const [incoming, setIncoming] = useState<IncomingOrder[]>(initialIncoming);
@@ -1123,6 +1126,9 @@ export function CashierBoard({
         <NewOrderModal
           onClose={() => setNewOrderOpen(false)}
           onCreated={(t) => setTables(t)}
+          onPaymentIssue={(m) => showToast(m)}
+          payFirst={payFirst}
+          cardSurchargeBp={cardSurchargeBp}
         />
       )}
 

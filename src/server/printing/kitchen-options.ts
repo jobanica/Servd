@@ -21,3 +21,20 @@ export async function kitchenShowsAddress(restaurantId: string): Promise<boolean
     return false;
   }
 }
+
+/**
+ * Does this shop take payment before the food is made?
+ *
+ * Only decides which button the till leads with — the cashier can always take
+ * payment on any order, and can always send one unpaid.
+ */
+export async function paysBeforeCooking(restaurantId: string): Promise<boolean> {
+  try {
+    const r = await tenantDb(restaurantId, (tx) =>
+      tx.restaurant.findFirst({ select: { printerConfig: true } }),
+    );
+    return parsePrinterConfig(r?.printerConfig).payments.payFirst;
+  } catch {
+    return false;
+  }
+}

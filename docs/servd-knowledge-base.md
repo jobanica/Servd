@@ -266,6 +266,17 @@ the cash drawer figure, because nobody put that money in a till.
 its **own** gateway account (**PayMongo** or **Xendit**); credentials are
 encrypted at rest and money goes directly to the restaurant.
 
+**Pay before the food is made.** A setting (Printer settings) for counters
+where the customer orders, pays, and only then sits down. The till leads with
+**Take payment** instead of Send to kitchen, and nothing reaches the kitchen
+until the money is in — a failed payment means no kitchen ticket, and the order
+sits on the board waiting to be settled. Applies to dine-in and takeout, the two
+where the customer is standing at the counter; pickup and delivery are ordered
+ahead or paid to the rider. It only decides which button is the big one: the
+cashier can always send an order unpaid, or take payment on one that wasn't
+going to be. The order stays on the kitchen board after paying and closes when
+the kitchen marks it done, the same "paid AND cooked" rule as everything else.
+
 **Card surcharge.** A restaurant can set a card fee (e.g. 3.5%) in Printer
 settings. It is added on top when a customer pays by card at the counter, worked
 out on the server from the saved rate, shown in the pay screen before the
