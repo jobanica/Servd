@@ -127,6 +127,68 @@ export async function setDownpaymentPaid(formData: FormData): Promise<void> {
   revalidatePath("/admin/advance-orders");
 }
 
+/**
+ * The advance-order queue, for the cashier's own screen.
+ *
+ * Same data as the owner's page, fetched by the logged-in staff member rather
+ * than by a restaurantId passed in — the till has no business naming another
+ * restaurant. Returns a list rather than revalidating a path, because the
+ * cashier reads this in a modal on top of the board, not on a page of its own.
+ */
+export async function getAdvanceQueue(): Promise<AdvanceOrder[]> {
+  let staff;
+  try {
+    staff = await requireStaff([...ROLES]);
+  } catch {
+    return [];
+  }
+  return listAdvanceOrders(staff.restaurantId);
+}
+
+export type SendToKitchenResult =
+  | { ok: true; orders: AdvanceOrder[]; message: string }
+  | { ok: false; error: string };
+
+/**
+ * Send one advance order to the kitchen, from the till.
+ *
+ * The same transition as the owner's button, but it answers with the refreshed
+ * queue instead of revalidating a page the cashier isn't looking at. Guarded on
+ * `status: "pending"`, so a second tap — or the other till doing it at the same
+ * moment — changes nothing rather than resurrecting an order the kitchen has
+ * already started or finished.
+ */
+export async function sendAdvanceToKitchenNow(orderId: string): Promise<SendToKitchenResult> {
+  let staff;
+  try {
+    staff = await requireStaff([...ROLES]);
+  } catch {
+    return { ok: false, error: "Not allowed." };
+  }
+  if (!orderId) return { ok: false, error: "No order." };
+
+  let moved = 0;
+  try {
+    const res = await tenantDb(staff.restaurantId, (tx) =>
+      tx.order.updateMany({
+        where: { id: orderId, scheduledFor: { not: null }, status: "pending" },
+        data: { status: "new", approvalStatus: "approved" },
+      }),
+    );
+    moved = res.count;
+  } catch (e) {
+    console.error("sendAdvanceToKitchenNow failed", e);
+    return { ok: false, error: "Couldn't send that order to the kitchen." };
+  }
+  if (moved === 0) {
+    return { ok: false, error: "That order is already with the kitchen." };
+  }
+
+  await notifyOrdersChanged(staff.restaurantId);
+  revalidatePath("/admin/advance-orders");
+  return { ok: true, orders: await listAdvanceOrders(staff.restaurantId), message: "Sent to the kitchen." };
+}
+
 /** Push an approved advance order into the kitchen/cashier flow (status → new). */
 export async function sendAdvanceToKitchen(formData: FormData): Promise<void> {
   const staff = await requireStaff([...ROLES]);

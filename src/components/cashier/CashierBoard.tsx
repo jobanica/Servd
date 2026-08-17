@@ -18,7 +18,8 @@ import {
 } from "@/server/orders/cashier";
 import { formatPeso } from "@/lib/money";
 import { chime, unlockAudio } from "@/lib/sound";
-import { isForAnotherDay, scheduledLabel } from "@/lib/orders/scheduled";
+import { dueBucket, isForAnotherDay, scheduledLabel } from "@/lib/orders/scheduled";
+import { getAdvanceQueue } from "@/server/orders/advance-orders";
 import { PrintTicketButton } from "./PrintTicketButton";
 import { PayModal } from "./PayModal";
 import { NewOrderModal } from "./NewOrderModal";
@@ -26,6 +27,7 @@ import { DiscountModal } from "./DiscountModal";
 import { LoyaltyRedeemModal } from "./LoyaltyRedeemModal";
 import { AddCustomerModal } from "./AddCustomerModal";
 import { ClosedOrdersModal } from "./ClosedOrdersModal";
+import { AdvanceOrdersModal } from "./AdvanceOrdersModal";
 import { ShiftSummaryModal } from "./ShiftSummaryModal";
 import { ShiftNotesModal } from "./ShiftNotesModal";
 import { VoidPinModal } from "./VoidPinModal";
@@ -95,6 +97,12 @@ export function CashierBoard({
   const [menuOpen, setMenuOpen] = useState(false);
   const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   const [closedOpen, setClosedOpen] = useState(false);
+  const [advanceOpen, setAdvanceOpen] = useState(false);
+  // How many bookings are waiting to go to the kitchen and are due today or
+  // already past due. Advance orders are kept off the "incoming now" popup on
+  // purpose — a booking for next Saturday shouldn't flash mid-service — so
+  // without this number nothing on the till says today's are waiting.
+  const [advanceDue, setAdvanceDue] = useState(0);
   const [shiftOpen, setShiftOpen] = useState(false);
   const [cashOutOpen, setCashOutOpen] = useState(false);
   const [shiftNotesOpen, setShiftNotesOpen] = useState(false);
@@ -180,6 +188,18 @@ export function CashierBoard({
         }
       }
       if (freshReady) setReadyDismissed(false);
+
+      // Bookings still waiting to be sent to the kitchen, and due today or
+      // already past their time. Best-effort — a failure here must never stop
+      // the board refreshing, which is the part the till actually runs on.
+      try {
+        const queue = await getAdvanceQueue();
+        setAdvanceDue(
+          queue.filter((a) => a.status === "pending" && dueBucket(a.scheduledFor) !== "later").length,
+        );
+      } catch {
+        /* leave the badge as it was */
+      }
 
       // Only re-render when something is genuinely different.
       const sigT = JSON.stringify(t);
@@ -468,6 +488,16 @@ export function CashierBoard({
 
       <div className="my-1 border-t border-plum-ink/10" />
 
+      <button onClick={() => setAdvanceOpen(true)} className={sidebarBtn}>
+        <span className="inline-flex items-center gap-1.5">
+          📅 Advance orders
+          {advanceDue > 0 && (
+            <span className="rounded-full bg-guava px-1.5 py-0.5 text-[10px] font-bold text-white">
+              {advanceDue}
+            </span>
+          )}
+        </span>
+      </button>
       <button onClick={() => setClosedOpen(true)} className={sidebarBtn}>Closed orders</button>
       <button onClick={() => setCashOutOpen(true)} className={sidebarBtn}>Cash out</button>
       <button onClick={() => setShiftOpen(true)} className={sidebarBtn}>End-of-shift summary</button>
@@ -1128,6 +1158,10 @@ export function CashierBoard({
 
       {closedOpen && (
         <ClosedOrdersModal restaurantId={restaurantId} onClose={() => setClosedOpen(false)} onReopened={(t) => setTables(t)} />
+      )}
+
+      {advanceOpen && (
+        <AdvanceOrdersModal restaurantId={restaurantId} onClose={() => setAdvanceOpen(false)} />
       )}
 
       {shiftOpen && <ShiftSummaryModal restaurantId={restaurantId} onClose={() => setShiftOpen(false)} />}

@@ -63,6 +63,54 @@ export function isForAnotherDay(
   return manilaDayKey(d) !== manilaDayKey(now);
 }
 
+/**
+ * How an advance order sorts on the till's queue.
+ *
+ * "overdue" first, "today" next, then the rest — the cashier's question all day
+ * is "what do I need to send to the kitchen now", and an order whose time has
+ * already passed is the one that costs a customer their booking.
+ */
+export type DueBucket = "overdue" | "today" | "later";
+
+export function dueBucket(
+  iso: string | Date | null | undefined,
+  now: Date = new Date(),
+): DueBucket {
+  const d = toDate(iso);
+  if (!d) return "later";
+  if (d.getTime() < now.getTime()) return "overdue";
+  return manilaDayKey(d) === manilaDayKey(now) ? "today" : "later";
+}
+
+/**
+ * Minutes until it's wanted, negative once the time has passed. Null when it
+ * isn't scheduled at all.
+ */
+export function minutesUntil(
+  iso: string | Date | null | undefined,
+  now: Date = new Date(),
+): number | null {
+  const d = toDate(iso);
+  if (!d) return null;
+  return Math.round((d.getTime() - now.getTime()) / 60_000);
+}
+
+/** "in 40 min", "in 3 h", "25 min late" — how a cashier reads the clock. */
+export function dueLabel(
+  iso: string | Date | null | undefined,
+  now: Date = new Date(),
+): string | null {
+  const mins = minutesUntil(iso, now);
+  if (mins == null) return null;
+  if (mins < 0) {
+    const late = Math.abs(mins);
+    return late < 60 ? `${late} min late` : `${Math.round(late / 60)} h late`;
+  }
+  if (mins < 60) return `in ${mins} min`;
+  if (mins < 24 * 60) return `in ${Math.round(mins / 60)} h`;
+  return `in ${Math.round(mins / (24 * 60))} days`;
+}
+
 function manilaDayKey(d: Date): string {
   return d.toLocaleDateString("en-CA", { timeZone: MANILA_TZ }); // YYYY-MM-DD
 }
