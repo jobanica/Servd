@@ -18,6 +18,7 @@ import { previewPromoCode } from "@/server/promotions/redeem";
 import { CartThumb } from "@/components/diner/CartThumb";
 import { CategoryTabs, categorySectionId } from "@/components/menu/CategoryTabs";
 import { captureCartLead } from "@/server/marketing/cart-recovery";
+import { replaceCartLine, selectionFromLine } from "@/lib/cart/edit-line";
 import { wrapsMidnight } from "@/lib/site/store-hours";
 import { LocationPicker } from "./LocationPicker";
 import { WebOrderTracker } from "./WebOrderTracker";
@@ -188,13 +189,13 @@ function groupHours(hours: DayHours[]): { label: string; value: string }[] {
 }
 
 /** Inline modifier/quantity picker (no i18n dependency). */
-function ItemConfig({ item, onAdd, onCancel }: { item: DinerItem; onAdd: (l: CartLine) => void; onCancel: () => void }) {
+function ItemConfig({ item, editing, onAdd, onCancel }: { item: DinerItem; editing?: CartLine | null; onAdd: (l: CartLine) => void; onCancel: () => void }) {
   const variants = item.variants ?? [];
   const inStock = (v: { stock?: number | null }) => v.stock == null || v.stock > 0;
-  const [variantId, setVariantId] = useState<string>((variants.find(inStock) ?? variants[0])?.id ?? "");
-  const [selection, setSelection] = useState<Selection>({});
-  const [quantity, setQuantity] = useState(1);
-  const [note, setNote] = useState("");
+  const [variantId, setVariantId] = useState<string>(editing?.variantId ?? (variants.find(inStock) ?? variants[0])?.id ?? "");
+  const [selection, setSelection] = useState<Selection>(editing ? selectionFromLine(editing) : {});
+  const [quantity, setQuantity] = useState(editing?.quantity ?? 1);
+  const [note, setNote] = useState(editing?.note ?? "");
   const [showError, setShowError] = useState(false);
   const chosenVariant = variants.find((v) => v.id === variantId) ?? null;
   const variantOut = !!chosenVariant && !inStock(chosenVariant);
@@ -219,7 +220,8 @@ function ItemConfig({ item, onAdd, onCancel }: { item: DinerItem; onAdd: (l: Car
   function add() {
     if (error || variantOut) return setShowError(true);
     onAdd({
-      lineId: lineId(),
+      // Editing keeps the line id, so the cart updates the row in place.
+      lineId: editing?.lineId ?? lineId(),
       itemId: item.id,
       name: chosenVariant ? `${item.name} (${chosenVariant.name})` : item.name,
       basePrice: effItem.price,
@@ -307,7 +309,7 @@ function ItemConfig({ item, onAdd, onCancel }: { item: DinerItem; onAdd: (l: Car
             <button onClick={() => setQuantity((q) => q + 1)} className="px-3 py-2 text-lg">+</button>
           </div>
           <button onClick={add} disabled={!!error || variantOut} className="flex-1 rounded-full bg-red-600 py-3 font-semibold text-white disabled:opacity-50">
-            {variantOut ? "Sold out" : `Add · ${formatPeso(price * quantity)}`}
+            {variantOut ? "Sold out" : `${editing ? "Update" : "Add"} · ${formatPeso(price * quantity)}`}
           </button>
         </div>
       </div>
@@ -354,6 +356,8 @@ export function WebOrder(props: WebOrderProps) {
 
   const [lines, setLines] = useState<CartLine[]>([]);
   const [configItem, setConfigItem] = useState<DinerItem | null>(null);
+  // The cart line being changed, when the picker was opened from the cart.
+  const [editingLine, setEditingLine] = useState<CartLine | null>(null);
   // What the online store offers (pick-up only / delivery only / both).
   const fulfillment = props.delivery?.fulfillment ?? "both";
   const [orderType, setOrderType] = useState<"pickup" | "delivery">(
@@ -579,6 +583,19 @@ export function WebOrder(props: WebOrderProps) {
       setLines((p) => addCartLine(p, { lineId: lineId(), itemId: item.id, name: item.name, basePrice: item.price, unitPrice: item.price, quantity: 1, modifiers: [], imageUrl: item.imageUrl }));
     } else setConfigItem(item);
   }
+  /**
+   * Reopen the picker on a line already in the cart, pre-filled.
+   *
+   * Nothing happens if the item has since left the menu — there's no sensible
+   * thing to edit against, and the line can still be removed.
+   */
+  function editLine(line: CartLine) {
+    const item = categories.flatMap((c) => c.items).find((i) => i.id === line.itemId);
+    if (!item) return;
+    setEditingLine(line);
+    setConfigItem(item);
+  }
+
   function setQty(id: string, delta: number) {
     setLines((p) =>
       p.flatMap((l) => (l.lineId === id ? (l.quantity + delta <= 0 ? [] : [{ ...l, quantity: l.quantity + delta }]) : [l])),
@@ -709,18 +726,25 @@ export function WebOrder(props: WebOrderProps) {
                 {/* min-w-0 so a long item name wraps instead of pushing the
                     price off the edge of a phone screen. */}
                 <div className="min-w-0 flex-1">
-                  <div className="flex justify-between gap-2">
-                    <span className="min-w-0 font-medium text-plum-ink">{l.name}</span>
-                    <span className="shrink-0 font-semibold">{formatPeso(l.unitPrice * l.quantity)}</span>
-                  </div>
-                  {l.modifiers.length > 0 && <p className="text-xs text-plum-ink/50">{l.modifiers.map((m) => m.name).join(", ")}</p>}
+                  {/* The description taps through to the picker, pre-filled.
+                      Changing a size or an add-on used to mean deleting the
+                      line and building it again. */}
+                  <button type="button" onClick={() => editLine(l)} className="block w-full text-left">
+                    <div className="flex justify-between gap-2">
+                      <span className="min-w-0 font-medium text-plum-ink">{l.name}</span>
+                      <span className="shrink-0 font-semibold">{formatPeso(l.unitPrice * l.quantity)}</span>
+                    </div>
+                    {l.modifiers.length > 0 && <p className="text-xs text-plum-ink/50">{l.modifiers.map((m) => m.name).join(", ")}</p>}
+                    {l.note && <p className="text-xs italic text-plum-ink/50">“{l.note}”</p>}
+                  </button>
                   <div className="mt-1 flex items-center gap-2">
                     <div className="flex items-center rounded-full border border-plum-ink/15">
                       <button onClick={() => setQty(l.lineId, -1)} className="px-2 text-lg">−</button>
                       <span className="w-6 text-center text-sm font-semibold">{l.quantity}</span>
                       <button onClick={() => setQty(l.lineId, 1)} className="px-2 text-lg">+</button>
                     </div>
-                    <button onClick={() => setLines((p) => p.filter((x) => x.lineId !== l.lineId))} className="text-xs text-muted hover:text-guava">remove</button>
+                    <button onClick={() => editLine(l)} className="text-xs font-semibold text-brand-primary">Edit</button>
+                    <button onClick={() => setLines((p) => p.filter((x) => x.lineId !== l.lineId))} className="text-xs font-semibold text-plum-ink/50 hover:text-guava">Remove</button>
                   </div>
                 </div>
               </li>
@@ -1312,7 +1336,20 @@ export function WebOrder(props: WebOrderProps) {
       </div>
 
       {/* Item config modal */}
-      {configItem && <ItemConfig item={configItem} onAdd={(l) => { setLines((p) => addCartLine(p, l)); setConfigItem(null); }} onCancel={() => setConfigItem(null)} />}
+      {configItem && (
+        <ItemConfig
+          item={configItem}
+          editing={editingLine}
+          onAdd={(l) => {
+            // addCartLine merges identical lines; an edit has to replace the
+            // one row it came from, or the original is left behind.
+            setLines((p) => (editingLine ? replaceCartLine(p, l) : addCartLine(p, l)));
+            setConfigItem(null);
+            setEditingLine(null);
+          }}
+          onCancel={() => { setConfigItem(null); setEditingLine(null); }}
+        />
+      )}
 
       {/* Cart bar + sheet (centered at the app width). */}
       {count > 0 && (

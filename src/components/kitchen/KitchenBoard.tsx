@@ -7,6 +7,7 @@ import {
   advanceOrderStatus,
   getKitchenHistory,
   reopenKitchenOrder,
+  toggleItemPrepared,
 } from "@/server/orders/kitchen";
 import type { KitchenOrder } from "@/lib/orders/types";
 import { useOnline } from "@/lib/offline/useOnline";
@@ -40,11 +41,13 @@ function urgency(iso: string, nowMs: number): { head: string; text: string } {
 function OrderCard({
   order,
   onAdvance,
+  onToggleItem,
   busy,
   nowMs,
 }: {
   order: KitchenOrder;
   onAdvance: (id: string, to: "preparing" | "done") => void;
+  onToggleItem: (itemId: string, prepared: boolean) => void;
   busy: boolean;
   nowMs: number;
 }) {
@@ -90,19 +93,75 @@ function OrderCard({
         </p>
       )}
 
-      <ul className="flex-1 space-y-3 px-3 py-3">
-        {order.items.map((it) => (
-          <li key={it.id}>
-            <p className="text-base font-semibold leading-snug text-plum-ink">
-              {it.quantity} x {it.name}
-            </p>
-            {it.modifiers.length > 0 && (
-              <p className="text-sm leading-snug text-plum-ink/45">{it.modifiers.join(", ")}</p>
-            )}
-            {it.note && <p className="text-sm font-medium leading-snug text-guava">“{it.note}”</p>}
-          </li>
-        ))}
+      <ul className="flex-1 px-1 py-1">
+        {order.items.map((it) => {
+          const done = !!it.preparedAt;
+          return (
+            <li key={it.id}>
+              {/* The whole line is the target. A cook wearing gloves on a
+                  splattered tablet is not going to hit a checkbox, so the tap
+                  area is the entire row. */}
+              <button
+                type="button"
+                onClick={() => onToggleItem(it.id, !done)}
+                aria-pressed={done}
+                className={`flex w-full items-start gap-2 rounded-lg px-2 py-2 text-left transition active:scale-[0.99] ${
+                  done ? "bg-plum-ink/5" : "hover:bg-cream/60"
+                }`}
+              >
+                <span
+                  className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 text-sm font-bold ${
+                    done
+                      ? "border-green-600 bg-green-600 text-white"
+                      : "border-plum-ink/25 text-transparent"
+                  }`}
+                  aria-hidden
+                >
+                  ✓
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span
+                    className={`block text-base font-semibold leading-snug ${
+                      done ? "text-plum-ink/35 line-through" : "text-plum-ink"
+                    }`}
+                  >
+                    {it.quantity} x {it.name}
+                  </span>
+                  {it.modifiers.length > 0 && (
+                    <span
+                      className={`block text-sm leading-snug ${
+                        done ? "text-plum-ink/25 line-through" : "text-plum-ink/45"
+                      }`}
+                    >
+                      {it.modifiers.join(", ")}
+                    </span>
+                  )}
+                  {it.note && (
+                    <span
+                      className={`block text-sm font-medium leading-snug ${
+                        done ? "text-plum-ink/25 line-through" : "text-guava"
+                      }`}
+                    >
+                      “{it.note}”
+                    </span>
+                  )}
+                </span>
+              </button>
+            </li>
+          );
+        })}
       </ul>
+
+      {/* How much is left, so the pass doesn't have to count struck-through
+          lines to find out. */}
+      {order.items.length > 1 && (
+        <p className="px-3 pb-1 text-xs font-semibold text-plum-ink/45">
+          {(() => {
+            const left = order.items.filter((i) => !i.preparedAt).length;
+            return left === 0 ? "All plated ✓" : `${left} of ${order.items.length} still to plate`;
+          })()}
+        </p>
+      )}
 
       <button
         onClick={() => onAdvance(order.id, next)}
@@ -321,6 +380,40 @@ export function KitchenBoard({
     }
   }
 
+  /**
+   * Tick a line off, or put it back.
+   *
+   * Painted before the server answers. On a pass this gets tapped between
+   * plating two dishes, and a checkbox that waits for a round trip is a
+   * checkbox that gets tapped twice. If the write fails, the resync puts the
+   * board straight and the error says why.
+   */
+  async function handleToggleItem(itemId: string, prepared: boolean) {
+    const at = prepared ? new Date().toISOString() : null;
+    setOrders((prev) =>
+      prev.map((o) => ({
+        ...o,
+        items: o.items.map((i) => (i.id === itemId ? { ...i, preparedAt: at } : i)),
+      })),
+    );
+    setError(null);
+    try {
+      const res = await toggleItemPrepared(itemId, prepared);
+      if (res.ok && res.orders) {
+        setOrders(res.orders);
+        if (offlineEnabled) kvSet(CACHE_KEY, res.orders);
+      } else if (!res.ok) {
+        setError(res.error ?? "Couldn't update that item.");
+        refresh();
+      }
+    } catch {
+      // Offline: the optimistic tick stands until the next successful refresh.
+      // Nothing is queued for it on purpose — it's a working aid, and replaying
+      // stale ticks onto a ticket that has since moved on would mislead.
+      setError("Couldn't reach the server — that tick may not have saved.");
+    }
+  }
+
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<KitchenOrder[] | null>(null);
 
@@ -491,6 +584,7 @@ export function KitchenBoard({
                 key={o.id}
                 order={o}
                 onAdvance={handleAdvance}
+                onToggleItem={handleToggleItem}
                 busy={busyId === o.id}
                 nowMs={nowMs}
               />
@@ -512,6 +606,7 @@ export function KitchenBoard({
                 key={o.id}
                 order={o}
                 onAdvance={handleAdvance}
+                onToggleItem={handleToggleItem}
                 busy={busyId === o.id}
                 nowMs={nowMs}
               />

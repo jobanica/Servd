@@ -13,6 +13,7 @@ import {
 import { formatPeso } from "@/lib/money";
 import { VOID_REASONS } from "@/lib/orders/void-reasons";
 import { useOrdersRefresh } from "@/lib/realtime/useOrdersRefresh";
+import { RefundModal } from "./RefundModal";
 
 /** Lists today's closed orders and lets the cashier re-open any of them. */
 export function ClosedOrdersModal({
@@ -33,6 +34,9 @@ export function ClosedOrdersModal({
   const [pin, setPin] = useState("");
   const [reason, setReason] = useState("");
   const [voidError, setVoidError] = useState<string | null>(null);
+  // Refunding specific items, for when only part of a paid ticket went wrong.
+  const [refundTarget, setRefundTarget] = useState<ClosedOrder | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   async function confirmVoid() {
     if (!voidTarget) return;
@@ -121,6 +125,19 @@ export function ClosedOrdersModal({
                     >
                       {busy === o.id ? "…" : "Re-open"}
                     </button>
+                    {/* Refund is for when part of a real sale went wrong — the
+                        dish that never came out. Void is for a sale that
+                        shouldn't have been recorded at all. Different things,
+                        so both are offered. */}
+                    {o.paymentStatus === "paid" && (
+                      <button
+                        onClick={() => setRefundTarget(o)}
+                        disabled={busy === o.id}
+                        className="rounded-full border border-plum-ink/15 px-3 py-1.5 text-xs font-semibold hover:bg-cream disabled:opacity-60"
+                      >
+                        Refund
+                      </button>
+                    )}
                     <button
                       onClick={() => { setVoidTarget(o); setVoidError(null); }}
                       disabled={busy === o.id}
@@ -160,6 +177,27 @@ export function ClosedOrdersModal({
           )}
         </div>
       </div>
+
+      {toast && (
+        <div className="fixed inset-x-0 bottom-6 z-[70] flex justify-center px-4" onClick={(e) => e.stopPropagation()}>
+          <p className="rounded-full bg-plum-ink px-4 py-2 text-sm font-semibold text-white shadow-lg">
+            {toast}
+          </p>
+        </div>
+      )}
+
+      {refundTarget && (
+        <RefundModal
+          orderId={refundTarget.id}
+          onClose={() => setRefundTarget(null)}
+          onDone={(message) => {
+            setRefundTarget(null);
+            setToast(message);
+            setTimeout(() => setToast(null), 4000);
+            void load();
+          }}
+        />
+      )}
 
       {voidTarget && (
         <div

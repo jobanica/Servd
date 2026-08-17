@@ -12,6 +12,7 @@ export function CartDrawer({
   lines,
   onSetQty,
   onRemove,
+  onEdit,
   onClose,
   onPlaceOrder,
   onPlaced,
@@ -30,6 +31,8 @@ export function CartDrawer({
   lines: CartLine[];
   onSetQty: (lineId: string, qty: number) => void;
   onRemove: (lineId: string) => void;
+  /** Reopen the item picker on an existing line, to change size/add-ons/note. */
+  onEdit?: (line: CartLine) => void;
   onClose: () => void;
   onPlaceOrder: () => Promise<PlaceOrderResult>;
   onPlaced: (orderId: string) => void;
@@ -182,24 +185,34 @@ export function CartDrawer({
                     {/* min-w-0 so a long name wraps rather than pushing the
                         price off the edge of a phone screen. */}
                     <div className="min-w-0 flex-1">
-                    <div className="flex justify-between gap-2">
-                      <span className="min-w-0 font-medium text-brand-ink">
-                        {line.name}
-                      </span>
-                      <span className="shrink-0 font-semibold">
-                        {formatPeso(line.unitPrice * line.quantity)}
-                      </span>
-                    </div>
-                    {line.modifiers.length > 0 && (
-                      <p className="text-xs text-plum-ink/50">
-                        {line.modifiers.map((m) => m.name).join(", ")}
-                      </p>
-                    )}
-                    {line.note && (
-                      <p className="text-xs italic text-plum-ink/50">
-                        “{line.note}”
-                      </p>
-                    )}
+                    {/* The whole description is the edit target. Changing your
+                        mind about a size or an add-on used to mean deleting the
+                        line and building it again from scratch. */}
+                    <button
+                      type="button"
+                      onClick={() => onEdit?.(line)}
+                      disabled={!onEdit}
+                      className="block w-full text-left disabled:cursor-default"
+                    >
+                      <div className="flex justify-between gap-2">
+                        <span className="min-w-0 font-medium text-brand-ink">
+                          {line.name}
+                        </span>
+                        <span className="shrink-0 font-semibold">
+                          {formatPeso(line.unitPrice * line.quantity)}
+                        </span>
+                      </div>
+                      {line.modifiers.length > 0 && (
+                        <p className="text-xs text-plum-ink/50">
+                          {line.modifiers.map((m) => m.name).join(", ")}
+                        </p>
+                      )}
+                      {line.note && (
+                        <p className="text-xs italic text-plum-ink/50">
+                          “{line.note}”
+                        </p>
+                      )}
+                    </button>
                     <div className="mt-2 flex items-center gap-3">
                       <div className="flex items-center rounded-full border border-plum-ink/15">
                         <button
@@ -220,9 +233,17 @@ export function CartDrawer({
                           +
                         </button>
                       </div>
+                      {onEdit && (
+                        <button
+                          onClick={() => onEdit(line)}
+                          className="text-xs font-semibold text-brand-primary"
+                        >
+                          Edit
+                        </button>
+                      )}
                       <button
                         onClick={() => onRemove(line.lineId)}
-                        className="text-xs text-muted hover:text-guava"
+                        className="text-xs font-semibold text-plum-ink/50 hover:text-guava"
                       >
                         {t("remove")}
                       </button>

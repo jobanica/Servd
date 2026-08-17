@@ -9,6 +9,7 @@ import {
   selectionToLineModifiers,
 } from "@/lib/cart/pricing";
 import type { CartLine, DinerItem, Selection } from "@/lib/cart/types";
+import { selectionFromLine } from "@/lib/cart/edit-line";
 import { tagInfo } from "@/lib/menu/dietary";
 import { VideoPlayer } from "./VideoPlayer";
 
@@ -19,21 +20,26 @@ function lineId(): string {
 
 export function ItemModal({
   item,
+  editing,
   onAdd,
   onClose,
 }: {
   item: DinerItem;
+  /** An existing cart line being changed, rather than a new one being added. */
+  editing?: CartLine | null;
   onAdd: (line: CartLine) => void;
   onClose: () => void;
 }) {
   const variants = item.variants ?? [];
   const inStock = (v: { stock?: number | null }) => v.stock == null || v.stock > 0;
   const [variantId, setVariantId] = useState<string>(
-    (variants.find(inStock) ?? variants[0])?.id ?? "",
+    editing?.variantId ?? (variants.find(inStock) ?? variants[0])?.id ?? "",
   );
-  const [selection, setSelection] = useState<Selection>({});
-  const [quantity, setQuantity] = useState(1);
-  const [note, setNote] = useState("");
+  const [selection, setSelection] = useState<Selection>(
+    editing ? selectionFromLine(editing) : {},
+  );
+  const [quantity, setQuantity] = useState(editing?.quantity ?? 1);
+  const [note, setNote] = useState(editing?.note ?? "");
   const [showError, setShowError] = useState(false);
   const t = useTranslations("item");
 
@@ -84,7 +90,9 @@ export function ItemModal({
       return;
     }
     onAdd({
-      lineId: lineId(),
+      // Editing keeps the same line id, so the cart replaces the line in place
+      // instead of leaving the old one behind next to the new one.
+      lineId: editing?.lineId ?? lineId(),
       itemId: item.id,
       name: chosenVariant ? `${item.name} (${chosenVariant.name})` : item.name,
       basePrice: effItem.price,
@@ -270,7 +278,9 @@ export function ItemModal({
             disabled={!!error || variantOut}
             className="flex-1 rounded-full py-3 font-semibold btn-brand disabled:opacity-50"
           >
-            {variantOut ? "Sold out" : `${t("add")} · ${formatPeso(price * quantity)}`}
+            {variantOut
+              ? "Sold out"
+              : `${editing ? "Update" : t("add")} · ${formatPeso(price * quantity)}`}
           </button>
         </div>
       </div>

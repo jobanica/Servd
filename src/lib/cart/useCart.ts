@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { CartLine } from "./types";
+import { replaceCartLine } from "./edit-line";
 
 /**
  * Cart state for the diner, persisted in localStorage so a refresh (or coming
@@ -49,11 +50,16 @@ export function useCart(restaurantId: string, tableToken: string) {
     );
   }, []);
 
+  /** Replace a line with an edited version of itself, in place. */
+  const replaceLine = useCallback((line: CartLine) => {
+    setLines((prev) => replaceCartLine(prev, line));
+  }, []);
+
   const removeLine = useCallback((lineId: string) => {
     setLines((prev) => prev.filter((l) => l.lineId !== lineId));
   }, []);
 
   const clear = useCallback(() => setLines([]), []);
 
-  return { lines, hydrated, addLine, setQty, removeLine, clear };
+  return { lines, hydrated, addLine, replaceLine, setQty, removeLine, clear };
 }

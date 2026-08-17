@@ -5,6 +5,12 @@ export interface KitchenOrderItem {
   quantity: number;
   note: string | null;
   modifiers: string[];
+  /**
+   * Ticked off by the kitchen once it's plated, ISO. Struck through on every
+   * tablet, so the pass can see at a glance what is still to come out of a
+   * five-item ticket instead of re-reading the whole thing.
+   */
+  preparedAt?: string | null;
 }
 
 export interface KitchenOrder {

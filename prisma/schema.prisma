@@ -1988,6 +1988,18 @@ model OrderItem {
   quantity   Int     @default(1)
   unitPrice  Int // snapshot of base price (centavos)
   note       String?
+  /// Ticked off by the kitchen as it goes out — the line is struck through on
+  /// every tablet so the pass can see what is still to come. Purely a working
+  /// aid: it doesn't move the order's status or touch stock.
+  ///
+  /// Nullable, no default. Both of these ship as hand-run migrations, and a
+  /// defaulted column is one Prisma writes into the INSERT of every order item.
+  preparedAt DateTime?
+  /// How many of this line were refunded, and what was handed back (centavos).
+  /// Null means none. The money itself is a negative payment row, so the day's
+  /// takings need no special-casing anywhere.
+  refundedQty Int?
+  refundedAmount Int?
 
   order     Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
   menuItem  MenuItem?           @relation(fields: [menuItemId], references: [id], onDelete: SetNull)

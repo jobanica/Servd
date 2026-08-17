@@ -58,6 +58,31 @@ type RawKitchenOrder = {
 };
 
 /**
+ * Which lines the kitchen has already ticked off.
+ *
+ * Read separately and best-effort: `preparedAt` ships as a hand-run migration,
+ * and selecting it inline would take the whole kitchen display down on a
+ * database that hasn't run the file yet. No column means nothing is ticked,
+ * which is how the board behaved before this existed.
+ */
+async function preparedMap(restaurantId: string, orderIds: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (orderIds.length === 0) return out;
+  try {
+    const rows = await tenantDb(restaurantId, (tx) =>
+      tx.orderItem.findMany({
+        where: { orderId: { in: orderIds }, preparedAt: { not: null } },
+        select: { id: true, preparedAt: true },
+      }),
+    );
+    for (const r of rows) if (r.preparedAt) out.set(r.id, r.preparedAt.toISOString());
+  } catch {
+    /* preparedAt column not migrated yet */
+  }
+  return out;
+}
+
+/**
  * Adds the card title and the type line. Shared by the live queue and the
  * history so a ticket reads identically whichever list it's in — a cook
  * checking what they just closed shouldn't have to re-read a different layout.
@@ -75,6 +100,7 @@ async function decorate(
   const types = new Map<string, string>();
   const addresses = new Map<string, string>();
   const scheduled = new Map<string, string>();
+  const prepared = await preparedMap(restaurantId, orders.map((o) => o.id));
   try {
     const meta = await tenantDb(restaurantId, (tx) =>
       tx.order.findMany({
@@ -125,8 +151,57 @@ async function decorate(
       quantity: it.quantity,
       note: it.note,
       modifiers: it.modifiers.map((m) => m.nameAtTime),
+      preparedAt: prepared.get(it.id) ?? null,
     })),
   }));
+}
+
+/**
+ * Tick a line off — or put it back — as the kitchen plates it.
+ *
+ * A working aid and nothing more: it doesn't move the order's status, doesn't
+ * touch stock, and doesn't decide when the ticket is done. The cook still
+ * presses "Mark ready" when the whole order is up. What it buys is the thing
+ * that was actually asked for: on a five-item ticket, seeing at a glance which
+ * two are still to come instead of re-reading the list every time.
+ *
+ * Toggling rather than one-way, because the commonest tap on a busy pass is the
+ * wrong one, and a cook who can't undo will stop using it.
+ *
+ * Written straight to the database rather than held on the tablet, so all three
+ * screens agree — the whole point is that the person at the pass and the person
+ * at the fryer are looking at the same ticket.
+ */
+export async function toggleItemPrepared(
+  orderItemId: string,
+  prepared: boolean,
+): Promise<{ ok: boolean; orders?: KitchenOrder[]; error?: string }> {
+  let staff;
+  try {
+    staff = await requireStaff(["kitchen", "admin", "cashier"]);
+  } catch {
+    return { ok: false, error: "Not allowed." };
+  }
+  try {
+    // updateMany, scoped through the order's restaurant: a stale tablet tapping
+    // a line from a ticket that has already left the board is a no-op, not a
+    // crash, and never reaches another restaurant's row.
+    await tenantDb(staff.restaurantId, (tx) =>
+      tx.orderItem.updateMany({
+        where: { id: orderItemId, order: { restaurantId: staff.restaurantId } },
+        data: { preparedAt: prepared ? new Date() : null },
+      }),
+    );
+  } catch (e) {
+    console.error("toggleItemPrepared failed", e);
+    return {
+      ok: false,
+      error:
+        "Ticking items off needs one database update. Run prisma/manual/add-item-prepared-and-refunds.sql, then try again.",
+    };
+  }
+  await notifyOrdersChanged(staff.restaurantId);
+  return { ok: true, orders: await getKitchenOrders() };
 }
 
 /**

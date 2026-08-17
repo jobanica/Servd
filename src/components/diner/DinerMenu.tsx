@@ -7,7 +7,7 @@ import { DIETARY_TAGS, tagInfo } from "@/lib/menu/dietary";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { cartCount, cartTotal } from "@/lib/cart/pricing";
 import { useCart } from "@/lib/cart/useCart";
-import type { DinerCategory, DinerItem } from "@/lib/cart/types";
+import type { CartLine, DinerCategory, DinerItem } from "@/lib/cart/types";
 import { placeOrder } from "@/server/orders/place-order";
 import { previewPromoCode } from "@/server/promotions/redeem";
 import type { PlaceOrderResult } from "@/lib/validation/order";
@@ -301,6 +301,9 @@ export function DinerMenu({
   }
 
   const [activeItem, setActiveItem] = useState<DinerItem | null>(null);
+  // A cart line being changed rather than a new item being added. Null means
+  // the picker is open to add something.
+  const [editingLine, setEditingLine] = useState<CartLine | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [billOpen, setBillOpen] = useState(false);
@@ -321,6 +324,9 @@ export function DinerMenu({
   // Drinks / desserts, detected by category name — powers the place-order upsell.
   const DRINK_RE = /drink|beverage|juice|coffee|tea|shake|soda|smoothie|frappe|lemonade|water|cola/i;
   const DESSERT_RE = /dessert|sweet|cake|ice ?cream|pastry|gelato|halo/i;
+  // Every item on the menu, flat — used to find the item a cart line came from
+  // when the diner taps it to change something.
+  const allItems = categories.flatMap((c) => c.items);
   const drinkItemIds = new Set(
     categories.filter((c) => DRINK_RE.test(c.name)).flatMap((c) => c.items.map((i) => i.id)),
   );
@@ -592,6 +598,16 @@ export function DinerMenu({
           lines={cart.lines}
           onSetQty={cart.setQty}
           onRemove={cart.removeLine}
+          onEdit={(line) => {
+            // Reopen the picker on the item this line came from, pre-filled.
+            // Falls back to doing nothing if the item has since left the menu —
+            // there's nothing sensible to edit against.
+            const item = allItems.find((i) => i.id === line.itemId);
+            if (!item) return;
+            setEditingLine(line);
+            setActiveItem(item);
+            setCartOpen(false);
+          }}
           onClose={() => setCartOpen(false)}
           onPlaceOrder={submitOrder}
           onPlaced={(orderId) => {
@@ -622,11 +638,21 @@ export function DinerMenu({
       {activeItem && (
         <ItemModal
           item={activeItem}
+          editing={editingLine}
           onAdd={(line) => {
-            cart.addLine(line);
+            // Same line id when editing, so it updates in place instead of
+            // leaving the original sitting next to its replacement.
+            if (editingLine) cart.replaceLine(line);
+            else cart.addLine(line);
             setActiveItem(null);
+            setEditingLine(null);
+            if (editingLine) setCartOpen(true); // straight back to the cart
           }}
-          onClose={() => setActiveItem(null)}
+          onClose={() => {
+            setActiveItem(null);
+            if (editingLine) setCartOpen(true);
+            setEditingLine(null);
+          }}
         />
       )}
 
