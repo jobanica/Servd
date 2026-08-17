@@ -13,6 +13,7 @@ import { useOnline } from "@/lib/offline/useOnline";
 import { kvGet, kvSet, outboxAdd, outboxAll, outboxRemove, type OutboxOp } from "@/lib/offline/idb";
 import { ConnectivityPill } from "@/components/offline/ConnectivityPill";
 import { alertChime, audioBlocked, chime, unlockAudio } from "@/lib/sound";
+import { isForAnotherDay, scheduledLabel } from "@/lib/orders/scheduled";
 
 /** Elapsed time as mm:ss (or h:mm:ss once past an hour). */
 function elapsed(iso: string, nowMs: number): string {
@@ -64,6 +65,21 @@ function OrderCard({
       <p className="border-b border-plum-ink/10 px-3 py-2 text-sm italic text-plum-ink/70">
         {order.typeLabel ?? "Dine in"}
       </p>
+
+      {/* An advance order, and when it's actually wanted. Stays on the card for
+          as long as the ticket is up: accepting it told the kitchen the order
+          exists, it didn't make it due now, and a card with no date on it looks
+          exactly like one to start cooking. */}
+      {order.scheduledFor && (
+        <p className="border-b border-mango/40 bg-mango/20 px-3 py-2 text-sm font-bold leading-snug text-plum-ink">
+          📅 Scheduled for {scheduledLabel(order.scheduledFor)}
+          {isForAnotherDay(order.scheduledFor) && (
+            <span className="mt-0.5 block text-xs font-extrabold uppercase tracking-wide text-guava">
+              Not for today
+            </span>
+          )}
+        </p>
+      )}
 
       {/* Where it's going, for a kitchen that batches by zone: everything for
           the same area gets cooked and bagged together instead of one ticket at

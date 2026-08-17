@@ -64,6 +64,7 @@ export async function getOrderTicket(
     let customerPhone: string | null = null;
     let customerNote: string | null = null;
     let cashTendered: number | null = null;
+    let scheduledFor: string | null = null;
     let surchargeAmount = 0;
     let surchargeLabel: string | null = null;
     try {
@@ -86,6 +87,7 @@ export async function getOrderTicket(
           customerPhone: true,
           customerNote: true,
           cashTendered: true,
+          scheduledFor: true,
         },
       });
       orderType = (meta?.orderType ?? "dine_in") as typeof orderType;
@@ -94,6 +96,7 @@ export async function getOrderTicket(
       customerPhone = meta?.customerPhone ?? null;
       customerNote = meta?.customerNote ?? null;
       cashTendered = meta?.cashTendered ?? null;
+      scheduledFor = meta?.scheduledFor ? meta.scheduledFor.toISOString() : null;
     } catch {
       /* not migrated yet */
     }
@@ -129,6 +132,7 @@ export async function getOrderTicket(
       customerAddress,
       customerPhone,
       customerNote,
+      scheduledFor,
       orderId: order.id,
       createdAt: order.createdAt.toISOString(),
       total: order.total,

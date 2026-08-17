@@ -24,5 +24,11 @@ export interface KitchenOrder {
    * home addresses on a screen the whole line can read.
    */
   customerAddress?: string | null;
+  /**
+   * When an advance order is wanted for, ISO. Present for as long as the ticket
+   * is on the board — accepting it told the kitchen about the order, it didn't
+   * make it due, and a card that drops the date is a card that says "cook now".
+   */
+  scheduledFor?: string | null;
   items: KitchenOrderItem[];
 }

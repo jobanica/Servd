@@ -74,6 +74,7 @@ async function decorate(
   const labels = new Map<string, string>();
   const types = new Map<string, string>();
   const addresses = new Map<string, string>();
+  const scheduled = new Map<string, string>();
   try {
     const meta = await tenantDb(restaurantId, (tx) =>
       tx.order.findMany({
@@ -83,6 +84,7 @@ async function decorate(
           orderType: true,
           customerName: true,
           orderNumber: true,
+          scheduledFor: true,
           ...(showAddress ? { customerAddress: true as const } : {}),
         },
       }),
@@ -90,6 +92,7 @@ async function decorate(
     for (const m of meta) {
       const addr = (m as { customerAddress?: string | null }).customerAddress?.trim();
       if (showAddress && m.orderType === "delivery" && addr) addresses.set(m.id, addr);
+      if (m.scheduledFor) scheduled.set(m.id, m.scheduledFor.toISOString());
       // A counter/stall order shows its big daily ticket number to the kitchen.
       // The type reads the same word here as on the cashier screen and the
       // receipt — the kitchen assembles from all three.
@@ -115,6 +118,7 @@ async function decorate(
     createdAt: o.createdAt.toISOString(),
     total: o.total,
     customerAddress: addresses.get(o.id) ?? null,
+    scheduledFor: scheduled.get(o.id) ?? null,
     items: o.items.map((it) => ({
       id: it.id,
       name: it.nameAtTime,

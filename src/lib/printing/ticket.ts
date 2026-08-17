@@ -6,6 +6,7 @@
  */
 
 import { orderTypeLabel, type OrderTypeKey } from "@/lib/orders/order-type";
+import { scheduledTicketLabel } from "@/lib/orders/scheduled";
 
 const VAT_RATE = 0.12;
 export const WIDTH = 32; // characters per line (58mm thermal; 80mm just has slack)
@@ -72,6 +73,8 @@ export interface Ticket {
   customerAddress: string | null;
   customerPhone: string | null;
   customerNote: string | null;
+  /** Advance order: when it's wanted for, ISO. Null on an ordinary order. */
+  scheduledFor: string | null;
   orderRef: string;
   placedAt: string;
   items: TicketLine[];
@@ -95,6 +98,7 @@ export interface TicketSource extends ReceiptBranding {
   customerAddress?: string | null;
   customerPhone?: string | null;
   customerNote?: string | null;
+  scheduledFor?: string | null;
   orderId: string;
   createdAt: string;
   total: number;
@@ -127,6 +131,7 @@ export function buildTicket(src: TicketSource): Ticket {
     customerAddress: src.customerAddress ?? null,
     customerPhone: src.customerPhone ?? null,
     customerNote: src.customerNote ?? null,
+    scheduledFor: src.scheduledFor ?? null,
     orderRef: src.orderId.slice(0, 8).toUpperCase(),
     placedAt: src.createdAt,
     items: src.items.map((i) => ({
@@ -192,6 +197,12 @@ export function ticketCustomerLines(t: Ticket): string[] {
   if (!t.showCustomer) return [];
   // A dine-in ticket already says which table; nobody is delivering to it.
   if (t.orderType === "dine_in") return [];
+  // Not on a kitchen docket. The cooks don't ring customers, and the address —
+  // if this kitchen works by zone — is printed once by the kitchen's own
+  // setting. Printing it here too gave every delivery ticket the same address
+  // twice, and put a customer's home address on the pass for kitchens that had
+  // deliberately turned that off.
+  if (t.kind === "kitchen") return [];
   const lines: string[] = [];
   if (t.customerName) lines.push(`Name : ${t.customerName}`);
   if (t.customerPhone) lines.push(`Phone: ${t.customerPhone}`);
@@ -218,6 +229,30 @@ function wrap(text: string, prefix: string, indent: string): string[] {
   return out;
 }
 
+/**
+ * "*** SCHEDULED FOR ***" and the day, boxed off so it can't be skimmed past.
+ *
+ * Nothing at all on an ordinary order — every ticket carrying a banner is a
+ * banner nobody reads.
+ */
+export function scheduledLines(t: Ticket): string[] {
+  const when = scheduledTicketLabel(t.scheduledFor);
+  if (!when) return [];
+  const rule = "*".repeat(WIDTH);
+  const box = [rule, center("*** SCHEDULED FOR ***"), center(when)];
+  // Only the kitchen is told not to start. The customer's copy just states when
+  // their order is for.
+  if (t.kind === "kitchen") box.push(center("*** DO NOT COOK YET ***"));
+  box.push(rule);
+  return box;
+}
+
+/** Centre text in the paper width. The body prints left-aligned. */
+function center(s: string): string {
+  const pad = Math.max(0, Math.floor((WIDTH - s.length) / 2));
+  return " ".repeat(pad) + s;
+}
+
 /** Left-aligned body: meta, itemized lines with prices, totals, payment. */
 export function ticketBodyLines(t: Ticket): string[] {
   const lines: string[] = [];
@@ -225,6 +260,10 @@ export function ticketBodyLines(t: Ticket): string[] {
   // Kitchen ticket = prep list only: quantities, items, modifiers and notes.
   // No prices, totals, VAT or payment — the cooks just need what to make.
   if (t.kind === "kitchen") {
+    // First thing on the docket, above the order number. A kitchen ticket that
+    // buries the date reads as "cook this now" — which is the one thing an
+    // advance order must never be mistaken for.
+    lines.push(...scheduledLines(t));
     lines.push(`Order #${t.orderRef}`);
     lines.push(new Date(t.placedAt).toLocaleString());
     // The address, when the kitchen works by zone — everything heading the same
@@ -241,6 +280,7 @@ export function ticketBodyLines(t: Ticket): string[] {
     return lines;
   }
 
+  lines.push(...scheduledLines(t));
   const docLabel = t.kind === "bill" ? "Bill" : "Receipt";
   lines.push(`${docLabel} #${t.orderRef}`);
   lines.push(new Date(t.placedAt).toLocaleString());

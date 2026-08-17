@@ -55,6 +55,13 @@ export interface CashierOrder {
   paymentRef: string | null;
   paymentReceiptUrl: string | null;
   cashTendered: number | null;
+  /**
+   * When an advance order is wanted for, ISO. Kept on the card AFTER
+   * acceptance — accepting it only means the kitchen has been told about it,
+   * not that it's due now, and a card that drops the date reads exactly like an
+   * order to start cooking immediately.
+   */
+  scheduledFor: string | null;
   createdAt: string;
   itemCount: number;
   items: { name: string; quantity: number; note: string | null; modifiers: string[] }[];
@@ -304,6 +311,8 @@ export async function getCashierTables(): Promise<CashierTable[]> {
   // Card fees already added — so a bill half-settled on a card still shows the
   // right amount outstanding on the floor.
   const surcharges = await surchargeMap(staff.restaurantId, orders.map((o) => o.id));
+  // When an advance order is actually wanted for.
+  const scheduled = await scheduledForMap(staff.restaurantId, orders.map((o) => o.id));
   const meta = await orderMetaMap(staff.restaurantId, orders.map((o) => o.id));
 
   const byTable = new Map<string, CashierTable>();
@@ -362,6 +371,7 @@ export async function getCashierTables(): Promise<CashierTable[]> {
       paymentRef: m?.paymentRef ?? null,
       paymentReceiptUrl: m?.paymentReceiptUrl ?? null,
       cashTendered: m?.cashTendered ?? null,
+      scheduledFor: scheduled.get(o.id) ?? null,
       createdAt: o.createdAt.toISOString(),
       itemCount: o._count.items,
       items: o.items.map((it) => ({

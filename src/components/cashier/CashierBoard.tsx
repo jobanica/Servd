@@ -18,6 +18,7 @@ import {
 } from "@/server/orders/cashier";
 import { formatPeso } from "@/lib/money";
 import { chime, unlockAudio } from "@/lib/sound";
+import { isForAnotherDay, scheduledLabel } from "@/lib/orders/scheduled";
 import { PrintTicketButton } from "./PrintTicketButton";
 import { PayModal } from "./PayModal";
 import { NewOrderModal } from "./NewOrderModal";
@@ -675,6 +676,19 @@ export function CashierBoard({
                     )}
                   </div>
 
+                  {/* When an advance order is wanted for — still here after it
+                      was accepted. Accepting only sent it to the kitchen; it
+                      didn't make it due, and a card that drops the date is
+                      indistinguishable from one to serve now. */}
+                  {o.scheduledFor && (
+                    <p className="mt-1 rounded-md bg-mango/20 px-2 py-1 text-xs font-bold text-plum-ink">
+                      📅 Scheduled for {scheduledLabel(o.scheduledFor)}
+                      {isForAnotherDay(o.scheduledFor) && (
+                        <span className="ml-1 font-extrabold uppercase text-guava">· not today</span>
+                      )}
+                    </p>
+                  )}
+
                   {/* The method the customer chose, still here after the order
                       was accepted. "Payment: unpaid" on ten cards says nothing
                       about which of them owes cash and which already sent a
@@ -822,8 +836,7 @@ export function CashierBoard({
                   </div>
                   {o.scheduledFor && (
                     <p className="mt-1 rounded-md bg-mango/20 px-2 py-1 text-xs font-bold text-plum-ink">
-                      📅 Advance order — wanted for{" "}
-                      {new Date(o.scheduledFor).toLocaleString("en-PH", { timeZone: "Asia/Manila", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                      📅 Advance order — wanted for {scheduledLabel(o.scheduledFor)}
                     </p>
                   )}
                   <PaymentBadge
