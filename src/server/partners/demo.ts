@@ -9,6 +9,7 @@ import { pesosToCentavos } from "@/lib/money";
 import { getCurrentPartner } from "@/server/partners/auth";
 import { provisionDemo, receiptJson } from "@/server/storefront-demo/provision";
 import { convertDemo } from "@/server/storefront-demo/convert";
+import { PARTNER_SCAN_LIMIT } from "@/lib/menu/scan-limit";
 import { scanAndSaveMenu } from "@/server/storefront-demo/scan-save";
 import { uploadMenuImage } from "@/server/storage/menu-images";
 
@@ -101,8 +102,12 @@ export async function scanPartnerDemoMenu(_prev: DemoScanState, formData: FormDa
   const restaurantId = String(formData.get("restaurantId") ?? "");
   if (!(await ownDemo(restaurantId, partner.id))) return { error: "Storefront not found." };
 
+  // One photo per scan. Each file is a vision call billed to us, and a partner
+  // account has no cap on storefronts — so the cost is capped per scan instead.
+  // Enforced here, not just in the file picker: the form is a POST like any
+  // other and `multiple` is a suggestion to the browser, not a rule.
   const files = formData.getAll("images").filter((f): f is File => f instanceof File && f.size > 0);
-  const res = await scanAndSaveMenu(restaurantId, files);
+  const res = await scanAndSaveMenu(restaurantId, files, PARTNER_SCAN_LIMIT);
   if (!res.ok) return { error: res.error };
   revalidatePath(PATH);
   revalidatePath(demoPath(restaurantId));

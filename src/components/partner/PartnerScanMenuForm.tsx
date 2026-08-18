@@ -10,11 +10,12 @@ export function PartnerScanMenuForm({ restaurantId }: { restaurantId: string }) 
       <input type="hidden" name="restaurantId" value={restaurantId} />
       <p className="font-heading font-bold text-plum-ink">✨ Scan a menu (photo or PDF)</p>
       <p className="text-xs text-plum-ink/55">
-        Upload a photo or PDF of the prospect&apos;s printed menu — AI reads it and fills in the
-        categories &amp; items for you (edit after). JPEG / PNG / WebP / PDF, up to 4 files.
+        Upload <strong>one</strong> photo or PDF of the prospect&apos;s printed menu — AI reads it
+        and fills in the categories &amp; items for you (edit after). JPEG / PNG / WebP / PDF.
+        Pick the clearest shot; you can scan again to add more.
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <input name="images" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple className="text-xs" />
+        <input name="images" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" className="text-xs" />
         <button
           disabled={pending}
           className="rounded-full bg-brand-gradient px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"

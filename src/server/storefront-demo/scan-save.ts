@@ -4,6 +4,7 @@ import { systemDb } from "@/server/tenancy/scoped-db";
 import { pesosToCentavos } from "@/lib/money";
 import { uploadMenuImage, uploadMenuImageBytes } from "@/server/storage/menu-images";
 import { ALLOWED_MENU_DOC_TYPES } from "@/lib/validation/menu";
+import { limitScanFiles, ADMIN_SCAN_LIMIT } from "@/lib/menu/scan-limit";
 import { scanMenuMedia } from "./ai-scan";
 
 export type ScanResult = { ok: true; added: number } | { ok: false; error: string };
@@ -12,14 +13,24 @@ export type ScanResult = { ok: true; added: number } | { ok: false; error: strin
  * Upload menu photo(s)/PDF, let Claude read them, and append the detected
  * categories + items to a demo storefront's menu. No auth here — the caller is
  * responsible for authorizing access to `restaurantId`.
+ *
+ * `maxFiles` is what the scan is allowed to cost: one vision call per file.
+ * The partner portal passes 1; the super-admin screen keeps the old 4.
  */
-export async function scanAndSaveMenu(restaurantId: string, files: File[]): Promise<ScanResult> {
-  const usable = files.filter((f) => f instanceof File && f.size > 0);
-  if (usable.length === 0) return { ok: false, error: "Choose at least one menu photo or PDF to scan." };
+export async function scanAndSaveMenu(
+  restaurantId: string,
+  files: File[],
+  maxFiles: number = ADMIN_SCAN_LIMIT,
+): Promise<ScanResult> {
+  const checked = limitScanFiles(
+    files.filter((f) => f instanceof File),
+    maxFiles,
+  );
+  if (!checked.ok) return { ok: false, error: checked.error };
 
   const media: { url: string; pdf: boolean }[] = [];
   try {
-    for (const f of usable.slice(0, 4)) {
+    for (const f of checked.files) {
       if (!ALLOWED_MENU_DOC_TYPES.includes(f.type as never)) {
         return { ok: false, error: "Use JPEG / PNG / WebP photos or a PDF." };
       }
