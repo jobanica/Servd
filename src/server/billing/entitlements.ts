@@ -1,6 +1,6 @@
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import type { PlanModuleType } from "@prisma/client";
-import { getPlanAccess } from "@/server/billing/feature-gate";
+import { getEntitledFeatures, getPlanAccess } from "@/server/billing/feature-gate";
 import type { Feature } from "@/lib/billing/features";
 
 export interface PlanLimits {
@@ -9,10 +9,16 @@ export interface PlanLimits {
   smsIncluded?: number;
 }
 
-// The premium add-on modules map 1:1 to gateable features, so module access is
-// resolved from the SAME plan feature set as everything else — a trial grants
-// the trialed plan's modules (Growth trial → custom domain only, not HR/inventory).
-const MODULE_FOR_FEATURE: Record<PlanModuleType, Feature> = {
+/**
+ * The premium add-on modules, each mapped 1:1 to a gateable feature.
+ *
+ * Exported so the mapping's invariants can be pinned by a test: every module
+ * here is sold as a one-time unlock, so module access MUST be resolved from the
+ * set that includes purchases, and none of them may become a monthly feature
+ * (getEntitledFeatures strips those, which would revoke something already paid
+ * for outright).
+ */
+export const MODULE_FOR_FEATURE: Record<PlanModuleType, Feature> = {
   hris: "hr",
   inventory: "inventory",
   custom_domain: "customDomain",
@@ -26,17 +32,32 @@ export interface Entitlements {
 }
 
 /**
- * Resolves what a restaurant is entitled to: its plan's add-on modules + limits.
- * Modules come from the plan's feature set (via getPlanAccess), so trials unlock
- * only the trialed plan's modules — never everything. Limits stay relaxed during
- * a trial so tiers can be tried without hitting caps.
+ * Resolves what a restaurant is entitled to: its add-on modules + limits.
+ *
+ * MODULES COME FROM getEntitledFeatures, NOT getPlanAccess. That distinction is
+ * the whole bug this once had: getPlanAccess answers "what does their PLAN
+ * include", which leaves out anything bought outright as a one-time unlock. So
+ * a shop that paid for HR saw "Owned — paid once, kept forever" on the billing
+ * page and the buy-it-now paywall on every HR page, because the store read
+ * their purchases and the gate read only their plan. Same for Inventory and the
+ * custom domain — every module-gated page in the app.
+ *
+ * One-time unlocks are permanent and survive a plan change, so anything that
+ * decides access has to read the same set. Trials still unlock only the trialed
+ * plan's modules; limits stay relaxed during a trial so tiers can be tried
+ * without hitting caps.
  */
 export async function getEntitlements(restaurantId: string): Promise<Entitlements> {
-  const access = await getPlanAccess(restaurantId);
+  // Both: the tier/trial flags come from the plan, the feature set from
+  // everything they actually have.
+  const [access, entitled] = await Promise.all([
+    getPlanAccess(restaurantId),
+    getEntitledFeatures(restaurantId),
+  ]);
 
   const modules = new Set<PlanModuleType>();
   for (const [mod, feature] of Object.entries(MODULE_FOR_FEATURE) as [PlanModuleType, Feature][]) {
-    if (access.features.has(feature)) modules.add(mod);
+    if (entitled.has(feature)) modules.add(mod);
   }
 
   // Status + plan limits from the restaurant row (best-effort).
