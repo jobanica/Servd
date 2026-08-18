@@ -152,6 +152,19 @@ For people who set restaurants up on Servd. Apply at `/partner/apply`.
   the price and never invoices the partner's client on their behalf.
 - **Free to join**, subject to approval.
 
+**How an account gets created.** A partner builds a demo storefront from their
+dashboard — a live `/r/{slug}` ordering page with a real menu but no login — and
+shows it to the prospect. When the prospect says yes, the partner converts it in
+one click: the same storefront gets a login (username + a one-time password to
+hand the owner), and the menu, link and QR codes all carry over. No approval step
+and no cap on how many they convert.
+
+**What plan those accounts land on.** The ₱0 **Free** plan — Servd does not bill
+a restaurant that a partner set up. Online ordering, the POS and the kitchen
+display work; other paid features stay locked until somebody buys them. The
+restaurant can still purchase unlocks from Servd directly at the usual prices
+(§3, §4), and that is separate from whatever the partner charges.
+
 Collecting what a restaurant owes a partner is the partner's own business.
 
 There is no referral or affiliate scheme, for restaurants or for partners. The

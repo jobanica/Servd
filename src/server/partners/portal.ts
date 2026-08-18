@@ -19,8 +19,15 @@ export interface PartnerAccountRow {
   id: string;
   name: string;
   slug: string;
-  /** "preview" until it's activated; "active" once it's a real shop. */
-  status: string;
+  /**
+   * Whether this is still a demo being pitched, or a real account with a login.
+   *
+   * Read off whether a staff row exists, NOT off restaurant.status: a demo is
+   * created `active` as well, because its ordering page has to work while the
+   * partner is showing it to a prospect. Conversion is what adds the login, so
+   * that's the only honest signal.
+   */
+  converted: boolean;
   createdAt: string;
 }
 
@@ -40,7 +47,14 @@ export async function getPartnerDashboard(partnerId: string): Promise<PartnerDas
         where: { demoPartnerId: partnerId },
         orderBy: { createdAt: "desc" },
         take: 200,
-        select: { id: true, name: true, displayName: true, slug: true, status: true, createdAt: true },
+        select: {
+          id: true,
+          name: true,
+          displayName: true,
+          slug: true,
+          createdAt: true,
+          _count: { select: { staff: true } },
+        },
       }),
     );
     return {
@@ -48,7 +62,7 @@ export async function getPartnerDashboard(partnerId: string): Promise<PartnerDas
         id: r.id,
         name: r.displayName || r.name,
         slug: r.slug,
-        status: r.status,
+        converted: r._count.staff > 0,
         createdAt: r.createdAt.toISOString(),
       })),
     };

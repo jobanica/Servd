@@ -6,12 +6,8 @@ import { PartnerDemos } from "@/components/partner/PartnerDemos";
 import { TrainingVideo } from "@/components/partner/TrainingVideo";
 import { AppIcon, Wordmark } from "@/components/Wordmark";
 
-const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
-  preview: { label: "Preview", cls: "bg-plum-ink/5 text-plum-ink/60" },
-  active: { label: "Live ✓", cls: "bg-mango/15 text-mango" },
-  suspended: { label: "Suspended", cls: "bg-guava/15 text-guava" },
-  archived: { label: "Archived", cls: "bg-plum-ink/5 text-plum-ink/40" },
-};
+const DEMO = { label: "Demo", cls: "bg-plum-ink/5 text-plum-ink/60" };
+const LIVE = { label: "Live ✓", cls: "bg-mango/15 text-mango" };
 
 export default async function PartnerPortalPage() {
   const partner = await requirePartnerPage();
@@ -80,7 +76,11 @@ export default async function PartnerPortalPage() {
 
       <div className="mt-4 rounded-tile border border-plum-ink/10 bg-white p-5">
         <p className="mb-3 text-sm font-semibold">
-          Your restaurants{data.accounts.length > 0 && ` (${data.accounts.length})`}
+          Your restaurants
+          {data.accounts.length > 0 &&
+            ` (${data.accounts.filter((a) => a.converted).length} live · ${
+              data.accounts.filter((a) => !a.converted).length
+            } demo)`}
         </p>
         {data.accounts.length === 0 ? (
           <p className="text-sm text-plum-ink/50">
@@ -89,7 +89,7 @@ export default async function PartnerPortalPage() {
         ) : (
           <ul className="divide-y divide-plum-ink/5">
             {data.accounts.map((r) => {
-              const s = STATUS_LABEL[r.status] ?? STATUS_LABEL.preview;
+              const s = r.converted ? LIVE : DEMO;
               return (
                 <li key={r.id} className="flex items-center justify-between gap-3 py-3">
                   <div className="min-w-0">

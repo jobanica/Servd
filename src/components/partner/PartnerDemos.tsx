@@ -11,6 +11,7 @@ import {
   type DemoScanState,
 } from "@/server/partners/demo";
 import type { PartnerDemoRow } from "@/server/partners/demo-queries";
+import { PartnerConvertForm } from "./PartnerConvertForm";
 
 export function PartnerDemos({ demos, appUrl }: { demos: PartnerDemoRow[]; appUrl: string }) {
   const router = useRouter();
@@ -31,9 +32,10 @@ export function PartnerDemos({ demos, appUrl }: { demos: PartnerDemoRow[]; appUr
     <div className="rounded-tile border border-plum-ink/10 bg-white p-5">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-semibold">Demo storefronts</p>
+          <p className="text-sm font-semibold">Storefronts</p>
           <p className="text-xs text-plum-ink/50">
-            Build a live ordering page for a prospect to show them Servd in action.
+            Build a live ordering page to pitch a prospect, then convert it into their account
+            when they say yes.
           </p>
         </div>
         <button
@@ -96,7 +98,18 @@ function DemoRow({ demo, appUrl }: { demo: PartnerDemoRow; appUrl: string }) {
     <div className="rounded-lg border border-plum-ink/10 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="font-medium">{demo.name}</p>
+          <p className="flex flex-wrap items-center gap-2 font-medium">
+            {demo.name}
+            {demo.converted ? (
+              <span className="rounded-full bg-mango/15 px-2 py-0.5 text-xs font-semibold text-mango">
+                Live account{demo.username ? ` · ${demo.username}` : ""}
+              </span>
+            ) : (
+              <span className="rounded-full bg-plum-ink/5 px-2 py-0.5 text-xs font-semibold text-plum-ink/55">
+                Demo
+              </span>
+            )}
+          </p>
           <p className="text-xs text-plum-ink/45">
             {demo.itemCount} item{demo.itemCount === 1 ? "" : "s"} ·{" "}
             <span className="break-all">{url}</span>
@@ -123,14 +136,25 @@ function DemoRow({ demo, appUrl }: { demo: PartnerDemoRow; appUrl: string }) {
           >
             {copied ? "Copied ✓" : "Copy link"}
           </button>
-          <form action={deletePartnerDemo}>
-            <input type="hidden" name="id" value={demo.id} />
-            <button className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-guava hover:bg-guava/10">
-              Delete
-            </button>
-          </form>
+          {/* A converted account is somebody's real shop, with real orders in
+              it — deleting it from here isn't a thing a partner should be able
+              to do by accident. The server refuses it too. */}
+          {!demo.converted && (
+            <form action={deletePartnerDemo}>
+              <input type="hidden" name="id" value={demo.id} />
+              <button className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-guava hover:bg-guava/10">
+                Delete
+              </button>
+            </form>
+          )}
         </div>
       </div>
+
+      {!demo.converted && (
+        <div className="mt-3 border-t border-plum-ink/5 pt-3">
+          <PartnerConvertForm restaurantId={demo.id} />
+        </div>
+      )}
 
       {/* AI menu scan — fills the storefront from a photo/PDF of the menu. */}
       <form action={scanAction} className="mt-3 flex flex-wrap items-center gap-2 border-t border-plum-ink/5 pt-3">

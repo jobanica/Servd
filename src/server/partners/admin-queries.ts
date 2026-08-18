@@ -20,7 +20,13 @@ export interface PartnerOverviewRow {
   createdAt: Date;
   /** Restaurants this partner has set up. */
   accounts: number;
-  /** How many of those are live rather than still a preview. */
+  /**
+   * How many of those became real accounts rather than staying a demo.
+   *
+   * Counted by whether a login exists. A demo is created `active` too — its
+   * ordering page has to work while it's being pitched — so restaurant status
+   * would report every demo as live.
+   */
   live: number;
 }
 
@@ -40,14 +46,14 @@ export async function getPartnersOverview(): Promise<{ partners: PartnerOverview
       try {
         const rows = await tx.restaurant.findMany({
           where: { demoPartnerId: { not: null } },
-          select: { demoPartnerId: true, status: true },
+          select: { demoPartnerId: true, _count: { select: { staff: true } } },
         });
         accountsBy = rows.reduce((m, r) => {
           const k = r.demoPartnerId!;
           return m.set(k, (m.get(k) ?? 0) + 1);
         }, new Map<string, number>());
         liveBy = rows
-          .filter((r) => r.status === "active")
+          .filter((r) => r._count.staff > 0)
           .reduce((m, r) => {
             const k = r.demoPartnerId!;
             return m.set(k, (m.get(k) ?? 0) + 1);

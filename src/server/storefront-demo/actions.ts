@@ -1,6 +1,5 @@
 "use server";
 
-import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -8,25 +7,13 @@ import { z } from "zod";
 import { requireSuperAdmin } from "@/server/tenancy/current-user";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { pesosToCentavos } from "@/lib/money";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { migrationHint } from "@/lib/db/migration-hint";
 import { uploadMenuImage } from "@/server/storage/menu-images";
 import { provisionDemo, receiptJson } from "./provision";
+import { convertDemo } from "./convert";
 import { scanAndSaveMenu } from "./scan-save";
 
 export type FormState = { ok?: boolean; error?: string } | null;
-
-const LOGIN_DOMAIN = process.env.INTERNAL_LOGIN_DOMAIN || "staff.servdph.com";
-function syntheticEmail(username: string): string {
-  return `${username}@${LOGIN_DOMAIN}`;
-}
-function tempPassword(): string {
-  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
-  const bytes = randomBytes(10);
-  let out = "";
-  for (let i = 0; i < 10; i++) out += chars[bytes[i] % chars.length];
-  return out;
-}
 
 const PATH = "/super-admin/storefronts";
 const detailPath = (id: string) => `${PATH}/${id}`;
@@ -234,81 +221,26 @@ export type ConvertState =
   | { ok?: boolean; error?: string; credentials?: { username: string; password: string } }
   | null;
 
-const convertSchema = z.object({
-  username: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .min(3, "Username must be at least 3 characters")
-    .max(30)
-    .regex(/^[a-z0-9._-]+$/, "Letters, numbers, dot, dash, underscore"),
-});
-
 /**
  * Convert a demo storefront into a REAL account: attach a username login to the
  * existing tenant (keeping its menu), and start a fresh 30-day Business trial.
  * Returns the credentials to hand the owner.
+ *
+ * The work is in convertDemo() because a partner can do this too, from their
+ * own dashboard — they land on the Free plan rather than a trial, since they
+ * bill the restaurant themselves. Everything else has to behave identically.
  */
 export async function convertDemoToAccount(_prev: ConvertState, formData: FormData): Promise<ConvertState> {
   await requireSuperAdmin();
   const restaurantId = String(formData.get("restaurantId"));
-  const parsed = convertSchema.safeParse({ username: formData.get("username") });
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid username" };
-  const username = parsed.data.username;
 
-  const info = await systemDb((tx) =>
-    tx.restaurant.findFirst({ where: { id: restaurantId }, select: { id: true, _count: { select: { staff: true } } } }),
-  );
-  if (!info) return { error: "Storefront not found." };
-  if (info._count.staff > 0) return { error: "This storefront already has a login." };
+  const res = await convertDemo(restaurantId, formData.get("username"), "trial30");
+  if (!res.ok) return { error: res.error };
 
-  const taken = await systemDb((tx) => tx.staffUser.findFirst({ where: { username }, select: { id: true } }));
-  if (taken) return { error: "That username is already taken." };
-
-  const password = tempPassword();
-  const email = syntheticEmail(username);
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true });
-  if (error || !data.user) {
-    return { error: /registered|exists/i.test(error?.message ?? "") ? "That username is taken." : error?.message ?? "Couldn't create the login." };
-  }
-  const authUserId = data.user.id;
-
-  try {
-    await systemDb(async (tx) => {
-      await tx.staffUser.create({
-        data: { restaurantId, authUserId, role: "admin", email, username },
-        select: { id: true },
-      });
-      // Fresh 30-day Business trial — the countdown starts now.
-      const sub = await tx.subscription.findFirst({
-        where: { restaurantId },
-        orderBy: { createdAt: "desc" },
-        select: { id: true },
-      });
-      const trialEndsAt = new Date();
-      trialEndsAt.setDate(trialEndsAt.getDate() + 30);
-      if (sub) {
-        await tx.subscription.update({
-          where: { id: sub.id },
-          data: { status: "trialing", trialEndsAt, currentPeriodEnd: trialEndsAt },
-          select: { id: true },
-        });
-      }
-    });
-  } catch (e) {
-    try {
-      await admin.auth.admin.deleteUser(authUserId);
-    } catch {
-      /* ignore */
-    }
-    const msg = e instanceof Error ? e.message : "Couldn't convert.";
-    return { error: /unique/i.test(msg) ? "That username is taken." : msg };
-  }
   revalidatePath(detailPath(restaurantId));
   revalidatePath(PATH);
   revalidatePath("/super-admin/accounts");
-  return { ok: true, credentials: { username, password } };
+  return { ok: true, credentials: res.credentials };
 }
 
 export async function deleteItem(formData: FormData): Promise<void> {

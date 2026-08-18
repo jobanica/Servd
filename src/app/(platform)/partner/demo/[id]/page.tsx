@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePartnerPage } from "@/server/partners/auth";
-import { partnerOwnsDemo } from "@/server/partners/demo-queries";
+import { partnerOwnsDemo, demoLogin } from "@/server/partners/demo-queries";
 import { getDemoStorefront } from "@/server/storefront-demo/queries";
 import {
   updatePartnerDemoDetails,
@@ -16,6 +16,7 @@ import {
 } from "@/server/partners/demo";
 import { CopyLink } from "@/components/super-admin/CopyLink";
 import { PartnerScanMenuForm } from "@/components/partner/PartnerScanMenuForm";
+import { PartnerConvertForm } from "@/components/partner/PartnerConvertForm";
 import { formatPeso } from "@/lib/money";
 import { qrPngDataUrl } from "@/lib/qr";
 
@@ -28,6 +29,7 @@ export default async function PartnerDemoDetailPage({ params }: { params: Promis
 
   const s = await getDemoStorefront(id);
   if (!s) notFound();
+  const login = await demoLogin(id);
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://servdph.com";
   const url = `${appUrl}/r/${s.slug}`;
@@ -81,6 +83,24 @@ export default async function PartnerDemoDetailPage({ params }: { params: Promis
           </div>
         </div>
       </div>
+
+      {/* Convert — the point of the whole preview. Once it has a login it's
+          their real account, so the panel turns into a reminder of the handle
+          they log in with. */}
+      {login.converted ? (
+        <div className="rounded-tile border border-mango/30 bg-mango/10 p-4">
+          <p className="font-heading font-bold text-plum-ink">✅ Real account</p>
+          <p className="mt-1 text-sm text-plum-ink/70">
+            The owner logs in{login.username ? (
+              <> as <strong className="font-mono">{login.username}</strong></>
+            ) : null}
+            . On the ₱0 Free plan — Servd bills them nothing; what they pay you is between you and
+            them. You can still edit their menu from here.
+          </p>
+        </div>
+      ) : (
+        <PartnerConvertForm restaurantId={s.id} />
+      )}
 
       {/* Business details */}
       <form action={updatePartnerDemoDetails} className="grid gap-3 rounded-tile border border-plum-ink/10 bg-white p-4 sm:grid-cols-2">
@@ -217,11 +237,14 @@ export default async function PartnerDemoDetailPage({ params }: { params: Promis
         </form>
       </div>
 
-      {/* Danger zone */}
-      <form action={deletePartnerDemo} className="border-t border-plum-ink/10 pt-4">
-        <input type="hidden" name="id" value={s.id} />
-        <button className="text-xs font-semibold text-guava hover:underline">Delete this storefront</button>
-      </form>
+      {/* Danger zone — demos only. A converted storefront is a real shop with
+          real orders in it; the server refuses to delete one either way. */}
+      {!login.converted && (
+        <form action={deletePartnerDemo} className="border-t border-plum-ink/10 pt-4">
+          <input type="hidden" name="id" value={s.id} />
+          <button className="text-xs font-semibold text-guava hover:underline">Delete this storefront</button>
+        </form>
+      )}
     </div>
   );
 }

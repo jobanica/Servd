@@ -8,6 +8,7 @@ import { systemDb } from "@/server/tenancy/scoped-db";
 import { pesosToCentavos } from "@/lib/money";
 import { getCurrentPartner } from "@/server/partners/auth";
 import { provisionDemo, receiptJson } from "@/server/storefront-demo/provision";
+import { convertDemo } from "@/server/storefront-demo/convert";
 import { scanAndSaveMenu } from "@/server/storefront-demo/scan-save";
 import { uploadMenuImage } from "@/server/storage/menu-images";
 
@@ -108,14 +109,62 @@ export async function scanPartnerDemoMenu(_prev: DemoScanState, formData: FormDa
   return { ok: true, added: res.added };
 }
 
-/** Partner: delete one of their own demo storefronts. */
+export type PartnerConvertState =
+  | { ok?: boolean; error?: string; credentials?: { username: string; password: string } }
+  | null;
+
+/**
+ * Partner: turn one of their demos into a real account.
+ *
+ * This is the moment the pitch lands — the prospect said yes, and the partner
+ * hands them a login to the exact storefront they've been looking at. The menu,
+ * the slug and the QR codes all carry over, so nothing has to be rebuilt.
+ *
+ * It goes onto the ₱0 Free plan, not a trial: Servd doesn't bill a restaurant a
+ * partner set up. The partner charges that restaurant directly, at whatever
+ * price they agreed, and paid features stay locked until somebody buys them.
+ *
+ * No approval step. A partner's whole advantage is that they can open accounts
+ * as fast as they can sell them.
+ */
+export async function convertPartnerDemo(
+  _prev: PartnerConvertState,
+  formData: FormData,
+): Promise<PartnerConvertState> {
+  let partner;
+  try {
+    partner = await requireApprovedPartner();
+  } catch {
+    return { error: "Your partner account isn't approved yet." };
+  }
+  const restaurantId = String(formData.get("restaurantId") ?? "");
+  if (!restaurantId || !(await ownDemo(restaurantId, partner.id))) {
+    return { error: "Storefront not found." };
+  }
+
+  const res = await convertDemo(restaurantId, formData.get("username"), "free");
+  if (!res.ok) return { error: res.error };
+
+  revalidatePath(PATH);
+  revalidatePath(demoPath(restaurantId));
+  return { ok: true, credentials: res.credentials };
+}
+
+/**
+ * Partner: delete one of their own demo storefronts.
+ *
+ * Only while it's still a demo. Once it has a login it's somebody's real shop,
+ * with real orders in it, and `demoPartnerId` still points here — so without
+ * the `staff: { none: {} }` guard this button would let a partner wipe a live
+ * restaurant and its entire history.
+ */
 export async function deletePartnerDemo(formData: FormData): Promise<void> {
   const partner = await requireApprovedPartner();
   const id = String(formData.get("id") ?? "");
   if (!id) return;
   // Ownership enforced in the where clause — a partner can't delete another's.
   await systemDb((tx) =>
-    tx.restaurant.deleteMany({ where: { id, demoPartnerId: partner.id } }),
+    tx.restaurant.deleteMany({ where: { id, demoPartnerId: partner.id, staff: { none: {} } } }),
   );
   revalidatePath(PATH);
   redirect(PATH);

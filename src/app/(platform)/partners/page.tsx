@@ -127,8 +127,8 @@ export default function PartnersPage() {
           />
           <Step
             n={3}
-            title="Set your price and bill them"
-            body="You agree the fee directly with the restaurant. Servd never sees it and never takes a share."
+            title="Turn it into their account"
+            body="They said yes? One click gives that same storefront a login — menu, link and QR all carry over. You agree the fee directly with them; Servd never sees it and never takes a share."
           />
         </div>
       </section>
