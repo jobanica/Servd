@@ -25,22 +25,42 @@ export interface DemoLogin {
  * Kept separate from getDemoStorefront (which the super-admin screen shares) so
  * the partner detail page can ask this one question without either screen
  * having to carry the other's fields.
+ *
+ * The two facts are fetched separately on purpose. `username` arrives in a
+ * manual migration (add-staff-username.sql), so a database that's behind the
+ * code throws on it — and asking for both at once meant that throw took the
+ * `converted` answer down with it, hiding the convert button on every demo. A
+ * missing display detail must not be able to remove the button.
  */
 export async function demoLogin(restaurantId: string): Promise<DemoLogin> {
+  let converted = false;
   try {
     const staff = await systemDb((tx) =>
+      tx.staffUser.findFirst({ where: { restaurantId }, select: { id: true } }),
+    );
+    converted = !!staff;
+  } catch {
+    // Can't tell whether a login exists. Say no: the convert action itself
+    // re-checks and refuses a storefront that already has one, so an offered
+    // button is recoverable — a missing one just looks broken.
+    return { converted: false, username: null };
+  }
+
+  let username: string | null = null;
+  try {
+    const row = await systemDb((tx) =>
       tx.staffUser.findFirst({
         where: { restaurantId },
         orderBy: { createdAt: "asc" },
         select: { username: true },
       }),
     );
-    return { converted: !!staff, username: staff?.username ?? null };
+    username = row?.username ?? null;
   } catch {
-    // Treat "can't tell" as converted: it hides the convert form and the delete
-    // button, which is the safe way to be wrong.
-    return { converted: true, username: null };
+    /* username column not migrated yet — the handle just isn't shown */
   }
+
+  return { converted, username };
 }
 
 export interface PartnerDemoRow {
@@ -77,23 +97,40 @@ export async function listPartnerDemos(partnerId: string): Promise<PartnerDemoRo
           displayName: true,
           slug: true,
           createdAt: true,
-          _count: { select: { menuItems: true } },
-          staff: {
-            orderBy: { createdAt: "asc" },
-            take: 1,
-            select: { username: true },
-          },
+          _count: { select: { menuItems: true, staff: true } },
         },
       }),
     );
+
+    // The login handle is a nice-to-have label, and `username` arrives in a
+    // manual migration — so it's fetched on its own. Folded into the query
+    // above, a database without that column would throw and take the whole
+    // storefront list with it, leaving the partner staring at "No demos yet".
+    let usernames = new Map<string, string | null>();
+    try {
+      const staff = await systemDb((tx) =>
+        tx.staffUser.findMany({
+          where: { restaurantId: { in: rows.map((r) => r.id) } },
+          orderBy: { createdAt: "asc" },
+          select: { restaurantId: true, username: true },
+        }),
+      );
+      usernames = staff.reduce(
+        (m, s) => (m.has(s.restaurantId) ? m : m.set(s.restaurantId, s.username)),
+        new Map<string, string | null>(),
+      );
+    } catch {
+      /* username column not migrated yet — the handle just isn't shown */
+    }
+
     return rows.map((r) => ({
       id: r.id,
       name: r.displayName || r.name,
       slug: r.slug,
       itemCount: r._count.menuItems,
       createdAt: r.createdAt.toISOString(),
-      converted: r.staff.length > 0,
-      username: r.staff[0]?.username ?? null,
+      converted: r._count.staff > 0,
+      username: usernames.get(r.id) ?? null,
     }));
   } catch {
     return []; // demoPartnerId column not migrated yet
