@@ -6,6 +6,7 @@ import { requireStaff } from "@/server/tenancy/current-user";
 import { buildTicket, type Ticket, type TicketKind } from "@/lib/printing/ticket";
 import { encodeTicketBase64, encodeReportBase64, encodeDrawerKickBase64 } from "@/lib/printing/escpos";
 import { drawerPolicy, shouldOpenDrawer } from "@/lib/printing/drawer";
+import { parsePrinterConfig, kitchenDestination } from "@/lib/printing/printer-config";
 import { restaurantSiteUrl } from "@/lib/qr";
 import { getShiftReport } from "./shift-report";
 
@@ -237,6 +238,44 @@ async function dispatchDrawerKick(restaurantId: string): Promise<SettleActions> 
   };
 }
 
+/** Which printer a job is for. A till may have a second one in the kitchen. */
+export type PrintStation = "till" | "kitchen";
+
+/**
+ * Write the PrintJob row, tagging which printer it's for.
+ *
+ * `station` arrives in a manual migration, and a cloud job that can't be
+ * written is a ticket that never prints — so a missing column falls back to an
+ * untagged row. The poll endpoint treats untagged jobs as the till's, which is
+ * exactly what they were before the column existed.
+ */
+async function recordJob(
+  restaurantId: string,
+  orderId: string | null,
+  method: "network" | "cloud",
+  payloadBase64: string,
+  status: string,
+  station: PrintStation,
+): Promise<void> {
+  const base = {
+    restaurantId,
+    orderId,
+    method,
+    payloadBase64,
+    status,
+    printedAt: status === "printed" ? new Date() : null,
+  };
+  try {
+    await systemDb((tx) => tx.printJob.create({ data: { ...base, station } }));
+  } catch {
+    try {
+      await systemDb((tx) => tx.printJob.create({ data: base }));
+    } catch {
+      /* the job is logging, not the print itself — never fail the sale for it */
+    }
+  }
+}
+
 /**
  * Send an already-encoded ESC/POS payload out over whichever transport this
  * restaurant uses.
@@ -254,6 +293,7 @@ async function dispatchBytes(
   base64: string,
   orderId: string | null,
   ticket?: Ticket,
+  station: PrintStation = "till",
 ): Promise<PrintDispatch> {
   switch (printMethod) {
     case "network": {
@@ -271,12 +311,7 @@ async function dispatchBytes(
       } catch {
         status = "failed";
       }
-      await systemDb((tx) =>
-        tx.printJob.create({
-          data: { restaurantId, orderId, method: "network", payloadBase64: base64, status,
-            printedAt: status === "printed" ? new Date() : null },
-        }),
-      );
+      await recordJob(restaurantId, orderId, "network", base64, status, station);
       return {
         ok: status === "printed",
         handledOnServer: true,
@@ -284,11 +319,7 @@ async function dispatchBytes(
       };
     }
     case "cloud": {
-      await systemDb((tx) =>
-        tx.printJob.create({
-          data: { restaurantId, orderId, method: "cloud", payloadBase64: base64, status: "queued" },
-        }),
-      );
+      await recordJob(restaurantId, orderId, "cloud", base64, "queued", station);
       return { ok: true, handledOnServer: true, message: "Queued — the printer will pick it up." };
     }
     case "bluetooth":
@@ -354,7 +385,37 @@ export async function printKitchenTicket(orderId: string): Promise<PrintDispatch
   } catch {
     return { ok: false, handledOnServer: false, message: "Not allowed." };
   }
-  return dispatch(staff.restaurantId, orderId, "kitchen");
+  return dispatchKitchen(staff.restaurantId, orderId);
+}
+
+/**
+ * Send a kitchen docket, to the kitchen's own printer where there is one.
+ *
+ * A restaurant with a printer at the pass and none of the screens wants the
+ * docket to come out THERE — the cashier's roll is for the bill. So when a
+ * separate kitchen printer is configured the ticket is aimed at it, on its own
+ * transport, and the till's method stops mattering: the cashier can be on a
+ * Bluetooth printer and the kitchen still prints from the server, unattended.
+ *
+ * With no kitchen printer set up this is exactly the old behaviour — one
+ * printer, both documents.
+ */
+async function dispatchKitchen(restaurantId: string, orderId: string): Promise<PrintDispatch> {
+  const { restaurant } = await loadTicket(restaurantId, orderId);
+  const kitchen = kitchenDestination(parsePrinterConfig(restaurant.printerConfig).kitchen);
+  if (!kitchen) return dispatch(restaurantId, orderId, "kitchen");
+
+  const ticket = await ticketFor(restaurantId, orderId, "kitchen");
+  if (!ticket) return { ok: false, handledOnServer: false, message: "Order not found." };
+  return dispatchBytes(
+    restaurantId,
+    kitchen.method,
+    { bridgeUrl: kitchen.bridgeUrl ?? undefined, pollToken: kitchen.pollToken ?? undefined },
+    encodeTicketBase64(ticket, false),
+    orderId,
+    ticket,
+    "kitchen",
+  );
 }
 
 /** Whether this restaurant prints kitchen tickets instead of using a display. */
@@ -380,6 +441,15 @@ export async function printKitchenIfNeeded(
 ): Promise<{ clientPrintNeeded: boolean }> {
   if (!(await kitchenPrintMode(restaurantId))) return { clientPrintNeeded: false };
   const { restaurant } = await loadTicket(restaurantId, orderId);
+
+  // A dedicated kitchen printer is always server-driven, so the cashier's
+  // device is out of it entirely — no print dialog opening at the till for a
+  // docket that belongs at the pass, and nothing lost if the tablet is asleep.
+  if (kitchenDestination(parsePrinterConfig(restaurant.printerConfig).kitchen)) {
+    await dispatchKitchen(restaurantId, orderId);
+    return { clientPrintNeeded: false };
+  }
+
   if (restaurant.printMethod === "network" || restaurant.printMethod === "cloud") {
     await dispatch(restaurantId, orderId, "kitchen");
     return { clientPrintNeeded: false };

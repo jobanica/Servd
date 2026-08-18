@@ -1936,6 +1936,12 @@ model PrintJob {
   method        PrintMethod
   payloadBase64 String // ESC/POS bytes, base64
   status        String      @default("queued") // queued | printed | failed
+  // Which printer this is for: "till" (default) or "kitchen", when a restaurant
+  // runs a second printer at the pass. Nullable with NO default — a static
+  // default would be sent by Prisma on every insert and break printing on a
+  // database that lacks the column. Null reads as the till, which is what every
+  // job was before a second printer existed.
+  station       String?
   createdAt     DateTime    @default(now())
   printedAt     DateTime?
 

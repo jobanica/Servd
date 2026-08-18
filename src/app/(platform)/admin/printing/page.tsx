@@ -41,9 +41,12 @@ export default async function PrintingSettingsPage() {
   const cfg = parsePrinterConfig(restaurant.printerConfig);
   const receipt = cfg.receipt;
   const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const cloudPollUrl = cfg.pollToken
-    ? `${base}/api/print/cloud/${restaurant.id}?token=${cfg.pollToken}`
-    : null;
+  const pollUrl = (token: string | null) =>
+    token ? `${base}/api/print/cloud/${restaurant.id}?token=${token}` : null;
+  const cloudPollUrl = pollUrl(cfg.pollToken);
+  // The kitchen printer polls with its OWN token, which is how the endpoint
+  // knows to hand it dockets rather than the till's receipts.
+  const kitchenPollUrl = pollUrl(cfg.kitchen.pollToken);
 
   return (
     <div className="space-y-6">
@@ -72,12 +75,16 @@ export default async function PrintingSettingsPage() {
           receiptShowCustomer: receipt.showCustomer,
           receiptShowCashTendered: receipt.showCashTendered,
           kitchenShowAddress: cfg.kitchen.showAddress,
+          kitchenSeparate: cfg.kitchen.separate,
+          kitchenMethod: cfg.kitchen.method ?? "network",
+          kitchenBridgeUrl: cfg.kitchen.bridgeUrl ?? "",
           cardSurchargePercent: bpToPercentString(cfg.payments.cardSurchargeBp),
           payFirst: cfg.payments.payFirst,
           autoPrintReceipt,
           openDrawerOn,
         }}
         cloudPollUrl={cloudPollUrl}
+        kitchenPollUrl={kitchenPollUrl}
       />
     </div>
   );

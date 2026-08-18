@@ -32,6 +32,18 @@ export interface ReceiptOptions {
   showCashTendered: boolean;
 }
 
+/**
+ * Transports a SECOND printer can use.
+ *
+ * Only the two the server drives. Bluetooth and the OS dialog both run through
+ * the cashier's browser — one Bluetooth printer is paired to that tab, and the
+ * print dialog sends a page to whatever the device has selected — so neither
+ * can be aimed at a machine in the kitchen. A kitchen printer has to be
+ * reachable from the server: a bridge agent on the LAN, or a printer that polls
+ * us for work.
+ */
+export type KitchenPrintMethod = "network" | "cloud";
+
 export interface KitchenOptions {
   /**
    * Show the delivery address on kitchen tickets.
@@ -42,6 +54,47 @@ export interface KitchenOptions {
    * whole reason it was asked for.
    */
   showAddress: boolean;
+  /**
+   * Kitchen tickets print on their own printer, not the till's.
+   *
+   * Off by default: everything keeps going to the one printer, exactly as it
+   * did. On, the cashier's printer is left for bills and receipts and the
+   * docket comes out at the pass — which is what a kitchen with a printer and
+   * no screen actually wants.
+   */
+  separate: boolean;
+  /** How the server reaches that printer. Null until one is chosen. */
+  method: KitchenPrintMethod | null;
+  /** network: the kitchen's own print-bridge agent. */
+  bridgeUrl: string | null;
+  /** cloud: the token the kitchen printer polls with. Distinct from the till's. */
+  pollToken: string | null;
+}
+
+/** Where a kitchen ticket should go, or null to use the till's printer. */
+export interface KitchenDestination {
+  method: KitchenPrintMethod;
+  bridgeUrl: string | null;
+  pollToken: string | null;
+}
+
+/**
+ * The kitchen printer, if this restaurant actually has a usable one.
+ *
+ * Returns null unless the setting is on AND the chosen transport has what it
+ * needs — a bridge URL, or a poll token. A half-filled form must fall back to
+ * the till printer rather than route tickets into a void: a docket printed in
+ * the wrong place is an annoyance, a docket printed nowhere is a missed order.
+ */
+export function kitchenDestination(kitchen: KitchenOptions): KitchenDestination | null {
+  if (!kitchen.separate || !kitchen.method) return null;
+  if (kitchen.method === "network" && !kitchen.bridgeUrl) return null;
+  if (kitchen.method === "cloud" && !kitchen.pollToken) return null;
+  return {
+    method: kitchen.method,
+    bridgeUrl: kitchen.bridgeUrl,
+    pollToken: kitchen.pollToken,
+  };
 }
 
 export interface PaymentOptions {
@@ -134,7 +187,14 @@ export function parsePrinterConfig(raw: unknown): PrinterConfig {
       showCustomer: boolOn(receipt.showCustomer),
       showCashTendered: boolOn(receipt.showCashTendered),
     },
-    kitchen: { showAddress: boolOff(kitchen.showAddress) },
+    kitchen: {
+      showAddress: boolOff(kitchen.showAddress),
+      separate: boolOff(kitchen.separate),
+      method:
+        kitchen.method === "network" || kitchen.method === "cloud" ? kitchen.method : null,
+      bridgeUrl: str(kitchen.bridgeUrl),
+      pollToken: str(kitchen.pollToken),
+    },
     payments: {
       payFirst: boolOff(payments.payFirst),
       cardSurchargeBp: normalizeSurchargeBp(payments.cardSurchargeBp),

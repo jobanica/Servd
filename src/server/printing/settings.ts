@@ -23,6 +23,11 @@ const schema = z.object({
   receiptShowCustomer: z.coerce.boolean().default(true),
   receiptShowCashTendered: z.coerce.boolean().default(true),
   kitchenShowAddress: z.coerce.boolean().default(false),
+  // A separate printer at the pass. Server-driven transports only — see
+  // KitchenPrintMethod for why a browser one can't be aimed at another room.
+  kitchenSeparate: z.coerce.boolean().default(false),
+  kitchenMethod: z.enum(["network", "cloud"]).default("network"),
+  kitchenBridgeUrl: z.string().url().optional().or(z.literal("")),
   // Typed as a percentage ("3.5"); stored as basis points.
   cardSurchargePercent: z.string().max(10).optional(),
   payFirst: z.coerce.boolean().default(false),
@@ -48,6 +53,9 @@ export async function updatePrintSettings(
     receiptShowCustomer: formData.get("receiptShowCustomer") === "on",
     receiptShowCashTendered: formData.get("receiptShowCashTendered") === "on",
     kitchenShowAddress: formData.get("kitchenShowAddress") === "on",
+    kitchenSeparate: formData.get("kitchenSeparate") === "on",
+    kitchenMethod: formData.get("kitchenMethod") ?? "network",
+    kitchenBridgeUrl: formData.get("kitchenBridgeUrl") ?? "",
     cardSurchargePercent: String(formData.get("cardSurchargePercent") ?? ""),
     payFirst: formData.get("payFirst") === "on",
     autoPrintReceipt: formData.get("autoPrintReceipt") === "on",
@@ -83,7 +91,23 @@ export async function updatePrintSettings(
       showCustomer: parsed.data.receiptShowCustomer,
       showCashTendered: parsed.data.receiptShowCashTendered,
     };
-    cfg.kitchen = { showAddress: parsed.data.kitchenShowAddress };
+    // The kitchen printer. Its poll token is generated once and then kept:
+    // regenerating it on every save would silently orphan a printer that's
+    // already been configured to poll with the old one.
+    const prevKitchen = (cfg.kitchen ?? {}) as Record<string, unknown>;
+    let kitchenPollToken = typeof prevKitchen.pollToken === "string" ? prevKitchen.pollToken : null;
+    if (parsed.data.kitchenSeparate && parsed.data.kitchenMethod === "cloud" && !kitchenPollToken) {
+      kitchenPollToken = randomBytes(16).toString("hex");
+    }
+    cfg.kitchen = {
+      showAddress: parsed.data.kitchenShowAddress,
+      separate: parsed.data.kitchenSeparate,
+      method: parsed.data.kitchenMethod,
+      // Keep the URL when the box is cleared but the printer is still on
+      // network — an accidental blank shouldn't lose the address.
+      bridgeUrl: parsed.data.kitchenBridgeUrl || (prevKitchen.bridgeUrl ?? null),
+      pollToken: kitchenPollToken,
+    };
     // Everything here rides in the JSON column that already exists, so these
     // four settings work the moment this deploys — no migration to wait on.
     cfg.payments = {

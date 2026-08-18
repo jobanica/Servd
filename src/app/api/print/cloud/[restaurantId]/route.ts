@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { systemDb } from "@/server/tenancy/scoped-db";
+import { parsePrinterConfig, kitchenDestination } from "@/lib/printing/printer-config";
 
 /**
  * Cloud / server-direct print poll endpoint.
@@ -12,6 +13,12 @@ import { systemDb } from "@/server/tenancy/scoped-db";
  * The printer authenticates with a per-restaurant token stored in
  * `printerConfig.pollToken`. The request is unauthenticated otherwise, so this
  * runs in systemDb but is tightly scoped by restaurantId + token.
+ *
+ * A restaurant can run TWO printers — the till, and one at the pass for kitchen
+ * dockets. They're told apart by the token they poll with: the kitchen printer
+ * has its own, and only ever receives jobs stamped for the kitchen. Untagged
+ * jobs belong to the till, which is what every job was before a second printer
+ * was possible.
  *
  * NOTE: simplified vs the full CloudPRNT handshake (status POST → job GET →
  * confirm) — enough to demonstrate the transport; harden per your printer model.
@@ -28,13 +35,42 @@ export async function GET(
       where: { id: restaurantId },
       select: { printerConfig: true },
     });
-    const cfg = (restaurant?.printerConfig as { pollToken?: string } | null) ?? null;
-    if (!cfg?.pollToken || cfg.pollToken !== token) return "unauthorized" as const;
+    const cfg = parsePrinterConfig(restaurant?.printerConfig);
+    const kitchen = kitchenDestination(cfg.kitchen);
 
-    const next = await tx.printJob.findFirst({
-      where: { restaurantId, method: "cloud", status: "queued" },
-      orderBy: { createdAt: "asc" },
-    });
+    // Which printer is asking? The kitchen's token only exists once a second
+    // printer is set up, and it must not collide with the till's.
+    let station: "till" | "kitchen";
+    if (token && kitchen?.method === "cloud" && kitchen.pollToken === token) {
+      station = "kitchen";
+    } else if (token && cfg.pollToken && cfg.pollToken === token) {
+      station = "till";
+    } else {
+      return "unauthorized" as const;
+    }
+
+    // Untagged jobs are the till's. Written that way on purpose: a database
+    // without the `station` column still queues work, and it must keep coming
+    // out at the till rather than silently going nowhere.
+    const forStation =
+      station === "kitchen"
+        ? { station: "kitchen" }
+        : { OR: [{ station: "till" }, { station: null }] };
+
+    let next;
+    try {
+      next = await tx.printJob.findFirst({
+        where: { restaurantId, method: "cloud", status: "queued", ...forStation },
+        orderBy: { createdAt: "asc" },
+      });
+    } catch {
+      // `station` not migrated yet — one queue, as before. The kitchen printer
+      // would share it, so setting one up needs add-print-job-station.sql.
+      next = await tx.printJob.findFirst({
+        where: { restaurantId, method: "cloud", status: "queued" },
+        orderBy: { createdAt: "asc" },
+      });
+    }
     if (!next) return null;
 
     await tx.printJob.update({

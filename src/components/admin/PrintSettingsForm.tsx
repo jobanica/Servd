@@ -21,6 +21,7 @@ const METHOD_HELP: Record<Method, string> = {
 export function PrintSettingsForm({
   initial,
   cloudPollUrl,
+  kitchenPollUrl,
 }: {
   initial: {
     printMethod: Method;
@@ -35,12 +36,16 @@ export function PrintSettingsForm({
     receiptShowCustomer: boolean;
     receiptShowCashTendered: boolean;
     kitchenShowAddress: boolean;
+    kitchenSeparate: boolean;
+    kitchenMethod: "network" | "cloud";
+    kitchenBridgeUrl: string;
     cardSurchargePercent: string;
     payFirst: boolean;
     autoPrintReceipt: boolean;
     openDrawerOn: DrawerPolicy;
   };
   cloudPollUrl: string | null;
+  kitchenPollUrl: string | null;
 }) {
   const [state, action] = useActionState<FormState, FormData>(
     updatePrintSettings,
@@ -56,6 +61,8 @@ export function PrintSettingsForm({
   const [showCustomer, setShowCustomer] = useState(initial.receiptShowCustomer);
   const [showCashTendered, setShowCashTendered] = useState(initial.receiptShowCashTendered);
   const [kitchenAddress, setKitchenAddress] = useState(initial.kitchenShowAddress);
+  const [kitchenSeparate, setKitchenSeparate] = useState(initial.kitchenSeparate);
+  const [kitchenMethod, setKitchenMethod] = useState<"network" | "cloud">(initial.kitchenMethod);
   const [surcharge, setSurcharge] = useState(initial.cardSurchargePercent);
   const [payFirst, setPayFirst] = useState(initial.payFirst);
   const [autoPrintReceipt, setAutoPrintReceipt] = useState(initial.autoPrintReceipt);
@@ -119,6 +126,87 @@ export function PrintSettingsForm({
             </span>
           </span>
         </label>
+
+        {/* A second printer at the pass. */}
+        <label className="mt-3 flex items-start gap-2 border-t border-plum-ink/10 pt-3 text-sm">
+          <input
+            type="checkbox"
+            name="kitchenSeparate"
+            checked={kitchenSeparate}
+            onChange={(e) => setKitchenSeparate(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span>
+            <span className="font-semibold">Kitchen has its own printer</span>
+            <span className="mt-0.5 block text-plum-ink/55">
+              Dockets print at the pass; the cashier&apos;s printer is left for bills and
+              receipts. Off — one printer does both, as before.
+            </span>
+          </span>
+        </label>
+
+        {kitchenSeparate && (
+          <div className="mt-3 space-y-3 rounded-lg border border-plum-ink/10 bg-white p-3">
+            <div>
+              <label className="block text-sm font-semibold">How the kitchen printer connects</label>
+              <select
+                name="kitchenMethod"
+                value={kitchenMethod}
+                onChange={(e) => setKitchenMethod(e.target.value as "network" | "cloud")}
+                className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2"
+              >
+                <option value="network">Network / USB (its own print-bridge)</option>
+                <option value="cloud">Cloud poll (CloudPRNT / Server Direct)</option>
+              </select>
+              <p className="mt-1 text-xs text-plum-ink/50">
+                Bluetooth and the OS dialog aren&apos;t offered here — both run through the
+                cashier&apos;s browser, so they can&apos;t reach a printer in another room. The
+                kitchen printer is driven by the server, which also means dockets keep printing
+                when the till is asleep.
+              </p>
+            </div>
+
+            {kitchenMethod === "network" && (
+              <div>
+                <label className="block text-sm font-semibold">Kitchen print-bridge URL</label>
+                <input
+                  name="kitchenBridgeUrl"
+                  defaultValue={initial.kitchenBridgeUrl}
+                  placeholder="http://192.168.1.60:8080/print"
+                  className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2"
+                />
+                <p className="mt-1 text-xs text-plum-ink/50">
+                  The agent next to the KITCHEN printer — a different address from the
+                  cashier&apos;s.
+                </p>
+              </div>
+            )}
+
+            {kitchenMethod === "cloud" && (
+              <div>
+                <label className="block text-sm font-semibold">Kitchen printer poll URL</label>
+                {kitchenPollUrl ? (
+                  <code className="mt-1 block break-all rounded-lg bg-cream px-3 py-2 text-xs">
+                    {kitchenPollUrl}
+                  </code>
+                ) : (
+                  <p className="mt-1 rounded-lg bg-cream px-3 py-2 text-xs text-plum-ink/60">
+                    Save to generate it — the kitchen printer gets its own token, which is how
+                    it receives dockets instead of the till&apos;s receipts.
+                  </p>
+                )}
+                <p className="mt-1 text-xs text-plum-ink/50">
+                  Point the KITCHEN printer at this URL, not the cashier&apos;s.
+                </p>
+              </div>
+            )}
+
+            <p className="text-xs text-plum-ink/50">
+              Turn <strong>Use a kitchen display screen</strong> off above if you want a docket
+              to print automatically the moment an order is accepted.
+            </p>
+          </div>
+        )}
       </div>
 
       {method === "bluetooth" && (
