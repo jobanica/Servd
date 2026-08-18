@@ -6,7 +6,7 @@ import { requireStaff } from "@/server/tenancy/current-user";
 import { buildTicket, type Ticket, type TicketKind } from "@/lib/printing/ticket";
 import { encodeTicketBase64, encodeReportBase64, encodeDrawerKickBase64 } from "@/lib/printing/escpos";
 import { drawerPolicy, shouldOpenDrawer } from "@/lib/printing/drawer";
-import { parsePrinterConfig, kitchenDestination } from "@/lib/printing/printer-config";
+import { parsePrinterConfig, kitchenDestination, isServerDriven } from "@/lib/printing/printer-config";
 import { restaurantSiteUrl } from "@/lib/qr";
 import { getShiftReport } from "./shift-report";
 
@@ -442,12 +442,20 @@ export async function printKitchenIfNeeded(
   if (!(await kitchenPrintMode(restaurantId))) return { clientPrintNeeded: false };
   const { restaurant } = await loadTicket(restaurantId, orderId);
 
-  // A dedicated kitchen printer is always server-driven, so the cashier's
-  // device is out of it entirely — no print dialog opening at the till for a
+  // A dedicated kitchen printer on a server transport takes the cashier's
+  // device out of it entirely — no print dialog opening at the till for a
   // docket that belongs at the pass, and nothing lost if the tablet is asleep.
-  if (kitchenDestination(parsePrinterConfig(restaurant.printerConfig).kitchen)) {
-    await dispatchKitchen(restaurantId, orderId);
-    return { clientPrintNeeded: false };
+  //
+  // A Bluetooth one is the opposite: the pairing lives in the cashier's
+  // browser, so the board has to send it. Same as the till's Bluetooth path,
+  // just aimed at the other device.
+  const kitchen = kitchenDestination(parsePrinterConfig(restaurant.printerConfig).kitchen);
+  if (kitchen) {
+    if (isServerDriven(kitchen.method)) {
+      await dispatchKitchen(restaurantId, orderId);
+      return { clientPrintNeeded: false };
+    }
+    return { clientPrintNeeded: true };
   }
 
   if (restaurant.printMethod === "network" || restaurant.printMethod === "cloud") {

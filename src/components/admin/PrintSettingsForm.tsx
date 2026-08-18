@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { updatePrintSettings, type FormState } from "@/server/printing/settings";
 import { DRAWER_POLICY_LABEL, type DrawerPolicy } from "@/lib/printing/drawer";
+import type { KitchenPrintMethod } from "@/lib/printing/printer-config";
 import { SubmitButton } from "./SubmitButton";
 
 type Method = "network" | "cloud" | "bluetooth" | "os_dialog";
@@ -37,7 +38,7 @@ export function PrintSettingsForm({
     receiptShowCashTendered: boolean;
     kitchenShowAddress: boolean;
     kitchenSeparate: boolean;
-    kitchenMethod: "network" | "cloud";
+    kitchenMethod: KitchenPrintMethod;
     kitchenBridgeUrl: string;
     cardSurchargePercent: string;
     payFirst: boolean;
@@ -62,7 +63,7 @@ export function PrintSettingsForm({
   const [showCashTendered, setShowCashTendered] = useState(initial.receiptShowCashTendered);
   const [kitchenAddress, setKitchenAddress] = useState(initial.kitchenShowAddress);
   const [kitchenSeparate, setKitchenSeparate] = useState(initial.kitchenSeparate);
-  const [kitchenMethod, setKitchenMethod] = useState<"network" | "cloud">(initial.kitchenMethod);
+  const [kitchenMethod, setKitchenMethod] = useState<KitchenPrintMethod>(initial.kitchenMethod);
   const [surcharge, setSurcharge] = useState(initial.cardSurchargePercent);
   const [payFirst, setPayFirst] = useState(initial.payFirst);
   const [autoPrintReceipt, setAutoPrintReceipt] = useState(initial.autoPrintReceipt);
@@ -152,17 +153,21 @@ export function PrintSettingsForm({
               <select
                 name="kitchenMethod"
                 value={kitchenMethod}
-                onChange={(e) => setKitchenMethod(e.target.value as "network" | "cloud")}
+                onChange={(e) => setKitchenMethod(e.target.value as KitchenPrintMethod)}
                 className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2"
               >
                 <option value="network">Network / USB (its own print-bridge)</option>
                 <option value="cloud">Cloud poll (CloudPRNT / Server Direct)</option>
+                <option value="bluetooth">Bluetooth (paired at the cashier)</option>
               </select>
               <p className="mt-1 text-xs text-plum-ink/50">
-                Bluetooth and the OS dialog aren&apos;t offered here — both run through the
-                cashier&apos;s browser, so they can&apos;t reach a printer in another room. The
-                kitchen printer is driven by the server, which also means dockets keep printing
-                when the till is asleep.
+                {kitchenMethod === "bluetooth"
+                  ? "Cheapest to set up — nothing to install. But the cashier's device holds the connection, so the kitchen printer has to be within Bluetooth range of it and that device has to stay awake with this page open. Choose Network if the kitchen is far from the till or the tablet gets locked."
+                  : "Driven by the server, so dockets keep printing whatever the till is doing — asleep, on another screen, or printing over Bluetooth itself."}
+              </p>
+              <p className="mt-1 text-xs text-plum-ink/50">
+                The OS print dialog isn&apos;t offered: it hands a page to whichever printer the
+                device has selected, with no way to say &ldquo;the other one&rdquo;.
               </p>
             </div>
 
@@ -199,6 +204,14 @@ export function PrintSettingsForm({
                   Point the KITCHEN printer at this URL, not the cashier&apos;s.
                 </p>
               </div>
+            )}
+
+            {kitchenMethod === "bluetooth" && (
+              <p className="rounded-lg bg-cream px-3 py-2 text-xs text-plum-ink/70">
+                Pair it once from the cashier screen — there&apos;s a
+                <strong> Connect kitchen printer</strong> button next to the till&apos;s. Pick the
+                KITCHEN printer there, not the same device as the receipt printer.
+              </p>
             )}
 
             <p className="text-xs text-plum-ink/50">

@@ -79,6 +79,7 @@ export function CashierBoard({
   showTutorials = false,
   cardSurchargeBp = 0,
   payFirst = false,
+  kitchenBluetooth = false,
 }: {
   restaurantId: string;
   initialTables: CashierTable[];
@@ -91,6 +92,12 @@ export function CashierBoard({
   cardSurchargeBp?: number;
   /** The shop takes payment before the food is made (Printer settings). */
   payFirst?: boolean;
+  /**
+   * The kitchen has its own BLUETOOTH printer, so this device pairs two.
+   * Only then is the second button worth the space — a network kitchen printer
+   * is the server's business and needs nothing here.
+   */
+  kitchenBluetooth?: boolean;
 }) {
   const [tables, setTables] = useState<CashierTable[]>(initialTables);
   const [incoming, setIncoming] = useState<IncomingOrder[]>(initialIncoming);
@@ -483,6 +490,7 @@ export function CashierBoard({
         + Customer
       </button>
       <BluetoothPrinterButton />
+      {kitchenBluetooth && <BluetoothPrinterButton station="kitchen" />}
       {/* "No sale" — the drawer without a transaction, for giving change or
           dropping a float in. Every till has one; this one didn't. */}
       <button onClick={popDrawer} className={sidebarBtn}>

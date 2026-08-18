@@ -26,7 +26,7 @@ const schema = z.object({
   // A separate printer at the pass. Server-driven transports only — see
   // KitchenPrintMethod for why a browser one can't be aimed at another room.
   kitchenSeparate: z.coerce.boolean().default(false),
-  kitchenMethod: z.enum(["network", "cloud"]).default("network"),
+  kitchenMethod: z.enum(["network", "cloud", "bluetooth"]).default("network"),
   kitchenBridgeUrl: z.string().url().optional().or(z.literal("")),
   // Typed as a percentage ("3.5"); stored as basis points.
   cardSurchargePercent: z.string().max(10).optional(),

@@ -1,11 +1,21 @@
 "use client";
 
 /**
- * Persistent Web Bluetooth ESC/POS printer (Chromium desktop/Android only).
+ * Persistent Web Bluetooth ESC/POS printers (Chromium desktop/Android only).
  *
  * Unlike the one-shot printViaBluetooth (which re-prompts every print), this
  * keeps the paired device so receipts print automatically after the first
  * "Connect printer" tap. Reconnects the GATT link on demand if it drops.
+ *
+ * TWO printers, not one. A restaurant can run a receipt printer at the till and
+ * a docket printer at the pass, and a browser can hold a GATT connection to
+ * each — they're separate devices with separate pairings. So everything here is
+ * keyed by station, defaulting to "till" so existing callers are unchanged.
+ *
+ * The catch, and it's worth knowing before choosing this over a network
+ * printer: both printers have to be in Bluetooth range of the cashier's device,
+ * and that device has to be awake with the page open. A kitchen printer on the
+ * network transport is driven by the server and has neither limitation.
  */
 
 import { writeToPrinter } from "./ble-write";
@@ -13,19 +23,38 @@ import { writeToPrinter } from "./ble-write";
 const DEFAULT_SERVICE = "000018f0-0000-1000-8000-00805f9b34fb";
 const DEFAULT_CHAR = "00002af1-0000-1000-8000-00805f9b34fb";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let device: any = null;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let characteristic: any = null;
-let serviceUuid = DEFAULT_SERVICE;
-let charUuid = DEFAULT_CHAR;
+/** Which printer: the cashier's receipt roll, or the kitchen's docket printer. */
+export type PrinterStation = "till" | "kitchen";
 
-const listeners = new Set<(connected: boolean) => void>();
-function notify() {
-  for (const l of listeners) l(isPrinterPaired());
+type Slot = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  device: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  characteristic: any;
+  serviceUuid: string;
+  charUuid: string;
+};
+
+const slots: Record<PrinterStation, Slot> = {
+  till: { device: null, characteristic: null, serviceUuid: DEFAULT_SERVICE, charUuid: DEFAULT_CHAR },
+  kitchen: { device: null, characteristic: null, serviceUuid: DEFAULT_SERVICE, charUuid: DEFAULT_CHAR },
+};
+
+const listeners = new Set<(connected: boolean, station: PrinterStation) => void>();
+function notify(station: PrinterStation) {
+  for (const l of listeners) l(isPrinterPaired(station), station);
 }
 
-export function onPrinterChange(cb: (connected: boolean) => void): () => void {
+/**
+ * Subscribe to pairing changes.
+ *
+ * The station is passed through so a button watching one printer can ignore
+ * the other's events — without it, connecting the kitchen printer would flip
+ * the till button's status too.
+ */
+export function onPrinterChange(
+  cb: (connected: boolean, station: PrinterStation) => void,
+): () => void {
   listeners.add(cb);
   return () => listeners.delete(cb);
 }
@@ -40,61 +69,90 @@ export function isBluetoothSupported(): boolean {
  * prints — but the device stays paired and printBytes reconnects on demand.
  * Status and print routing key off pairing, not the momentary GATT state.
  */
-export function isPrinterPaired(): boolean {
-  return !!device;
+export function isPrinterPaired(station: PrinterStation = "till"): boolean {
+  return !!slots[station].device;
 }
 
-export function isPrinterConnected(): boolean {
-  return !!(device?.gatt?.connected && characteristic);
+export function isPrinterConnected(station: PrinterStation = "till"): boolean {
+  const s = slots[station];
+  return !!(s.device?.gatt?.connected && s.characteristic);
 }
 
-export function printerName(): string | null {
-  return device?.name ?? null;
+export function printerName(station: PrinterStation = "till"): string | null {
+  return slots[station].device?.name ?? null;
 }
 
 /** Pair + connect a printer. MUST be called from a user gesture (a click). */
-export async function connectPrinter(opts?: { serviceUuid?: string; charUuid?: string }): Promise<void> {
+export async function connectPrinter(opts?: {
+  serviceUuid?: string;
+  charUuid?: string;
+  station?: PrinterStation;
+}): Promise<void> {
   if (!isBluetoothSupported()) {
     throw new Error("Bluetooth isn't supported on this device/browser. Use Chrome on desktop or Android.");
   }
-  serviceUuid = opts?.serviceUuid ?? DEFAULT_SERVICE;
-  charUuid = opts?.charUuid ?? DEFAULT_CHAR;
+  const station = opts?.station ?? "till";
+  const slot = slots[station];
+  slot.serviceUuid = opts?.serviceUuid ?? DEFAULT_SERVICE;
+  slot.charUuid = opts?.charUuid ?? DEFAULT_CHAR;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const bt = (navigator as any).bluetooth;
-  device = await bt.requestDevice({ acceptAllDevices: true, optionalServices: [serviceUuid] });
-  device.addEventListener("gattserverdisconnected", () => {
-    characteristic = null;
-    notify();
+  const device = await bt.requestDevice({
+    acceptAllDevices: true,
+    optionalServices: [slot.serviceUuid],
   });
-  await connectGatt();
-  notify();
+
+  // Pairing the same physical printer to both stations would send every docket
+  // to the receipt roll as well. Cheap to catch here, confusing to debug later.
+  const other: PrinterStation = station === "till" ? "kitchen" : "till";
+  if (slots[other].device && slots[other].device.id === device.id) {
+    throw new Error(
+      station === "kitchen"
+        ? "That's the till printer. Pick the kitchen's printer instead."
+        : "That's the kitchen printer. Pick the till's printer instead.",
+    );
+  }
+
+  slot.device = device;
+  device.addEventListener("gattserverdisconnected", () => {
+    slot.characteristic = null;
+    notify(station);
+  });
+  await connectGatt(station);
+  notify(station);
 }
 
-async function connectGatt(): Promise<void> {
-  const server = await device.gatt.connect();
-  const svc = await server.getPrimaryService(serviceUuid);
-  characteristic = await svc.getCharacteristic(charUuid);
+async function connectGatt(station: PrinterStation): Promise<void> {
+  const slot = slots[station];
+  const server = await slot.device.gatt.connect();
+  const svc = await server.getPrimaryService(slot.serviceUuid);
+  slot.characteristic = await svc.getCharacteristic(slot.charUuid);
 }
 
 /** Send ESC/POS bytes to the connected printer (reconnects if dropped). */
-export async function printBytes(bytes: Uint8Array): Promise<void> {
-  if (!device) throw new Error("No printer connected.");
-  if (!isPrinterConnected()) await connectGatt();
-  await writeToPrinter(characteristic, bytes);
+export async function printBytes(
+  bytes: Uint8Array,
+  station: PrinterStation = "till",
+): Promise<void> {
+  const slot = slots[station];
+  if (!slot.device) throw new Error("No printer connected.");
+  if (!isPrinterConnected(station)) await connectGatt(station);
+  await writeToPrinter(slot.characteristic, bytes);
 }
 
-export function disconnectPrinter(): void {
+export function disconnectPrinter(station: PrinterStation = "till"): void {
+  const slot = slots[station];
   try {
-    device?.gatt?.disconnect();
+    slot.device?.gatt?.disconnect();
   } catch {
     /* ignore */
   }
   // Fully unpair so the status reverts and the next print won't silently
   // reconnect to a printer the user deliberately disconnected.
-  device = null;
-  characteristic = null;
-  notify();
+  slot.device = null;
+  slot.characteristic = null;
+  notify(station);
 }
 
 /** Decode a base64 ESC/POS payload into bytes (browser-safe). */

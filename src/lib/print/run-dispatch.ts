@@ -1,7 +1,12 @@
 "use client";
 
 import type { PrintDispatch } from "@/server/printing/print";
-import { isPrinterPaired, printBytes, base64ToBytes } from "@/lib/printing/bt-printer";
+import {
+  isPrinterPaired,
+  printBytes,
+  base64ToBytes,
+  type PrinterStation,
+} from "@/lib/printing/bt-printer";
 import { printViaBluetooth } from "@/lib/printing/bluetooth";
 
 /**
@@ -38,7 +43,13 @@ export async function runPrintDispatch(
   orderId: string,
   doc: "bill" | "receipt" | "kitchen",
 ): Promise<string | null> {
-  return finishDispatch(res, () => openTicketForPrint(orderId, doc));
+  // A docket goes to the kitchen's own printer when one has been paired on this
+  // device; otherwise it falls back to the till's, which is where it used to
+  // come out anyway. No configuration needed on the client — a paired kitchen
+  // printer IS the setting.
+  const station: PrinterStation =
+    doc === "kitchen" && isPrinterPaired("kitchen") ? "kitchen" : "till";
+  return finishDispatch(res, () => openTicketForPrint(orderId, doc), station);
 }
 
 /**
@@ -58,6 +69,7 @@ export async function runReportDispatch(
 async function finishDispatch(
   res: PrintDispatch,
   fallback: () => void,
+  station: PrinterStation = "till",
 ): Promise<string | null> {
   if (res.handledOnServer) return res.message || null;
   if (!res.ok && res.message) return res.message;
@@ -65,8 +77,8 @@ async function finishDispatch(
   // A paired Web Bluetooth printer prints the exact bytes we got back.
   // printBytes silently reconnects if the BLE link dropped while idle, so we
   // never re-open the device chooser once a printer has been paired.
-  if (isPrinterPaired() && res.ticketBase64) {
-    await printBytes(base64ToBytes(res.ticketBase64));
+  if (isPrinterPaired(station) && res.ticketBase64) {
+    await printBytes(base64ToBytes(res.ticketBase64), station);
     return "Printed.";
   }
   if (res.clientAction === "bluetooth" && res.ticketBase64) {

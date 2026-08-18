@@ -35,14 +35,24 @@ export interface ReceiptOptions {
 /**
  * Transports a SECOND printer can use.
  *
- * Only the two the server drives. Bluetooth and the OS dialog both run through
- * the cashier's browser — one Bluetooth printer is paired to that tab, and the
- * print dialog sends a page to whatever the device has selected — so neither
- * can be aimed at a machine in the kitchen. A kitchen printer has to be
- * reachable from the server: a bridge agent on the LAN, or a printer that polls
- * us for work.
+ * The OS dialog isn't one of them: it hands a page to whatever printer that
+ * device has selected, and there's no way to say "the other one".
+ *
+ * The other three can each be aimed at a specific machine, but not on equal
+ * terms. `network` and `cloud` are driven by the server, so the docket prints
+ * whatever the till is doing — asleep, on another screen, or printing over
+ * Bluetooth itself. `bluetooth` runs through the cashier's browser: a second
+ * device pairing in the same tab, which works and is the cheapest setup, but
+ * only while that device is awake with the page open and both printers are in
+ * BLE range. Prefer network where the kitchen is out of range or the till gets
+ * locked.
  */
-export type KitchenPrintMethod = "network" | "cloud";
+export type KitchenPrintMethod = "network" | "cloud" | "bluetooth";
+
+/** Can the server print this itself, or does the cashier's browser have to? */
+export function isServerDriven(method: KitchenPrintMethod): boolean {
+  return method === "network" || method === "cloud";
+}
 
 export interface KitchenOptions {
   /**
@@ -90,6 +100,9 @@ export function kitchenDestination(kitchen: KitchenOptions): KitchenDestination 
   if (!kitchen.separate || !kitchen.method) return null;
   if (kitchen.method === "network" && !kitchen.bridgeUrl) return null;
   if (kitchen.method === "cloud" && !kitchen.pollToken) return null;
+  // Bluetooth needs nothing stored: the pairing lives in the cashier's browser,
+  // not in the database. Whether a printer is actually paired is a question
+  // only the client can answer, and it falls back to the till printer if not.
   return {
     method: kitchen.method,
     bridgeUrl: kitchen.bridgeUrl,
@@ -191,7 +204,9 @@ export function parsePrinterConfig(raw: unknown): PrinterConfig {
       showAddress: boolOff(kitchen.showAddress),
       separate: boolOff(kitchen.separate),
       method:
-        kitchen.method === "network" || kitchen.method === "cloud" ? kitchen.method : null,
+        kitchen.method === "network" || kitchen.method === "cloud" || kitchen.method === "bluetooth"
+          ? kitchen.method
+          : null,
       bridgeUrl: str(kitchen.bridgeUrl),
       pollToken: str(kitchen.pollToken),
     },

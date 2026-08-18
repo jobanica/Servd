@@ -10,6 +10,7 @@ import { StaffDataError } from "@/components/StaffDataError";
 import { hasTutorials } from "@/server/tutorials/tutorials";
 import { staffLabel } from "@/server/tenancy/staff-name";
 import { cardSurchargeBp } from "@/server/orders/surcharge";
+import { kitchenNeedsBluetoothPairing } from "@/server/printing/kitchen-printer";
 import { paysBeforeCooking } from "@/server/printing/kitchen-options";
 
 export default async function CashierHome() {
@@ -49,6 +50,7 @@ export default async function CashierHome() {
   const surchargeBp = await cardSurchargeBp(user.restaurantId);
   // Whether this shop takes the money before the food is made.
   const payFirst = await paysBeforeCooking(user.restaurantId);
+  const kitchenBluetooth = await kitchenNeedsBluetoothPairing(user.restaurantId);
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
@@ -83,6 +85,7 @@ export default async function CashierHome() {
         showTutorials={await hasTutorials()}
         cardSurchargeBp={surchargeBp}
         payFirst={payFirst}
+        kitchenBluetooth={kitchenBluetooth}
       />
       {offlineEnabled && <ServiceWorkerRegister />}
     </div>

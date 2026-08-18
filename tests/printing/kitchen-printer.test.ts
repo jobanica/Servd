@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { parsePrinterConfig, kitchenDestination } from "@/lib/printing/printer-config";
+import {
+  parsePrinterConfig,
+  kitchenDestination,
+  isServerDriven,
+} from "@/lib/printing/printer-config";
 
 /**
  * A restaurant with a printer at the pass and no kitchen screen: the docket
@@ -50,10 +54,19 @@ describe("kitchenDestination", () => {
     ).toBeNull();
   });
 
-  it("refuses a browser transport — it can't reach another room", () => {
-    // Bluetooth is paired to the cashier's tab and the OS dialog prints to
-    // whatever that device selected; neither can be aimed at the pass.
-    expect(cfg({ separate: true, method: "bluetooth" }).method).toBeNull();
+  it("accepts Bluetooth, which the cashier's browser drives", () => {
+    // Nothing is stored for it — the pairing lives in the browser — so the
+    // destination is complete as soon as the method is chosen.
+    const d = kitchenDestination(cfg({ separate: true, method: "bluetooth" }));
+    expect(d).toEqual({ method: "bluetooth", bridgeUrl: null, pollToken: null });
+    expect(isServerDriven("bluetooth")).toBe(false);
+    expect(isServerDriven("network")).toBe(true);
+    expect(isServerDriven("cloud")).toBe(true);
+  });
+
+  it("refuses the OS dialog — it prints to whatever the device selected", () => {
+    // There's no way to say "the other printer", so it can't be aimed anywhere.
+    expect(cfg({ separate: true, method: "os_dialog" }).method).toBeNull();
     expect(kitchenDestination(cfg({ separate: true, method: "os_dialog" }))).toBeNull();
   });
 
