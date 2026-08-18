@@ -405,7 +405,7 @@ export function NewOrderModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/40 sm:items-center">
-      <div className="flex max-h-screen w-full max-w-5xl flex-col bg-white sm:max-h-[90vh] sm:rounded-tile">
+      <div className="flex h-[100dvh] max-h-[100dvh] w-full max-w-5xl flex-col bg-white sm:h-auto sm:max-h-[90vh] sm:rounded-tile">
         <div className="flex items-center justify-between border-b border-plum-ink/10 p-4">
           <h2 className="font-heading text-xl font-bold">New order (POS)</h2>
           <button onClick={onClose} className="text-2xl leading-none text-plum-ink/40" aria-label="Close">
@@ -489,7 +489,16 @@ export function NewOrderModal({
                 unreachable — exactly when the order is big enough to matter. */}
             {lines.length > 0 && (
             <div className="flex min-h-0 flex-col border-t border-plum-ink/10 md:border-l md:border-t-0">
-              <div className="shrink-0 space-y-3 border-b border-plum-ink/10 p-4">
+              {/* ONE scroll region for everything above the footer.
+
+                  The order-type picker and the customer fields used to sit
+                  outside it as a shrink-0 block. Pick Delivery on a short phone
+                  and those three inputs alone are taller than the panel, so
+                  they pushed Send to kitchen off the bottom — and nothing could
+                  scroll to reach it, because the only scrollable region was the
+                  cart list underneath. */}
+              <div className="min-h-0 flex-1 overflow-y-auto">
+              <div className="space-y-3 border-b border-plum-ink/10 p-4">
                 {/* Order type */}
                 <div className="grid grid-cols-3 gap-1 rounded-lg bg-cream/60 p-1">
                   {/* All five types, named exactly as the kitchen display and
@@ -590,7 +599,7 @@ export function NewOrderModal({
                 )}
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              <div className="p-4">
                 {lines.length === 0 ? (
                   <p className="text-sm text-plum-ink/40">No items yet. Tap menu items to add.</p>
                 ) : (
@@ -638,7 +647,12 @@ export function NewOrderModal({
                 )}
               </div>
 
-              <div className="shrink-0 border-t border-plum-ink/10 bg-white p-4">
+              </div>
+
+              {/* Always visible. shrink-0 keeps it out of the scroll, and the
+                  safe-area padding keeps it clear of an iPhone's home
+                  indicator — the button being reachable is the whole point. */}
+              <div className="shrink-0 border-t border-plum-ink/10 bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
                 {submitError && <p className="mb-2 text-sm text-guava">{submitError}</p>}
                 <div className="mb-3 flex justify-between font-heading text-lg font-bold">
                   <span>Total</span>
