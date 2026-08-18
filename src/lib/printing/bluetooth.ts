@@ -9,6 +9,8 @@
  * "serial over GATT" profile but can be overridden in printerConfig.
  */
 
+import { writeToPrinter } from "./ble-write";
+
 const DEFAULT_SERVICE = "000018f0-0000-1000-8000-00805f9b34fb";
 const DEFAULT_CHAR = "00002af1-0000-1000-8000-00805f9b34fb";
 
@@ -36,10 +38,8 @@ export async function printViaBluetooth(
   const svc = await server.getPrimaryService(service);
   const ch = await svc.getCharacteristic(characteristic);
 
-  // BLE writes are capped (~512 bytes); chunk the stream.
-  const CHUNK = 200;
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    await ch.writeValueWithoutResponse(bytes.slice(i, i + CHUNK));
-  }
+  // Paced + acknowledged where possible, and it waits for the printer to drain
+  // before the link drops — see ble-write for the receipt this lost bytes from.
+  await writeToPrinter(ch, bytes);
   server.disconnect();
 }

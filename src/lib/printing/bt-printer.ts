@@ -8,6 +8,8 @@
  * "Connect printer" tap. Reconnects the GATT link on demand if it drops.
  */
 
+import { writeToPrinter } from "./ble-write";
+
 const DEFAULT_SERVICE = "000018f0-0000-1000-8000-00805f9b34fb";
 const DEFAULT_CHAR = "00002af1-0000-1000-8000-00805f9b34fb";
 
@@ -79,10 +81,7 @@ async function connectGatt(): Promise<void> {
 export async function printBytes(bytes: Uint8Array): Promise<void> {
   if (!device) throw new Error("No printer connected.");
   if (!isPrinterConnected()) await connectGatt();
-  const CHUNK = 200; // BLE writes are capped (~512 bytes)
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    await characteristic.writeValueWithoutResponse(bytes.slice(i, i + CHUNK));
-  }
+  await writeToPrinter(characteristic, bytes);
 }
 
 export function disconnectPrinter(): void {
