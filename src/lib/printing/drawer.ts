@@ -26,6 +26,10 @@ export function drawerPolicy(raw: string | null | undefined): DrawerPolicy {
  */
 export function shouldOpenDrawer(policy: DrawerPolicy, method: string | null | undefined): boolean {
   if (policy === "never" || !method) return false;
+  // A Grab/Foodpanda ticket is closed at the counter but nothing crossed it —
+  // the platform remits later. Popping the drawer on one is an open till for no
+  // reason, and "any" was never meant to include money that never arrived.
+  if (method === "third_party") return false;
   if (policy === "any") return true;
   return method === "cash";
 }

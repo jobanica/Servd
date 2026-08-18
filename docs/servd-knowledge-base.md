@@ -266,6 +266,18 @@ the cash drawer figure, because nobody put that money in a till.
 its **own** gateway account (**PayMongo** or **Xendit**); credentials are
 encrypted at rest and money goes directly to the restaurant.
 
+**Third-party orders (Grab, Foodpanda).** Nothing is tendered at the counter —
+the rider collects the food and the platform remits later — so a third-party
+ticket shows one button, **"Picked up — settled by <platform>"**, instead of
+Cash / GCash / Card. It closes the ticket as its own payment method, which gives
+it its own line in the shift breakdown, the Z-report and accounting. The cash
+drawer never opens on one, whatever the drawer policy says, and no
+cash-received line prints. Discounts, points, gift cards and split payment are
+hidden on these tickets (the app charged the customer and ran its own promo);
+serving, editing items and voiding still work. Recorded at the ticket's full
+value, not net of the platform's commission — the commission is a cost settled
+against the remittance, not a discount the restaurant gave.
+
 **Pay before the food is made.** A setting (Printer settings) for counters
 where the customer orders, pays, and only then sits down. The till leads with
 **Take payment** instead of Send to kitchen, and nothing reaches the kitchen

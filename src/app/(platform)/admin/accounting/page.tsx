@@ -9,6 +9,10 @@ import { DateRangePicker } from "@/components/admin/DateRangePicker";
 const METHOD_LABEL: Record<string, string> = {
   cash: "Cash", card_terminal: "Card (terminal)", gcash: "GCash (counter)", maya: "Maya (counter)",
   online_gcash: "GCash (online)", online_card: "Card (online)",
+  // bank_transfer was missing here and showed as the raw enum value on this
+  // page alone — the four label maps had already drifted.
+  bank_transfer: "Bank transfer",
+  third_party: "Third-party app (Grab/Foodpanda)",
 };
 
 export default async function AccountingPage({

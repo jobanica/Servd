@@ -65,6 +65,10 @@ enum PaymentMethod {
   gcash // scanned at the counter (in person)
   maya // scanned at the counter (in person)
   bank_transfer // customer transferred to the restaurant's bank account
+  /// Grab, Foodpanda and the like. Nothing is tendered at the counter — the
+  /// rider collects the food and the platform remits later — so this exists to
+  /// close the ticket honestly instead of ringing it up as cash nobody took.
+  third_party
 }
 
 enum Gateway {

@@ -59,6 +59,8 @@ const METHOD_LABEL: Record<string, string> = {
   online_gcash: "GCash (online)",
   online_card: "Card (online)",
   bank_transfer: "Bank transfer",
+  // Grab / Foodpanda: the platform remits later, nothing crossed the counter.
+  third_party: "Third-party app",
 };
 
 export function methodLabel(method: string): string {

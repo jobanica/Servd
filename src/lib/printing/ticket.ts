@@ -48,6 +48,7 @@ const METHOD_LABEL: Record<string, string> = {
   online_gcash: "GCash",
   online_card: "Card (online)",
   bank_transfer: "Bank transfer",
+  third_party: "Third-party app",
 };
 
 /**

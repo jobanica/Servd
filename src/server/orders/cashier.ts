@@ -108,6 +108,12 @@ export interface CashierTable {
   tableNumber: string; // dine-in table label
   kind: OrderTypeKey;
   label: string; // header label ("Table 5", "Pickup — Juan", "Delivery — Ana")
+  /**
+   * Who the order is for. On a third-party ticket this is the platform —
+   * "food panda", "Grab" — and the settle button names it, so a cashier can see
+   * they're closing the right one.
+   */
+  customerName: string | null;
   customerPhone: string | null;
   customerAddress: string | null;
   mapUrl: string | null;
@@ -340,6 +346,9 @@ export async function getCashierTables(): Promise<CashierTable[]> {
         tableNumber: o.table?.tableNumber ?? "",
         kind: isDineIn ? "dine_in" : kind,
         label,
+        // Who the order is for — on a third-party ticket this is the platform
+        // ("food panda", "Grab"), which the settle button names outright.
+        customerName,
         customerPhone: m?.customerPhone ?? null,
         customerAddress: m?.customerAddress ?? null,
         mapUrl: m?.mapUrl ?? null,
@@ -603,7 +612,9 @@ export type CounterMethod =
   | "card_terminal"
   | "gcash"
   | "maya"
-  | "bank_transfer";
+  | "bank_transfer"
+  // Grab / Foodpanda. Not tendered at the counter — see settleThirdParty.
+  | "third_party";
 
 /**
  * Record an in-person payment (cash/card/e-wallet). Marks paid AND closes the order.
@@ -631,6 +642,50 @@ export async function markOrderPaid(
     printTicket: settled.printTicket,
     drawerKickBase64: settled.drawerKickBase64,
   };
+}
+
+/**
+ * Close a Grab / Foodpanda ticket once the rider has taken the food.
+ *
+ * Nothing is tendered here, which is the whole point. The platform collected
+ * from the customer in its own app and remits to the restaurant later, so there
+ * is no cash to count, no change to give and no card to tap — but the sale is
+ * real and has to land somewhere. Ringing it up as cash (the only thing the
+ * till could do before) put it in the wrong column of every report AND left the
+ * drawer over by the amount at cash-out, because the money it claimed to hold
+ * was never there.
+ *
+ * Recorded at the ticket's full value, not net of the platform's commission.
+ * That matches every other method — what the customer was charged is what the
+ * sale was — and the commission is a cost, settled against the platform's
+ * remittance, not a discount the restaurant gave.
+ *
+ * No PIN and no confirmation: it takes money nowhere and is undone by re-opening
+ * the ticket, the same as any other settle.
+ */
+export async function settleThirdParty(
+  orderId: string,
+): Promise<{ ok: boolean; tables?: CashierTable[]; error?: string; printTicket?: boolean }> {
+  let staff;
+  try {
+    staff = await requireStaff(["cashier", "admin"]);
+  } catch {
+    return { ok: false, error: "Not allowed." };
+  }
+
+  const settled = await settleAtCounter(staff, orderId, "third_party");
+  if (!settled.ok) {
+    // A database that hasn't run the migration rejects the enum value outright.
+    // Say which file rather than showing a raw Postgres string.
+    const missing = /invalid input value for enum|third_party/i.test(settled.error);
+    return {
+      ok: false,
+      error: missing
+        ? "Settling a third-party order needs one database update. Run prisma/manual/add-third-party-tender.sql, then try again."
+        : settled.error,
+    };
+  }
+  return { ok: true, tables: await getCashierTables(), printTicket: settled.printTicket };
 }
 
 type SettleOutcome =

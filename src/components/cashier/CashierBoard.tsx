@@ -13,6 +13,7 @@ import {
   type CounterMethod,
   markServed,
   closeOrder,
+  settleThirdParty,
   type CashierTable,
   type IncomingOrder,
 } from "@/server/orders/cashier";
@@ -388,6 +389,33 @@ export function CashierBoard({
     }
   }
 
+  /**
+   * Close a Grab/Foodpanda ticket after the rider has collected it.
+   *
+   * Straight through — no tender screen, because there is nothing to tender and
+   * no change to count. The receipt still prints on the transports that need
+   * the browser to send it, but the drawer deliberately stays shut.
+   */
+  async function settleForPlatform(orderId: string) {
+    setBusy(orderId);
+    try {
+      const res = await settleThirdParty(orderId);
+      if (res.ok && res.tables) {
+        setTables(res.tables);
+        showToast("Recorded as a third-party sale.");
+        if (res.printTicket) await printPaidReceipt(orderId);
+      } else if (!res.ok) {
+        showToast(res.error ?? "Couldn't record that.");
+        refresh();
+      }
+    } catch {
+      showToast("Something went wrong. Please try again.");
+      refresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function close(orderId: string) {
     setBusy(orderId);
     try {
@@ -740,7 +768,23 @@ export function CashierBoard({
                       one tap away. */}
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <PrintTicketButton orderId={o.id} paid={o.paymentStatus === "paid"} />
-                    {o.paymentStatus !== "paid" && (
+                    {o.paymentStatus !== "paid" && t.kind === "third_party" && (
+                      /* Nothing is tendered on a Grab/Foodpanda ticket — the
+                         rider takes the food and the platform remits later. One
+                         tap once it's collected, and no cash/card buttons at
+                         all: offering them is what got these rung up as money
+                         nobody took. */
+                      <button
+                        onClick={() => settleForPlatform(o.id)}
+                        disabled={busy === o.id}
+                        className="rounded-lg px-3 py-1.5 text-xs font-bold btn-brand disabled:opacity-60"
+                      >
+                        {busy === o.id
+                          ? "Recording…"
+                          : `🏍️ Picked up — settled by ${t.customerName?.trim() || "the app"}`}
+                      </button>
+                    )}
+                    {o.paymentStatus !== "paid" && t.kind !== "third_party" && (
                       <>
                         <button
                           onClick={() => setPayTarget({ id: o.id, label: t.label, due: Math.max(0, o.net - o.paid), method: "cash" })}
@@ -756,6 +800,9 @@ export function CashierBoard({
                         >
                           📱 GCash / Maya
                         </button>
+                      </>
+                    )}
+                    {o.paymentStatus !== "paid" && (
                         <div className="relative">
                           <button
                             onClick={() => setMenuOrderId(menuOrderId === o.id ? null : o.id)}
@@ -778,22 +825,30 @@ export function CashierBoard({
                                 <OverflowItem accent onClick={() => { setMenuOrderId(null); setAddItemsTarget({ id: o.id, label: t.label }); }}>
                                   + Add items
                                 </OverflowItem>
-                                <OverflowItem onClick={() => { setMenuOrderId(null); pay(o.id, "card_terminal"); }}>
-                                  Paid (card)
-                                </OverflowItem>
-                                <OverflowItem onClick={() => { setMenuOrderId(null); setSplitTarget({ id: o.id, label: t.label, remaining: Math.max(0, o.net - o.paid) }); }}>
-                                  Split payment
-                                </OverflowItem>
-                                <OverflowItem onClick={() => { setMenuOrderId(null); setDiscountOrder(o); }}>
-                                  {o.discountAmount > 0 ? "Edit discount" : "Discount"}
-                                </OverflowItem>
-                                <OverflowItem onClick={() => { setMenuOrderId(null); setLoyaltyOrderId(o.id); }}>
-                                  ⭐ Points
-                                </OverflowItem>
+                                {/* Nothing here applies to a platform order: the
+                                    app charged the customer, set the price and
+                                    ran its own promo. Serving, editing and
+                                    voiding still do, so they stay. */}
+                                {t.kind !== "third_party" && (
+                                  <>
+                                    <OverflowItem onClick={() => { setMenuOrderId(null); pay(o.id, "card_terminal"); }}>
+                                      Paid (card)
+                                    </OverflowItem>
+                                    <OverflowItem onClick={() => { setMenuOrderId(null); setSplitTarget({ id: o.id, label: t.label, remaining: Math.max(0, o.net - o.paid) }); }}>
+                                      Split payment
+                                    </OverflowItem>
+                                    <OverflowItem onClick={() => { setMenuOrderId(null); setDiscountOrder(o); }}>
+                                      {o.discountAmount > 0 ? "Edit discount" : "Discount"}
+                                    </OverflowItem>
+                                    <OverflowItem onClick={() => { setMenuOrderId(null); setLoyaltyOrderId(o.id); }}>
+                                      ⭐ Points
+                                    </OverflowItem>
+                                  </>
+                                )}
                                 <OverflowItem onClick={() => { setMenuOrderId(null); setEditOrderTarget({ id: o.id, label: t.label }); }}>
                                   Edit items
                                 </OverflowItem>
-                                {o.creditApplied === 0 && (
+                                {o.creditApplied === 0 && t.kind !== "third_party" && (
                                   <OverflowItem onClick={() => { setMenuOrderId(null); setGiftCardTarget({ id: o.id, label: t.label }); }}>
                                     🎁 Gift card
                                   </OverflowItem>
@@ -805,7 +860,6 @@ export function CashierBoard({
                             </>
                           )}
                         </div>
-                      </>
                     )}
                     {/* Only paid orders can be closed/dismissed — an unpaid open
                         order stays on the board until the customer pays. */}
