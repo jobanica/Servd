@@ -1,20 +1,31 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AppIcon, Wordmark } from "@/components/Wordmark";
-import { EarningsCalculator } from "@/components/partner/EarningsCalculator";
-import { getPartnerProgram } from "@/server/partners/program";
-import { formatPHP } from "@/lib/partners/program";
 
 const APPLY = "/partner/apply";
 
+/**
+ * The partner program, as it actually is now.
+ *
+ * It used to be an affiliate scheme: refer a restaurant, earn 30% of their
+ * subscription for a year and 10% for life, plus milestone bonuses. All of that
+ * is gone — no commission, no bonuses, no payouts, nothing to claw back.
+ *
+ * What replaces it is simpler and worth more to the people who were actually
+ * doing this: a partner sets restaurants up themselves, as many as they like,
+ * and charges those restaurants whatever they decide. Servd never sees that
+ * price and never takes a share of it. So the page sells the margin they set
+ * rather than a percentage we set.
+ */
+
 export const metadata: Metadata = {
-  title: "Servd Partner Program — earn recurring income referring restaurants",
+  title: "Servd Partner Program — set up restaurants, set your own price",
   description:
-    "Refer restaurants to Servd and earn 30% commission in year one, then 10% for the life of every subscription — plus stacking milestone bonuses. Free to join, no earnings cap.",
+    "Set up as many restaurants on Servd as you like and charge them whatever you decide. No commission split, no cap, no revenue share — the margin is yours.",
   openGraph: {
     title: "Become a Servd Partner",
     description:
-      "30% first year, then 10% for life on every restaurant you refer. Free to join, paid monthly.",
+      "Unlimited restaurant accounts. You set the price, you keep all of it. Free to join.",
     type: "website",
     images: [{ url: "/brand/servd-icon.svg" }],
   },
@@ -41,9 +52,7 @@ function Step({ n, title, body }: { n: number; title: string; body: string }) {
   );
 }
 
-export default async function PartnersPage() {
-  const program = await getPartnerProgram();
-
+export default function PartnersPage() {
   return (
     <div className="bg-cream text-plum-ink">
       {/* Nav */}
@@ -81,11 +90,11 @@ export default async function PartnersPage() {
             Servd Partner Program
           </span>
           <h1 className="mt-5 font-heading text-4xl font-extrabold leading-tight sm:text-5xl">
-            Earn recurring income by referring restaurants to Servd
+            Set restaurants up on Servd. Charge whatever you like.
           </h1>
           <p className="mt-4 text-lg text-cream/80">
-            {program.firstYearPct}% commission the first year, then {program.lifetimePct}% for life —
-            on every restaurant you bring on board.
+            No commission split and no cap on accounts. You decide what each restaurant
+            pays you, and you keep all of it.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
@@ -94,101 +103,72 @@ export default async function PartnersPage() {
             >
               Become a partner
             </Link>
-            <a href="#calculator" className="rounded-full px-6 py-3 text-base font-semibold text-cream/80 hover:text-cream">
-              See what you could earn →
+            <a href="#how" className="rounded-full px-6 py-3 text-base font-semibold text-cream/80 hover:text-cream">
+              See how it works →
             </a>
           </div>
-          <p className="mt-4 text-sm text-cream/55">Free to join · no earnings cap · paid monthly</p>
+          <p className="mt-4 text-sm text-cream/55">Free to join · unlimited accounts · no revenue share</p>
         </div>
       </section>
 
       {/* 2. How it works */}
-      <section className="mx-auto max-w-6xl px-6 py-16">
+      <section id="how" className="mx-auto max-w-6xl px-6 py-16">
         <h2 className="text-center font-heading text-2xl font-bold sm:text-3xl">How it works</h2>
         <div className="mt-8 grid gap-5 md:grid-cols-3">
-          <Step n={1} title="Join & get your link" body="Apply in minutes. Once approved you get a unique referral link to share." />
-          <Step n={2} title="Refer restaurants" body="Share your link with restaurants. When they sign up and subscribe, they're yours." />
-          <Step n={3} title="Earn every month" body="Get paid a recurring commission for as long as each restaurant keeps paying." />
+          <Step
+            n={1}
+            title="Apply and get approved"
+            body="A short form. Once you're approved you get a partner login and a walkthrough of the setup."
+          />
+          <Step
+            n={2}
+            title="Build them a preview"
+            body="Put a restaurant's menu in and send them a working link before they've paid a peso. It sells itself."
+          />
+          <Step
+            n={3}
+            title="Set your price and bill them"
+            body="You agree the fee directly with the restaurant. Servd never sees it and never takes a share."
+          />
         </div>
       </section>
 
-      {/* 3. The commission */}
+      {/* 3. What you actually get */}
       <section className="mx-auto max-w-6xl px-6 pb-16">
         <h2 className="text-center font-heading text-2xl font-bold sm:text-3xl">
-          Commission that keeps paying
+          What being a partner gets you
         </h2>
         <div className="mx-auto mt-8 grid max-w-3xl gap-5 sm:grid-cols-2">
           <div className="rounded-tile border-2 border-brand-primary/30 bg-white p-7">
-            <p className="font-heading text-5xl font-extrabold text-brand-primary">{program.firstYearPct}%</p>
-            <p className="mt-2 font-semibold">First {program.firstYearMonths} months</p>
+            <p className="font-heading text-5xl font-extrabold text-brand-primary">∞</p>
+            <p className="mt-2 font-semibold">Unlimited accounts</p>
             <p className="mt-1 text-sm text-plum-ink/60">
-              On the referred restaurant&apos;s subscription for their entire first year.
+              Set up as many restaurants as you can sign. There is no cap and no per-account
+              charge to you.
             </p>
           </div>
           <div className="rounded-tile border border-plum-ink/10 bg-white p-7">
-            <p className="font-heading text-5xl font-extrabold">{program.lifetimePct}%</p>
-            <p className="mt-2 font-semibold">Every month after — for life</p>
+            <p className="font-heading text-5xl font-extrabold">100%</p>
+            <p className="mt-2 font-semibold">Of whatever you charge</p>
             <p className="mt-1 text-sm text-plum-ink/60">
-              Keep earning every month for as long as the restaurant stays subscribed.
+              You set the price with each restaurant — setup, monthly, a package, however you
+              work. None of it is split with us.
             </p>
           </div>
         </div>
-      </section>
-
-      {/* 4. Calculator */}
-      <section id="calculator" className="mx-auto max-w-5xl px-6 pb-16">
-        <h2 className="text-center font-heading text-2xl font-bold sm:text-3xl">
-          See what you could earn
-        </h2>
-        <p className="mx-auto mt-2 max-w-xl text-center text-sm text-plum-ink/55">
-          Drag the slider and set an example plan price. This is an illustration, not a guarantee.
+        <p className="mx-auto mt-6 max-w-2xl text-center text-sm text-plum-ink/55">
+          There is no commission in either direction. We don&apos;t pay you a percentage, and we
+          don&apos;t take one — which is exactly why there&apos;s no ceiling on what a partner
+          account is worth to you.
         </p>
-        <div className="mt-8">
-          <EarningsCalculator program={program} />
-        </div>
       </section>
 
-      {/* 5. Performance bonuses */}
-      <section className="mx-auto max-w-3xl px-6 pb-16">
-        <h2 className="text-center font-heading text-2xl font-bold sm:text-3xl">
-          Performance bonuses
-        </h2>
-        <p className="mt-2 text-center text-sm text-plum-ink/55">
-          One-time bonuses as you hit active-paying-referral milestones. They stack.
-        </p>
-        <div className="mt-6 overflow-hidden rounded-tile border border-plum-ink/10 bg-white">
-          <table className="w-full text-left">
-            <thead className="bg-cream/60 text-sm text-plum-ink/55">
-              <tr>
-                <th className="px-5 py-3 font-semibold">Active paying referrals</th>
-                <th className="px-5 py-3 text-right font-semibold">One-time bonus</th>
-              </tr>
-            </thead>
-            <tbody>
-              {program.bonusTiers.map((t) => {
-                const top = t.activeReferrals === 250;
-                return (
-                  <tr
-                    key={t.activeReferrals}
-                    className={`border-t border-plum-ink/5 ${top ? "bg-brand-gradient text-white" : ""}`}
-                  >
-                    <td className="px-5 py-3 font-semibold">
-                      {t.activeReferrals} {top && <span className="ml-1 text-xs font-bold">★ top tier</span>}
-                    </td>
-                    <td className="px-5 py-3 text-right font-heading text-lg font-extrabold">
-                      {formatPHP(t.bonusPesos)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* 6. Who it's for */}
+      {/* 4. Who it's for */}
       <section className="mx-auto max-w-4xl px-6 pb-16 text-center">
         <h2 className="font-heading text-2xl font-bold sm:text-3xl">Who it&apos;s for</h2>
+        <p className="mx-auto mt-2 max-w-xl text-sm text-plum-ink/55">
+          Anyone already selling to restaurants, or willing to do the setup for them.
+        </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2.5">
           {[
             "Freelancers",
@@ -208,15 +188,16 @@ export default async function PartnersPage() {
         </div>
       </section>
 
-      {/* 7. Final CTA band */}
+      {/* 5. Final CTA band */}
       <section className="px-6 pb-16">
         <div
           className="mx-auto max-w-5xl rounded-tile px-8 py-12 text-center text-white"
           style={{ background: "linear-gradient(135deg,#FF9A2E,#FF7A1A,#FF4D6D)" }}
         >
-          <h2 className="font-heading text-3xl font-extrabold">Start earning with Servd</h2>
+          <h2 className="font-heading text-3xl font-extrabold">Build your own book of restaurants</h2>
           <p className="mx-auto mt-2 max-w-xl text-white/90">
-            Free to join, no cap on earnings, paid monthly via {program.payoutMethods.join(" or ")}.
+            Free to join, unlimited accounts, and the price you charge is yours to set and yours
+            to keep.
           </p>
           <Link
             href={APPLY}
@@ -227,7 +208,7 @@ export default async function PartnersPage() {
         </div>
       </section>
 
-      {/* 8. Footer */}
+      {/* 6. Footer */}
       <footer className="border-t border-plum-ink/10 bg-white">
         <div className="mx-auto max-w-6xl px-6 py-8">
           <div className="flex items-center gap-2">
@@ -235,9 +216,9 @@ export default async function PartnersPage() {
             <Wordmark size="1rem" />
           </div>
           <p className="mt-3 max-w-3xl text-xs leading-relaxed text-plum-ink/45">
-            Earnings shown are illustrative and not a guarantee. Commissions are paid on active,
-            paid subscriptions and may be reversed if a referred restaurant refunds or cancels
-            within the clawback window. Participation is subject to the Servd partner agreement.
+            Servd pays partners no commission and takes no share of what a partner charges its
+            clients. What you bill a restaurant, and collecting it, is between you and them.
+            Participation is subject to the Servd partner agreement.
           </p>
           <p className="mt-3 text-xs text-plum-ink/40">
             Already a partner?{" "}

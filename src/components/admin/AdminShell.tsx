@@ -99,7 +99,6 @@ const NAV: { group: string; items: Item[] }[] = [
       { label: "Happy hour", href: "/admin/happy-hours", d: I.star },
       { label: "Gift cards", href: "/admin/gift-cards", d: I.star },
       { label: "Loyalty & rewards", href: "/admin/loyalty", d: I.star },
-      { label: "Refer & earn", href: "/admin/referrals", d: I.star },
       { label: "Customers", href: "/admin/customers", d: I.users },
       { label: "SMS marketing", href: "/admin/sms", d: I.chat },
       { label: "Content scheduler", href: "/admin/content", d: I.film },

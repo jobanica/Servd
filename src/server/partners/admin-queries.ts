@@ -1,85 +1,70 @@
 import "server-only";
 import { systemDb } from "@/server/tenancy/scoped-db";
 
+/**
+ * The partner list, for super-admin.
+ *
+ * It used to carry each partner's payable and paid commission, and a list of
+ * payout batches waiting to be approved. There is no commission now — a partner
+ * sets restaurants up and bills them directly — so what's left is who they are,
+ * whether they're approved, and how many restaurants they've actually set up,
+ * which is the only number that says whether a partner is working out.
+ */
+
 export interface PartnerOverviewRow {
   id: string;
   name: string;
   email: string;
   status: string;
   tier: string;
-  payoutMethod: string | null;
   createdAt: Date;
-  payable: number; // centavos, unpaid commissions not yet in a payout
-  paid: number; // centavos
+  /** Restaurants this partner has set up. */
+  accounts: number;
+  /** How many of those are live rather than still a preview. */
+  live: number;
 }
 
-export interface PayoutRow {
-  id: string;
-  partnerId: string;
-  partnerName: string;
-  period: string;
-  amount: number;
-  status: string;
-  paidAt: Date | null;
-}
-
-export async function getPartnersOverview(): Promise<{ partners: PartnerOverviewRow[]; payouts: PayoutRow[] }> {
+export async function getPartnersOverview(): Promise<{ partners: PartnerOverviewRow[] }> {
   try {
     return await systemDb(async (tx) => {
       const partners = await tx.partner.findMany({
         orderBy: { createdAt: "desc" },
-        select: { id: true, name: true, email: true, status: true, tier: true, payoutMethod: true, createdAt: true },
+        select: { id: true, name: true, email: true, status: true, tier: true, createdAt: true },
       });
 
-      const payableRows = await tx.commission.groupBy({
-        by: ["partnerId"],
-        where: { status: "payable", payoutId: null },
-        _sum: { amount: true },
-      });
-      const paidRows = await tx.commission.groupBy({
-        by: ["partnerId"],
-        where: { status: "paid" },
-        _sum: { amount: true },
-      });
-      // Milestone bonuses count toward payable (earned, not yet in a payout) / paid.
-      const bonusPayableRows = await tx.partnerBonus.groupBy({
-        by: ["partnerId"],
-        where: { status: "earned", payoutId: null },
-        _sum: { amount: true },
-      });
-      const bonusPaidRows = await tx.partnerBonus.groupBy({
-        by: ["partnerId"],
-        where: { status: "paid" },
-        _sum: { amount: true },
-      });
-      const sumByPartner = (
-        ...groups: { partnerId: string; _sum: { amount: number | null } }[][]
-      ) => {
-        const m = new Map<string, number>();
-        for (const r of groups.flat())
-          m.set(r.partnerId, (m.get(r.partnerId) ?? 0) + (r._sum.amount ?? 0));
-        return m;
-      };
-      const payableBy = sumByPartner(payableRows, bonusPayableRows);
-      const paidBy = sumByPartner(paidRows, bonusPaidRows);
-
-      const payoutRows = await tx.payout.findMany({
-        orderBy: { createdAt: "desc" },
-        take: 50,
-        select: { id: true, partnerId: true, period: true, amount: true, status: true, paidAt: true },
-      });
-      const nameBy = new Map(partners.map((p) => [p.id, p.name]));
+      // How many restaurants each partner has set up, and how many went live.
+      // Best-effort: demoPartnerId ships in a manual migration, and a partner
+      // list with no counts beats no partner list.
+      let accountsBy = new Map<string, number>();
+      let liveBy = new Map<string, number>();
+      try {
+        const rows = await tx.restaurant.findMany({
+          where: { demoPartnerId: { not: null } },
+          select: { demoPartnerId: true, status: true },
+        });
+        accountsBy = rows.reduce((m, r) => {
+          const k = r.demoPartnerId!;
+          return m.set(k, (m.get(k) ?? 0) + 1);
+        }, new Map<string, number>());
+        liveBy = rows
+          .filter((r) => r.status === "active")
+          .reduce((m, r) => {
+            const k = r.demoPartnerId!;
+            return m.set(k, (m.get(k) ?? 0) + 1);
+          }, new Map<string, number>());
+      } catch {
+        /* demoPartnerId not migrated yet */
+      }
 
       return {
         partners: partners.map((p) => ({
           ...p,
-          payable: payableBy.get(p.id) ?? 0,
-          paid: paidBy.get(p.id) ?? 0,
+          accounts: accountsBy.get(p.id) ?? 0,
+          live: liveBy.get(p.id) ?? 0,
         })),
-        payouts: payoutRows.map((p) => ({ ...p, partnerName: nameBy.get(p.partnerId) ?? "—" })),
       };
     });
   } catch {
-    return { partners: [], payouts: [] };
+    return { partners: [] };
   }
 }

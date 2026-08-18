@@ -1,7 +1,6 @@
 import "server-only";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { addMonths } from "@/lib/billing/period";
-import { onInvoicePaid } from "@/server/referrals/accrual";
 
 /**
  * Mark a subscription invoice paid and activate the subscription — the single
@@ -23,9 +22,6 @@ export async function activateByProviderRef(
       where: { id: invoice.id },
       data: { status: "paid", paidAt: now },
     });
-
-    // Track-1 referral accrual — same tx, so webhook retries can't double-pay.
-    await onInvoicePaid(tx, invoice.id);
 
     const sub = await tx.subscription.findFirst({
       where: { restaurantId: invoice.restaurantId },

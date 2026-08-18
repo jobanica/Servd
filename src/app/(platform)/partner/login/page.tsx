@@ -13,7 +13,9 @@ export default async function PartnerLoginPage() {
         <Wordmark size="1.3rem" />
       </Link>
       <h1 className="mt-8 font-heading text-2xl font-bold">Partner login</h1>
-      <p className="mt-1 text-sm text-plum-ink/55">Access your referral link and earnings.</p>
+      <p className="mt-1 text-sm text-plum-ink/55">
+        Build previews and set up the restaurants you&apos;ve signed.
+      </p>
       <div className="mt-6">
         <PartnerLoginForm />
       </div>

@@ -5,7 +5,6 @@ import { markAddonPaidByProviderRef } from "@/server/billing/addons";
 import { activateFeatureSubByProviderRef } from "@/server/billing/feature-subscriptions";
 import { activatePreviewByProviderRef } from "@/server/build/activation";
 import { systemDb } from "@/server/tenancy/scoped-db";
-import { clawbackByInvoiceProviderRef } from "@/server/referrals/accrual";
 
 /**
  * PayMongo platform billing webhook. Marks an invoice paid + activates the
@@ -22,11 +21,8 @@ export async function POST(req: NextRequest) {
   const event = provider.verifyAndParseWebhook(rawBody, signature);
   if (!event) return new Response("Invalid signature", { status: 400 });
 
-  // Refund → reverse referral rewards tied to that invoice (within window).
-  if (event.status === "refunded") {
-    await systemDb((tx) => clawbackByInvoiceProviderRef(tx, event.providerRef, "refund"));
-    return new Response("ok", { status: 200 });
-  }
+  // A refund used to claw back referral rewards; there are none to reverse now.
+  if (event.status === "refunded") return new Response("ok", { status: 200 });
 
   if (event.status !== "paid") return new Response("ok", { status: 200 });
 

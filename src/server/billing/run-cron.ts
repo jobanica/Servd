@@ -5,11 +5,6 @@ import { nextBillingAction } from "@/lib/billing/lifecycle";
 import { addMonths } from "@/lib/billing/period";
 import { PLAN_FIELDS } from "@/server/billing/subscription";
 import { renewFeatureSubscriptions } from "@/server/billing/feature-subscriptions";
-import {
-  consumeCreditForCycle,
-  onInvoicePaid,
-  clawbackForReferredRestaurant,
-} from "@/server/referrals/accrual";
 
 export interface CronSummary {
   processed: number;
@@ -90,8 +85,6 @@ export async function runBillingCron(now: Date = new Date()): Promise<CronSummar
     if (decision.action === "cancel") {
       await systemDb(async (tx) => {
         await tx.subscription.update({ where: { id: sub.id }, data: { status: "cancelled" } });
-        // Churn clawback — reverse referral rewards if within the window.
-        await clawbackForReferredRestaurant(tx, sub.restaurantId, "churned", now);
       });
       s.cancelled++;
       continue;
@@ -121,25 +114,6 @@ export async function runBillingCron(now: Date = new Date()): Promise<CronSummar
       });
       s.suspended++;
       continue;
-    }
-
-    // A pending referral credit covers this cycle → grant a free month, no charge.
-    if (decision.action === "charge" || decision.action === "await_payment") {
-      const freeMonth = await systemDb(async (tx) => {
-        const consumed = await consumeCreditForCycle(tx, sub.restaurantId, amount, now);
-        if (!consumed) return false;
-        const base = sub.currentPeriodEnd && sub.currentPeriodEnd > now ? sub.currentPeriodEnd : now;
-        await tx.restaurantInvoice.create({
-          data: { restaurantId: sub.restaurantId, amount: 0, status: "paid", periodStart: now, periodEnd: addMonths(base, 1), paidAt: now },
-        });
-        await tx.subscription.update({ where: { id: sub.id }, data: { status: "active", currentPeriodEnd: addMonths(base, 1), failedCharges: 0 } });
-        await tx.restaurant.update({ where: { id: sub.restaurantId }, data: { status: "active" } });
-        return true;
-      });
-      if (freeMonth) {
-        s.charged++;
-        continue;
-      }
     }
 
     const canCharge = decision.action === "charge" && provider && sub.providerPaymentMethodId;
@@ -172,8 +146,6 @@ export async function runBillingCron(now: Date = new Date()): Promise<CronSummar
         });
         await tx.subscription.update({ where: { id: sub.id }, data: { status: "active", currentPeriodEnd: addMonths(base, 1), failedCharges: 0 } });
         await tx.restaurant.update({ where: { id: sub.restaurantId }, data: { status: "active" } });
-        // Track-1 referral accrual on a real paid month (same tx).
-        await onInvoicePaid(tx, inv.id);
       });
       s.charged++;
     } else {

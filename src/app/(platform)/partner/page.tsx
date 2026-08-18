@@ -1,19 +1,16 @@
 import { requirePartnerPage } from "@/server/partners/auth";
-import { getPartnerDashboard } from "@/server/partners/portal";
+import { getPartnerDashboard, getPartnerTrainingUrl } from "@/server/partners/portal";
 import { listPartnerDemos } from "@/server/partners/demo-queries";
-import { getProgramSettings } from "@/server/referrals/settings";
 import { signOutPartner } from "@/server/partners/login-action";
-import { ReferralLink } from "@/components/admin/ReferralLink";
 import { PartnerDemos } from "@/components/partner/PartnerDemos";
 import { TrainingVideo } from "@/components/partner/TrainingVideo";
 import { AppIcon, Wordmark } from "@/components/Wordmark";
-import { formatPeso } from "@/lib/money";
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
-  signed_up: { label: "Signed up", cls: "bg-plum-ink/5 text-plum-ink/60" },
-  trialing: { label: "Trialing", cls: "bg-plum-ink/5 text-plum-ink/60" },
-  paying: { label: "Paying ✓", cls: "bg-mango/15 text-mango" },
-  churned: { label: "Churned", cls: "bg-guava/15 text-guava" },
+  preview: { label: "Preview", cls: "bg-plum-ink/5 text-plum-ink/60" },
+  active: { label: "Live ✓", cls: "bg-mango/15 text-mango" },
+  suspended: { label: "Suspended", cls: "bg-guava/15 text-guava" },
+  archived: { label: "Archived", cls: "bg-plum-ink/5 text-plum-ink/40" },
 };
 
 export default async function PartnerPortalPage() {
@@ -40,11 +37,10 @@ export default async function PartnerPortalPage() {
     );
   }
 
-  const data = await getPartnerDashboard(partner.id, true);
+  const data = await getPartnerDashboard(partner.id);
   const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const link = data.code ? `${base.replace(/\/$/, "")}/signup?ref=${data.code}` : "";
   const demos = await listPartnerDemos(partner.id);
-  const settings = await getProgramSettings();
+  const trainingUrl = await getPartnerTrainingUrl();
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
@@ -67,53 +63,44 @@ export default async function PartnerPortalPage() {
 
       <h1 className="mt-6 font-heading text-2xl font-bold">Partner dashboard</h1>
 
-      {settings.partnerTrainingUrl && (
+      <p className="mt-1 text-sm text-plum-ink/55">
+        Set up as many restaurants as you like. What you charge them is yours to decide —
+        Servd doesn&apos;t take a cut and never sees the price.
+      </p>
+
+      {trainingUrl && (
         <div className="mt-4">
-          <TrainingVideo url={settings.partnerTrainingUrl} />
+          <TrainingVideo url={trainingUrl} />
         </div>
       )}
-
-      <div className="mt-4 rounded-tile border border-plum-ink/10 bg-white p-5">
-        <p className="text-sm font-semibold">Your referral link</p>
-        {link ? (
-          <div className="mt-2">
-            <ReferralLink url={link} />
-          </div>
-        ) : (
-          <p className="mt-2 text-sm text-plum-ink/50">Your link is being generated…</p>
-        )}
-      </div>
-
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        <div className="rounded-tile border border-plum-ink/10 bg-white p-5">
-          <p className="text-xs text-plum-ink/50">Accrued (awaiting payout)</p>
-          <p className="font-heading text-2xl font-extrabold text-mango">{formatPeso(data.accrued)}</p>
-        </div>
-        <div className="rounded-tile border border-plum-ink/10 bg-white p-5">
-          <p className="text-xs text-plum-ink/50">Paid out</p>
-          <p className="font-heading text-2xl font-extrabold">{formatPeso(data.paid)}</p>
-        </div>
-      </div>
 
       <div className="mt-4">
         <PartnerDemos demos={demos} appUrl={base} />
       </div>
 
       <div className="mt-4 rounded-tile border border-plum-ink/10 bg-white p-5">
-        <p className="mb-3 text-sm font-semibold">Restaurants you referred</p>
-        {data.referrals.length === 0 ? (
-          <p className="text-sm text-plum-ink/50">No referrals yet. Share your link to start earning.</p>
+        <p className="mb-3 text-sm font-semibold">
+          Your restaurants{data.accounts.length > 0 && ` (${data.accounts.length})`}
+        </p>
+        {data.accounts.length === 0 ? (
+          <p className="text-sm text-plum-ink/50">
+            None yet. Build a preview above to show a restaurant what theirs would look like.
+          </p>
         ) : (
           <ul className="divide-y divide-plum-ink/5">
-            {data.referrals.map((r) => {
-              const s = STATUS_LABEL[r.status] ?? STATUS_LABEL.signed_up;
+            {data.accounts.map((r) => {
+              const s = STATUS_LABEL[r.status] ?? STATUS_LABEL.preview;
               return (
-                <li key={r.id} className="flex items-center justify-between py-3">
-                  <div>
-                    <p className="font-medium">{r.name}</p>
-                    <p className="text-xs text-plum-ink/45">Joined {r.createdAt.toLocaleDateString()}</p>
+                <li key={r.id} className="flex items-center justify-between gap-3 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{r.name}</p>
+                    <p className="text-xs text-plum-ink/45">
+                      Set up {new Date(r.createdAt).toLocaleDateString()} · /{r.slug}
+                    </p>
                   </div>
-                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${s.cls}`}>{s.label}</span>
+                  <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${s.cls}`}>
+                    {s.label}
+                  </span>
                 </li>
               );
             })}
@@ -121,24 +108,9 @@ export default async function PartnerPortalPage() {
         )}
       </div>
 
-      {data.payouts.length > 0 && (
-        <div className="mt-4 rounded-tile border border-plum-ink/10 bg-white p-5">
-          <p className="mb-3 text-sm font-semibold">Payout history</p>
-          <ul className="divide-y divide-plum-ink/5 text-sm">
-            {data.payouts.map((p) => (
-              <li key={p.id} className="flex items-center justify-between py-2">
-                <span>{p.period}</span>
-                <span className="font-semibold">{formatPeso(p.amount)}</span>
-                <span className="text-xs text-plum-ink/50">{p.status}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
       <p className="mt-6 text-xs text-plum-ink/40">
-        Commissions accrue on the referred restaurant&apos;s paid invoices and may be reversed if
-        they refund or cancel within the clawback window. Payouts are reviewed and sent manually.
+        There is no cap on how many restaurants you can set up, and no commission in either
+        direction — you bill your clients yourself, at whatever you decide.
       </p>
     </div>
   );

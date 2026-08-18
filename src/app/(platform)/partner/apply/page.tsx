@@ -11,8 +11,8 @@ export default function PartnerApplyPage() {
       </Link>
       <h1 className="mt-8 font-heading text-3xl font-extrabold">Become a Servd partner</h1>
       <p className="mt-2 text-plum-ink/65">
-        Refer restaurants and earn a recurring commission on their subscription. Apply below —
-        we&apos;ll review and send your referral link once approved.
+        Set restaurants up on Servd and charge them what you decide — no commission split and
+        no cap on accounts. Apply below — we&apos;ll review and send your login once approved.
       </p>
       <div className="mt-6">
         <ApplyPartnerForm />

@@ -5,7 +5,7 @@ as source knowledge for answering pricing questions.
 
 All amounts are Philippine Pesos (₱).
 
-**Last updated:** 14 August 2026
+**Last updated:** 18 August 2026
 
 > **There is no monthly subscription.** Servd is a one-time-payment product.
 > ₱499 activates a restaurant's online ordering, and every other paid feature is
@@ -139,36 +139,30 @@ Servd never holds the money and adds nothing on top.
 
 ---
 
-## 8. Referral programme (for restaurants)
+## 8. Partner programme (for resellers and agencies)
 
-Any restaurant gets a referral code from **Admin → Refer & earn**. Referrals are
-tracked for **30 days** from the first click, and reward account credit.
+For people who set restaurants up on Servd. Apply at `/partner/apply`.
 
----
+- **Unlimited accounts.** No cap on how many restaurants a partner sets up, and
+  no per-account charge to the partner.
+- **The partner sets the price.** Whatever they bill a restaurant — setup,
+  monthly, a package — is agreed directly between them and that restaurant.
+- **No revenue share in either direction.** Servd pays the partner no
+  commission and takes no share of what the partner charges. Servd never sees
+  the price and never invoices the partner's client on their behalf.
+- **Free to join**, subject to approval.
 
-## 9. Partner programme (for resellers and agencies)
+Collecting what a restaurant owes a partner is the partner's own business.
 
-For people who sell Servd to restaurants. Apply at `/partners/apply`.
-
-- **30% commission** on everything a referred restaurant pays in their first
-  **12 months**
-- **10% ongoing commission** for the life of the account after that
-- Tracked for **30 days** from first click; **60-day** clawback on cancellations
-- **Minimum payout ₱500** — below that it rolls into the next payout
-
-**Milestone bonuses**, paid once as active referrals pass each level:
-
-| Active referrals | Bonus |
-|---|---|
-| 10 | ₱2,000 |
-| 25 | ₱5,000 |
-| 50 | ₱15,000 |
-| 100 | ₱40,000 |
-| 250 | ₱100,000 |
+There is no referral or affiliate scheme, for restaurants or for partners. The
+old programme — 30% year-one commission, 10% ongoing, milestone bonuses,
+clawbacks and payout batches, plus account credit for a restaurant that referred
+another — was withdrawn in favour of the arrangement above, and nothing accrues
+under it any more.
 
 ---
 
-## 10. Common pricing questions
+## 9. Common pricing questions
 
 **Do I pay monthly?** No. ₱499 activates your online ordering and it's yours for
 good — walang monthly bayad. Other features are optional one-time unlocks. The

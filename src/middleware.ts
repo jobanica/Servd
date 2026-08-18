@@ -16,27 +16,6 @@ import { readUtmParams, encodeUtm, UTM_COOKIE, UTM_MAX_AGE } from "@/lib/utm";
  * No DB calls here (Edge-safe): we route by host *shape*; the restaurant lookup
  * happens in the rewritten Node route.
  */
-// Referral attribution: capture ?ref=CODE into a 30-day, last-touch cookie that
-// signup later reads. Edge-safe (no DB). Sanitized + length-capped.
-const REF_COOKIE = "servd_ref";
-const REF_MAX_AGE = 30 * 24 * 60 * 60; // 30 days
-
-function captureRef(req: NextRequest, res: NextResponse): NextResponse {
-  const raw = req.nextUrl.searchParams.get("ref");
-  if (raw) {
-    const code = raw.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 32);
-    if (code) {
-      res.cookies.set(REF_COOKIE, code, {
-        maxAge: REF_MAX_AGE,
-        path: "/",
-        httpOnly: true,
-        sameSite: "lax",
-      });
-    }
-  }
-  return res;
-}
-
 /**
  * Ad attribution: capture utm_* (or a bare fbclid) into a 90-day cookie the
  * builder later stamps onto the lead. Done here rather than in a client
@@ -62,9 +41,16 @@ function captureUtm(req: NextRequest, res: NextResponse): NextResponse {
   return res;
 }
 
-/** Both click-attribution captures, applied to whatever response we're sending. */
+/**
+ * Click attribution, applied to whatever response we're sending.
+ *
+ * There used to be a second capture here — ?ref=CODE into a 30-day referral
+ * cookie — which the referral program read to attribute a signup and accrue a
+ * commission. There is no commission any more, so nothing reads it and it is
+ * gone; only the ad tags are still worth keeping.
+ */
 function captureAttribution(req: NextRequest, res: NextResponse): NextResponse {
-  return captureUtm(req, captureRef(req, res));
+  return captureUtm(req, res);
 }
 
 type PendingCookie = { name: string; value: string; options?: Record<string, unknown> };

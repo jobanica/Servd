@@ -420,9 +420,9 @@ model Restaurant {
   feedbackMode    FeedbackMode @default(follow_up)
 
   // --- Printing ---
-  printMethod    PrintMethod @default(network)
-  printerConfig  Json? // transport-specific details (ip, port, cloudprnt url…)
-  autoPrint      Boolean     @default(false)
+  printMethod      PrintMethod @default(network)
+  printerConfig    Json? // transport-specific details (ip, port, cloudprnt url…)
+  autoPrint        Boolean     @default(false)
   // Print a receipt automatically when a payment settles. Default on, because
   // that was the only behaviour before this was a choice — but a till whose
   // customers don't want paper was burning a roll a day with no way to stop it.
@@ -437,15 +437,15 @@ model Restaurant {
   // Handing the default to the database instead means Prisma never names the
   // column, so a create keeps working right through the migration lag and the
   // column starts carrying its default the moment the SQL is run.
-  autoPrintReceipt Boolean   @default(dbgenerated("true"))
+  autoPrintReceipt Boolean     @default(dbgenerated("true"))
   // When to pop the cash drawer: never | cash (cash payments only) | any.
   // A card or GCash sale puts nothing in the drawer, so "cash" is the default —
   // but a till that gives change for e-wallets can choose "any".
-  openDrawerOn   String      @default(dbgenerated("'cash'"))
-  cashierVoidPin String? // PIN a cashier must enter to void an unpaid order
+  openDrawerOn     String      @default(dbgenerated("'cash'"))
+  cashierVoidPin   String? // PIN a cashier must enter to void an unpaid order
   // Kitchen routing: true => on-screen kitchen display; false => print a kitchen
   // ticket for the kitchen when an order is accepted/created (no screen).
-  kitchenDisplay Boolean     @default(true)
+  kitchenDisplay   Boolean     @default(true)
 
   // --- Payments (connected-accounts model) ---
   // Each restaurant stores its OWN PayMongo credentials, encrypted at rest.
@@ -988,169 +988,62 @@ model LandingStat {
 }
 
 // ----------------------------------------------------------------------------
-// Affiliate & referral program (Track 1: restaurant-to-restaurant credit)
+// Partner program
 // ----------------------------------------------------------------------------
+//
+// This used to be an affiliate scheme in two tracks: a restaurant that referred
+// another restaurant earned account credit (Track 1), and a platform partner
+// earned a recurring percentage of the subscriptions they brought in (Track 2),
+// with milestone bonuses, payout batches, clawbacks and withholding on top.
+//
+// None of that exists any more. A partner sets restaurants up themselves, as
+// many as they like, and bills those restaurants directly at whatever price
+// they agree; Servd never sees that price and never takes or pays a share. So
+// there is nothing to attribute, accrue, claw back or pay out, and the tables
+// that existed only to track money moving between us and a partner are gone:
+// referral_codes, referrals, referral_events, commissions, payouts,
+// partner_bonuses and account_credits.
+//
+// Dropping the tables themselves is optional and destructive — see
+// prisma/manual/drop-referral-program.sql. Nothing reads them, so leaving them
+// in place is harmless.
 
-/// A unique referral code. Owned by a restaurant (Track 1) or a partner (Track 2).
-model ReferralCode {
-  id           String   @id @default(uuid())
-  code         String   @unique
-  ownerType    String // "restaurant" | "partner"
-  restaurantId String? // set for restaurant-owned codes (RLS key)
-  partnerId    String? // set for partner-owned codes (Track 2)
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
-
-  @@index([restaurantId])
-  @@map("referral_codes")
-}
-
-/// One referred restaurant, attributed to a code. Accrual is driven off paid
-/// invoices, never signups.
-model Referral {
-  id                   String    @id @default(uuid())
-  referralCodeId       String
-  referrerRestaurantId String? // denormalized owner restaurant (Track 1) — RLS key
-  referredRestaurantId String    @unique // last-touch: one attribution per restaurant
-  partnerId            String? // set for partner-track referrals (Track 2)
-  status               String    @default("signed_up") // signed_up | trialing | paying | churned
-  firstPaidAt          DateTime?
-  paidMonths           Int       @default(0)
-  createdAt            DateTime  @default(now())
-
-  @@index([referralCodeId])
-  @@index([referrerRestaurantId])
-  @@index([partnerId])
-  @@map("referrals")
-}
-
-// ----------------------------------------------------------------------------
-// Affiliate program (Track 2: platform partners — recurring commission)
-// ----------------------------------------------------------------------------
-
-/// A platform-level affiliate / reseller. Has its own login (Supabase auth).
+/// A platform partner. Has its own login (Supabase auth) and can set up an
+/// unlimited number of restaurants, which they bill directly.
 model Partner {
   id               String   @id @default(uuid())
   authUserId       String?  @unique // Supabase auth user for the partner portal
   name             String
   email            String   @unique
-  status           String   @default("pending") // pending | approved | suspended
-  tier             String   @default("affiliate") // affiliate | reseller
-  payoutMethod     String? // "gcash" | "bank"
-  payoutDetailsEnc String? // encrypted JSON (account name/number)
-  taxInfoEnc       String? // encrypted JSON (TIN, etc.) — supports PH reporting
+  status           String   @default("pending") // pending | approved | suspended | rejected
+  tier             String   @default("reseller") // "affiliate" survives only on old rows
+  // Payout/tax columns from the commission era. Servd pays partners nothing, so
+  // new applications never fill these in; they stay only to preserve what was
+  // already collected. Nothing reads them.
+  payoutMethod     String?
+  payoutDetailsEnc String?
+  taxInfoEnc       String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
   @@map("partners")
 }
 
-/// A commission earned by a partner off a referred restaurant's PAID invoice.
-model Commission {
-  id         String   @id @default(uuid())
-  partnerId  String
-  referralId String
-  invoiceId  String
-  amount     Int // centavos
-  status     String   @default("payable") // payable | paid | clawed_back
-  period     String // "YYYY-MM" of the paid invoice
-  payoutId   String?
-  createdAt  DateTime @default(now())
-
-  // One commission per paid invoice per referral (idempotency / no double-pay).
-  @@unique([referralId, invoiceId])
-  @@index([partnerId, status])
-  @@map("commissions")
-}
-
-/// A payout batch to a partner (record-keeping only; never auto-disburses).
-model Payout {
-  id        String    @id @default(uuid())
-  partnerId String
-  period    String // "YYYY-MM"
-  amount    Int // centavos
-  method    String? // snapshot of payout method
-  status    String    @default("requested") // requested | approved | paid
-  paidAt    DateTime?
-  createdAt DateTime  @default(now())
-
-  @@index([partnerId, status])
-  @@map("payouts")
-}
-
-/// Subscription account credit (Track 1 reward). Applied against a future
-/// Servd invoice — never paid out as cash.
-model AccountCredit {
-  id               String    @id @default(uuid())
-  restaurantId     String
-  amount           Int // centavos
-  reason           String
-  sourceReferralId String?
-  status           String    @default("pending") // pending | applied | reversed
-  appliedInvoiceId String?
-  appliedAt        DateTime?
-  createdAt        DateTime  @default(now())
-
-  // At most one referral-sourced credit per restaurant per referral (idempotency).
-  @@unique([restaurantId, sourceReferralId])
-  @@index([restaurantId, status])
-  @@map("account_credits")
-}
-
-/// Program-wide settings (singleton row id="program"). Configurable, not hardcoded.
+/// Program-wide settings (singleton row id="program").
+///
+/// Once carried the commission rates, bonus tiers, cookie window, clawback
+/// window, minimum payout and withholding %. All of that went with the
+/// commission; the training video is the only setting left. The columns still
+/// exist in the database (NOT NULL with defaults, so inserts here are fine) —
+/// the optional drop script clears them out.
 model ProgramSetting {
-  id                   String   @id @default("program")
-  track1CreditMonths   Int      @default(1)
-  // FINAL Track-2 terms: flat year-1 % then ongoing % for life (single rate for
-  // all partners). track2CommissionPct/ResellerPct are deprecated/unused.
-  commissionPctYear1   Int      @default(30)
-  commissionPctOngoing Int      @default(10)
-  bonusTiersJson       Json? // [{ activeReferrals, amount(centavos) }] — milestone bonuses
-  track2CommissionPct  Int      @default(25) // deprecated (superseded by commissionPctYear1)
-  track2ResellerPct    Int      @default(35) // deprecated
-  track2DurationMonths Int      @default(12) // year-1 boundary in months
-  bountyAmount         Int      @default(0) // centavos (bounty payout model)
-  payoutModel          String   @default("recurring") // recurring | bounty
-  cookieDays           Int      @default(30)
-  clawbackDays         Int      @default(60)
-  minPayout            Int      @default(50000) // centavos = ₱500
-  // Configurable withholding % applied to payout statements (PH reporting). NOT
-  // tax advice — 0 by default; an accountant should confirm the correct rate.
-  withholdingPct       Int      @default(0)
-  // Partner onboarding/training video shown on the partner dashboard. A YouTube/
-  // Vimeo link or a direct video URL (super-admin sets it).
-  partnerTrainingUrl   String?
-  updatedAt            DateTime @updatedAt
+  id                 String   @id @default("program")
+  /// Partner onboarding video shown on the partner dashboard. A YouTube/Vimeo
+  /// link or a direct video URL (super-admin sets it).
+  partnerTrainingUrl String?
+  updatedAt          DateTime @updatedAt
 
   @@map("program_settings")
-}
-
-/// One-time milestone bonus earned by a partner at an active-referral tier.
-/// Earned once per tier (unique), paid through the normal payout batch flow.
-model PartnerBonus {
-  id        String   @id @default(uuid())
-  partnerId String
-  tierCount Int // the milestone (e.g. 10/25/50/100/250)
-  amount    Int // centavos
-  status    String   @default("earned") // earned | paid
-  payoutId  String?
-  earnedAt  DateTime @default(now())
-
-  @@unique([partnerId, tierCount])
-  @@index([partnerId, status])
-  @@map("partner_bonuses")
-}
-
-/// Append-only audit / fraud trail for the referral program.
-model ReferralEvent {
-  id         String   @id @default(uuid())
-  referralId String?
-  type       String // attribution | self_referral_blocked | first_paid | clawback | credit_applied
-  detailJson Json?
-  createdAt  DateTime @default(now())
-
-  @@index([referralId])
-  @@map("referral_events")
 }
 
 // ----------------------------------------------------------------------------
@@ -1984,25 +1877,25 @@ model Promotion {
 }
 
 model OrderItem {
-  id         String  @id @default(uuid())
-  orderId    String
-  menuItemId String? // nullable: kept as SetNull so deleting a menu item/category
+  id             String    @id @default(uuid())
+  orderId        String
+  menuItemId     String? // nullable: kept as SetNull so deleting a menu item/category
   //          preserves order history (name & price are snapshotted below).
-  nameAtTime String // snapshot of item name
-  quantity   Int     @default(1)
-  unitPrice  Int // snapshot of base price (centavos)
-  note       String?
+  nameAtTime     String // snapshot of item name
+  quantity       Int       @default(1)
+  unitPrice      Int // snapshot of base price (centavos)
+  note           String?
   /// Ticked off by the kitchen as it goes out — the line is struck through on
   /// every tablet so the pass can see what is still to come. Purely a working
   /// aid: it doesn't move the order's status or touch stock.
   ///
   /// Nullable, no default. Both of these ship as hand-run migrations, and a
   /// defaulted column is one Prisma writes into the INSERT of every order item.
-  preparedAt DateTime?
+  preparedAt     DateTime?
   /// How many of this line were refunded, and what was handed back (centavos).
   /// Null means none. The money itself is a negative payment row, so the day's
   /// takings need no special-casing anywhere.
-  refundedQty Int?
+  refundedQty    Int?
   refundedAmount Int?
 
   order     Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)

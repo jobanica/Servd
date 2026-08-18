@@ -15,8 +15,8 @@ export function ApplyPartnerForm() {
         <p className="text-3xl">✅</p>
         <h2 className="mt-2 font-heading text-xl font-bold">Application received</h2>
         <p className="mt-1 text-sm text-plum-ink/60">
-          Confirm your email, then we&apos;ll review your application. You&apos;ll get your
-          referral link once approved.
+          Confirm your email, then we&apos;ll review your application. You&apos;ll be able to log
+          in and start setting restaurants up once approved.
         </p>
         <Link href="/partner/login" className="mt-4 inline-block rounded-full px-5 py-2 text-sm font-semibold btn-brand">
           Go to login
@@ -41,33 +41,12 @@ export function ApplyPartnerForm() {
           <input name="password" type="password" required className={field} placeholder="At least 8 characters" />
         </div>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className={label}>Partner type</label>
-          <select name="tier" className={field}>
-            <option value="affiliate">Affiliate (referrals)</option>
-            <option value="reseller">Reseller (setup &amp; support)</option>
-          </select>
-        </div>
-        <div>
-          <label className={label}>Payout method</label>
-          <select name="payoutMethod" className={field}>
-            <option value="gcash">GCash</option>
-            <option value="bank">Bank transfer</option>
-          </select>
-        </div>
-      </div>
-      <div>
-        <label className={label}>Payout details (account name &amp; number)</label>
-        <input name="payoutDetails" required className={field} placeholder="e.g. GCash · Juan DC · 0917…" />
-      </div>
-      <div>
-        <label className={label}>Tax ID / TIN (optional)</label>
-        <input name="taxInfo" className={field} />
-        <p className="mt-1 text-xs text-plum-ink/45">
-          Stored securely to support tax reporting. Consult your accountant on withholding.
-        </p>
-      </div>
+      {/* No payout or tax fields: Servd pays partners nothing. You bill the
+          restaurants you set up, directly, at whatever price you agree. */}
+      <p className="rounded-lg bg-cream px-3 py-2 text-xs text-plum-ink/55">
+        There&apos;s nothing to collect from us — you set up as many restaurants as you like and
+        charge them yourself, at whatever price you agree. Servd takes no share of it.
+      </p>
 
       {state?.error && <p className="text-sm text-guava">{state.error}</p>}
       <button className="rounded-full px-6 py-2.5 text-sm font-semibold btn-brand">Apply to partner</button>

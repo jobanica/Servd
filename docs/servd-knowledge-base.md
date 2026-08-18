@@ -3,7 +3,7 @@
 A reference describing everything Servd does. Written to be loaded into an AI
 assistant as source knowledge for answering customer and staff questions.
 
-**Last updated:** 13 August 2026
+**Last updated:** 18 August 2026
 
 ---
 
@@ -449,9 +449,6 @@ content engine for generating and batching posts.
 
 **Feedback & reputation** — post-meal feedback collection, ratings over time,
 and Google review prompting.
-
-**Refer & earn** — restaurants get a referral code; referrals are tracked and
-credited.
 
 ---
 

@@ -4,7 +4,6 @@ import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { systemDb } from "@/server/tenancy/scoped-db";
-import { encryptJson } from "@/lib/crypto/secrets";
 
 export type ApplyState = { ok?: boolean; error?: string } | null;
 
@@ -12,27 +11,29 @@ const schema = z.object({
   name: z.string().trim().min(2, "Your name is required").max(120),
   email: z.string().trim().email("Enter a valid email"),
   password: z.string().min(8, "Password must be at least 8 characters"),
-  tier: z.enum(["affiliate", "reseller"]).default("affiliate"),
-  payoutMethod: z.enum(["gcash", "bank"]).default("gcash"),
-  payoutDetails: z.string().trim().min(2, "Enter your payout details").max(300),
-  taxInfo: z.string().trim().max(120).optional().or(z.literal("")),
 });
 
 /**
- * Affiliate/reseller partner application. Creates a Supabase auth user (so the
- * partner can log into the portal once approved) and a `pending` partner row.
- * Payout + tax details are encrypted at rest. Super-admin approves before any
- * referral code is issued.
+ * Partner application. Creates a Supabase auth user (so the partner can log
+ * into the portal once approved) and a `pending` partner row. Super-admin
+ * approves before the portal opens.
+ *
+ * It used to also ask for a payout method, bank/GCash details and a TIN,
+ * because Servd paid partners a commission and needed somewhere to send it.
+ * Servd pays them nothing now — a partner bills the restaurants they set up
+ * directly — so asking for an account number would be collecting a sensitive
+ * detail that nothing will ever use. The columns stay for the rows that already
+ * have them; new applications simply leave them null.
+ *
+ * Every partner is a reseller now, for the same reason: "affiliate" meant
+ * somebody who referred a restaurant and earned a percentage, and that isn't a
+ * thing any more.
  */
 export async function applyAsPartner(_prev: ApplyState, formData: FormData): Promise<ApplyState> {
   const parsed = schema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
     password: formData.get("password"),
-    tier: formData.get("tier") ?? "affiliate",
-    payoutMethod: formData.get("payoutMethod") ?? "gcash",
-    payoutDetails: formData.get("payoutDetails"),
-    taxInfo: formData.get("taxInfo") ?? "",
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   const v = parsed.data;
@@ -58,11 +59,8 @@ export async function applyAsPartner(_prev: ApplyState, formData: FormData): Pro
             authUserId,
             name: v.name,
             email: v.email,
-            tier: v.tier,
+            tier: "reseller",
             status: "pending",
-            payoutMethod: v.payoutMethod,
-            payoutDetailsEnc: encryptJson({ details: v.payoutDetails }),
-            taxInfoEnc: v.taxInfo ? encryptJson({ tax: v.taxInfo }) : null,
           },
         }),
       );
