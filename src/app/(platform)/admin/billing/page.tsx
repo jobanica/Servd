@@ -9,6 +9,7 @@ import { listOwnedFeatures, addonKeyFor } from "@/server/billing/owned-features"
 import { getFeaturePrices } from "@/server/billing/feature-pricing";
 import { FEATURE_META, type Feature } from "@/lib/billing/features";
 import { formatPeso } from "@/lib/money";
+import { manilaDate } from "@/lib/time/manila";
 
 const FEATURE_LABEL: Record<string, string> = Object.fromEntries(
   FEATURE_META.map((f) => [f.key, f.label]),
@@ -138,7 +139,7 @@ export default async function BillingPage({
             <tbody>
               {invoices.map((inv) => (
                 <tr key={inv.id} className="border-t border-plum-ink/10">
-                  <td className="py-2">{inv.createdAt.toLocaleDateString()}</td>
+                  <td className="py-2">{manilaDate(inv.createdAt)}</td>
                   <td>{formatPeso(inv.amount)}</td>
                   <td>{inv.status}</td>
                 </tr>

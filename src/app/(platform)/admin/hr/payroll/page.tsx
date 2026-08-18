@@ -5,6 +5,7 @@ import { listEmployees } from "@/server/hr/queries";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { addPayrollDeduction, deletePayrollDeduction } from "@/server/hr/actions";
 import { formatPeso } from "@/lib/money";
+import { manilaDate } from "@/lib/time/manila";
 
 function monthRange(which: "this" | "last") {
   const now = new Date();
@@ -78,7 +79,7 @@ export default async function PayrollPage({
           <Link href="/admin/hr" className="text-sm text-plum-ink/50">← HR</Link>
           <h1 className="font-heading text-2xl font-bold">Payroll</h1>
           <p className="text-sm text-plum-ink/50">
-            Covered: {from.toLocaleDateString()} – {to.toLocaleDateString()}
+            Covered: {manilaDate(from)} – {manilaDate(to)}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -195,7 +196,7 @@ export default async function PayrollPage({
               <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
                 <span className="min-w-0">
                   <span className="font-medium text-plum-ink">{d.employee.fullName}</span>
-                  <span className="text-plum-ink/55"> · {d.label} · {d.appliedOn.toLocaleDateString()}</span>
+                  <span className="text-plum-ink/55"> · {d.label} · {manilaDate(d.appliedOn)}</span>
                 </span>
                 <span className="flex items-center gap-3">
                   <span className="font-semibold text-guava">−{formatPeso(d.amount)}</span>

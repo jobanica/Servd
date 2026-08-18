@@ -5,6 +5,7 @@ import { getSalesReport, getVatReport, getCogs, getExpenses, getSalesTickets } f
 import { formatPeso } from "@/lib/money";
 import { parseReportRange } from "@/lib/time/report-range";
 import { DateRangePicker } from "@/components/admin/DateRangePicker";
+import { manilaDate } from "@/lib/time/manila";
 
 const METHOD_LABEL: Record<string, string> = {
   cash: "Cash", card_terminal: "Card (terminal)", gcash: "GCash (counter)", maya: "Maya (counter)",
@@ -180,7 +181,7 @@ export default async function AccountingPage({
             <tbody>
               {sales.byDay.map((d) => (
                 <tr key={d.day} className="border-t border-plum-ink/5">
-                  <td className="py-1.5">{new Date(d.day).toLocaleDateString()}</td>
+                  <td className="py-1.5">{manilaDate(d.day)}</td>
                   <td className="text-right">{d.orders}</td>
                   <td className="text-right font-semibold">{formatPeso(d.amount)}</td>
                 </tr>

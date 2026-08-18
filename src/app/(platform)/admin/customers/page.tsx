@@ -4,6 +4,7 @@ import { requireFeaturePage } from "@/server/billing/feature-gate";
 import { getCustomers } from "@/server/customers/customers";
 import { formatPeso } from "@/lib/money";
 import { AddCustomerForm } from "@/components/customers/AddCustomerForm";
+import { manilaDate } from "@/lib/time/manila";
 
 export default async function CustomersPage() {
   const { restaurantId } = await requireAdminPage();
@@ -66,7 +67,7 @@ export default async function CustomersPage() {
                     <td className="px-4 py-2 text-right text-plum-ink/60">{c.orders}</td>
                     <td className="px-4 py-2 text-right text-plum-ink/60">{formatPeso(c.totalSpent)}</td>
                     <td className="px-4 py-2 text-plum-ink/50">
-                      {c.lastOrderAt ? new Date(c.lastOrderAt).toLocaleDateString() : "—"}
+                      {c.lastOrderAt ? manilaDate(c.lastOrderAt) : "—"}
                     </td>
                     <td className="px-4 py-2 text-plum-ink/50">{c.address ?? "—"}</td>
                   </tr>

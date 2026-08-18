@@ -4,6 +4,7 @@ import { hasModule } from "@/server/billing/entitlements";
 import { listPurchaseOrders, listSuppliers } from "@/server/inventory/queries";
 import { createPurchaseOrder } from "@/server/inventory/actions";
 import { formatPeso } from "@/lib/money";
+import { manilaDate } from "@/lib/time/manila";
 
 export default async function PurchaseOrdersPage() {
   const { restaurantId } = await requireAdminPage();
@@ -42,7 +43,7 @@ export default async function PurchaseOrdersPage() {
                 <div>
                   <span className="font-medium">{po.supplier?.name ?? "No supplier"}</span>
                   <span className="block text-xs text-plum-ink/40">
-                    {po.createdAt.toLocaleDateString()} · {po.items.length} item(s)
+                    {manilaDate(po.createdAt)} · {po.items.length} item(s)
                   </span>
                 </div>
                 <div className="text-right">

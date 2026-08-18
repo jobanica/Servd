@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireHrPage } from "@/server/hr/guard";
 import { getLateReport } from "@/server/hr/attendance";
 import { manilaTime } from "@/lib/time/manila";
+import { manilaDate } from "@/lib/time/manila";
 
 const time = manilaTime;
 
@@ -77,7 +78,7 @@ export default async function LateReportPage({
                 {rows.map((r, i) => (
                   <tr key={i} className="border-t border-plum-ink/5">
                     <td className="py-2 font-medium">{r.name}</td>
-                    <td>{new Date(r.date).toLocaleDateString()}</td>
+                    <td>{manilaDate(r.date)}</td>
                     <td>{time(r.shiftStart)}</td>
                     <td>{time(r.clockIn)}</td>
                     <td className="text-right font-semibold text-guava">{r.minutesLate} min</td>

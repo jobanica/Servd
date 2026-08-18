@@ -1,6 +1,7 @@
 import "server-only";
 
 import { systemDb } from "@/server/tenancy/scoped-db";
+import { manilaDate, manilaDateTime } from "@/lib/time/manila";
 
 /**
  * The customer book — every person who has ordered (pickup/delivery save their
@@ -145,9 +146,9 @@ export async function customersCsv(restaurantId: string): Promise<string> {
         r.totalEarned,
         r.orders,
         (r.totalSpent / 100).toFixed(2),
-        esc(r.lastOrderAt ? new Date(r.lastOrderAt).toLocaleString() : ""),
+        esc(r.lastOrderAt ? manilaDateTime(r.lastOrderAt) : ""),
         esc(r.address),
-        esc(r.joinedAt ? new Date(r.joinedAt).toLocaleDateString() : ""),
+        esc(r.joinedAt ? manilaDate(r.joinedAt) : ""),
       ].join(","),
     );
   }

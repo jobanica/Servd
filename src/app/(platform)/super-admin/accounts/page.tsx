@@ -1,5 +1,6 @@
 import { listBusinesses } from "@/server/billing/super-admin";
 import { CreateAccountForm } from "@/components/super-admin/CreateAccountForm";
+import { manilaDate } from "@/lib/time/manila";
 
 function mapUrl(lat: number | null, lng: number | null, address: string | null): string | null {
   if (lat != null && lng != null) return `https://www.google.com/maps?q=${lat},${lng}`;
@@ -61,7 +62,7 @@ export default async function SuperAdminAccountsPage() {
                       <td className="px-4 py-2 font-mono text-xs text-plum-ink/70">
                         {b.ownerLogin ?? <span className="text-plum-ink/30">—</span>}
                       </td>
-                      <td className="px-4 py-2 text-plum-ink/50">{new Date(b.createdAt).toLocaleDateString()}</td>
+                      <td className="px-4 py-2 text-plum-ink/50">{manilaDate(b.createdAt)}</td>
                     </tr>
                   );
                 })

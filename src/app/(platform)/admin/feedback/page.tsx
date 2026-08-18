@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
 import { getFeedbackList, getFeedbackStats } from "@/server/feedback/queries";
+import { manilaDateTime } from "@/lib/time/manila";
 
 function Stars({ rating }: { rating: number }) {
   return (
@@ -51,7 +52,7 @@ export default async function FeedbackInboxPage() {
               <div className="flex items-center justify-between">
                 <Stars rating={f.rating} />
                 <span className="text-xs text-plum-ink/40">
-                  {f.createdAt.toLocaleString()}
+                  {manilaDateTime(f.createdAt)}
                 </span>
               </div>
               {f.comment && (

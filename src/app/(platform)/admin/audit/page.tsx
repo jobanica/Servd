@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
 import { requireFeaturePage } from "@/server/billing/feature-gate";
 import { getAuditLogs } from "@/server/audit/log";
+import { manilaDateTime } from "@/lib/time/manila";
 
 const ACTION_LABEL: Record<string, string> = {
   "order.void": "Voided order",
@@ -80,7 +81,7 @@ export default async function AuditPage({
               rows.map((r) => (
                 <tr key={r.id} className="align-top">
                   <td className="px-4 py-2.5 whitespace-nowrap text-plum-ink/60">
-                    {new Date(r.createdAt).toLocaleString()}
+                    {manilaDateTime(r.createdAt)}
                   </td>
                   <td className="px-4 py-2.5">{r.actorEmail ?? "—"}</td>
                   <td className="px-4 py-2.5 font-medium">{ACTION_LABEL[r.action] ?? r.action}</td>

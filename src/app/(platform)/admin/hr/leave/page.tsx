@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireHrPage } from "@/server/hr/guard";
 import { listLeaveTypes, listLeaveRequests, listEmployees } from "@/server/hr/queries";
 import { createLeaveType, requestLeave, resolveLeave } from "@/server/hr/actions";
+import { manilaDate } from "@/lib/time/manila";
 
 export default async function LeavePage() {
   const { restaurantId, eligible } = await requireHrPage();
@@ -52,7 +53,7 @@ export default async function LeavePage() {
           <li key={r.id} className="flex items-center justify-between rounded-tile border border-plum-ink/10 bg-white p-3 text-sm">
             <div>
               <span className="font-medium">{r.employee.fullName}</span> · {r.leaveType.name}
-              <span className="block text-xs text-plum-ink/40">{r.startDate.toLocaleDateString()} – {r.endDate.toLocaleDateString()} · {r.status}</span>
+              <span className="block text-xs text-plum-ink/40">{manilaDate(r.startDate)} – {manilaDate(r.endDate)} · {r.status}</span>
             </div>
             {r.status === "pending" && (
               <span className="flex gap-2">

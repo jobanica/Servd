@@ -5,6 +5,7 @@ import { hasModule } from "@/server/billing/entitlements";
 import { getPurchaseOrder, listInventory } from "@/server/inventory/queries";
 import { addPurchaseOrderItem, receivePurchaseOrder } from "@/server/inventory/actions";
 import { formatPeso } from "@/lib/money";
+import { manilaDateTime } from "@/lib/time/manila";
 
 export default async function PurchaseOrderDetail({
   params,
@@ -67,7 +68,7 @@ export default async function PurchaseOrderDetail({
         </form>
       )}
       {received && (
-        <p className="text-sm text-mango">Received {po.receivedAt?.toLocaleString()} — stock + weighted-average cost updated.</p>
+        <p className="text-sm text-mango">Received {po.receivedAt ? manilaDateTime(po.receivedAt) : "—"} — stock + weighted-average cost updated.</p>
       )}
     </div>
   );

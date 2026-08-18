@@ -19,6 +19,7 @@ import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
 import { TempPasswordButton } from "@/components/super-admin/TempPasswordButton";
 import { addSmsCredits, setSenderName } from "@/server/sms/admin";
 import { formatPeso } from "@/lib/money";
+import { manilaDate } from "@/lib/time/manila";
 
 const STATUS_STYLE: Record<string, string> = {
   active: "bg-mango/15 text-mango",
@@ -37,7 +38,7 @@ function StatusBadge({ status }: { status: SubStatus | null }) {
 }
 
 function fmtDate(iso: string | null) {
-  return iso ? new Date(iso).toLocaleDateString() : "—";
+  return iso ? manilaDate(iso) : "—";
 }
 
 /** Monthly online-order cap implied by the plan name (null = unlimited). */

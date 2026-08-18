@@ -1,5 +1,6 @@
 import { listPlatformFeedback } from "@/server/platform-feedback/queries";
 import { setFeedbackResolved } from "@/server/platform-feedback/actions";
+import { manilaDateTime } from "@/lib/time/manila";
 
 export default async function SuperAdminFeedbackPage() {
   const items = await listPlatformFeedback();
@@ -51,7 +52,7 @@ function Section({
                 <span className="font-semibold">{f.restaurantName ?? "Unknown restaurant"}</span>
                 {f.rating ? <span className="ml-2 text-mango">{"★".repeat(f.rating)}</span> : null}
                 <span className="block text-xs text-plum-ink/40">
-                  {f.authorEmail ?? "—"} · {new Date(f.createdAt).toLocaleString()}
+                  {f.authorEmail ?? "—"} · {manilaDateTime(f.createdAt)}
                 </span>
               </div>
               <form action={setFeedbackResolved}>

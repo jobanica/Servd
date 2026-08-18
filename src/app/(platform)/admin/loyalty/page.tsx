@@ -4,6 +4,7 @@ import { requireFeaturePage } from "@/server/billing/feature-gate";
 import { getLoyaltyConfig, getLoyaltyMembers, getLoyaltyActivity } from "@/server/loyalty/loyalty";
 import { formatPeso } from "@/lib/money";
 import { LoyaltyForm } from "@/components/admin/LoyaltyForm";
+import { manilaDate, manilaDateTime } from "@/lib/time/manila";
 
 export default async function LoyaltyPage() {
   const { restaurantId } = await requireAdminPage();
@@ -68,7 +69,7 @@ export default async function LoyaltyPage() {
                     </td>
                     <td className="px-4 py-2 text-right text-plum-ink/60">{m.totalEarned}</td>
                     <td className="px-4 py-2 text-plum-ink/50">
-                      {new Date(m.joinedAt).toLocaleDateString()}
+                      {manilaDate(m.joinedAt)}
                     </td>
                   </tr>
                 ))}
@@ -97,7 +98,7 @@ export default async function LoyaltyPage() {
               <tbody>
                 {activity.map((a) => (
                   <tr key={a.id} className="border-t border-plum-ink/5">
-                    <td className="px-4 py-2 text-plum-ink/60">{new Date(a.createdAt).toLocaleString()}</td>
+                    <td className="px-4 py-2 text-plum-ink/60">{manilaDateTime(a.createdAt)}</td>
                     <td className="px-4 py-2 text-plum-ink/70">{a.phone}</td>
                     <td className="px-4 py-2">
                       <span

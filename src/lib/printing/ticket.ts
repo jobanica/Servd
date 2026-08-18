@@ -7,6 +7,7 @@
 
 import { orderTypeLabel, type OrderTypeKey } from "@/lib/orders/order-type";
 import { scheduledTicketLabel } from "@/lib/orders/scheduled";
+import { manilaDateTime } from "@/lib/time/manila";
 
 const VAT_RATE = 0.12;
 export const WIDTH = 32; // characters per line (58mm thermal; 80mm just has slack)
@@ -277,7 +278,9 @@ export function ticketBodyLines(t: Ticket): string[] {
     // advance order must never be mistaken for.
     lines.push(...scheduledLines(t));
     lines.push(`Order #${t.orderRef}`);
-    lines.push(new Date(t.placedAt).toLocaleString());
+    // Manila, always. The ticket is built on the server, which runs in UTC, so
+    // a bare toLocaleString() printed 4:54 AM on an order placed at 12:54 PM.
+    lines.push(manilaDateTime(t.placedAt));
     // The address, when the kitchen works by zone — everything heading the same
     // way gets cooked and bagged in one run instead of one ticket at a time.
     if (t.kitchenShowAddress && t.orderType === "delivery" && t.customerAddress) {
@@ -295,7 +298,9 @@ export function ticketBodyLines(t: Ticket): string[] {
   lines.push(...scheduledLines(t));
   const docLabel = t.kind === "bill" ? "Bill" : "Receipt";
   lines.push(`${docLabel} #${t.orderRef}`);
-  lines.push(new Date(t.placedAt).toLocaleString());
+  // See above: the customer's copy has to agree with the wall clock, and with
+  // the timestamp on the GCash/Maya payment they just made.
+  lines.push(manilaDateTime(t.placedAt));
   lines.push("--------------------------------");
   for (const item of t.items) {
     lines.push(pad(`${item.quantity}x ${item.name}`, amt(item.lineTotal)));

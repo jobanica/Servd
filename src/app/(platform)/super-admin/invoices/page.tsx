@@ -1,6 +1,7 @@
 import { listInvoices } from "@/server/billing/super-admin";
 import { markInvoicePaid, voidInvoice } from "@/server/billing/super-admin-actions";
 import { formatPeso } from "@/lib/money";
+import { manilaDate } from "@/lib/time/manila";
 
 const STATUS_STYLE: Record<string, string> = {
   paid: "bg-mango/15 text-mango",
@@ -51,10 +52,10 @@ export default async function InvoicesPage() {
                     </span>
                   </td>
                   <td className="px-4 py-2 text-xs text-plum-ink/50">
-                    {new Date(i.periodStart).toLocaleDateString()} – {new Date(i.periodEnd).toLocaleDateString()}
+                    {manilaDate(i.periodStart)} – {manilaDate(i.periodEnd)}
                   </td>
                   <td className="px-4 py-2 text-xs text-plum-ink/50">
-                    {new Date(i.createdAt).toLocaleDateString()}
+                    {manilaDate(i.createdAt)}
                   </td>
                   <td className="px-4 py-2">
                     {(i.status === "open" || i.status === "failed") && (

@@ -4,6 +4,7 @@ import { listTimeEntries, listEmployees } from "@/server/hr/queries";
 import { approveTimeEntry } from "@/server/hr/actions";
 import { computeHours } from "@/lib/hr/hours";
 import { manilaDateTime, manilaTime } from "@/lib/time/manila";
+import { manilaDate } from "@/lib/time/manila";
 
 /** "YYYY-MM-DD" → a Date at the start (or end) of that day. Invalid → null. */
 function parseDay(v: string | undefined, endOfDay = false): Date | null {
@@ -57,7 +58,7 @@ export default async function TimesheetsPage({
         <h1 className="font-heading text-2xl font-bold">Timesheets</h1>
         <p className="text-sm text-plum-ink/50">
           {selected ? `${selected.fullName} · ` : ""}
-          {from.toLocaleDateString()} – {to.toLocaleDateString()}
+          {manilaDate(from)} – {manilaDate(to)}
         </p>
       </div>
 

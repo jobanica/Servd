@@ -3,6 +3,7 @@ import { requireAdminPage } from "@/server/tenancy/require-admin";
 import { getExpenses } from "@/server/accounting/queries";
 import { addExpense, deleteExpense } from "@/server/accounting/actions";
 import { formatPeso } from "@/lib/money";
+import { manilaDate } from "@/lib/time/manila";
 
 function range(p: "this" | "last") {
   const now = new Date();
@@ -37,7 +38,7 @@ export default async function ExpensesPage({
         <div>
           <Link href="/admin/accounting" className="text-sm text-plum-ink/50">← Accounting</Link>
           <h1 className="font-heading text-2xl font-bold">Expenses</h1>
-          <p className="text-sm text-plum-ink/50">{from.toLocaleDateString()} – {to.toLocaleDateString()}</p>
+          <p className="text-sm text-plum-ink/50">{manilaDate(from)} – {manilaDate(to)}</p>
         </div>
         <div className="flex gap-2">
           <Link href="/admin/accounting/expenses?period=this" className={`rounded-full px-3 py-1 text-sm font-semibold ${period === "this" ? "btn-brand text-white" : "border border-plum-ink/15"}`}>This month</Link>
@@ -74,7 +75,7 @@ export default async function ExpensesPage({
             {expenses.length === 0 && <tr><td className="p-3 text-plum-ink/40" colSpan={5}>No expenses recorded.</td></tr>}
             {expenses.map((e) => (
               <tr key={e.id} className="border-t border-plum-ink/10">
-                <td className="p-3">{new Date(e.date).toLocaleDateString()}</td>
+                <td className="p-3">{manilaDate(e.date)}</td>
                 <td>{e.category}</td>
                 <td className="text-plum-ink/60">{e.note ?? "—"}</td>
                 <td className="text-right font-semibold">{formatPeso(e.amount)}</td>

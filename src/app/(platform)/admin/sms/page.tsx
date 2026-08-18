@@ -4,6 +4,7 @@ import { requireFeaturePage } from "@/server/billing/feature-gate";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { getCampaigns, getConfirmedCount, setDoubleOptIn } from "@/server/sms/campaigns";
 import { SmsComposeForm } from "@/components/admin/SmsComposeForm";
+import { manilaDateTime } from "@/lib/time/manila";
 
 export default async function SmsPage() {
   const { restaurantId } = await requireAdminPage();
@@ -82,7 +83,7 @@ export default async function SmsPage() {
               >
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-plum-ink/40">
-                    {(c.sentAt ?? c.createdAt).toLocaleString()}
+                    {manilaDateTime(c.sentAt ?? c.createdAt)}
                   </span>
                   <span className="text-plum-ink/50">
                     {c.recipientCount} recipient{c.recipientCount === 1 ? "" : "s"}

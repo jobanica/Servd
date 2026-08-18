@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireHrPage } from "@/server/hr/guard";
 import { getPayslip } from "@/server/hr/payroll";
 import { formatPeso } from "@/lib/money";
+import { manilaDate } from "@/lib/time/manila";
 
 function monthRange(which: "this" | "last") {
   const now = new Date();
@@ -54,7 +55,7 @@ export default async function PayslipPage({
       <div>
         <Link href={`/admin/hr/payroll?${backQs}`} className="text-sm text-plum-ink/50">← Payroll</Link>
         <h1 className="font-heading text-2xl font-bold">{row.name} — payslip</h1>
-        <p className="text-sm text-plum-ink/50">{from.toLocaleDateString()} – {to.toLocaleDateString()}</p>
+        <p className="text-sm text-plum-ink/50">{manilaDate(from)} – {manilaDate(to)}</p>
       </div>
 
       {/* Summary */}
@@ -94,7 +95,7 @@ export default async function PayslipPage({
             )}
             {days.map((d) => (
               <tr key={d.date} className="border-t border-plum-ink/10">
-                <td className="p-3">{new Date(d.date).toLocaleDateString()}</td>
+                <td className="p-3">{manilaDate(d.date)}</td>
                 <td>{time(d.shiftStart)}</td>
                 <td>{time(d.clockIn)}</td>
                 <td className="text-right">{d.hours > 0 ? d.hours : "—"}</td>

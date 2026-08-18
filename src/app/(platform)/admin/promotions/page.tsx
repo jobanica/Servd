@@ -7,6 +7,7 @@ import { deletePromotion, togglePromotion } from "@/server/promotions/actions";
 import { AddPromotionForm } from "@/components/admin/AddPromotionForm";
 import { offerSummary } from "@/lib/promotions/compute";
 import { formatPeso } from "@/lib/money";
+import { manilaDate } from "@/lib/time/manila";
 
 export default async function PromotionsPage() {
   const { restaurantId } = await requireAdminPage();
@@ -76,7 +77,7 @@ export default async function PromotionsPage() {
                   {p.description && <p className="mt-0.5 text-sm text-plum-ink/55">{p.description}</p>}
                   <p className="mt-0.5 text-xs text-plum-ink/40">
                     {p.minSpend > 0 && `Min spend ${formatPeso(p.minSpend)} · `}
-                    {p.expiresAt && `Expires ${new Date(p.expiresAt).toLocaleDateString()}`}
+                    {p.expiresAt && `Expires ${manilaDate(p.expiresAt)}`}
                   </p>
                 </div>
                 <form action={togglePromotion}>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireHrPage } from "@/server/hr/guard";
 import { listShifts, listEmployees, listOpenSwaps } from "@/server/hr/queries";
 import { createShift, deleteShift, resolveSwap } from "@/server/hr/actions";
+import { manilaDateTime, manilaTime } from "@/lib/time/manila";
 
 // Values are JS getDay() (0=Sun…6=Sat); shown Monday-first for PH work weeks.
 const WORK_DAYS = [
@@ -43,7 +44,7 @@ export default async function SchedulePage() {
           <ul className="mt-2 space-y-2 text-sm">
             {swaps.map((s) => (
               <li key={s.id} className="flex items-center justify-between">
-                <span>{s.employee.fullName} · {s.shift.startsAt.toLocaleString()}</span>
+                <span>{s.employee.fullName} · {manilaDateTime(s.shift.startsAt)}</span>
                 <span className="flex gap-2">
                   <form action={resolveSwap}><input type="hidden" name="id" value={s.id} /><input type="hidden" name="approve" value="true" /><button className="text-xs font-semibold text-brand-primary">approve</button></form>
                   <form action={resolveSwap}><input type="hidden" name="id" value={s.id} /><input type="hidden" name="approve" value="false" /><button className="text-xs text-muted">reject</button></form>
@@ -94,7 +95,7 @@ export default async function SchedulePage() {
             <div>
               <span className="font-medium">{s.employee?.fullName ?? "Open shift"}</span>
               {s.role && <span className="ml-2 text-plum-ink/40">{s.role}</span>}
-              <span className="block text-xs text-plum-ink/40">{s.startsAt.toLocaleString()} – {s.endsAt.toLocaleTimeString()}</span>
+              <span className="block text-xs text-plum-ink/40">{manilaDateTime(s.startsAt)} – {manilaTime(s.endsAt)}</span>
             </div>
             <form action={deleteShift}><input type="hidden" name="id" value={s.id} /><button className="text-xs text-muted hover:text-guava">delete</button></form>
           </li>
