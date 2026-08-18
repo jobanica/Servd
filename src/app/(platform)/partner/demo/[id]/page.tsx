@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePartnerPage } from "@/server/partners/auth";
-import { partnerOwnsDemo, demoLogin } from "@/server/partners/demo-queries";
+import { partnerOwnsDemo, demoLogin, demoAlreadyScanned } from "@/server/partners/demo-queries";
 import { getDemoStorefront } from "@/server/storefront-demo/queries";
 import {
   updatePartnerDemoDetails,
@@ -30,6 +30,7 @@ export default async function PartnerDemoDetailPage({ params }: { params: Promis
   const s = await getDemoStorefront(id);
   if (!s) notFound();
   const login = await demoLogin(id);
+  const scanned = await demoAlreadyScanned(id);
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://servdph.com";
   const url = `${appUrl}/r/${s.slug}`;
@@ -143,7 +144,7 @@ export default async function PartnerDemoDetailPage({ params }: { params: Promis
       <div className="space-y-4">
         <h2 className="font-heading text-lg font-bold">Menu</h2>
 
-        <PartnerScanMenuForm restaurantId={s.id} />
+        <PartnerScanMenuForm restaurantId={s.id} alreadyScanned={scanned} />
 
         {s.categories.map((cat) => (
           <div key={cat.id} className="rounded-tile border border-plum-ink/10 bg-white p-4">

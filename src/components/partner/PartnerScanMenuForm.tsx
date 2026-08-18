@@ -3,8 +3,30 @@
 import { useActionState } from "react";
 import { scanPartnerDemoMenu, type DemoScanState } from "@/server/partners/demo";
 
-export function PartnerScanMenuForm({ restaurantId }: { restaurantId: string }) {
+export function PartnerScanMenuForm({
+  restaurantId,
+  alreadyScanned = false,
+}: {
+  restaurantId: string;
+  /** This storefront has had its one scan — show that instead of a dead button. */
+  alreadyScanned?: boolean;
+}) {
   const [state, action, pending] = useActionState<DemoScanState, FormData>(scanPartnerDemoMenu, null);
+
+  // Offering a button that can only fail is worse than not offering one. The
+  // server refuses a second scan regardless; this just says so up front.
+  if (alreadyScanned && !state?.ok) {
+    return (
+      <div className="rounded-tile border border-plum-ink/10 bg-white p-4">
+        <p className="font-heading font-bold text-plum-ink">✅ Menu already scanned</p>
+        <p className="mt-1 text-xs text-plum-ink/55">
+          One AI scan per storefront. Everything it read is below — add, edit or delete items by
+          hand from here.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <form action={action} className="rounded-tile border border-brand-primary/25 bg-brand-primary/5 p-4">
       <input type="hidden" name="restaurantId" value={restaurantId} />

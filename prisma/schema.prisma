@@ -392,6 +392,13 @@ model Restaurant {
   // Set when a partner creates this as a DEMO storefront (no login) to pitch a
   // prospect. Null for real tenants + super-admin demos.
   demoPartnerId String?
+  // When a partner ran the AI menu scan on this storefront. One scan per demo:
+  // it's an AI vision call billed to us, and a partner opens unlimited demos.
+  // Nullable with NO default — a static default would be sent by Prisma on
+  // every insert and break creates on a database that lacks the column.
+  // Deliberately a timestamp rather than a boolean: "when" answers questions a
+  // flag can't, and reads as false when null either way.
+  menuScannedAt DateTime?
 
   // --- White-label branding (defaults give a clean "Servd look") ---
   displayName       String?

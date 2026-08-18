@@ -10,6 +10,7 @@ import { getCurrentPartner } from "@/server/partners/auth";
 import { provisionDemo, receiptJson } from "@/server/storefront-demo/provision";
 import { convertDemo } from "@/server/storefront-demo/convert";
 import { PARTNER_SCAN_LIMIT } from "@/lib/menu/scan-limit";
+import { demoAlreadyScanned } from "@/server/partners/demo-queries";
 import { scanAndSaveMenu } from "@/server/storefront-demo/scan-save";
 import { uploadMenuImage } from "@/server/storage/menu-images";
 
@@ -102,13 +103,37 @@ export async function scanPartnerDemoMenu(_prev: DemoScanState, formData: FormDa
   const restaurantId = String(formData.get("restaurantId") ?? "");
   if (!(await ownDemo(restaurantId, partner.id))) return { error: "Storefront not found." };
 
-  // One photo per scan. Each file is a vision call billed to us, and a partner
-  // account has no cap on storefronts — so the cost is capped per scan instead.
-  // Enforced here, not just in the file picker: the form is a POST like any
-  // other and `multiple` is a suggestion to the browser, not a rule.
+  // One scan per storefront, one photo per scan. Each file is an AI vision call
+  // billed to us, and a partner opens unlimited demos — so the spend is capped
+  // where it's created rather than trusted to good manners.
+  //
+  // Both checks live here, not just in the form: this is an ordinary POST, and
+  // a hidden button or a missing `multiple` attribute stops nobody.
+  if (await demoAlreadyScanned(restaurantId)) {
+    return {
+      error:
+        "This storefront has already been scanned. Add or edit the remaining items by hand below.",
+    };
+  }
+
   const files = formData.getAll("images").filter((f): f is File => f instanceof File && f.size > 0);
   const res = await scanAndSaveMenu(restaurantId, files, PARTNER_SCAN_LIMIT);
   if (!res.ok) return { error: res.error };
+
+  // Stamp it only on success — a scan that failed or read nothing shouldn't
+  // burn the storefront's one attempt. Best-effort: if the column isn't there
+  // yet, the fallback in demoAlreadyScanned covers it.
+  try {
+    await systemDb((tx) =>
+      tx.restaurant.update({
+        where: { id: restaurantId },
+        data: { menuScannedAt: new Date() },
+        select: { id: true },
+      }),
+    );
+  } catch {
+    /* menuScannedAt not migrated yet — run add-menu-scanned-at.sql */
+  }
   revalidatePath(PATH);
   revalidatePath(demoPath(restaurantId));
   return { ok: true, added: res.added };

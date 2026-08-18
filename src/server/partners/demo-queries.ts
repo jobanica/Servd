@@ -63,6 +63,37 @@ export async function demoLogin(restaurantId: string): Promise<DemoLogin> {
   return { converted, username };
 }
 
+/**
+ * Has this demo already had its one AI menu scan?
+ *
+ * `menuScannedAt` is the real record, and it survives the partner deleting the
+ * items afterwards. It arrives in a manual migration though, so until that's
+ * applied this falls back to "does the storefront already have menu items?" —
+ * softer (clearing the menu would buy another scan) but it still holds the rule
+ * on a database that's behind the code, which is the state that matters.
+ */
+export async function demoAlreadyScanned(restaurantId: string): Promise<boolean> {
+  try {
+    const r = await systemDb((tx) =>
+      tx.restaurant.findFirst({ where: { id: restaurantId }, select: { menuScannedAt: true } }),
+    );
+    return !!r?.menuScannedAt;
+  } catch {
+    /* menuScannedAt not migrated yet — fall through */
+  }
+  try {
+    const item = await systemDb((tx) =>
+      tx.menuItem.findFirst({ where: { restaurantId }, select: { id: true } }),
+    );
+    return !!item;
+  } catch {
+    // Can't tell. Allow it: a scan that should have been blocked costs one
+    // vision call, where a wrongly blocked one leaves the partner unable to
+    // build the storefront at all.
+    return false;
+  }
+}
+
 export interface PartnerDemoRow {
   id: string;
   name: string;
