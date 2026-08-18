@@ -2,26 +2,39 @@
 -- READ-ONLY. Changes nothing. Safe to run any time.
 -- ============================================================================
 --
--- "The partner can't see the Convert button." This tells you why. Run the
--- whole file and read the four results in order.
+-- "The partner can't see the Convert button." This tells you why.
+--
+-- RUN PART 1 ON ITS OWN FIRST. If it reports that `partners` doesn't exist,
+-- stop — run add-partner-program.sql, then come back. Parts 2-4 read those
+-- tables, and Postgres aborts the whole script on the first missing one, so
+-- running everything at once just gives you `relation "partners" does not
+-- exist` and no other answers.
 -- ============================================================================
 
--- 1. Are the two columns the partner portal needs actually here?
---    Both ship in manual migrations: add-demo-partner.sql, add-staff-username.sql.
---    A missing demoPartnerId means the portal lists NOTHING at all.
-SELECT 'restaurants.demoPartnerId' AS column_needed,
-       to_regclass('public.restaurants') IS NOT NULL AS table_exists,
+-- ============================ PART 1 — run alone ============================
+
+-- 1. Is everything the partner portal needs actually here?
+--    All four come from add-partner-program.sql. A missing `partners` table or
+--    a missing demoPartnerId column means the portal shows nothing at all.
+SELECT 'partners (table)' AS needs,
+       to_regclass('public.partners') IS NOT NULL AS present
+UNION ALL
+SELECT 'program_settings (table)',
+       to_regclass('public.program_settings') IS NOT NULL
+UNION ALL
+SELECT 'restaurants.demoPartnerId',
        EXISTS (
          SELECT 1 FROM information_schema.columns
          WHERE table_name = 'restaurants' AND column_name = 'demoPartnerId'
-       ) AS column_exists
+       )
 UNION ALL
 SELECT 'staff_users.username',
-       to_regclass('public.staff_users') IS NOT NULL,
        EXISTS (
          SELECT 1 FROM information_schema.columns
          WHERE table_name = 'staff_users' AND column_name = 'username'
        );
+
+-- ===================== PARTS 2-4 — only once Part 1 is all `true` ===========
 
 -- 2. Which partners exist, and are they approved? An unapproved partner sees
 --    the "application under review" screen instead of a dashboard.
