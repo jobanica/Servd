@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { getCurrentUser } from "@/server/tenancy/current-user";
-import { isMemberOf } from "@/server/tenancy/branches";
+import { isMemberOf, canEnterBranch } from "@/server/tenancy/branches";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { uniqueSlug } from "@/lib/slug";
 import { BRANCH_COOKIE, BRANCH_COOKIE_MAX_AGE } from "@/lib/tenancy/active-branch";
@@ -23,8 +23,12 @@ export async function switchBranch(formData: FormData): Promise<void> {
   const user = await getCurrentUser();
   if (!user || user.kind !== "staff") return;
 
+  // Membership AND activated. A branch that hasn't been paid for has no
+  // ordering and nothing to run — switching into it shows a dashboard that
+  // can't do anything, which reads as the app being broken rather than as the
+  // branch not being live yet.
   const restaurantId = String(formData.get("restaurantId") ?? "");
-  if (!restaurantId || !(await isMemberOf(user.authUserId, restaurantId))) return;
+  if (!restaurantId || !(await canEnterBranch(user.authUserId, restaurantId))) return;
 
   (await cookies()).set(BRANCH_COOKIE, restaurantId, {
     maxAge: BRANCH_COOKIE_MAX_AGE,
@@ -119,13 +123,10 @@ export async function addBranch(
     return { error: "Couldn't create the branch. Please try again." };
   }
 
-  // Land them in the new branch so they can set it up straight away.
-  (await cookies()).set(BRANCH_COOKIE, newId, {
-    maxAge: BRANCH_COOKIE_MAX_AGE,
-    path: "/",
-    httpOnly: true,
-    sameSite: "lax",
-  });
+  // Deliberately NOT switched into: the branch isn't activated yet, and an
+  // unactivated branch can't be entered. Setting the cookie here would point it
+  // at a branch the session then refuses, quietly landing them somewhere else.
+  void newId;
   return { ok: true };
 }
 

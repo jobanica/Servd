@@ -57,7 +57,17 @@ export async function getCurrentUser(): Promise<CurrentUser> {
     // the browser, so membership is verified here rather than trusted.
     const memberships = await tx.staffUser.findMany({
       where: { authUserId: user.id },
-      select: { id: true, restaurantId: true, role: true, email: true, createdAt: true },
+      select: {
+        id: true,
+        restaurantId: true,
+        role: true,
+        email: true,
+        createdAt: true,
+        // Only a LIVE branch can be worked in — an unactivated one has no
+        // ordering and nothing to run, so a stale cookie pointing at one must
+        // not strand the owner in a dashboard that can't do anything.
+        restaurant: { select: { status: true } },
+      },
     });
 
     if (memberships.length > 0) {
@@ -66,6 +76,7 @@ export async function getCurrentUser(): Promise<CurrentUser> {
         memberships.map((m) => ({
           restaurantId: m.restaurantId,
           createdAt: m.createdAt.toISOString(),
+          active: m.restaurant.status === "active",
         })),
         requested,
       );

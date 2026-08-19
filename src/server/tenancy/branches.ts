@@ -65,3 +65,31 @@ export async function isMemberOf(authUserId: string, restaurantId: string): Prom
     return false;
   }
 }
+
+/**
+ * May this login switch INTO that branch?
+ *
+ * Membership isn't enough — the branch also has to be activated. An
+ * unactivated branch has no online ordering and nothing to run, so switching
+ * into it drops the owner in a dashboard that can't do anything and looks
+ * broken. They activate it from the branches list, then go in.
+ *
+ * Checked on the server, not just hidden in the UI: the branch id comes from a
+ * form post, and a hidden button stops nobody.
+ */
+export async function canEnterBranch(
+  authUserId: string,
+  restaurantId: string,
+): Promise<boolean> {
+  try {
+    const hit = await systemDb((tx) =>
+      tx.staffUser.findFirst({
+        where: { authUserId, restaurantId, restaurant: { status: "active" } },
+        select: { id: true },
+      }),
+    );
+    return !!hit;
+  } catch {
+    return false;
+  }
+}

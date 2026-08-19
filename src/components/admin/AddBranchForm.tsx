@@ -10,8 +10,8 @@ import { addBranch, type AddBranchState } from "@/server/tenancy/branch-actions"
  *
  * Created first and activated afterwards, so a failed checkout leaves a branch
  * the owner can retry rather than money taken for a restaurant that was never
- * made. On success they're already switched into it, because the next thing
- * anybody does with a new branch is set up its menu.
+ * made. It does NOT switch them into it: an unactivated branch can't be
+ * entered, so doing so would land them somewhere else and look like a bug.
  */
 export function AddBranchForm({ activationPrice }: { activationPrice: string }) {
   const [state, action, pending] = useActionState<AddBranchState, FormData>(addBranch, null);
@@ -46,8 +46,7 @@ export function AddBranchForm({ activationPrice }: { activationPrice: string }) 
       {state?.error && <p className="mt-2 text-sm text-guava">{state.error}</p>}
       {state?.ok && (
         <p className="mt-2 text-sm text-mango">
-          Branch created — you&apos;re now in it. Add its menu, then activate it when you&apos;re
-          ready to take orders.
+          Branch created. Activate it above to switch into it and start setting it up.
         </p>
       )}
     </form>

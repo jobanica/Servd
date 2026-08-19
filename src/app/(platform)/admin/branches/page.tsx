@@ -85,7 +85,11 @@ export default async function BranchesPage({
                         price={formatPeso(ACTIVATION_PRICE)}
                       />
                     )}
-                    {!b.active && (
+                    {/* Switching is only offered once the branch is live. The
+                        server refuses it either way — an unactivated branch has
+                        nothing to run, so entering it looks like a broken app
+                        rather than an unpaid one. */}
+                    {!b.active && b.status === "active" && (
                       <form action={switchBranch}>
                         <input type="hidden" name="restaurantId" value={b.restaurantId} />
                         <button className="rounded-full border border-plum-ink/15 px-4 py-2 text-sm font-semibold hover:bg-cream">

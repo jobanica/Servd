@@ -15,8 +15,12 @@ import type { BranchRow } from "@/server/tenancy/branches";
  * from the previous branch is left on screen.
  */
 export function BranchSwitcher({ branches }: { branches: BranchRow[] }) {
-  if (branches.length < 2) return null;
   const active = branches.find((b) => b.active);
+  // Only live branches can be entered. The one they're currently in is kept
+  // regardless, so the select always has something to show as chosen — an
+  // owner sitting in their first, not-yet-activated shop included.
+  const options = branches.filter((b) => b.status === "active" || b.active);
+  if (options.length < 2) return null;
 
   return (
     <form action={switchBranch} className="px-3 pb-2">
@@ -29,7 +33,7 @@ export function BranchSwitcher({ branches }: { branches: BranchRow[] }) {
         onChange={(e) => e.currentTarget.form?.requestSubmit()}
         className="w-full rounded-lg border border-plum-ink/15 bg-white px-2.5 py-2 text-sm font-semibold"
       >
-        {branches.map((b) => (
+        {options.map((b) => (
           <option key={b.restaurantId} value={b.restaurantId}>
             {b.name}
             {b.status !== "active" ? " (not activated)" : ""}
