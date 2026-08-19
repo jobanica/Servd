@@ -43,6 +43,8 @@ import { CashOutModal } from "./CashOutModal";
 import { PaymentBadge } from "./PaymentBadge";
 import { orderTypeLabelWithEmoji } from "@/lib/orders/order-type";
 import { BluetoothPrinterButton } from "./BluetoothPrinterButton";
+import { WaitBadge } from "./WaitBadge";
+import { waitingFrom, waitingLabel, waitTone } from "@/lib/orders/waiting";
 import { printPaidTicket, printKitchenTicket, openCashDrawer } from "@/server/printing/print";
 import { runPrintDispatch, sendDrawerKick } from "@/lib/print/run-dispatch";
 
@@ -99,6 +101,15 @@ export function CashierBoard({
    */
   kitchenBluetooth?: boolean;
 }) {
+  // One clock for the whole board, so every waiting time agrees and the page
+  // re-renders once a minute rather than once per card. A minute is enough —
+  // the till shows minutes, not seconds.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+
   const [tables, setTables] = useState<CashierTable[]>(initialTables);
   const [incoming, setIncoming] = useState<IncomingOrder[]>(initialIncoming);
   const [live, setLive] = useState(false);
@@ -466,6 +477,18 @@ export function CashierBoard({
       .map((o) => ({ ...o, tableNumber: t.tableNumber })),
   );
 
+  // The longest any incoming order has been waiting, for the sidebar button.
+  // Advance orders that aren't due yet are excluded — waitingFrom returns null
+  // for those, and counting them would show hours of "waiting" for nothing.
+  const longestIncomingWait = (() => {
+    let oldest: string | null = null;
+    for (const o of incoming) {
+      const from = waitingFrom(o.createdAt, o.scheduledFor, nowMs);
+      if (from && (!oldest || from < oldest)) oldest = from;
+    }
+    return oldest && waitTone(oldest, nowMs) !== "fresh" ? waitingLabel(oldest, nowMs) : null;
+  })();
+
   const showPopup = incoming.length > 0 && !popupDismissed;
   const showReady = readyOrders.length > 0 && !readyDismissed && !showPopup;
 
@@ -503,6 +526,11 @@ export function CashierBoard({
           className="w-full rounded-full border border-guava bg-guava/10 px-4 py-2.5 text-sm font-semibold text-guava"
         >
           {incoming.length} incoming
+          {/* The longest wait in the queue, on the button itself. With the
+              popup dismissed this is the only thing on screen saying an order
+              has been sitting there — a count alone reads the same at ten
+              seconds and ten minutes. */}
+          {longestIncomingWait && <span className="font-normal"> · {longestIncomingWait} waiting</span>}
         </button>
       )}
       {readyOrders.length > 0 && (
@@ -672,10 +700,18 @@ export function CashierBoard({
             <ul className="mt-3 space-y-3">
               {t.orders.map((o) => (
                 <li key={o.id} className="rounded-lg bg-cream/60 p-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span>
-                      {o.itemCount} item{o.itemCount > 1 ? "s" : ""} ·{" "}
-                      <span className="text-plum-ink/50">{o.status}</span>
+                  <div className="flex items-center justify-between gap-2 text-sm">
+                    <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                      <span>
+                        {o.itemCount} item{o.itemCount > 1 ? "s" : ""} ·{" "}
+                        <span className="text-plum-ink/50">{o.status}</span>
+                      </span>
+                      {/* Only while the kitchen still has it. Once it's served,
+                          how long it took stops being something anyone can act
+                          on, and a red badge on a finished order is noise. */}
+                      {!o.served && o.status !== "done" && (
+                        <WaitBadge createdAt={o.createdAt} scheduledFor={o.scheduledFor} nowMs={nowMs} />
+                      )}
                     </span>
                     {o.discountAmount > 0 || o.creditApplied > 0 ? (
                       <span className="text-right">
@@ -925,8 +961,13 @@ export function CashierBoard({
             <ul className="mt-4 space-y-3">
               {incoming.map((o) => (
                 <li key={o.id} className="rounded-lg border border-guava/40 bg-guava/5 p-3">
-                  <div className="flex items-center justify-between">
-                    <span className="font-heading font-bold">{o.label}</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="truncate font-heading font-bold">{o.label}</span>
+                      {/* How long it's been sitting unaccepted — the number the
+                          customer is about to ring up and ask about. */}
+                      <WaitBadge createdAt={o.createdAt} scheduledFor={o.scheduledFor} nowMs={nowMs} />
+                    </span>
                     <span className="font-semibold">{formatPeso(o.total)}</span>
                   </div>
                   {o.scheduledFor && (

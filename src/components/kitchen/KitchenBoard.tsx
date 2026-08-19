@@ -14,28 +14,25 @@ import { useOnline } from "@/lib/offline/useOnline";
 import { kvGet, kvSet, outboxAdd, outboxAll, outboxRemove, type OutboxOp } from "@/lib/offline/idb";
 import { ConnectivityPill } from "@/components/offline/ConnectivityPill";
 import { alertChime, audioBlocked, chime, unlockAudio } from "@/lib/sound";
+import { waitingClock, waitTone, type WaitTone } from "@/lib/orders/waiting";
 import { isForAnotherDay, scheduledLabel } from "@/lib/orders/scheduled";
-
-/** Elapsed time as mm:ss (or h:mm:ss once past an hour). */
-function elapsed(iso: string, nowMs: number): string {
-  const secs = Math.max(0, Math.floor((nowMs - new Date(iso).getTime()) / 1000));
-  const h = Math.floor(secs / 3600);
-  const m = Math.floor((secs % 3600) / 60);
-  const sec = secs % 60;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
-}
 
 /**
  * Urgency from how long the order has been waiting. Green while it's fresh,
  * amber once it's dragging, red when it's genuinely late — readable across the
  * kitchen at a glance.
+ *
+ * The thresholds live in lib/orders/waiting so the till agrees with the
+ * kitchen: a ticket the cook sees as late shouldn't read as fine at the
+ * counter, which is where the customer is standing.
  */
+const URGENCY: Record<WaitTone, { head: string; text: string }> = {
+  late: { head: "bg-red-500", text: "text-white" },
+  warn: { head: "bg-amber-400", text: "text-plum-ink" },
+  fresh: { head: "bg-green-500", text: "text-white" },
+};
 function urgency(iso: string, nowMs: number): { head: string; text: string } {
-  const mins = (nowMs - new Date(iso).getTime()) / 60000;
-  if (mins >= 20) return { head: "bg-red-500", text: "text-white" };
-  if (mins >= 10) return { head: "bg-amber-400", text: "text-plum-ink" };
-  return { head: "bg-green-500", text: "text-white" };
+  return URGENCY[waitTone(iso, nowMs)];
 }
 
 function OrderCard({
@@ -61,7 +58,7 @@ function OrderCard({
       <div className={`${tone.head} ${tone.text} px-3 py-2`}>
         <p className="font-heading text-2xl font-extrabold leading-none">{order.tableNumber}</p>
         <p className="mt-1 text-xs font-semibold tabular-nums opacity-90">
-          {elapsed(order.createdAt, nowMs)}
+          {waitingClock(order.createdAt, nowMs)}
         </p>
       </div>
 
