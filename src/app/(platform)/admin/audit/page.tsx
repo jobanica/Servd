@@ -7,8 +7,19 @@ import { manilaDateTime } from "@/lib/time/manila";
 const ACTION_LABEL: Record<string, string> = {
   "order.void": "Voided order",
   "order.item_void": "Removed item",
-  "table.status": "Table status",
+  "order.void_closed": "Voided a closed ticket",
+  "order.refund": "Refund",
+  "menu.price_changed": "Menu price changed",
+  "menu.item_updated": "Menu item edited",
+  "menu.item_deleted": "Menu item deleted",
+  "menu.item_available": "Item back on the menu",
+  "menu.item_unavailable": "Item taken off the menu",
   "giftcard.redeem": "Gift card redeemed",
+  "delivery.booking_created": "Delivery booked",
+  "delivery.booking_failed": "Delivery booking failed",
+  "delivery.booking_manual": "Delivery booked by hand",
+  "delivery.status_changed": "Delivery status changed",
+  "delivery.booking_cancelled": "Delivery cancelled",
 };
 
 function summary(v: unknown): string {
@@ -37,18 +48,20 @@ export default async function AuditPage({
         <Link href="/admin" className="text-sm text-plum-ink/50">← Dashboard</Link>
         <h1 className="font-heading text-2xl font-bold">Audit log</h1>
         <p className="text-sm text-plum-ink/50">
-          Every sensitive change — voids, item edits, table-status and gift-card redemptions —
-          with who did it, when, and the before/after.
+          Who changed what, when, and what it was before: voids and refunds at the till, menu
+          price and availability changes, gift-card redemptions and delivery bookings.
         </p>
       </div>
 
       <div className="flex flex-wrap gap-2 text-sm">
         {[
           ["All", ""],
-          ["Voids", "order.void"],
-          ["Item edits", "order.item_void"],
-          ["Gift cards", "giftcard.redeem"],
-          ["Tables", "table.status"],
+          // Filters match on a prefix, so "order." catches voids and refunds
+          // and "menu." catches every price, availability and deletion change.
+          ["Orders", "order."],
+          ["Menu", "menu."],
+          ["Gift cards", "giftcard."],
+          ["Delivery", "delivery."],
         ].map(([label, action]) => (
           <Link
             key={label}

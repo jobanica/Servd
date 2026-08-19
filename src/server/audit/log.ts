@@ -3,10 +3,22 @@ import type { Prisma } from "@prisma/client";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 
 /**
- * Append-only audit trail. Every sensitive change (voids, item edits, discount
- * overrides, table-status changes) records who/what/when with before/after
- * snapshots. Reused across features — pass the SAME transaction client so the
- * log commits atomically with the change it describes.
+ * Append-only audit trail: who/what/when with before/after snapshots.
+ *
+ * What is actually recorded, so this comment can be trusted as the list:
+ *   order.void, order.item_void, order.void_closed, order.refund
+ *   menu.price_changed, menu.item_updated, menu.item_deleted,
+ *   menu.item_available, menu.item_unavailable
+ *   giftcard.redeem
+ *   delivery.booking_created / _failed / _manual / _cancelled,
+ *   delivery.status_changed
+ *
+ * Anything not on that list is NOT audited — staff and role changes, settings,
+ * and plan/billing changes among them.
+ *
+ * Reused across features — pass the SAME transaction client so the log commits
+ * atomically with the change it describes. A log that can survive its own
+ * transaction rolling back is worse than no log.
  *
  * Best-effort: if the audit_logs table isn't migrated yet, the write is skipped
  * rather than failing the underlying operation.
@@ -14,8 +26,8 @@ import { tenantDb } from "@/server/tenancy/scoped-db";
 export interface AuditEntry {
   actorStaffId?: string | null;
   actorEmail?: string | null;
-  action: string; // "order.void", "order.item_void", "table.status", …
-  entityType: string; // "order", "table", "order_item", …
+  action: string; // "order.void", "menu.price_changed", …
+  entityType: string; // "order", "order_item", "menu_item", …
   entityId?: string | null;
   reason?: string | null;
   before?: unknown;

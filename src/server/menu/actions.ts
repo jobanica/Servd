@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireAdminAction } from "@/server/tenancy/require-admin";
+import { writeAudit } from "@/server/audit/log";
 import { uploadMenuImage } from "@/server/storage/menu-images";
 import { uploadMenuVideo } from "@/server/storage/menu-videos";
 import { setDailyLimit } from "@/server/menu/servings";
@@ -266,7 +267,7 @@ export async function updateItem(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId, staffUserId, email } = await requireAdminAction();
   const id = String(formData.get("id"));
   const parsed = menuItemSchema.safeParse({
     categoryId: formData.get("categoryId"),
@@ -286,22 +287,50 @@ export async function updateItem(
     return { error: e instanceof Error ? e.message : "Upload failed" };
   }
 
-  await tenantDb(restaurantId, (tx) =>
-    tx.menuItem.update({
+  const price = pesosToCentavos(parsed.data.pricePesos);
+  await tenantDb(restaurantId, async (tx) => {
+    // Read first, in the same transaction, so the audit row records what the
+    // item actually was rather than what the form happened to be showing.
+    const before = await tx.menuItem.findUnique({
+      where: { id },
+      select: { name: true, price: true, isAvailable: true },
+    });
+
+    await tx.menuItem.update({
       where: { id },
       data: {
         categoryId: parsed.data.categoryId,
         name: parsed.data.name,
         description: parsed.data.description || null,
-        price: pesosToCentavos(parsed.data.pricePesos),
+        price,
         isAvailable: parsed.data.isAvailable,
         dietaryTags: sanitizeTags(formData.getAll("dietaryTags").map(String)),
         // Only overwrite the image when a new one was uploaded.
         ...(imageUrl ? { imageUrl } : {}),
         ...videoUpdate,
       },
-    }),
-  );
+    });
+
+    // Only when something worth answering for actually moved. Logging every
+    // save would bury the price changes under description tweaks and photo
+    // uploads, and an audit log nobody can read is one nobody checks.
+    const changed =
+      !before ||
+      before.price !== price ||
+      before.name !== parsed.data.name ||
+      before.isAvailable !== parsed.data.isAvailable;
+    if (changed) {
+      await writeAudit(tx, restaurantId, {
+        actorStaffId: staffUserId,
+        actorEmail: email,
+        action: before && before.price !== price ? "menu.price_changed" : "menu.item_updated",
+        entityType: "menu_item",
+        entityId: id,
+        before: before ?? undefined,
+        after: { name: parsed.data.name, price, isAvailable: parsed.data.isAvailable },
+      });
+    }
+  });
   await savePosOnly(restaurantId, id, formData);
   const costError = await saveFoodCost(restaurantId, id, formData.get("costPesos"));
   const limitError = await saveDailyLimit(restaurantId, id, formData.get("dailyLimit"));
@@ -417,21 +446,49 @@ export async function saveItemVariants(formData: FormData): Promise<void> {
 
 /** Out-of-stock toggle, used straight from the menu list. */
 export async function toggleItemAvailability(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId, staffUserId, email } = await requireAdminAction();
   const id = String(formData.get("id"));
   const available = formData.get("available") === "true";
-  await tenantDb(restaurantId, (tx) =>
-    tx.menuItem.update({ where: { id }, data: { isAvailable: available } }),
-  );
+  await tenantDb(restaurantId, async (tx) => {
+    const item = await tx.menuItem.update({
+      where: { id },
+      data: { isAvailable: available },
+      select: { name: true },
+    });
+    // Marking a seller unavailable takes it off the menu mid-service, so it's
+    // worth a line saying who did it.
+    await writeAudit(tx, restaurantId, {
+      actorStaffId: staffUserId,
+      actorEmail: email,
+      action: available ? "menu.item_available" : "menu.item_unavailable",
+      entityType: "menu_item",
+      entityId: id,
+      after: { name: item.name, isAvailable: available },
+    });
+  });
   await refresh();
 }
 
 export async function deleteItem(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId, staffUserId, email } = await requireAdminAction();
   const id = String(formData.get("id"));
-  await tenantDb(restaurantId, (tx) =>
-    tx.menuItem.delete({ where: { id } }),
-  );
+  await tenantDb(restaurantId, async (tx) => {
+    // Snapshot before it's gone — after the delete there is nothing left to
+    // describe what was removed, which is exactly what you want to know.
+    const before = await tx.menuItem.findUnique({
+      where: { id },
+      select: { name: true, price: true },
+    });
+    await tx.menuItem.delete({ where: { id } });
+    await writeAudit(tx, restaurantId, {
+      actorStaffId: staffUserId,
+      actorEmail: email,
+      action: "menu.item_deleted",
+      entityType: "menu_item",
+      entityId: id,
+      before: before ?? undefined,
+    });
+  });
   await refresh();
 }
 
