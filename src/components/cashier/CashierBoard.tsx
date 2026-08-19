@@ -513,7 +513,7 @@ export function CashierBoard({
         + Customer
       </button>
       <BluetoothPrinterButton />
-      {kitchenBluetooth && <BluetoothPrinterButton station="kitchen" />}
+      {kitchenBluetooth && <BluetoothPrinterButton station="kitchen" explainUnsupported />}
       {/* "No sale" — the drawer without a transaction, for giving change or
           dropping a float in. Every till has one; this one didn't. */}
       <button onClick={popDrawer} className={sidebarBtn}>

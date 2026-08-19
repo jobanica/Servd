@@ -208,9 +208,12 @@ export function PrintSettingsForm({
 
             {kitchenMethod === "bluetooth" && (
               <p className="rounded-lg bg-cream px-3 py-2 text-xs text-plum-ink/70">
-                Pair it once from the cashier screen — there&apos;s a
-                <strong> Connect kitchen printer</strong> button next to the till&apos;s. Pick the
-                KITCHEN printer there, not the same device as the receipt printer.
+                <strong>Save this page first.</strong> A{" "}
+                <strong>Connect kitchen printer</strong> button then appears on the cashier
+                screen, in the left sidebar under the till&apos;s own printer button — on a phone,
+                open the ☰ menu to see it. Pair the KITCHEN printer there, not the same device as
+                the receipt printer. Needs Chrome on Android or a desktop; Web Bluetooth doesn&apos;t
+                exist on iPhone or iPad.
               </p>
             )}
 

@@ -23,7 +23,20 @@ const LABEL: Record<PrinterStation, { idle: string; live: string }> = {
  * Rendered twice where a restaurant runs a docket printer at the pass as well —
  * one button per station, each pairing its own device.
  */
-export function BluetoothPrinterButton({ station = "till" }: { station?: PrinterStation }) {
+export function BluetoothPrinterButton({
+  station = "till",
+  explainUnsupported = false,
+}: {
+  station?: PrinterStation;
+  /**
+   * Say why the button is missing instead of rendering nothing.
+   *
+   * Used for the kitchen printer: the settings page has just told them to come
+   * here and pair it, so silence looks like a bug in the app rather than a
+   * limitation of the browser they're using.
+   */
+  explainUnsupported?: boolean;
+}) {
   const [connected, setConnected] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -52,7 +65,19 @@ export function BluetoothPrinterButton({ station = "till" }: { station?: Printer
     }
   }
 
-  if (!supported) return null; // hidden on iOS/Safari (no Web Bluetooth)
+  if (!supported) {
+    // No Web Bluetooth: iOS/Safari at all, and Chrome on iOS too (it's Safari
+    // underneath). Nothing here can pair a printer on this device.
+    if (!explainUnsupported) return null;
+    return (
+      <p className="rounded-lg bg-cream px-3 py-2 text-xs text-plum-ink/60">
+        This device can&apos;t pair a Bluetooth printer — Web Bluetooth needs Chrome on Android or
+        a desktop, and never works on iPhone or iPad. Use this till on an Android tablet, or set
+        the kitchen printer to <strong>Network</strong> in Printer settings so the server drives
+        it instead.
+      </p>
+    );
+  }
 
   if (connected) {
     return (
