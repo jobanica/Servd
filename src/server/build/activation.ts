@@ -11,6 +11,7 @@ import { readBuildCookie } from "./session";
 import { sendActivationEmail } from "@/server/email/transactional";
 import { suppressOnActivation } from "@/server/email/followup";
 import { ACTIVATION_PRICE } from "./queries";
+import { BRANCH_NOTE } from "@/server/tenancy/branch-activation";
 
 /**
  * Turning a paid DIY preview into a real account.
@@ -158,10 +159,14 @@ async function activateRequest(requestId: string): Promise<boolean> {
   const request = await systemDb((tx) =>
     tx.activationRequest.findUnique({
       where: { id: requestId },
-      select: { id: true, status: true, restaurantId: true },
+      select: { id: true, status: true, restaurantId: true, note: true },
     }),
   );
   if (!request) return false;
+  // A branch activation is settled by server/tenancy/branch-activation, which
+  // grants the same unlock without touching identity. This path would create a
+  // login for an owner who already has one, so it must not claim those.
+  if (request.note === BRANCH_NOTE) return false;
   if (request.status === "activated") return true; // replayed webhook — no-op
 
   const restaurant = await systemDb((tx) =>

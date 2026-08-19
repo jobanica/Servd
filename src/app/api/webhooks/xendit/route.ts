@@ -3,6 +3,7 @@ import { getPlatformBilling } from "@/server/billing/platform-settings";
 import { XenditBillingProvider } from "@/server/billing/xendit";
 import { activateByProviderRef } from "@/server/billing/activate";
 import { markAddonPaidByProviderRef } from "@/server/billing/addons";
+import { activateBranchByProviderRef } from "@/server/tenancy/branch-activation";
 import { activateFeatureSubByProviderRef } from "@/server/billing/feature-subscriptions";
 import {
   activatePreviewByProviderRef,
@@ -30,6 +31,14 @@ export async function POST(req: NextRequest) {
     // An expired/failed DIY activation invoice: the preview survives as a warm
     // lead for manual follow-up, and the funnel numbers stay honest.
     await abandonPreviewByProviderRef(event.providerRef);
+    return new Response("ok", { status: 200 });
+  }
+
+  // A paid BRANCH activation (₱499) — an owner switching on another shop.
+  // Checked before the DIY handler because both read the same table: the DIY
+  // one ends by creating a login and emailing credentials, which for a branch
+  // would mean a second auth user on an email that already exists.
+  if (await activateBranchByProviderRef(event.providerRef)) {
     return new Response("ok", { status: 200 });
   }
 
