@@ -10,6 +10,7 @@ import {
   printerName,
   type PrinterStation,
 } from "@/lib/printing/bt-printer";
+import { bluetoothHelp, isUserCancel } from "@/lib/printing/bluetooth-help";
 
 const LABEL: Record<PrinterStation, { idle: string; live: string }> = {
   till: { idle: "🖨️ Connect printer", live: "🖨️ Printer connected" },
@@ -57,9 +58,14 @@ export function BluetoothPrinterButton({
     try {
       await connectPrinter({ station });
     } catch (e) {
-      // User cancelling the chooser throws — only surface real errors.
+      // The chooser throws when they press Cancel — they know they did that.
+      // Everything else gets translated: the browser's own wording is written
+      // for developers, and "Web Bluetooth API globally disabled" reads like a
+      // broken app when it means the browser refused before we ever asked.
       const msg = e instanceof Error ? e.message : "Couldn't connect.";
-      if (!/cancel|user/i.test(msg)) setErr(msg);
+      if (!isUserCancel(msg)) {
+        setErr(bluetoothHelp(msg, typeof navigator !== "undefined" ? navigator.userAgent : "").message);
+      }
     } finally {
       setBusy(false);
     }
