@@ -155,7 +155,9 @@ export function AdminShell({
   const isActive = (href: string) =>
     href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
 
-  // Show ALL items; "locked" ones (not in the plan) route to the upgrade page.
+  // Show ALL items. A locked one still links to its OWN page, which sells the
+  // unlock in place — sending it to /admin/billing instead was the thing that
+  // dumped an owner into a list of eighteen prices when they wanted one.
   const allowed = features ? new Set(features) : null;
   const isLocked = (href: string) => {
     const f = ITEM_FEATURE[href];
@@ -175,16 +177,16 @@ export function AdminShell({
           <div className="space-y-0.5">
             {section.items.map((item) => {
               const locked = isLocked(item.href);
-              const href = locked
-                ? `/admin/billing?upgrade=${ITEM_FEATURE[item.href]}`
-                : item.href;
-              const active = !locked && isActive(item.href);
+              // Always the real page. The padlock still marks it as paid, so
+              // nobody is surprised by what's on the other side.
+              const href = item.href;
+              const active = isActive(item.href);
               return (
                 <Link
                   key={item.href}
                   href={href}
                   onClick={() => setOpen(false)}
-                  title={locked ? "Upgrade to unlock" : undefined}
+                  title={locked ? "Paid feature — open it to see the price" : undefined}
                   className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
                     active
                       ? "bg-brand-gradient text-white shadow-sm"
@@ -202,7 +204,9 @@ export function AdminShell({
                         <rect x="5" y="11" width="14" height="9" rx="2" />
                         <path d="M8 11V8a4 4 0 1 1 8 0v3" />
                       </svg>
-                      Upgrade
+                      {/* "Upgrade" implied a plan to move up to. These are
+                          one-time unlocks — the padlock alone says paid, and
+                          the price is on the page itself. */}
                     </span>
                   )}
                 </Link>
