@@ -25,7 +25,8 @@ export type FeaturePriceMap = Record<Feature, FeaturePrice>;
  */
 export const DEFAULT_FEATURE_PRICES: FeaturePriceMap = {
   onlineOrdering: { price: 250_000, enabled: true },
-  onlinePayments: { price: 150_000, enabled: true },
+  // Retired with the card gateway — never offered again. See FEATURE_META.
+  onlinePayments: { price: 0, enabled: false },
   loyalty: { price: 120_000, enabled: true },
   promotions: { price: 100_000, enabled: true },
   customers: { price: 70_000, enabled: true },

@@ -46,7 +46,6 @@ export default async function SiteTablePage({
         tagline: restaurant.tagline,
       }}
       categories={categories}
-      payOnline={restaurant.paymentOnlineEnabled}
       googleReviewUrl={restaurant.googleReviewUrl}
       promotions={promotions}
       loyaltyEnabled={loyalty.enabled}

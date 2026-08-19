@@ -69,7 +69,6 @@ export interface WebOrderProps {
   rating?: { count: number; average: number | null } | null;
   categories: DinerCategory[];
   contact?: { address: string | null; phone: string | null };
-  payOnline?: boolean;
   loyalty?: LoyaltyInfo | null;
   hours?: DayHours[];
   zones?: DeliveryZone[];
@@ -349,7 +348,7 @@ function ProductCard({ item, onPick }: { item: DinerItem; onPick: (i: DinerItem)
 }
 
 export function WebOrder(props: WebOrderProps) {
-  const { slug, restaurantName, logoUrl, categories, contact, payOnline, loyalty, hours, zones = [], openNow, pauseWhenClosed, acceptsBookings, bookHref, demo = false, onDemoOrder } = props;
+  const { slug, restaurantName, logoUrl, categories, contact, loyalty, hours, zones = [], openNow, pauseWhenClosed, acceptsBookings, bookHref, demo = false, onDemoOrder } = props;
   const home = props.homeHref ?? `/r/${slug}`;
   const book = bookHref ?? `/r/${slug}/book`;
   const paused = !!pauseWhenClosed && openNow === false;

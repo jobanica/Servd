@@ -46,7 +46,6 @@ export default async function SiteHomePage({
       rating={rating}
       categories={categories}
       contact={{ address: c?.address ?? null, phone: c?.phone ?? null }}
-      payOnline={restaurant.paymentOnlineEnabled}
       loyalty={loyalty}
       hours={sf.hours}
       zones={sf.zones}

@@ -262,9 +262,17 @@ the cash drawer figure, because nobody put that money in a till.
 
 **At the counter:** Cash, Card terminal, GCash, Maya, Bank transfer.
 
-**Online:** GCash and card through a payment gateway. Each restaurant connects
-its **own** gateway account (**PayMongo** or **Xendit**); credentials are
-encrypted at rest and money goes directly to the restaurant.
+**Online:** the customer scans the restaurant's own **GCash**, **Maya** or
+**bank (InstaPay / QRPH)** QR, sends the payment, and attaches the reference
+number and a screenshot. Staff confirm it against the account before the order
+is settled — a screenshot alone never closes a bill.
+
+Money goes straight to the restaurant's own e-wallet or bank account. Servd
+never touches it and adds nothing on top.
+
+The card-gateway option (a connected PayMongo or Xendit account, redirecting
+the diner off-site to pay) was withdrawn: almost nobody used it, and the extra
+hop confused customers who already know how to scan a QR.
 
 **Third-party orders (Grab, Foodpanda).** Nothing is tendered at the counter —
 the rider collects the food and the platform remits later — so a third-party
@@ -519,8 +527,8 @@ cards, online payments, offline mode, custom domain, white-label, audit log,
 data export, customer book. Bought once, owned for good — an unlock can't lapse
 or be cancelled.
 
-**No commission.** Servd takes no cut of sales; payments go directly to the
-restaurant's own PayMongo or Xendit account.
+**No commission.** Servd takes no cut of sales; customers pay straight into the
+restaurant's own GCash, Maya or bank account.
 
 The ₱899 Growth and ₱1,799 Business monthly plans were retired. Any account
 still on one keeps what it has.
@@ -552,8 +560,9 @@ A thermal receipt printer and cash drawer are optional but supported.
 shift, so their takings are counted separately. Any cashier can still settle any
 order — shifts decide whose money it is, never who may serve a table.
 
-**Where does online payment money go?** Directly to the restaurant's own
-PayMongo or Xendit account. Servd never holds it.
+**Where does online payment money go?** Straight into the restaurant's own
+GCash, Maya or bank account — the customer scans the shop's QR. Servd never
+holds it.
 
 **Does it work if the internet drops?** The kitchen and cashier screens keep
 working offline once that unlock is bought, and sync when the connection returns.

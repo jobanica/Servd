@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { getTableBill, requestBill, type TableBill } from "@/server/orders/request-bill";
 import { applyBillPromo, clearBillPromo, listRedeemableCodes, type RedeemableCode } from "@/server/promotions/apply-bill";
-import { createTableCheckout } from "@/server/payments/checkout";
 import { getDineInGcash, type DineInGcash } from "@/server/tables/dine-in-gcash";
 import { prepareReceipt } from "@/lib/images/receipt";
 
@@ -22,16 +21,14 @@ function peso(centavos: number) {
 export function BillSheet({
   slug,
   tableToken,
-  payOnline,
   onClose,
 }: {
   slug: string;
   tableToken: string;
-  payOnline: boolean;
   onClose: () => void;
 }) {
   const [bill, setBill] = useState<TableBill | null | "loading">("loading");
-  const [phase, setPhase] = useState<"choose" | "cash" | "gcash" | "redirecting">("choose");
+  const [phase, setPhase] = useState<"choose" | "cash" | "gcash">("choose");
   const [gcash, setGcash] = useState<DineInGcash | null>(null);
   // Proof of payment the diner sends to the cashier from this screen.
   const [gcashRef, setGcashRef] = useState("");
@@ -48,8 +45,6 @@ export function BillSheet({
   const [splitMode, setSplitMode] = useState<"evenly" | "item">("evenly");
   const [people, setPeople] = useState(2);
   const [picked, setPicked] = useState<Set<number>>(new Set());
-  const [tipPct, setTipPct] = useState(0);
-  const [tipCustom, setTipCustom] = useState("");
   const [codes, setCodes] = useState<RedeemableCode[]>([]);
 
   const loadBill = useCallback(() => {
@@ -143,28 +138,6 @@ export function BillSheet({
     setBusy(false);
     if (res.ok) setSent(true);
     else setError(res.error ?? "Couldn't send that to the cashier.");
-  }
-
-  // Gratuity the diner chose (custom pesos override the percentage chips).
-  function tipCentavos(): number {
-    const billTotal = bill && bill !== "loading" ? bill.total : 0;
-    const custom = Number(tipCustom);
-    if (tipCustom.trim() && Number.isFinite(custom) && custom > 0) return Math.round(custom * 100);
-    return Math.round((billTotal * tipPct) / 100);
-  }
-
-  async function payOnlineNow() {
-    setBusy(true);
-    setError(null);
-    await requestBill({ slug, tableToken, method: "online" });
-    const res = await createTableCheckout({ slug, tableToken, tipCentavos: tipCentavos() });
-    if (res.ok && res.checkoutUrl) {
-      setPhase("redirecting");
-      window.location.href = res.checkoutUrl;
-    } else {
-      setBusy(false);
-      setError(res.error ?? "Couldn't start online payment.");
-    }
   }
 
   return (
@@ -460,58 +433,8 @@ export function BillSheet({
                   </div>
                 )}
 
-                {/* Optional tip — only meaningful when paying online */}
-                {payOnline && (
-                  <div className="mt-4">
-                    <p className="text-sm font-semibold text-brand-ink/70">Add a tip?</p>
-                    <div className="mt-2 flex gap-2">
-                      {[0, 5, 10, 15].map((p) => (
-                        <button
-                          key={p}
-                          onClick={() => {
-                            setTipPct(p);
-                            setTipCustom("");
-                          }}
-                          className={`flex-1 rounded-full py-1.5 text-xs font-semibold ${
-                            tipPct === p && !tipCustom
-                              ? "bg-brand-primary text-white"
-                              : "bg-white text-brand-ink/70 ring-1 ring-brand-ink/10"
-                          }`}
-                        >
-                          {p === 0 ? "No tip" : `${p}%`}
-                        </button>
-                      ))}
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={tipCustom}
-                        onChange={(e) => setTipCustom(e.target.value)}
-                        placeholder="₱"
-                        className="w-16 rounded-full border border-brand-ink/15 px-2 py-1.5 text-center text-xs"
-                      />
-                    </div>
-                    {tipCentavos() > 0 && (
-                      <p className="mt-1 text-right text-xs text-brand-ink/55">
-                        Tip {peso(tipCentavos())} · Pay {peso(bill.total + tipCentavos())}
-                      </p>
-                    )}
-                  </div>
-                )}
-
                 <p className="mt-5 text-center text-sm font-semibold text-brand-ink/70">How would you like to pay?</p>
                 <div className="mt-3 space-y-2">
-                  {payOnline && (
-                    <button
-                      onClick={payOnlineNow}
-                      disabled={busy}
-                      className="w-full rounded-full py-3 font-semibold text-white btn-brand disabled:opacity-60"
-                    >
-                      {phase === "redirecting"
-                        ? "Opening…"
-                        : `💳 Pay online${tipCentavos() > 0 ? ` ${peso(bill.total + tipCentavos())}` : ""} (GCash / Card)`}
-                    </button>
-                  )}
                   {gcash && (
                     <button
                       onClick={payGcashQr}

@@ -42,7 +42,6 @@ export default async function PreviewPage({ params }: { params: Promise<{ slug: 
         coverImageUrl: restaurant.coverImageUrl,
         categories,
         contact: { address: null, phone: null },
-        payOnline: false,
         hours: undefined,
         zones: [],
         openNow: true,

@@ -38,6 +38,13 @@ export interface FeatureMeta {
   label: string;
   group: string;
   /**
+   * No longer sold, and gates nothing. Kept in the list so a restaurant that
+   * already bought it doesn't have the purchase silently disappear, and so
+   * sanitizeFeatures() doesn't strip it out of stored plans. Hidden from the
+   * feature store unless it's owned.
+   */
+  retired?: boolean;
+  /**
    * What this actually does for a restaurant, in one sentence.
    *
    * Shown on the in-place unlock card that replaces a locked screen. It has to
@@ -54,7 +61,18 @@ export const FEATURE_META: FeatureMeta[] = [
   { key: "floorPlan", label: "Visual floor plan & table status", group: "Ordering & service" , blurb: "See the room as a map — which tables are seated, waiting on food, or ready to clear." },
   { key: "reservations", label: "Reservations & waitlist", group: "Ordering & service" , blurb: "Take bookings and run a waitlist, with the table held on your floor plan." },
   { key: "onlineOrdering", label: "Online ordering website + delivery", group: "Ordering & service" , blurb: "Your own ordering website for pickup and delivery — orders drop straight into the POS." },
-  { key: "onlinePayments", label: "Online payments (GCash / card)", group: "Payments" , blurb: "Let customers pay by GCash or card when they order, so the money is in before the food goes out." },
+  // Retired. This was the PayMongo/Xendit connected-account gateway, where the
+  // diner was redirected off-site to pay by card. Nobody used it and customers
+  // found the extra hop confusing, so the shop's own GCash/Maya/bank QR — which
+  // customers already know how to scan — is the only online payment now, and
+  // that ships with online ordering rather than being sold separately.
+  {
+    key: "onlinePayments",
+    label: "Online payments (card gateway)",
+    group: "Payments",
+    retired: true,
+    blurb: "Retired — customers pay by scanning your own GCash, Maya or bank QR instead.",
+  },
   { key: "giftCards", label: "Gift cards & store credit", group: "Payments" , blurb: "Sell gift cards and store credit, and redeem them at the till." },
   { key: "loyalty", label: "Loyalty & rewards", group: "Marketing & growth" , blurb: "Points and rewards that bring regulars back, tracked automatically on every order." },
   { key: "promotions", label: "Promotions, promo codes & happy hours", group: "Marketing & growth" , blurb: "Promo codes, discounts and happy-hour pricing that apply themselves at checkout." },

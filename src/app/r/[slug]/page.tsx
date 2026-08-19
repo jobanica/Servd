@@ -59,7 +59,6 @@ export default async function RestaurantSite({
       rating={rating}
       categories={categories}
       contact={contact}
-      payOnline={restaurant.paymentOnlineEnabled}
       loyalty={loyalty}
       hours={sf.hours}
       zones={sf.zones}

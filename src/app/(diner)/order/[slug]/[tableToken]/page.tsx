@@ -34,13 +34,12 @@ export default async function DinerOrderPage({
   if (!table) notFound();
 
   const locale = await getLocale();
-  const [categories, promotions, loyalty, loyaltyOk, promoOk, payOk, rating] = await Promise.all([
+  const [categories, promotions, loyalty, loyaltyOk, promoOk, rating] = await Promise.all([
     getPublicMenu(restaurant.id, locale),
     getActivePromotions(restaurant.id),
     getLoyaltyConfig(restaurant.id),
     hasFeature(restaurant.id, "loyalty"),
     hasFeature(restaurant.id, "promotions"),
-    hasFeature(restaurant.id, "onlinePayments"),
     getPublicRatingStats(restaurant.id),
   ]);
 
@@ -58,7 +57,6 @@ export default async function DinerOrderPage({
         tagline: restaurant.tagline,
       }}
       categories={categories}
-      payOnline={payOk && restaurant.paymentOnlineEnabled}
       justPaid={paid === "1"}
       googleReviewUrl={restaurant.googleReviewUrl}
       promotions={promoOk ? promotions : []}

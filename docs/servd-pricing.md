@@ -79,7 +79,6 @@ expire or be cancelled, because it was bought rather than rented.
 | Promotions, promo codes & happy hours | **₱1,000** |
 | Loyalty & rewards | **₱1,200** |
 | Reservations & waitlist | **₱1,200** |
-| Online payments (GCash / card) | **₱1,500** |
 | Offline mode | **₱1,500** |
 | Online ordering website + delivery | **₱2,500** |
 | Accounting (sales, VAT, P&L) | **₱2,500** |
@@ -91,6 +90,10 @@ Bought from **Admin → Billing & features**.
 
 **Not sold as one-time unlocks:**
 
+- **Online payments** — retired. It was a card gateway the diner was redirected
+  to; customers pay by scanning the shop's own GCash / Maya / bank QR now, and
+  that comes with online ordering. Restaurants that already bought it keep it,
+  and it is never sold again.
 - **SMS marketing** — every text costs real money, so it runs on credits.
 - **AI menu import** — burns API credits per import.
 - **Content scheduler** — its own monthly subscription (below).
@@ -132,10 +135,13 @@ code it printed; it simply can't add more until it unlocks.
 
 **Servd takes no cut of a restaurant's sales.**
 
-Each restaurant connects its **own** payment gateway account (**PayMongo** or
-**Xendit**). Customer payments go directly to the restaurant. Whatever that
-gateway charges per transaction is between the restaurant and the gateway —
-Servd never holds the money and adds nothing on top.
+Customers pay by scanning the restaurant's own **GCash**, **Maya** or **bank
+(InstaPay / QRPH)** QR code and attaching the reference number; staff confirm it
+before settling. The money lands directly in the restaurant's own account —
+Servd never holds it and adds nothing on top, and there is no gateway fee
+because there is no gateway.
+
+Setting those QRs up is part of online ordering; it is not a separate purchase.
 
 ---
 
@@ -186,8 +192,8 @@ only if you want it.
 includes QR ordering, the POS, the kitchen display, your counter QR and one
 table QR.
 
-**Do you take a percentage of my sales?** No. Payments go straight to your own
-PayMongo or Xendit account.
+**Do you take a percentage of my sales?** No. Customers scan your own GCash,
+Maya or bank QR, so the money goes straight to you.
 
 **Do I need a credit card to try it?** No. Build your full preview and see your
 ordering page working for free. The ₱499 only comes when you're ready to accept

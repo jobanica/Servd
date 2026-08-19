@@ -48,7 +48,12 @@ export default async function BillingPage({
 
   const needsPayment = sub?.status === "past_due";
 
-  const rows: StoreRow[] = FEATURE_META.map((f) => {
+  const rows: StoreRow[] = FEATURE_META
+    // A retired feature is listed only for the shops that already bought it —
+    // there's no sense showing everyone else something they can't buy and
+    // wouldn't want.
+    .filter((f) => !f.retired || owned.has(f.key as Feature))
+    .map((f) => {
     const key = f.key as Feature;
     const priced = prices[key];
     return {

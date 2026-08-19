@@ -162,7 +162,6 @@ export function DinerMenu({
   isCounter = false,
   brand,
   categories,
-  payOnline,
   justPaid,
   googleReviewUrl = null,
   promotions = [],
@@ -176,7 +175,6 @@ export function DinerMenu({
   isCounter?: boolean;
   brand: RestaurantBrand;
   categories: DinerCategory[];
-  payOnline: boolean;
   justPaid?: boolean;
   googleReviewUrl?: string | null;
   promotions?: PromoItem[];
@@ -718,7 +716,6 @@ export function DinerMenu({
         <BillSheet
           slug={slug}
           tableToken={tableToken}
-          payOnline={payOnline}
           onClose={() => setBillOpen(false)}
         />
       )}

@@ -27,7 +27,6 @@ export async function getOnboardingState(
         onboardingCompletedAt: true,
         logoUrl: true,
         brandPrimaryColor: true,
-        paymentOnlineEnabled: true,
         printerConfig: true,
       },
     });
@@ -36,6 +35,25 @@ export async function getOnboardingState(
     // signup, so it can't count as a real branding action.)
     const printerConfigured =
       !!(r.printerConfig as { configured?: boolean } | null)?.configured;
+
+    // Any one of the three manual QR methods being live counts as "set up".
+    // They live in the storefront's paymentConfig JSON. Best-effort: an
+    // onboarding checklist must never be the thing that breaks the dashboard.
+    let payQrReady = false;
+    try {
+      const sf = await tx.storefrontSetting.findFirst({
+        where: { restaurantId },
+        select: { paymentConfig: true },
+      });
+      const pay = (sf?.paymentConfig ?? {}) as {
+        gcashEnabled?: boolean;
+        mayaEnabled?: boolean;
+        bankEnabled?: boolean;
+      };
+      payQrReady = !!(pay.gcashEnabled || pay.mayaEnabled || pay.bankEnabled);
+    } catch {
+      /* not migrated yet — the step just reads as not done */
+    }
     const [itemCount, tableCount] = await Promise.all([
       tx.menuItem.count(),
       tx.table.count(),
@@ -61,10 +79,13 @@ export async function getOnboardingState(
         done: tableCount > 0,
       },
       {
+        // Was "connect a payment gateway", pointing at PayMongo/Xendit setup.
+        // Customers pay by scanning the shop's own GCash/Maya/bank QR now, so
+        // the step is uploading those — set up on the storefront page.
         key: "payments",
-        label: "Connect online payment (optional)",
-        href: "/admin/payments",
-        done: r.paymentOnlineEnabled,
+        label: "Add your GCash / Maya / bank QR (optional)",
+        href: "/admin/storefront",
+        done: payQrReady,
       },
       {
         key: "printer",

@@ -53,7 +53,6 @@ const ITEM_FEATURE: Record<string, string> = {
   "/admin/inventory": "inventory",
   "/admin/hr": "hr",
   "/admin/storefront": "onlineOrdering",
-  "/admin/payments": "onlinePayments",
   // NOT gated here on purpose: Free/trial accounts must be able to open the
   // page to buy the one-time custom-domain unlock. The page itself locks it.
   "/admin/floor": "floorPlan",
@@ -119,7 +118,6 @@ const NAV: { group: string; items: Item[] }[] = [
       { label: "Cashier", href: "/admin/cashier", d: I.cash },
       { label: "Online website", href: "/admin/storefront", d: I.globe },
       { label: "Branding", href: "/admin/branding", d: I.brush },
-      { label: "Online payment", href: "/admin/payments", d: I.card },
       { label: "Delivery partners", href: "/admin/delivery", d: I.box },
       { label: "Printing", href: "/admin/printing", d: I.print },
       { label: "Custom domain", href: "/admin/domains", d: I.globe },
