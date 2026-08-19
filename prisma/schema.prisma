@@ -1242,6 +1242,18 @@ model ModifierGroup {
   required     Boolean  @default(false)
   minSelect    Int      @default(0)
   maxSelect    Int      @default(1) // 1 => single-select, >1 => multi-select
+  /// The order these appear in, everywhere, for every item that uses them.
+  ///
+  /// Set once on the Modifiers page. Without it the order came off the
+  /// item↔group link, whose sortOrder was never written — so every row tied at
+  /// 0 and Postgres returned them in whatever order it liked, which is why one
+  /// item asked Size → Flavour → Add-ons and the next asked Flavour → Add-ons
+  /// → Size.
+  ///
+  /// Nullable with NO default: a static default would be sent by Prisma on
+  /// every insert and break creates on a database that lacks the column. Null
+  /// sorts last, behind everything explicitly ordered.
+  sortOrder    Int?
   createdAt    DateTime @default(now())
 
   restaurant Restaurant              @relation(fields: [restaurantId], references: [id], onDelete: Cascade)

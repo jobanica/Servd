@@ -6,6 +6,8 @@ import { getServingStates } from "@/server/menu/servings";
 import { getDishStock } from "@/server/inventory/dish-stock";
 import { getVariantsMap } from "@/server/menu/variants";
 import { getUnavailableModifierIds } from "@/server/menu/modifier-availability";
+import { getModifierGroupOrder } from "@/server/menu/modifier-order";
+import { sortModifierGroups } from "@/lib/menu/modifier-order";
 import { getPosOnlyItemIds } from "@/server/menu/pos-only";
 import { variantPrice } from "@/lib/menu/variant-price";
 
@@ -39,14 +41,19 @@ export async function getPublicMenu(
           include: {
             translations: { where: { locale } },
             modifierGroups: {
-              orderBy: { sortOrder: "asc" },
               include: {
                 group: {
-                  // Explicit columns: `isAvailable` on a modifier arrives in a
-                  // manual migration, and a wide include would break the whole
-                  // menu on a database that hasn't run it yet. It's layered on
-                  // below from a best-effort query instead.
-                  include: {
+                  // Explicit columns throughout: `isAvailable` on a modifier and
+                  // `sortOrder` on a group each arrive in a manual migration, and
+                  // a wide include would break the whole menu on a database that
+                  // hasn't run them. Both are layered on below from best-effort
+                  // queries instead.
+                  select: {
+                    id: true,
+                    name: true,
+                    required: true,
+                    minSelect: true,
+                    maxSelect: true,
                     modifiers: {
                       orderBy: { sortOrder: "asc" },
                       select: { id: true, name: true, priceDelta: true },
@@ -72,6 +79,8 @@ export async function getPublicMenu(
   // Add-ons the kitchen marked out — shown disabled rather than hidden, so the
   // diner can see the option exists and is just unavailable right now.
   const modsOut = await getUnavailableModifierIds(restaurantId);
+  // The one order for option groups, set on the Modifiers page.
+  const groupOrder = await getModifierGroupOrder(restaurantId);
   // Counted stock — a recipe's ingredients or a product's own units. Shown sold
   // out as soon as the last portion is spoken for, not when it's finally
   // cooked: otherwise the shelf reads as full to everyone who loads the page
@@ -128,13 +137,20 @@ export async function getPublicMenu(
       videoPosterUrl: item.videoPosterUrl,
       isAvailable: item.isAvailable && !cappedOut && !allSizesOut && !stockOut,
       dietaryTags: item.dietaryTags ?? [],
-      groups: item.modifierGroups.map((link) => ({
-        id: link.group.id,
-        name: link.group.name,
-        required: link.group.required,
-        minSelect: link.group.minSelect,
-        maxSelect: link.group.maxSelect,
-        modifiers: link.group.modifiers.map((m) => ({
+      // Sorted by the order set on the Modifiers page, so every item asks the
+      // same questions in the same sequence.
+      groups: sortModifierGroups(
+        item.modifierGroups.map((link) => ({
+          ...link.group,
+          sortOrder: groupOrder.get(link.group.id) ?? null,
+        })),
+      ).map((group) => ({
+        id: group.id,
+        name: group.name,
+        required: group.required,
+        minSelect: group.minSelect,
+        maxSelect: group.maxSelect,
+        modifiers: group.modifiers.map((m) => ({
           id: m.id,
           name: m.name,
           priceDelta: m.priceDelta,

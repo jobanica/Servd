@@ -509,6 +509,31 @@ export async function reorderCategories(orderedIds: string[]): Promise<void> {
   await refresh();
 }
 
+/**
+ * Persist a new modifier-group order (sortOrder = position).
+ *
+ * This IS the order every menu item asks its questions in — it isn't set per
+ * item. Arranging it once here is the whole point: before, the order came off
+ * the item↔group link, which nothing wrote, so each item ended up with
+ * whatever sequence the database felt like returning.
+ */
+export async function reorderModifierGroups(orderedIds: string[]): Promise<void> {
+  const { restaurantId } = await requireAdminAction();
+  const ids = orderIds.parse(orderedIds);
+  try {
+    await tenantDb(restaurantId, (tx) =>
+      Promise.all(
+        ids.map((id, i) =>
+          tx.modifierGroup.updateMany({ where: { id, restaurantId }, data: { sortOrder: i } }),
+        ),
+      ),
+    );
+  } catch {
+    /* sortOrder not migrated yet — see prisma/manual/add-modifier-group-order.sql */
+  }
+  await refresh();
+}
+
 /** Persist a new item order within one category (sortOrder = position). */
 export async function reorderItems(categoryId: string, orderedIds: string[]): Promise<void> {
   const { restaurantId } = await requireAdminAction();

@@ -6,6 +6,8 @@ import { AddModifierGroupForm } from "@/components/admin/AddModifierGroupForm";
 import { AddModifierForm } from "@/components/admin/AddModifierForm";
 import { ModifierRow } from "@/components/admin/ModifierRow";
 import { ModifierGroupHeader } from "@/components/admin/ModifierGroupHeader";
+import { SortableList } from "@/components/admin/SortableList";
+import { reorderModifierGroups } from "@/server/menu/actions";
 
 export default async function ModifiersPage() {
   const { restaurantId } = await requireAdminPage();
@@ -32,9 +34,18 @@ export default async function ModifiersPage() {
         <p className="text-sm text-plum-ink/50">No modifier groups yet.</p>
       )}
 
-      {groups.map((group) => (
+      {groups.length > 1 && (
+        <p className="text-sm text-plum-ink/55">
+          Drag ⠿ (or use ▲▼) to set the order. This is the order every menu item asks in — Size
+          before Flavour before Add-ons, on every dish that uses them.
+        </p>
+      )}
+
+      <SortableList
+        entries={groups.map((group) => ({
+          id: group.id,
+          node: (
         <section
-          key={group.id}
           className="rounded-tile border border-plum-ink/10 bg-white p-4"
         >
           <ModifierGroupHeader
@@ -57,7 +68,11 @@ export default async function ModifiersPage() {
             <AddModifierForm groupId={group.id} />
           </div>
         </section>
-      ))}
+          ),
+        }))}
+        onReorder={reorderModifierGroups}
+        className="space-y-6"
+      />
     </div>
   );
 }

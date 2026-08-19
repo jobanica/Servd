@@ -7,6 +7,8 @@ import { getActiveHappyHoursTenant } from "@/server/pricing/happy-hour";
 import { getServingStates } from "@/server/menu/servings";
 import { getVariantsMap } from "@/server/menu/variants";
 import { getUnavailableModifierIds } from "@/server/menu/modifier-availability";
+import { getModifierGroupOrder } from "@/server/menu/modifier-order";
+import { sortModifierGroups } from "@/lib/menu/modifier-order";
 import { getDishStock } from "@/server/inventory/dish-stock";
 import { getPosOnlyItemIds } from "@/server/menu/pos-only";
 import { variantPrice } from "@/lib/menu/variant-price";
@@ -72,13 +74,20 @@ export async function buildValidatedOrder(
       where: { id: { in: itemIds } },
       include: {
         modifierGroups: {
-          orderBy: { sortOrder: "asc" },
-          // Explicit modifier columns — `isAvailable` lands in a manual
-          // migration and is layered on separately (see modsOut below), so an
-          // un-migrated database can still take orders.
+          // Explicit columns throughout — `isAvailable` on a modifier and
+          // `sortOrder` on a group each land in a manual migration and are
+          // layered on separately, so an un-migrated database can still take
+          // orders. A till that can't ring up a sale is the worst failure here.
           include: {
             group: {
-              include: { modifiers: { select: { id: true, name: true, priceDelta: true } } },
+              select: {
+                id: true,
+                name: true,
+                required: true,
+                minSelect: true,
+                maxSelect: true,
+                modifiers: { select: { id: true, name: true, priceDelta: true } },
+              },
             },
           },
         },
@@ -86,6 +95,7 @@ export async function buildValidatedOrder(
     }),
   );
   const itemMap = new Map(dbItems.map((i) => [i.id, i]));
+  const groupOrder = await getModifierGroupOrder(restaurantId);
 
   // Active happy-hour rules → the authoritative base price per item (the client
   // is never trusted for the discounted price).
@@ -206,13 +216,20 @@ export async function buildValidatedOrder(
       videoPosterUrl: dbItem.videoPosterUrl,
       isAvailable: dbItem.isAvailable,
       dietaryTags: dbItem.dietaryTags ?? [],
-      groups: dbItem.modifierGroups.map((l) => ({
-        id: l.group.id,
-        name: l.group.name,
-        required: l.group.required,
-        minSelect: l.group.minSelect,
-        maxSelect: l.group.maxSelect,
-        modifiers: l.group.modifiers.map((m) => ({
+      // Same order as the diner menu and the Modifiers page — the cashier
+      // shouldn't be reading a different sequence to the customer.
+      groups: sortModifierGroups(
+        dbItem.modifierGroups.map((l) => ({
+          ...l.group,
+          sortOrder: groupOrder.get(l.group.id) ?? null,
+        })),
+      ).map((group) => ({
+        id: group.id,
+        name: group.name,
+        required: group.required,
+        minSelect: group.minSelect,
+        maxSelect: group.maxSelect,
+        modifiers: group.modifiers.map((m) => ({
           id: m.id,
           name: m.name,
           priceDelta: m.priceDelta,
