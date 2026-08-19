@@ -3,6 +3,7 @@ import { tenantDb } from "@/server/tenancy/scoped-db";
 import { getEntitledFeatures } from "@/server/billing/feature-gate";
 import { hasTutorials } from "@/server/tutorials/tutorials";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { listBranches } from "@/server/tenancy/branches";
 
 /**
  * Dashboard chrome for the restaurant back-office. Wraps every /admin page in
@@ -36,6 +37,9 @@ export default async function AdminLayout({
     getEntitledFeatures(user.restaurantId),
     hasTutorials(),
   ]);
+  // Only an owner with more than one shop sees a switcher; for everyone else
+  // this is one cheap query that resolves to a single row.
+  const branches = await listBranches(user.authUserId, user.restaurantId);
 
   return (
     <AdminShell
@@ -53,6 +57,7 @@ export default async function AdminLayout({
       fullWhiteLabel={features.has("whiteLabel")}
       features={[...features]}
       showTutorials={tutorialsReady}
+      branches={branches}
     >
       {children}
     </AdminShell>

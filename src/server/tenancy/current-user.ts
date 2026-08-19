@@ -1,5 +1,7 @@
+import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { systemDb } from "@/server/tenancy/scoped-db";
+import { pickBranch, BRANCH_COOKIE } from "@/lib/tenancy/active-branch";
 import type { StaffRole } from "@prisma/client";
 
 /**
@@ -21,6 +23,12 @@ export type CurrentUser =
       restaurantId: string;
       role: StaffRole;
       email: string;
+      /**
+       * How many restaurants this login is staff at. One for almost everyone;
+       * more for an owner running branches, which is the only case where the
+       * dashboard shows a branch switcher.
+       */
+      branchCount: number;
     }
   | { kind: "super"; authUserId: string; email: string }
   | null;
@@ -43,10 +51,25 @@ export async function getCurrentUser(): Promise<CurrentUser> {
       return { kind: "super", authUserId: user.id, email: admin.email };
     }
 
-    const staff = await tx.staffUser.findUnique({
+    // findMany, not findUnique: one login can be staff at several restaurants
+    // (an owner with branches). Which one they're looking at comes from the
+    // branch cookie, checked against these rows — the cookie is a request from
+    // the browser, so membership is verified here rather than trusted.
+    const memberships = await tx.staffUser.findMany({
       where: { authUserId: user.id },
+      select: { id: true, restaurantId: true, role: true, email: true, createdAt: true },
     });
-    if (staff) {
+
+    if (memberships.length > 0) {
+      const requested = (await cookies()).get(BRANCH_COOKIE)?.value ?? null;
+      const activeId = pickBranch(
+        memberships.map((m) => ({
+          restaurantId: m.restaurantId,
+          createdAt: m.createdAt.toISOString(),
+        })),
+        requested,
+      );
+      const staff = memberships.find((m) => m.restaurantId === activeId) ?? memberships[0];
       return {
         kind: "staff",
         authUserId: user.id,
@@ -54,6 +77,7 @@ export async function getCurrentUser(): Promise<CurrentUser> {
         restaurantId: staff.restaurantId,
         role: staff.role,
         email: staff.email,
+        branchCount: memberships.length,
       };
     }
 

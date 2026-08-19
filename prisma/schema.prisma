@@ -726,7 +726,10 @@ model StaffUser {
   restaurantId String
   // Authentication is handled by Supabase Auth (passwords live in auth.users,
   // hashed + salted by Supabase). We DON'T roll our own password storage.
-  authUserId   String    @unique
+  // NOT globally unique: one login can be staff at several restaurants, which
+  // is how an owner runs multiple branches from a single account. Unique per
+  // restaurant instead, so they still can't hold two roles in the same shop.
+  authUserId   String
   role         StaffRole
   email        String
   username     String?   @unique // optional login handle (super-admin can create by username)
@@ -736,7 +739,10 @@ model StaffUser {
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   @@unique([restaurantId, email])
+  @@unique([restaurantId, authUserId])
   @@index([restaurantId])
+  // Every request resolves the session by authUserId, so this one is hot.
+  @@index([authUserId])
   @@map("staff_users")
 }
 

@@ -7,6 +7,8 @@ import { Wordmark } from "@/components/Wordmark";
 import { brandStyle, type BrandInput } from "@/lib/theme/brand";
 import { signOut } from "@/app/(platform)/login/actions";
 import { PlatformFeedbackButton } from "./PlatformFeedbackButton";
+import { BranchSwitcher } from "./BranchSwitcher";
+import type { BranchRow } from "@/server/tenancy/branches";
 
 function Icon({ d }: { d: string }) {
   return (
@@ -114,6 +116,7 @@ const NAV: { group: string; items: Item[] }[] = [
     group: "Settings",
     items: [
       { label: "Account", href: "/admin/account", d: I.users },
+      { label: "Branches", href: "/admin/branches", d: I.home },
       { label: "Staff & access", href: "/admin/staff", d: I.users },
       { label: "Cashier", href: "/admin/cashier", d: I.cash },
       { label: "Online website", href: "/admin/storefront", d: I.globe },
@@ -134,6 +137,7 @@ export function AdminShell({
   fullWhiteLabel = false,
   features,
   showTutorials = false,
+  branches = [],
   children,
 }: {
   brand: { name: string; slug: string; status: string; logoUrl?: string | null };
@@ -142,6 +146,8 @@ export function AdminShell({
   features?: string[];
   /** False when the hub has no videos yet — see the sidebar link below. */
   showTutorials?: boolean;
+  /** Every shop this login can work in. The switcher hides below two. */
+  branches?: BranchRow[];
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -158,6 +164,7 @@ export function AdminShell({
 
   const nav = (
     <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
+      <BranchSwitcher branches={branches} />
       {NAV.map((section, i) => (
         <div key={i}>
           {section.group && (
