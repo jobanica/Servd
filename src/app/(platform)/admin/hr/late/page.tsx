@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireHrPage } from "@/server/hr/guard";
+import { featureLockOr } from "@/server/billing/feature-lock-gate";
 import { getLateReport } from "@/server/hr/attendance";
 import { manilaTime } from "@/lib/time/manila";
 import { manilaDate } from "@/lib/time/manila";
@@ -12,13 +13,8 @@ export default async function LateReportPage({
   searchParams: Promise<{ from?: string; to?: string; grace?: string }>;
 }) {
   const { restaurantId, eligible } = await requireHrPage();
-  if (!eligible) {
-    return (
-      <div className="rounded-tile border border-plum-ink/10 bg-white p-5">
-        <p className="text-sm text-plum-ink/70">HR is a one-time unlock.</p>
-      </div>
-    );
-  }
+  const locked = await featureLockOr(restaurantId, "hr", "Late & absent");
+  if (locked) return locked;
 
   const sp = await searchParams;
   const today = new Date();

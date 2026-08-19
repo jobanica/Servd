@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
-import { requireFeaturePage } from "@/server/billing/feature-gate";
+import { featureLockOr } from "@/server/billing/feature-lock-gate";
 import { getFloorPlan } from "@/server/tables/floor";
 import { FloorPlan } from "@/components/admin/FloorPlan";
 
@@ -10,7 +10,8 @@ import { FloorPlan } from "@/components/admin/FloorPlan";
  */
 export default async function FloorPage() {
   const { restaurantId } = await requireAdminPage();
-  await requireFeaturePage(restaurantId, "floorPlan");
+  const locked = await featureLockOr(restaurantId, "floorPlan", "Floor plan");
+  if (locked) return locked;
   const tables = await getFloorPlan(restaurantId);
 
   return (

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
-import { requireFeaturePage } from "@/server/billing/feature-gate";
+import { featureLockOr } from "@/server/billing/feature-lock-gate";
 import { getCustomers } from "@/server/customers/customers";
 import { formatPeso } from "@/lib/money";
 import { AddCustomerForm } from "@/components/customers/AddCustomerForm";
@@ -8,7 +8,8 @@ import { manilaDate } from "@/lib/time/manila";
 
 export default async function CustomersPage() {
   const { restaurantId } = await requireAdminPage();
-  await requireFeaturePage(restaurantId, "customers");
+  const locked = await featureLockOr(restaurantId, "customers", "Customers");
+  if (locked) return locked;
   const customers = await getCustomers(restaurantId);
 
   return (

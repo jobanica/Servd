@@ -1,6 +1,5 @@
 import "server-only";
 
-import { redirect } from "next/navigation";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import type { Tier } from "@/lib/billing/catalog";
 import {
@@ -120,12 +119,11 @@ export async function getEntitledFeatures(restaurantId: string): Promise<Set<Fea
   return all;
 }
 
-/** Page guard: redirect to the billing page (to upgrade) if the plan lacks it. */
-export async function requireFeaturePage(restaurantId: string, feature: Feature): Promise<void> {
-  if (!(await hasFeature(restaurantId, feature))) {
-    redirect(`/admin/billing?upgrade=${feature}`);
-  }
-}
+// requireFeaturePage() used to live here and redirect a locked page to
+// /admin/billing?upgrade=<feature>. It's gone: landing on a list of eighteen
+// priced features reads as a bill rather than an offer, and the one thing the
+// owner actually wanted was buried in it. Locked pages now render their own
+// unlock in place — see server/billing/feature-lock-gate.
 
 export interface TrialInfo {
   onTrial: boolean;

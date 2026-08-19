@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
-import { requireFeaturePage } from "@/server/billing/feature-gate";
+import { featureLockOr } from "@/server/billing/feature-lock-gate";
 import { getSalesReport, getVatReport, getCogs, getExpenses, getSalesTickets } from "@/server/accounting/queries";
 import { formatPeso } from "@/lib/money";
 import { parseReportRange } from "@/lib/time/report-range";
@@ -22,7 +22,8 @@ export default async function AccountingPage({
   searchParams: Promise<{ range?: string; from?: string; to?: string }>;
 }) {
   const { restaurantId } = await requireAdminPage();
-  await requireFeaturePage(restaurantId, "accounting");
+  const locked = await featureLockOr(restaurantId, "accounting", "Accounting");
+  if (locked) return locked;
   const sp = await searchParams;
   const reportRange = parseReportRange(sp);
   const { from, to } = reportRange;

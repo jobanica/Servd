@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
-import { requireFeaturePage } from "@/server/billing/feature-gate";
+import { featureLockOr } from "@/server/billing/feature-lock-gate";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { PaymentSettingsForm } from "@/components/admin/PaymentSettingsForm";
 
 export default async function PaymentsSettingsPage() {
   const { restaurantId } = await requireAdminPage();
-  await requireFeaturePage(restaurantId, "onlinePayments");
+  const locked = await featureLockOr(restaurantId, "onlinePayments", "Online payments");
+  if (locked) return locked;
 
   const restaurant = await tenantDb(restaurantId, (tx) =>
     tx.restaurant.findFirstOrThrow({

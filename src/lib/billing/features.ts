@@ -37,30 +37,39 @@ export interface FeatureMeta {
   key: Feature;
   label: string;
   group: string;
+  /**
+   * What this actually does for a restaurant, in one sentence.
+   *
+   * Shown on the in-place unlock card that replaces a locked screen. It has to
+   * read as "here is what you get", not "here is what you're missing" — the
+   * owner is standing on the page they just tried to open, so the job is to
+   * tell them what it does, not to sell them the whole catalogue.
+   */
+  blurb: string;
 }
 
 /** Display metadata, grouped — drives the super-admin per-plan checkboxes. */
 export const FEATURE_META: FeatureMeta[] = [
-  { key: "unlimitedTables", label: "Unlimited tables & QR codes", group: "Ordering & service" },
-  { key: "floorPlan", label: "Visual floor plan & table status", group: "Ordering & service" },
-  { key: "reservations", label: "Reservations & waitlist", group: "Ordering & service" },
-  { key: "onlineOrdering", label: "Online ordering website + delivery", group: "Ordering & service" },
-  { key: "onlinePayments", label: "Online payments (GCash / card)", group: "Payments" },
-  { key: "giftCards", label: "Gift cards & store credit", group: "Payments" },
-  { key: "loyalty", label: "Loyalty & rewards", group: "Marketing & growth" },
-  { key: "promotions", label: "Promotions, promo codes & happy hours", group: "Marketing & growth" },
-  { key: "customers", label: "Customer book + CSV export", group: "Marketing & growth" },
-  { key: "sms", label: "SMS marketing", group: "Marketing & growth" },
-  { key: "contentScheduler", label: "Social content scheduler", group: "Marketing & growth" },
-  { key: "aiMenuImport", label: "AI menu import", group: "Marketing & growth" },
-  { key: "dataExport", label: "Data export (sales, orders, menu)", group: "Operations & back office" },
-  { key: "auditLog", label: "Audit log (who changed what)", group: "Operations & back office" },
-  { key: "offline", label: "Offline mode (keep taking orders)", group: "Operations & back office" },
-  { key: "accounting", label: "Accounting (sales, VAT, P&L)", group: "Operations & back office" },
-  { key: "inventory", label: "Inventory, COGS, low-stock & reorder", group: "Operations & back office" },
-  { key: "hr", label: "HR, attendance & payroll", group: "Operations & back office" },
-  { key: "customDomain", label: "Custom domain", group: "Branding" },
-  { key: "whiteLabel", label: "Full white-label (remove “Powered by Servd”)", group: "Branding" },
+  { key: "unlimitedTables", label: "Unlimited tables & QR codes", group: "Ordering & service" , blurb: "Print a QR for every table instead of just one, so diners order from where they're sitting." },
+  { key: "floorPlan", label: "Visual floor plan & table status", group: "Ordering & service" , blurb: "See the room as a map — which tables are seated, waiting on food, or ready to clear." },
+  { key: "reservations", label: "Reservations & waitlist", group: "Ordering & service" , blurb: "Take bookings and run a waitlist, with the table held on your floor plan." },
+  { key: "onlineOrdering", label: "Online ordering website + delivery", group: "Ordering & service" , blurb: "Your own ordering website for pickup and delivery — orders drop straight into the POS." },
+  { key: "onlinePayments", label: "Online payments (GCash / card)", group: "Payments" , blurb: "Let customers pay by GCash or card when they order, so the money is in before the food goes out." },
+  { key: "giftCards", label: "Gift cards & store credit", group: "Payments" , blurb: "Sell gift cards and store credit, and redeem them at the till." },
+  { key: "loyalty", label: "Loyalty & rewards", group: "Marketing & growth" , blurb: "Points and rewards that bring regulars back, tracked automatically on every order." },
+  { key: "promotions", label: "Promotions, promo codes & happy hours", group: "Marketing & growth" , blurb: "Promo codes, discounts and happy-hour pricing that apply themselves at checkout." },
+  { key: "customers", label: "Customer book + CSV export", group: "Marketing & growth" , blurb: "Every customer who has ordered, with their history and address — exportable to CSV." },
+  { key: "sms", label: "SMS marketing", group: "Marketing & growth" , blurb: "Text your customers about promos and updates." },
+  { key: "contentScheduler", label: "Social content scheduler", group: "Marketing & growth" , blurb: "Write and schedule your social posts ahead of time." },
+  { key: "aiMenuImport", label: "AI menu import", group: "Marketing & growth" , blurb: "Photograph a printed menu and have it typed up for you." },
+  { key: "dataExport", label: "Data export (sales, orders, menu)", group: "Operations & back office" , blurb: "Download your sales, orders and menu as spreadsheets." },
+  { key: "auditLog", label: "Audit log (who changed what)", group: "Operations & back office" , blurb: "A record of who changed what — voids, discounts, price edits, refunds." },
+  { key: "offline", label: "Offline mode (keep taking orders)", group: "Operations & back office" , blurb: "Keep taking orders when the internet drops; everything syncs once it's back." },
+  { key: "accounting", label: "Accounting (sales, VAT, P&L)", group: "Operations & back office" , blurb: "Sales, VAT and profit worked out for you, with expenses and cost of goods." },
+  { key: "inventory", label: "Inventory, COGS, low-stock & reorder", group: "Operations & back office" , blurb: "Count stock, cost your recipes, and get told before you run out." },
+  { key: "hr", label: "HR, attendance & payroll", group: "Operations & back office" , blurb: "Attendance, shifts and payroll for your staff." },
+  { key: "customDomain", label: "Custom domain", group: "Branding" , blurb: "Run your ordering site on your own web address instead of a Servd link." },
+  { key: "whiteLabel", label: "Full white-label (remove “Powered by Servd”)", group: "Branding" , blurb: "Remove \u201cPowered by Servd\u201d so the site is entirely yours." },
 ];
 
 export const ALL_FEATURES: Feature[] = FEATURE_META.map((f) => f.key);

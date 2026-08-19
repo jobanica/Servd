@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireHrPage } from "@/server/hr/guard";
+import { featureLockOr } from "@/server/billing/feature-lock-gate";
 import { getAttendanceToday } from "@/server/hr/attendance";
 import { manilaTime, manilaDate } from "@/lib/time/manila";
 
@@ -7,13 +8,8 @@ const time = manilaTime;
 
 export default async function AttendanceDashboard() {
   const { restaurantId, eligible } = await requireHrPage();
-  if (!eligible) {
-    return (
-      <div className="rounded-tile border border-plum-ink/10 bg-white p-5">
-        <p className="text-sm text-plum-ink/70">HR is a one-time unlock.</p>
-      </div>
-    );
-  }
+  const locked = await featureLockOr(restaurantId, "hr", "Attendance");
+  if (locked) return locked;
   const a = await getAttendanceToday(restaurantId);
 
   return (

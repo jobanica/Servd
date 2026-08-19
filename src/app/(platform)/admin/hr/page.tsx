@@ -1,27 +1,16 @@
 import Link from "next/link";
 import { requireHrPage } from "@/server/hr/guard";
+import { featureLockOr } from "@/server/billing/feature-lock-gate";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { listEmployees } from "@/server/hr/queries";
 import { qrSvg } from "@/lib/qr";
 import { formatPeso } from "@/lib/money";
 import { AddEmployeeForm } from "@/components/admin/hr/AddEmployeeForm";
 
-function UpgradePrompt() {
-  return (
-    <div className="rounded-tile border border-plum-ink/10 bg-white p-5">
-      <h1 className="font-heading text-2xl font-bold">HR</h1>
-      <p className="mt-2 text-sm text-plum-ink/70">
-        HR is a one-time unlock.{" "}
-        <Link href="/admin/billing" className="font-semibold text-brand-primary">Unlock it once</Link>{" "}
-        to manage employees, schedules, attendance, leave, and payroll prep.
-      </p>
-    </div>
-  );
-}
-
 export default async function HrPage() {
   const { restaurantId, eligible } = await requireHrPage();
-  if (!eligible) return <UpgradePrompt />;
+  const locked = await featureLockOr(restaurantId, "hr", "HR");
+  if (locked) return locked;
   const employees = await listEmployees(restaurantId);
 
   const restaurant = await tenantDb(restaurantId, (tx) =>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
-import { requireFeaturePage } from "@/server/billing/feature-gate";
+import { featureLockOr } from "@/server/billing/feature-lock-gate";
 import { listHappyHours, toggleHappyHour, deleteHappyHour } from "@/server/pricing/happy-hour";
 import { getMenu } from "@/server/menu/queries";
 import { HappyHourForm } from "@/components/admin/HappyHourForm";
@@ -14,7 +14,8 @@ import { formatPeso } from "@/lib/money";
  */
 export default async function HappyHoursPage() {
   const { restaurantId } = await requireAdminPage();
-  await requireFeaturePage(restaurantId, "promotions");
+  const locked = await featureLockOr(restaurantId, "promotions", "Happy hours");
+  if (locked) return locked;
 
   const [rules, menu] = await Promise.all([listHappyHours(restaurantId), getMenu(restaurantId)]);
   const categories = menu.map((c) => ({ id: c.id, name: c.name }));

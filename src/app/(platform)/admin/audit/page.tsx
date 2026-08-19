@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
-import { requireFeaturePage } from "@/server/billing/feature-gate";
+import { featureLockOr } from "@/server/billing/feature-lock-gate";
 import { getAuditLogs } from "@/server/audit/log";
 import { manilaDateTime } from "@/lib/time/manila";
 
@@ -26,7 +26,8 @@ export default async function AuditPage({
   searchParams: Promise<{ action?: string }>;
 }) {
   const { restaurantId } = await requireAdminPage();
-  await requireFeaturePage(restaurantId, "auditLog");
+  const locked = await featureLockOr(restaurantId, "auditLog", "Audit log");
+  if (locked) return locked;
   const sp = await searchParams;
   const rows = await getAuditLogs(restaurantId, { action: sp.action || undefined });
 

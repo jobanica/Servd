@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
 import { tenantDb } from "@/server/tenancy/scoped-db";
-import { hasModule } from "@/server/billing/entitlements";
+import { featureLockOr } from "@/server/billing/feature-lock-gate";
 import {
   isProductStockReady,
   listIngredients,
@@ -19,18 +19,8 @@ import { deleteSupplier, setAutoOutOfStock, setLowStockAlertPhone } from "@/serv
 
 export default async function InventoryPage() {
   const { restaurantId } = await requireAdminPage();
-  if (!(await hasModule(restaurantId, "inventory"))) {
-    return (
-      <div className="rounded-tile border border-plum-ink/10 bg-white p-5">
-        <h1 className="font-heading text-2xl font-bold">Inventory</h1>
-        <p className="mt-2 text-sm text-plum-ink/70">
-          Inventory is a one-time unlock.{" "}
-          <Link href="/admin/billing" className="font-semibold text-brand-primary">Unlock it once</Link>{" "}
-          to count stock per product, track ingredients, and see your cost of goods.
-        </p>
-      </div>
-    );
-  }
+  const locked = await featureLockOr(restaurantId, "inventory", "Inventory");
+  if (locked) return locked;
 
   const from = new Date();
   from.setDate(from.getDate() - 30);

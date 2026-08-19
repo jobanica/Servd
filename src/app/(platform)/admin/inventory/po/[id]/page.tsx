@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
-import { hasModule } from "@/server/billing/entitlements";
+import { featureLockOr } from "@/server/billing/feature-lock-gate";
 import { getPurchaseOrder, listInventory } from "@/server/inventory/queries";
 import { addPurchaseOrderItem, receivePurchaseOrder } from "@/server/inventory/actions";
 import { formatPeso } from "@/lib/money";
@@ -14,9 +14,8 @@ export default async function PurchaseOrderDetail({
 }) {
   const { id } = await params;
   const { restaurantId } = await requireAdminPage();
-  if (!(await hasModule(restaurantId, "inventory"))) {
-    return <p className="text-sm text-plum-ink/60">Inventory module not enabled.</p>;
-  }
+  const locked = await featureLockOr(restaurantId, "inventory", "Purchase order");
+  if (locked) return locked;
   const [po, items] = await Promise.all([
     getPurchaseOrder(restaurantId, id),
     listInventory(restaurantId),

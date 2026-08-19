@@ -1,23 +1,14 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
-import { hasModule } from "@/server/billing/entitlements";
+import { featureLockOr } from "@/server/billing/feature-lock-gate";
 import { getReorderSuggestions, type ReorderSuggestion } from "@/server/inventory/queries";
 import { createPoFromSuggestions } from "@/server/inventory/actions";
 import { formatPeso } from "@/lib/money";
 
 export default async function ReorderPage() {
   const { restaurantId } = await requireAdminPage();
-  if (!(await hasModule(restaurantId, "inventory"))) {
-    return (
-      <div className="rounded-tile border border-plum-ink/10 bg-white p-5">
-        <h1 className="font-heading text-2xl font-bold">Reorder suggestions</h1>
-        <p className="mt-2 text-sm text-plum-ink/70">
-          Inventory is a one-time unlock.{" "}
-          <Link href="/admin/billing" className="font-semibold text-brand-primary">Unlock it once</Link>.
-        </p>
-      </div>
-    );
-  }
+  const locked = await featureLockOr(restaurantId, "inventory", "Reorder");
+  if (locked) return locked;
 
   const suggestions = await getReorderSuggestions(restaurantId);
 

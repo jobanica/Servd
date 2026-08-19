@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
-import { requireFeaturePage } from "@/server/billing/feature-gate";
+import { featureLockOr } from "@/server/billing/feature-lock-gate";
 import { getStorefront } from "@/server/storefront/storefront";
 import { StorefrontForm } from "@/components/admin/StorefrontForm";
 import { tenantDb } from "@/server/tenancy/scoped-db";
@@ -9,7 +9,8 @@ import { CopyLink } from "@/components/super-admin/CopyLink";
 
 export default async function StorefrontPage() {
   const { restaurantId } = await requireAdminPage();
-  await requireFeaturePage(restaurantId, "onlineOrdering");
+  const locked = await featureLockOr(restaurantId, "onlineOrdering", "Online ordering");
+  if (locked) return locked;
   const sf = await getStorefront(restaurantId);
 
   // Public ordering-website URL — prefer a verified custom domain, else the

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
-import { requireFeaturePage } from "@/server/billing/feature-gate";
+import { featureLockOr } from "@/server/billing/feature-lock-gate";
 import { getPromotions } from "@/server/promotions/queries";
 import { getMenu } from "@/server/menu/queries";
 import { deletePromotion, togglePromotion } from "@/server/promotions/actions";
@@ -11,7 +11,8 @@ import { manilaDate } from "@/lib/time/manila";
 
 export default async function PromotionsPage() {
   const { restaurantId } = await requireAdminPage();
-  await requireFeaturePage(restaurantId, "promotions");
+  const locked = await featureLockOr(restaurantId, "promotions", "Promotions");
+  if (locked) return locked;
   const [promotions, menu] = await Promise.all([
     getPromotions(restaurantId),
     getMenu(restaurantId),

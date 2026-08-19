@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
-import { requireFeaturePage } from "@/server/billing/feature-gate";
+import { featureLockOr } from "@/server/billing/feature-lock-gate";
 import { listGiftCards, setGiftCardActive } from "@/server/gift-cards/gift-cards";
 import { IssueGiftCardForm } from "@/components/admin/IssueGiftCardForm";
 import { formatPeso } from "@/lib/money";
@@ -11,7 +11,8 @@ import { formatPeso } from "@/lib/money";
  */
 export default async function GiftCardsPage() {
   const { restaurantId } = await requireAdminPage();
-  await requireFeaturePage(restaurantId, "giftCards");
+  const locked = await featureLockOr(restaurantId, "giftCards", "Gift cards");
+  if (locked) return locked;
   const cards = await listGiftCards(restaurantId);
 
   return (

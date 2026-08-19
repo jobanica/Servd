@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
-import { requireFeaturePage } from "@/server/billing/feature-gate";
+import { featureLockOr } from "@/server/billing/feature-lock-gate";
 
 const DATASETS: { type: string; label: string; desc: string }[] = [
   { type: "orders", label: "Orders", desc: "Every order with totals, discounts, gift card, tip and net." },
@@ -10,7 +10,8 @@ const DATASETS: { type: string; label: string; desc: string }[] = [
 
 export default async function ExportPage() {
   const { restaurantId } = await requireAdminPage();
-  await requireFeaturePage(restaurantId, "dataExport");
+  const locked = await featureLockOr(restaurantId, "dataExport", "Data export");
+  if (locked) return locked;
 
   return (
     <div className="space-y-6">

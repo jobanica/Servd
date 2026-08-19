@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
-import { requireFeaturePage } from "@/server/billing/feature-gate";
+import { featureLockOr } from "@/server/billing/feature-lock-gate";
 import {
   listReservations,
   setReservationStatus,
@@ -17,7 +17,8 @@ function when(d: Date | null): string {
 
 export default async function ReservationsPage() {
   const { restaurantId } = await requireAdminPage();
-  await requireFeaturePage(restaurantId, "reservations");
+  const locked = await featureLockOr(restaurantId, "reservations", "Reservations");
+  if (locked) return locked;
   const [rows, tables] = await Promise.all([listReservations(restaurantId), getTables(restaurantId)]);
 
   const waitlist = rows.filter((r) => r.status === "waitlisted");
