@@ -9,6 +9,19 @@
 -- This finds the accounts whose config now looks blank. It changes nothing.
 -- ============================================================================
 
+-- 0. THE ONE-ROW ANSWER. Start here — it fits on a phone, and the slug list is
+--    exactly what the restore query needs pasting into it.
+SELECT count(*)                                  AS wiped_shops,
+       string_agg(r.slug, ', ' ORDER BY r.slug)  AS slugs
+FROM restaurants r
+JOIN storefront_settings s ON s."restaurantId" = r.id
+WHERE r.status = 'active'
+  AND coalesce((s."paymentConfig"->>'gcashEnabled')::boolean, false) = false
+  AND coalesce((s."paymentConfig"->>'mayaEnabled')::boolean,  false) = false
+  AND coalesce((s."paymentConfig"->>'bankEnabled')::boolean,  false) = false
+  AND coalesce((s."deliveryConfig"->>'baseFee')::numeric, 0) = 0
+  AND jsonb_array_length(coalesce(s."deliveryZones", '[]'::jsonb)) = 0;
+
 -- 1. Accounts whose payment/delivery config reads as empty or missing.
 --    "looks_wiped" = no payment method switched on AND no delivery pricing set,
 --    which is what a defaults-overwrite leaves behind.
