@@ -61,5 +61,11 @@ SELECT
       AND (SELECT attname FROM pg_attribute
            WHERE attrelid = t.oid AND attnum = x.indkey[0]) = 'authUserId'
   ) AS global_unique_gone,
-  to_regclass('public.staff_users_restaurantId_authUserId_key') IS NOT NULL AS per_restaurant_unique,
-  to_regclass('public.staff_users_authUserId_idx') IS NOT NULL AS lookup_index;
+  -- pg_indexes, NOT to_regclass. to_regclass parses its argument as an SQL
+  -- identifier, so an unquoted mixed-case name is folded to lower case and
+  -- never matches an index created with quotes — it reports a perfectly good
+  -- index as missing, which is worse than not checking at all.
+  EXISTS (SELECT 1 FROM pg_indexes WHERE tablename = 'staff_users'
+          AND indexname = 'staff_users_restaurantId_authUserId_key') AS per_restaurant_unique,
+  EXISTS (SELECT 1 FROM pg_indexes WHERE tablename = 'staff_users'
+          AND indexname = 'staff_users_authUserId_idx')              AS lookup_index;
