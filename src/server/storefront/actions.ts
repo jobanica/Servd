@@ -67,7 +67,19 @@ export async function updateStorefront(
   const str = (k: string, max: number) => String(formData.get(k) ?? "").trim().slice(0, max);
   // The dine-in GCash QR toggle is set on the Tables page, not here — carry the
   // saved value over so saving the website settings never switches it off.
-  const { payment: savedPayment } = await getStorefront(restaurantId);
+  const saved = await getStorefront(restaurantId);
+  // REFUSE to save when the stored config couldn't be read. Everything the form
+  // was prefilled with is then a default, and writing it back replaces the
+  // shop's real payment and delivery settings with blanks. That is exactly how
+  // a set of accounts lost their configuration; a failed read must never
+  // become a successful overwrite.
+  if (saved.configUnavailable) {
+    return {
+      error:
+        "Couldn't load your saved settings just now, so nothing was written — this protects what you already have. Refresh and try again; if it keeps happening, the database needs its pending migration.",
+    };
+  }
+  const savedPayment = saved.payment;
   const paymentConfig = {
     dineInGcashEnabled: savedPayment.dineInGcashEnabled,
     codEnabled: formData.get("codEnabled") === "on",

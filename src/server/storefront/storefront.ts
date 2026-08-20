@@ -72,6 +72,16 @@ export interface Storefront {
   zones: DeliveryZone[];
   pauseWhenClosed: boolean;
   /**
+   * The saved booking/payment/delivery config could NOT be read.
+   *
+   * Everything in this object is then a DEFAULT, not the shop's settings. The
+   * settings page prefills from here and its Save writes back what it was
+   * shown, so a write that happens while this is true replaces a real
+   * configuration with blanks. That is precisely what happened once; the flag
+   * exists so it can't happen quietly again.
+   */
+  configUnavailable: boolean;
+  /**
    * The owner has stopped online orders by hand, right now.
    *
    * Separate from pauseWhenClosed: that one follows the clock, this one is a
@@ -249,22 +259,38 @@ export async function getStorefront(restaurantId: string): Promise<Storefront> {
     );
     let acceptsBookings = false;
     let ordersPaused = false;
+    let configUnavailable = false;
     let booking = defaultBookingConfig();
     let payment = defaultPaymentConfig();
     let delivery = defaultDeliveryConfig();
     try {
       const b = await tenantDb(restaurantId, (tx) =>
-        tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { acceptsBookings: true, bookingConfig: true, paymentConfig: true, deliveryConfig: true, ordersPaused: true } }),
+        tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { acceptsBookings: true, bookingConfig: true, paymentConfig: true, deliveryConfig: true } }),
       );
       acceptsBookings = !!b?.acceptsBookings;
-      ordersPaused = !!b?.ordersPaused;
       booking = normalizeBookingConfig(b?.bookingConfig);
       payment = normalizePaymentConfig(b?.paymentConfig);
       delivery = normalizeDeliveryConfig(b?.deliveryConfig);
-    } catch { /* columns not migrated yet */ }
-    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones), pauseWhenClosed: !!s?.pauseWhenClosed, ordersPaused, acceptsBookings, booking, payment, delivery };
+    } catch {
+      // Columns not migrated yet — booking/payment/delivery below are DEFAULTS,
+      // not this shop's settings. Say so, loudly, in the returned object.
+      configUnavailable = true;
+    }
+    // ordersPaused is NEWER STILL, so it gets its own query and its own catch.
+    // Reading it alongside the block above is what broke: one missing column
+    // threw the whole query, the catch handed back DEFAULTS for payment,
+    // booking and delivery, the settings page prefilled from those defaults,
+    // and the next Save wrote the blanks over a shop's real configuration.
+    // One best-effort read per migration generation, never a shared one.
+    try {
+      const pausedRow = await tenantDb(restaurantId, (tx) =>
+        tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { ordersPaused: true } }),
+      );
+      ordersPaused = !!pausedRow?.ordersPaused;
+    } catch { /* ordersPaused not migrated yet */ }
+    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones), pauseWhenClosed: !!s?.pauseWhenClosed, ordersPaused, configUnavailable, acceptsBookings, booking, payment, delivery };
   } catch {
-    return { hours: defaultHours(), zones: [], pauseWhenClosed: false, ordersPaused: false, acceptsBookings: false, booking: defaultBookingConfig(), payment: defaultPaymentConfig(), delivery: defaultDeliveryConfig() };
+    return { hours: defaultHours(), zones: [], pauseWhenClosed: false, ordersPaused: false, configUnavailable: true, acceptsBookings: false, booking: defaultBookingConfig(), payment: defaultPaymentConfig(), delivery: defaultDeliveryConfig() };
   }
 }
 
@@ -276,22 +302,38 @@ export async function getPublicStorefront(restaurantId: string): Promise<Storefr
     );
     let acceptsBookings = false;
     let ordersPaused = false;
+    let configUnavailable = false;
     let booking = defaultBookingConfig();
     let payment = defaultPaymentConfig();
     let delivery = defaultDeliveryConfig();
     try {
       const b = await systemDb((tx) =>
-        tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { acceptsBookings: true, bookingConfig: true, paymentConfig: true, deliveryConfig: true, ordersPaused: true } }),
+        tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { acceptsBookings: true, bookingConfig: true, paymentConfig: true, deliveryConfig: true } }),
       );
       acceptsBookings = !!b?.acceptsBookings;
-      ordersPaused = !!b?.ordersPaused;
       booking = normalizeBookingConfig(b?.bookingConfig);
       payment = normalizePaymentConfig(b?.paymentConfig);
       delivery = normalizeDeliveryConfig(b?.deliveryConfig);
-    } catch { /* columns not migrated yet */ }
-    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones), pauseWhenClosed: !!s?.pauseWhenClosed, ordersPaused, acceptsBookings, booking, payment, delivery };
+    } catch {
+      // Columns not migrated yet — booking/payment/delivery below are DEFAULTS,
+      // not this shop's settings. Say so, loudly, in the returned object.
+      configUnavailable = true;
+    }
+    // ordersPaused is NEWER STILL, so it gets its own query and its own catch.
+    // Reading it alongside the block above is what broke: one missing column
+    // threw the whole query, the catch handed back DEFAULTS for payment,
+    // booking and delivery, the settings page prefilled from those defaults,
+    // and the next Save wrote the blanks over a shop's real configuration.
+    // One best-effort read per migration generation, never a shared one.
+    try {
+      const pausedRow = await systemDb((tx) =>
+        tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { ordersPaused: true } }),
+      );
+      ordersPaused = !!pausedRow?.ordersPaused;
+    } catch { /* ordersPaused not migrated yet */ }
+    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones), pauseWhenClosed: !!s?.pauseWhenClosed, ordersPaused, configUnavailable, acceptsBookings, booking, payment, delivery };
   } catch {
-    return { hours: defaultHours(), zones: [], pauseWhenClosed: false, ordersPaused: false, acceptsBookings: false, booking: defaultBookingConfig(), payment: defaultPaymentConfig(), delivery: defaultDeliveryConfig() };
+    return { hours: defaultHours(), zones: [], pauseWhenClosed: false, ordersPaused: false, configUnavailable: true, acceptsBookings: false, booking: defaultBookingConfig(), payment: defaultPaymentConfig(), delivery: defaultDeliveryConfig() };
   }
 }
 
