@@ -130,14 +130,44 @@ async function connectGatt(station: PrinterStation): Promise<void> {
   slot.characteristic = await svc.getCharacteristic(slot.charUuid);
 }
 
-/** Send ESC/POS bytes to the connected printer (reconnects if dropped). */
+/**
+ * Send ESC/POS bytes to the connected printer, reconnecting if the link dropped.
+ *
+ * Retries ONCE on failure, and that retry is the point of this function rather
+ * than a nicety. A BLE printer drops its GATT link whenever it's idle, so the
+ * link is routinely dead when a sale settles — and it can also die between the
+ * check and the write, which no amount of checking first will catch. Without
+ * the retry that race surfaces as "the receipt didn't print and the drawer
+ * didn't open", the two together, because both ride the same connection.
+ *
+ * One retry, not a loop: if a fresh GATT connection also fails, the printer is
+ * off, out of range, or paired to another device, and hammering it just delays
+ * telling the cashier something is actually wrong.
+ */
 export async function printBytes(
   bytes: Uint8Array,
   station: PrinterStation = "till",
 ): Promise<void> {
   const slot = slots[station];
   if (!slot.device) throw new Error("No printer connected.");
-  if (!isPrinterConnected(station)) await connectGatt(station);
+
+  try {
+    if (!isPrinterConnected(station)) await connectGatt(station);
+    await writeToPrinter(slot.characteristic, bytes);
+    return;
+  } catch {
+    /* fall through to one clean retry */
+  }
+
+  // Drop what we think we know about the link and rebuild it from scratch —
+  // a stale characteristic from the dead connection is exactly what fails.
+  slot.characteristic = null;
+  try {
+    slot.device.gatt?.disconnect();
+  } catch {
+    /* already gone */
+  }
+  await connectGatt(station);
   await writeToPrinter(slot.characteristic, bytes);
 }
 
