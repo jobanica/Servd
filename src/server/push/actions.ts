@@ -72,11 +72,17 @@ export async function saveDinerPushSubscription(
     );
     if (!order) return { ok: false };
 
+    // restaurantId is deliberately left alone on an existing row. One endpoint
+    // is one device, and that device may already be a merchant's till: taking
+    // its restaurantId over because the owner ordered lunch somewhere else
+    // would move their new-order alarm to the other restaurant. Merchant sends
+    // match on restaurantId and diner sends on orderId, so one row can serve
+    // both without either noticing.
     await systemDb((tx) =>
       tx.pushSubscription.upsert({
         where: { endpoint },
         create: { restaurantId: restaurant.id, orderId, endpoint, p256dh, auth },
-        update: { restaurantId: restaurant.id, orderId, p256dh, auth },
+        update: { orderId, p256dh, auth },
         select: { id: true },
       }),
     );

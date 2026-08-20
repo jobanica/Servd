@@ -165,19 +165,31 @@ export async function getWebOrderStatus(
     try {
       const booking = await tx.deliveryBooking.findFirst({
         where: { orderId, restaurantId: restaurant.id },
-        select: {
-          trackingUrl: true, riderName: true, status: true,
-          arrivedAt: true, lastMessageAt: true, lastMessageBody: true,
-        },
+        select: { trackingUrl: true, riderName: true, status: true },
         orderBy: { createdAt: "desc" },
       });
       rider = visibleRiderTracking(booking);
-      // Both follow the tracking link's own rule: if the diner may not see the
-      // rider, they may not see what the rider said either.
+
+      // The arrival and the last message are read separately, and are allowed
+      // to fail on their own: these three columns are newer than the rest, and
+      // asking for them in the query above would mean a database that has not
+      // had them added yet loses the rider link it has always had.
+      //
+      // Both follow that link's rule anyway — a diner who may not see the rider
+      // may not see what the rider said either.
       if (rider.riderTrackingUrl) {
-        riderArrivedAt = booking?.arrivedAt?.toISOString() ?? null;
-        riderMessageAt = booking?.lastMessageAt?.toISOString() ?? null;
-        riderMessage = booking?.lastMessageBody ?? null;
+        try {
+          const said = await tx.deliveryBooking.findFirst({
+            where: { orderId, restaurantId: restaurant.id },
+            select: { arrivedAt: true, lastMessageAt: true, lastMessageBody: true },
+            orderBy: { createdAt: "desc" },
+          });
+          riderArrivedAt = said?.arrivedAt?.toISOString() ?? null;
+          riderMessageAt = said?.lastMessageAt?.toISOString() ?? null;
+          riderMessage = said?.lastMessageBody ?? null;
+        } catch {
+          /* arrival columns not migrated here */
+        }
       }
     } catch {
       /* delivery_bookings not migrated here */

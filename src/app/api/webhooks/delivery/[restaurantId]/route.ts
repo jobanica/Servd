@@ -29,7 +29,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ res
   const matched = await systemDb(async (tx) => {
     const booking = await tx.deliveryBooking.findFirst({
       where: { restaurantId, bookingRef: update.bookingRef },
-      select: { orderId: true, arrivedAt: true },
+      select: { orderId: true },
     });
     if (!booking) return null;
 
@@ -43,14 +43,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ res
         riderLng: update.riderLng ?? undefined,
         trackingUrl: update.trackingUrl ?? undefined,
         etaMinutes: update.etaMinutes ?? undefined,
-        arrivedAt: update.arrivedAt ? new Date(update.arrivedAt) : undefined,
-        // Only the rider's side is kept. What the diner typed they already have.
-        lastMessageAt:
-          update.message && update.message.from === "rider" && update.message.at
-            ? new Date(update.message.at)
-            : undefined,
-        lastMessageBody:
-          update.message && update.message.from === "rider" ? update.message.body ?? undefined : undefined,
       },
     });
 
@@ -63,16 +55,62 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ res
         data: { deliveryStatus: "delivered", status: "closed", paymentStatus: "paid", billRequested: false },
       });
     }
-    // Arriving twice is one arrival: the first stamp wins, so a retried
-    // callback does not ring the diner's phone again.
-    return { orderId: booking.orderId, wasArrived: Boolean(booking.arrivedAt) };
+    return booking.orderId;
   }).catch(() => null);
 
   if (matched) {
     await notifyOrdersChanged(restaurantId);
-    await tellTheDiner(restaurantId, matched.orderId, matched.wasArrived, update);
+    const wasArrived = await recordArrivalAndMessage(restaurantId, update);
+    await tellTheDiner(restaurantId, matched, wasArrived, update);
   }
   return new Response("ok", { status: 200 });
+}
+
+/**
+ * Arrival and the last message, written apart from everything above.
+ *
+ * Deliberately its own transaction, and deliberately allowed to fail. These
+ * three columns are new; a deployment that reaches production before the SQL
+ * in prisma/manual does would otherwise take the whole callback down with them
+ * — and that callback is what marks an order out-for-delivery and delivered.
+ * A missing doorbell is worth nothing next to an order that never closes.
+ *
+ * Returns whether this booking had already arrived before now, so a retried
+ * callback does not ring the diner's phone twice.
+ */
+async function recordArrivalAndMessage(
+  restaurantId: string,
+  update: {
+    bookingRef: string;
+    arrivedAt?: string | null;
+    message?: { from: string; body: string | null; at: string | null } | null;
+  },
+): Promise<boolean> {
+  const rider = update.message?.from === "rider" ? update.message : null;
+  if (!update.arrivedAt && !rider) return false;
+
+  try {
+    return await systemDb(async (tx) => {
+      const before = await tx.deliveryBooking.findFirst({
+        where: { restaurantId, bookingRef: update.bookingRef },
+        select: { arrivedAt: true },
+      });
+      await tx.deliveryBooking.updateMany({
+        where: { restaurantId, bookingRef: update.bookingRef },
+        data: {
+          arrivedAt: update.arrivedAt ? new Date(update.arrivedAt) : undefined,
+          // Only the rider's side is kept. What the diner typed they already have.
+          lastMessageAt: rider?.at ? new Date(rider.at) : undefined,
+          lastMessageBody: rider ? rider.body ?? undefined : undefined,
+        },
+      });
+      return Boolean(before?.arrivedAt);
+    });
+  } catch {
+    // Columns not migrated here yet. Say "already arrived" so nothing is
+    // announced from a state we could not read.
+    return true;
+  }
 }
 
 /**

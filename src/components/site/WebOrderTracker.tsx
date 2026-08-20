@@ -396,7 +396,10 @@ export function WebOrderTracker({
           </a>
         )}
 
-        {delivery && !terminal && <AlertMe slug={slug} orderId={orderId} />}
+        {/* Only where there is a rider to be alerted about. A restaurant that
+            arranges delivery by phone has no arrival to announce, and offering
+            to alert somebody about one would be a promise nothing keeps. */}
+        {delivery && riderTrackingUrl && !terminal && <AlertMe slug={slug} orderId={orderId} />}
 
         {/* Watch the rider — only when the provider actually gave us a page to
             send them to. A manual booking is a phone call and a deep-link one
@@ -470,22 +473,26 @@ export function WebOrderTracker({
  * it, or already refused, does not need to be asked again.
  */
 function AlertMe({ slug, orderId }: { slug: string; orderId: string }) {
-  const [state, setState] = useState<"idle" | "busy" | "on" | "unavailable">(() => {
-    if (!pushSupported() || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) return "unavailable";
-    return Notification.permission === "granted" ? "on" : Notification.permission === "denied" ? "unavailable" : "idle";
-  });
+  // Starts hidden and decides on the client. Reading Notification.permission
+  // during render would make the server and the browser disagree about what
+  // this renders, which is a hydration error rather than a button.
+  const [state, setState] = useState<"unknown" | "idle" | "busy" | "on" | "unavailable">("unknown");
 
-  // Already allowed notifications on a previous order? Then the subscription
-  // still has to be pointed at this one, and that needs no prompt.
   useEffect(() => {
-    if (state !== "on") return;
+    if (!pushSupported() || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) { setState("unavailable"); return; }
+    if (Notification.permission === "denied") { setState("unavailable"); return; }
+    if (Notification.permission !== "granted") { setState("idle"); return; }
+
+    // Already allowed on a previous order: the subscription still has to be
+    // pointed at this one, and that needs no prompt.
+    setState("on");
     void (async () => {
       const keys = await subscribeToPush();
       if (keys) await saveDinerPushSubscription({ slug, orderId, ...keys });
     })();
-  }, [state, slug, orderId]);
+  }, [slug, orderId]);
 
-  if (state === "unavailable" || state === "on") return null;
+  if (state === "unknown" || state === "unavailable" || state === "on") return null;
 
   return (
     <button
