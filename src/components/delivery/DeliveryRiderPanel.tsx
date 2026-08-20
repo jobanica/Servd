@@ -104,6 +104,33 @@ export function DeliveryRiderPanel({ orderId, pulse = 0 }: { orderId: string; pu
     load();
   }, [load, pulse]);
 
+  /**
+   * Ask the provider where things stand, while a delivery is actually running.
+   *
+   * Callbacks are the fast path, but they are somebody else's network: a
+   * signature that stops matching, a deploy, an outage, and the board sits on
+   * "Finding a rider…" while the food is halfway across town. Polling every
+   * twenty seconds costs one request per live delivery and means the panel
+   * repairs itself — including picking up the tracking URL, which is what the
+   * Track rider link needs.
+   *
+   * Only for API bookings, and only until the delivery is over: a manual
+   * booking has nobody to ask, and a delivered one has nothing left to say.
+   */
+  const live =
+    mode === "api" &&
+    (booking?.status === "searching" || booking?.status === "assigned" || booking?.status === "picked_up");
+
+  useEffect(() => {
+    if (!live) return;
+    const id = setInterval(() => {
+      void refreshBookingStatus(orderId)
+        .then((res) => { if (res.booking !== undefined) setBooking(res.booking ?? null); })
+        .catch(() => { /* transient — the next tick tries again */ });
+    }, 20_000);
+    return () => clearInterval(id);
+  }, [live, orderId]);
+
   async function onBook() {
     setBusy(true);
     setError(null);
