@@ -9,7 +9,34 @@
 -- This finds the accounts whose config now looks blank. It changes nothing.
 -- ============================================================================
 
--- 0. THE ONE-ROW ANSWER. Start here — it fits on a phone, and the slug list is
+-- 0a. THE TIGHT LIST. This is the one to act on.
+--
+--     A shop that never opened the payment/delivery section has NULL in those
+--     columns: the first save writes only hours/zones/pauseWhenClosed, and
+--     paymentConfig and deliveryConfig are written by a second statement.
+--
+--     So "the column is NOT NULL but everything in it is off/zero" means the
+--     config was WRITTEN and is now blank — which is exactly the shape the
+--     defaults-overwrite leaves, and it excludes every shop that simply never
+--     set delivery up. That is the difference between a list of 100 and a list
+--     you can act on.
+SELECT count(*)                                  AS likely_wiped,
+       string_agg(r.slug, ', ' ORDER BY r.slug)  AS slugs
+FROM restaurants r
+JOIN storefront_settings s ON s."restaurantId" = r.id
+WHERE r.status = 'active'
+  AND s."paymentConfig" IS NOT NULL
+  AND s."deliveryConfig" IS NOT NULL
+  AND coalesce((s."paymentConfig"->>'gcashEnabled')::boolean, false) = false
+  AND coalesce((s."paymentConfig"->>'mayaEnabled')::boolean,  false) = false
+  AND coalesce((s."paymentConfig"->>'bankEnabled')::boolean,  false) = false
+  AND coalesce(s."paymentConfig"->>'gcashNumber', '') = ''
+  AND coalesce(s."paymentConfig"->>'gcashQrUrl',  '') = ''
+  AND coalesce((s."deliveryConfig"->>'baseFee')::numeric, 0) = 0
+  AND coalesce((s."deliveryConfig"->>'perKm')::numeric, 0) = 0
+  AND jsonb_array_length(coalesce(s."deliveryZones", '[]'::jsonb)) = 0;
+
+-- 0b. THE ONE-ROW ANSWER. Start here — it fits on a phone, and the slug list is
 --    exactly what the restore query needs pasting into it.
 SELECT count(*)                                  AS wiped_shops,
        string_agg(r.slug, ', ' ORDER BY r.slug)  AS slugs
