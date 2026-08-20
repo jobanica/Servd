@@ -78,6 +78,31 @@ export interface WebOrderStatusResult {
   total: number; // centavos
   orderNumber: number | null; // daily ticket number, if any
   prepMinutes: number | null; // ETA the merchant set on accept, if any
+  /**
+   * Where the diner can watch the rider, when the provider gives us one.
+   *
+   * Only an API provider returns a tracking URL — a manual booking is a phone
+   * call and a deep-link booking happens inside somebody else's app, and
+   * neither has a page to send anyone to. Null is the normal case, not a
+   * failure, so the tracker simply shows nothing.
+   */
+  riderTrackingUrl: string | null;
+  riderName: string | null;
+}
+
+/**
+ * What the diner may see of the rider, given the booking we hold.
+ *
+ * Pulled out as its own function because it is a rule, not plumbing: a link is
+ * shown only while somebody is actually carrying the order, and only when the
+ * provider gave us a page to link to. A manual booking never has one.
+ */
+export function visibleRiderTracking(
+  booking: { trackingUrl: string | null; riderName: string | null; status: string } | null,
+): { riderTrackingUrl: string | null; riderName: string | null } {
+  const live = booking?.status === "assigned" || booking?.status === "picked_up";
+  if (!live || !booking?.trackingUrl) return { riderTrackingUrl: null, riderName: null };
+  return { riderTrackingUrl: booking.trackingUrl, riderName: booking.riderName ?? null };
 }
 
 export async function getWebOrderStatus(
@@ -133,6 +158,21 @@ export async function getWebOrderStatus(
       /* column not migrated yet */
     }
 
+    // The booking is best-effort like the columns above: a restaurant with no
+    // delivery integration has no row here, and the tracker must not break for
+    // one that never will.
+    let rider = { riderTrackingUrl: null as string | null, riderName: null as string | null };
+    try {
+      const booking = await tx.deliveryBooking.findFirst({
+        where: { orderId, restaurantId: restaurant.id },
+        select: { trackingUrl: true, riderName: true, status: true },
+        orderBy: { createdAt: "desc" },
+      });
+      rider = visibleRiderTracking(booking);
+    } catch {
+      /* delivery_bookings not migrated here */
+    }
+
     return {
       restaurantId: restaurant.id,
       status: order.status,
@@ -142,6 +182,8 @@ export async function getWebOrderStatus(
       total: netTotal,
       orderNumber,
       prepMinutes,
+      riderTrackingUrl: rider.riderTrackingUrl,
+      riderName: rider.riderName,
     };
   });
 }

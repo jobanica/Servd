@@ -149,6 +149,8 @@ export function WebOrderTracker({
   const [total, setTotal] = useState(0);
   const [prepMinutes, setPrepMinutes] = useState<number | null>(null);
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
+  const [riderTrackingUrl, setRiderTrackingUrl] = useState<string | null>(null);
+  const [riderName, setRiderName] = useState<string | null>(null);
   const prevStatus = useRef<string>("pending");
   const prevDelivery = useRef<string | null>(null);
 
@@ -172,6 +174,8 @@ export function WebOrderTracker({
     setTotal(res.total);
     setPrepMinutes(res.prepMinutes);
     setRestaurantId(res.restaurantId);
+    setRiderTrackingUrl(res.riderTrackingUrl);
+    setRiderName(res.riderName);
 
     // Chime + notify on the meaningful transitions.
     if (res.status !== prevStatus.current || res.deliveryStatus !== prevDelivery.current) {
@@ -338,6 +342,20 @@ export function WebOrderTracker({
           <p className="mt-3 text-xs text-plum-ink/45">
             This page updates automatically.{phone ? ` ${restaurantName} may also call ${phone} to confirm.` : ""}
           </p>
+        )}
+
+        {/* Watch the rider — only when the provider actually gave us a page to
+            send them to. A manual booking is a phone call and a deep-link one
+            happens in somebody else's app; neither has anything to link. */}
+        {delivery && riderTrackingUrl && !terminal && (
+          <a
+            href={riderTrackingUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-5 flex items-center justify-center gap-2 rounded-full bg-plum-ink px-6 py-3 text-sm font-semibold text-white"
+          >
+            🛵 Track {riderName ? riderName : "your rider"} on the map
+          </a>
         )}
 
         {/* Confirm arrival — only while the order is out for delivery. */}
