@@ -58,6 +58,43 @@ export async function sendOrderPush(restaurantId: string, payload: OrderPushPayl
   await deliver(subs, body);
 }
 
+export interface DinerPushPayload {
+  title: string;
+  body: string;
+  /** Where tapping it should land — the diner's own tracker, normally. */
+  url: string;
+  /** Collapses repeats: a rider sending three messages leaves one notification. */
+  tag?: string;
+}
+
+/**
+ * Tell one diner's devices something about their order.
+ *
+ * Keyed on the order rather than the restaurant, so it reaches the phone that
+ * asked to be told about this delivery and nobody else's. A diner who never
+ * pressed the button has no rows here and this quietly does nothing, which is
+ * the correct amount of notification for someone who did not ask for any.
+ */
+export async function sendDinerPush(orderId: string, payload: DinerPushPayload): Promise<void> {
+  if (!ensureConfigured()) return;
+  let subs: { endpoint: string; p256dh: string; auth: string }[] = [];
+  try {
+    subs = await systemDb((tx) =>
+      tx.pushSubscription.findMany({ where: { orderId }, select: { endpoint: true, p256dh: true, auth: true } }),
+    );
+  } catch {
+    return; // column not migrated yet
+  }
+  if (subs.length === 0) return;
+
+  await deliver(subs, JSON.stringify({
+    title: payload.title,
+    body: payload.body,
+    url: payload.url,
+    tag: payload.tag ?? `order-${orderId}`,
+  }));
+}
+
 /** Fan a payload out to every device, pruning subscriptions the browser dropped. */
 async function deliver(
   subs: { endpoint: string; p256dh: string; auth: string }[],

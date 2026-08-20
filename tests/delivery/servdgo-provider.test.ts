@@ -195,6 +195,50 @@ describe("webhook verification", () => {
     expect(provider().verifyWebhook!(payload, headersWith(sign(payload, old)))).toBeNull();
   });
 
+  it("carries the arrival through, because it is not a status", () => {
+    const body = JSON.stringify({
+      event: "order.arrived", reference: "SERVD-1001", status: "on_the_way",
+      arrivedAt: "2026-08-20T09:15:00.000Z", trackingToken: "tok123",
+    });
+    const t = Math.floor(Date.now() / 1000);
+    const update = provider().verifyWebhook!(body, headersWith(sign(body, t)));
+    // Still out for delivery: nobody has taken the food yet.
+    expect(update).toMatchObject({
+      event: "order.arrived",
+      status: "picked_up",
+      arrivedAt: "2026-08-20T09:15:00.000Z",
+    });
+  });
+
+  it("carries a message, and who said it", () => {
+    const body = JSON.stringify({
+      event: "order.message", reference: "SERVD-1001", status: "on_the_way",
+      message: { from: "rider", body: "I am at the blue gate.", at: "2026-08-20T09:16:00.000Z" },
+    });
+    const t = Math.floor(Date.now() / 1000);
+    const update = provider().verifyWebhook!(body, headersWith(sign(body, t)));
+    expect(update?.message).toEqual({
+      from: "rider", body: "I am at the blue gate.", at: "2026-08-20T09:16:00.000Z",
+    });
+  });
+
+  it("gives a photo with no words something to say", () => {
+    const body = JSON.stringify({
+      event: "order.message", reference: "SERVD-1001", status: "on_the_way",
+      message: { from: "rider", body: "   ", imageUrl: "https://example.test/p.jpg", at: null },
+    });
+    const t = Math.floor(Date.now() / 1000);
+    const update = provider().verifyWebhook!(body, headersWith(sign(body, t)));
+    expect(update?.message?.body).toBe("Sent a photo");
+  });
+
+  it("has no arrival and no message on an ordinary status callback", () => {
+    const t = Math.floor(Date.now() / 1000);
+    const update = provider().verifyWebhook!(payload, headersWith(sign(payload, t)));
+    expect(update?.arrivedAt).toBeNull();
+    expect(update?.message).toBeNull();
+  });
+
   it("rejects a missing or malformed header", () => {
     expect(provider().verifyWebhook!(payload, new Headers())).toBeNull();
     expect(provider().verifyWebhook!(payload, headersWith("nonsense"))).toBeNull();
