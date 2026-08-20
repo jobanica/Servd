@@ -70,6 +70,8 @@ export interface WebOrderProps {
   categories: DinerCategory[];
   contact?: { address: string | null; phone: string | null };
   loyalty?: LoyaltyInfo | null;
+  /** The owner stopped online orders by hand. Beats the clock. */
+  ordersPaused?: boolean;
   hours?: DayHours[];
   zones?: DeliveryZone[];
   openNow?: boolean;
@@ -348,10 +350,19 @@ function ProductCard({ item, onPick }: { item: DinerItem; onPick: (i: DinerItem)
 }
 
 export function WebOrder(props: WebOrderProps) {
-  const { slug, restaurantName, logoUrl, categories, contact, loyalty, hours, zones = [], openNow, pauseWhenClosed, acceptsBookings, bookHref, demo = false, onDemoOrder } = props;
+  const { slug, restaurantName, logoUrl, categories, contact, loyalty, hours, zones = [], openNow, pauseWhenClosed, ordersPaused, acceptsBookings, bookHref, demo = false, onDemoOrder } = props;
   const home = props.homeHref ?? `/r/${slug}`;
   const book = bookHref ?? `/r/${slug}/book`;
-  const paused = !!pauseWhenClosed && openNow === false;
+  // Two ways ordering stops. `ordersPaused` is the owner's own switch, thrown
+  // because the kitchen is buried — it holds whatever the clock says.
+  // `pauseWhenClosed` is automatic and only bites outside opening hours.
+  const paused = !!ordersPaused || (!!pauseWhenClosed && openNow === false);
+  const pausedByOwner = !!ordersPaused;
+  // Say it at the top as well. Finding out at the checkout button, after
+  // choosing a meal, is the version of this that loses a customer for good.
+  const pausedBanner = pausedByOwner
+    ? "We've paused online orders right now — the kitchen is at capacity. Please check back shortly."
+    : null;
 
   const [lines, setLines] = useState<CartLine[]>([]);
   const [configItem, setConfigItem] = useState<DinerItem | null>(null);
@@ -1105,7 +1116,9 @@ export function WebOrder(props: WebOrderProps) {
         {error && <p className="mt-2 text-sm text-guava">{error}</p>}
         {paused && !canSchedule ? (
           <div className="mt-3 rounded-lg bg-plum-ink/5 px-3 py-2 text-center text-sm font-semibold text-plum-ink/60">
-            🔒 Online ordering is paused — we&apos;re closed right now.
+            {pausedByOwner
+              ? "🔒 We've paused online orders — the kitchen is at capacity. Please check back shortly."
+              : "🔒 Online ordering is paused — we're closed right now."}
           </div>
         ) : !checkout ? (
           <button
@@ -1145,6 +1158,13 @@ export function WebOrder(props: WebOrderProps) {
   return (
     <div className="min-h-screen bg-white">
       <div className="mx-auto max-w-xl bg-white shadow-sm">
+        {/* Said up front, not only at the checkout button. Finding out after
+            choosing a meal is the version of this that loses the customer. */}
+        {pausedBanner && (
+          <div className="bg-mango/15 px-4 py-2.5 text-center text-sm font-semibold text-plum-ink">
+            ⏸ {pausedBanner}
+          </div>
+        )}
         {/* Hero cover + overlaid actions */}
         <div className="relative">
           <div className="relative h-48 w-full overflow-hidden bg-plum-ink sm:h-56">

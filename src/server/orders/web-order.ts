@@ -108,6 +108,19 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
   }
 
   const storefront = await getPublicStorefront(restaurant.id);
+
+  // The owner has stopped online orders by hand — usually because the kitchen
+  // is buried. Refused HERE and not only in the page: someone with the site
+  // already open, or a bookmarked checkout, would otherwise sail straight past
+  // a hidden button and land an order in a kitchen that can't take it.
+  if (storefront.ordersPaused) {
+    return {
+      ok: false,
+      error:
+        "We've paused online orders for now — the kitchen is at capacity. Please try again shortly.",
+    };
+  }
+
   // Enforce the store's fulfillment mode server-side (the client hides the
   // other option, but never trust the client).
   const fulfillment = storefront.delivery.fulfillment;

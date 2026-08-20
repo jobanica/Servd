@@ -171,3 +171,51 @@ export async function updateStorefront(
   revalidatePath("/sites/[host]", "page");
   return { ok: true };
 }
+
+export type PauseState = { ok?: boolean; paused?: boolean; error?: string } | null;
+
+/**
+ * Stop or resume online orders, immediately.
+ *
+ * Its own action rather than a field on the storefront form: this gets used
+ * mid-service, one-handed, while the kitchen is shouting. Making somebody
+ * scroll a long settings page and press Save to stop the orders arriving is
+ * the wrong shape for the moment it's needed in.
+ *
+ * Writes with updateMany + a create fallback so a restaurant that has never
+ * saved storefront settings can still pause.
+ */
+export async function setOrdersPaused(
+  _prev: PauseState,
+  formData: FormData,
+): Promise<PauseState> {
+  const { restaurantId } = await requireAdminAction();
+  const paused = formData.get("paused") === "true";
+
+  try {
+    await tenantDb(restaurantId, async (tx) => {
+      const res = await tx.storefrontSetting.updateMany({
+        where: { restaurantId },
+        data: { ordersPaused: paused },
+      });
+      if (res.count === 0) {
+        await tx.storefrontSetting.create({
+          data: { restaurantId, ordersPaused: paused },
+          select: { id: true },
+        });
+      }
+    });
+  } catch {
+    return {
+      error:
+        "Couldn't save that — run prisma/manual/add-orders-paused.sql, then try again.",
+    };
+  }
+
+  revalidatePath("/admin/storefront");
+  // The storefront itself, so a paused shop stops taking orders at once rather
+  // than serving a cached page that still has a working checkout button.
+  revalidatePath("/r/[slug]", "page");
+  revalidatePath("/sites/[host]", "page");
+  return { ok: true, paused };
+}

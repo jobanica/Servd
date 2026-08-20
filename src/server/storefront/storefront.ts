@@ -71,6 +71,13 @@ export interface Storefront {
   hours: DayHours[]; // always length 7, index 0=Sun … 6=Sat
   zones: DeliveryZone[];
   pauseWhenClosed: boolean;
+  /**
+   * The owner has stopped online orders by hand, right now.
+   *
+   * Separate from pauseWhenClosed: that one follows the clock, this one is a
+   * busy-switch, and it only comes back on when somebody turns it back on.
+   */
+  ordersPaused: boolean;
   acceptsBookings: boolean; // website "Book a table" flow enabled
   booking: BookingConfig; // advance-order downpayment / approval settings
   payment: PaymentConfig; // manual GCash / cash settings
@@ -241,21 +248,23 @@ export async function getStorefront(restaurantId: string): Promise<Storefront> {
       tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { hours: true, deliveryZones: true, pauseWhenClosed: true } }),
     );
     let acceptsBookings = false;
+    let ordersPaused = false;
     let booking = defaultBookingConfig();
     let payment = defaultPaymentConfig();
     let delivery = defaultDeliveryConfig();
     try {
       const b = await tenantDb(restaurantId, (tx) =>
-        tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { acceptsBookings: true, bookingConfig: true, paymentConfig: true, deliveryConfig: true } }),
+        tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { acceptsBookings: true, bookingConfig: true, paymentConfig: true, deliveryConfig: true, ordersPaused: true } }),
       );
       acceptsBookings = !!b?.acceptsBookings;
+      ordersPaused = !!b?.ordersPaused;
       booking = normalizeBookingConfig(b?.bookingConfig);
       payment = normalizePaymentConfig(b?.paymentConfig);
       delivery = normalizeDeliveryConfig(b?.deliveryConfig);
     } catch { /* columns not migrated yet */ }
-    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones), pauseWhenClosed: !!s?.pauseWhenClosed, acceptsBookings, booking, payment, delivery };
+    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones), pauseWhenClosed: !!s?.pauseWhenClosed, ordersPaused, acceptsBookings, booking, payment, delivery };
   } catch {
-    return { hours: defaultHours(), zones: [], pauseWhenClosed: false, acceptsBookings: false, booking: defaultBookingConfig(), payment: defaultPaymentConfig(), delivery: defaultDeliveryConfig() };
+    return { hours: defaultHours(), zones: [], pauseWhenClosed: false, ordersPaused: false, acceptsBookings: false, booking: defaultBookingConfig(), payment: defaultPaymentConfig(), delivery: defaultDeliveryConfig() };
   }
 }
 
@@ -266,21 +275,23 @@ export async function getPublicStorefront(restaurantId: string): Promise<Storefr
       tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { hours: true, deliveryZones: true, pauseWhenClosed: true } }),
     );
     let acceptsBookings = false;
+    let ordersPaused = false;
     let booking = defaultBookingConfig();
     let payment = defaultPaymentConfig();
     let delivery = defaultDeliveryConfig();
     try {
       const b = await systemDb((tx) =>
-        tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { acceptsBookings: true, bookingConfig: true, paymentConfig: true, deliveryConfig: true } }),
+        tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { acceptsBookings: true, bookingConfig: true, paymentConfig: true, deliveryConfig: true, ordersPaused: true } }),
       );
       acceptsBookings = !!b?.acceptsBookings;
+      ordersPaused = !!b?.ordersPaused;
       booking = normalizeBookingConfig(b?.bookingConfig);
       payment = normalizePaymentConfig(b?.paymentConfig);
       delivery = normalizeDeliveryConfig(b?.deliveryConfig);
     } catch { /* columns not migrated yet */ }
-    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones), pauseWhenClosed: !!s?.pauseWhenClosed, acceptsBookings, booking, payment, delivery };
+    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones), pauseWhenClosed: !!s?.pauseWhenClosed, ordersPaused, acceptsBookings, booking, payment, delivery };
   } catch {
-    return { hours: defaultHours(), zones: [], pauseWhenClosed: false, acceptsBookings: false, booking: defaultBookingConfig(), payment: defaultPaymentConfig(), delivery: defaultDeliveryConfig() };
+    return { hours: defaultHours(), zones: [], pauseWhenClosed: false, ordersPaused: false, acceptsBookings: false, booking: defaultBookingConfig(), payment: defaultPaymentConfig(), delivery: defaultDeliveryConfig() };
   }
 }
 

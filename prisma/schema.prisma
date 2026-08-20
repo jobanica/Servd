@@ -581,12 +581,23 @@ model PushSubscription {
 
 /// Public website settings: store hours + delivery zones/fees.
 model StorefrontSetting {
-  id              String  @id @default(uuid())
-  restaurantId    String  @unique
+  id              String   @id @default(uuid())
+  restaurantId    String   @unique
   hours           Json? // [{open,close,closed}] index 0=Sun … 6=Sat
   deliveryZones   Json? // [{name, fee}] fee in centavos
-  pauseWhenClosed Boolean @default(false) // block online orders outside hours
-  acceptsBookings Boolean @default(false) // show the "Book a table" flow on the website
+  pauseWhenClosed Boolean  @default(false) // block online orders outside hours
+  /// Manual "stop taking online orders" switch, for when the kitchen is buried.
+  ///
+  /// Separate from pauseWhenClosed, which is automatic and tied to opening
+  /// hours. This one is the owner deciding, right now, regardless of the clock
+  /// — and it has to be flipped back by hand, which is the point: it should
+  /// never quietly turn itself on again mid-service.
+  ///
+  /// Nullable with NO default: a static default would be sent by Prisma on
+  /// every insert and break saving storefront settings on a database that
+  /// lacks the column. Null means not paused.
+  ordersPaused    Boolean?
+  acceptsBookings Boolean  @default(false) // show the "Book a table" flow on the website
   bookingConfig   Json? // { requireDownpayment, downpaymentType, downpaymentValue, downpaymentInstructions }
   paymentConfig   Json? // { codEnabled, gcashEnabled, gcashName, gcashNumber, gcashQrUrl }
   deliveryConfig  Json? // { mode, baseFee, perKm, freeKm, minFee, maxKm, roadFactor, originLat, originLng }

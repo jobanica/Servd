@@ -63,6 +63,10 @@ export default async function RestaurantSite({
       hours={sf.hours}
       zones={sf.zones}
       openNow={isOpenNow(sf.hours)}
+      // Both pause routes. pauseWhenClosed was never passed through before, so
+      // that setting had no effect on the live site at all.
+      pauseWhenClosed={sf.pauseWhenClosed}
+      ordersPaused={sf.ordersPaused}
       homeHref={`/r/${slug}`}
       acceptsBookings={sf.acceptsBookings}
       bookHref={`/r/${slug}/book`}
