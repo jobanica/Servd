@@ -97,9 +97,28 @@ export interface DeliveryProvider {
 }
 
 /** Normalised webhook payload an API provider maps its event onto. */
+/** One thing the rider said, on the way. */
+export interface DeliveryMessage {
+  from: "rider" | "customer";
+  body: string | null;
+  at: string | null;
+}
+
 export interface WebhookUpdate {
   bookingRef: string;
   status: RiderStatus;
+  /** The provider's own name for what happened, when it gives one. */
+  event?: string | null;
+  /**
+   * When the rider announced they were at the door.
+   *
+   * Deliberately separate from status: arriving is not a stage of the delivery,
+   * it is a moment inside "out for delivery", and the delivery is not over
+   * until somebody hands the food across.
+   */
+  arrivedAt?: string | null;
+  /** Present on a message event, so the diner can be told somebody spoke. */
+  message?: DeliveryMessage | null;
   riderName?: string | null;
   riderPhone?: string | null;
   riderLat?: number | null;

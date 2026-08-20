@@ -6,6 +6,8 @@ import { getWebOrderStatus, cancelWebOrder, customerMarkDelivered } from "@/serv
 import { chime } from "@/lib/sound";
 import { formatPeso } from "@/lib/money";
 import { formatOrderNumber } from "@/lib/orders/order-number";
+import { subscribeToPush, pushSupported } from "@/lib/push/subscribe";
+import { saveDinerPushSubscription } from "@/server/push/actions";
 
 type Tone = "wait" | "go" | "ready" | "done" | "bad";
 type Stage = { label: string; detail: string; tone: Tone };
@@ -151,8 +153,15 @@ export function WebOrderTracker({
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
   const [riderTrackingUrl, setRiderTrackingUrl] = useState<string | null>(null);
   const [riderName, setRiderName] = useState<string | null>(null);
+  const [riderArrivedAt, setRiderArrivedAt] = useState<string | null>(null);
+  const [riderMessage, setRiderMessage] = useState<string | null>(null);
+  const [riderMessageAt, setRiderMessageAt] = useState<string | null>(null);
   const prevStatus = useRef<string>("pending");
   const prevDelivery = useRef<string | null>(null);
+  // The first poll is history, not news: re-opening a bookmarked tracker must
+  // not announce an arrival that happened twenty minutes ago.
+  const prevArrived = useRef<string | null | undefined>(undefined);
+  const prevMessageAt = useRef<string | null | undefined>(undefined);
 
   // Once this order is finished (completed / delivered / cancelled), forget it so
   // the site stops showing the "you have a recent order" banner for it.
@@ -176,6 +185,27 @@ export function WebOrderTracker({
     setRestaurantId(res.restaurantId);
     setRiderTrackingUrl(res.riderTrackingUrl);
     setRiderName(res.riderName);
+    setRiderArrivedAt(res.riderArrivedAt);
+    setRiderMessage(res.riderMessage);
+    setRiderMessageAt(res.riderMessageAt);
+
+    // "I'm outside" is the one moment on this page where somebody is waiting on
+    // the diner rather than the other way round, so it gets its own alert.
+    if (prevArrived.current === undefined) {
+      prevArrived.current = res.riderArrivedAt;
+    } else if (res.riderArrivedAt && !prevArrived.current) {
+      prevArrived.current = res.riderArrivedAt;
+      chime();
+      notify("Your rider is outside 🛵", "They are at your address with your order.");
+    }
+
+    if (prevMessageAt.current === undefined) {
+      prevMessageAt.current = res.riderMessageAt;
+    } else if (res.riderMessageAt && res.riderMessageAt !== prevMessageAt.current) {
+      prevMessageAt.current = res.riderMessageAt;
+      chime();
+      notify("Message from your rider 💬", res.riderMessage ?? "Tap to read it.");
+    }
 
     // Chime + notify on the meaningful transitions.
     if (res.status !== prevStatus.current || res.deliveryStatus !== prevDelivery.current) {
@@ -344,6 +374,30 @@ export function WebOrderTracker({
           </p>
         )}
 
+        {/* At the door. Not a stage — the delivery is not over until somebody
+            hands the food across — so it sits over the stage rather than in it. */}
+        {delivery && riderArrivedAt && !terminal && (
+          <p className="mt-5 rounded-2xl bg-plum-ink px-4 py-3 text-sm font-semibold text-white">
+            🛵 Your rider is outside with your order.
+          </p>
+        )}
+
+        {delivery && riderMessage && !terminal && (
+          <a
+            href={riderTrackingUrl ?? trackPath}
+            target={riderTrackingUrl ? "_blank" : undefined}
+            rel={riderTrackingUrl ? "noopener noreferrer" : undefined}
+            className="mt-3 block rounded-2xl border border-plum-ink/15 bg-cream px-4 py-3 text-left"
+          >
+            <span className="block text-xs font-semibold uppercase tracking-wide text-plum-ink/45">
+              Message from your rider
+            </span>
+            <span className="block text-sm text-plum-ink">{riderMessage}</span>
+          </a>
+        )}
+
+        {delivery && !terminal && <AlertMe slug={slug} orderId={orderId} />}
+
         {/* Watch the rider — only when the provider actually gave us a page to
             send them to. A manual booking is a phone call and a deep-link one
             happens in somebody else's app; neither has anything to link. */}
@@ -401,5 +455,52 @@ export function WebOrderTracker({
         </a>
       </div>
     </div>
+  );
+}
+
+/**
+ * "Tell me on my phone."
+ *
+ * Without this the tracker can only alert a diner who left the tab open, which
+ * is not what anybody does after ordering food. A Web Push subscription tied to
+ * this one order survives the tab being closed, and it is scoped to the order —
+ * it can never be used to send this person anything else.
+ *
+ * Hidden once it can no longer change anything: a diner who has already allowed
+ * it, or already refused, does not need to be asked again.
+ */
+function AlertMe({ slug, orderId }: { slug: string; orderId: string }) {
+  const [state, setState] = useState<"idle" | "busy" | "on" | "unavailable">(() => {
+    if (!pushSupported() || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) return "unavailable";
+    return Notification.permission === "granted" ? "on" : Notification.permission === "denied" ? "unavailable" : "idle";
+  });
+
+  // Already allowed notifications on a previous order? Then the subscription
+  // still has to be pointed at this one, and that needs no prompt.
+  useEffect(() => {
+    if (state !== "on") return;
+    void (async () => {
+      const keys = await subscribeToPush();
+      if (keys) await saveDinerPushSubscription({ slug, orderId, ...keys });
+    })();
+  }, [state, slug, orderId]);
+
+  if (state === "unavailable" || state === "on") return null;
+
+  return (
+    <button
+      type="button"
+      disabled={state === "busy"}
+      onClick={async () => {
+        setState("busy");
+        const keys = await subscribeToPush();
+        if (!keys) { setState("unavailable"); return; }
+        const res = await saveDinerPushSubscription({ slug, orderId, ...keys });
+        setState(res.ok ? "on" : "unavailable");
+      }}
+      className="mt-5 w-full rounded-full border border-plum-ink/15 px-6 py-3 text-sm font-semibold text-plum-ink disabled:opacity-50"
+    >
+      {state === "busy" ? "Setting up…" : "🔔 Alert me when my rider arrives"}
+    </button>
   );
 }

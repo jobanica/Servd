@@ -89,6 +89,17 @@ export interface WebOrderStatusResult {
    */
   riderTrackingUrl: string | null;
   riderName: string | null;
+  /**
+   * When the rider said they were at the door.
+   *
+   * Not a delivery status: it happens *during* "out for delivery" and the
+   * delivery is not finished until somebody hands the food across. The tracker
+   * shows it as a banner over the current stage rather than as a new stage.
+   */
+  riderArrivedAt: string | null;
+  /** The last thing the rider said, so the tracker can announce it. */
+  riderMessageAt: string | null;
+  riderMessage: string | null;
 }
 
 export async function getWebOrderStatus(
@@ -148,13 +159,26 @@ export async function getWebOrderStatus(
     // delivery integration has no row here, and the tracker must not break for
     // one that never will.
     let rider = { riderTrackingUrl: null as string | null, riderName: null as string | null };
+    let riderArrivedAt: string | null = null;
+    let riderMessageAt: string | null = null;
+    let riderMessage: string | null = null;
     try {
       const booking = await tx.deliveryBooking.findFirst({
         where: { orderId, restaurantId: restaurant.id },
-        select: { trackingUrl: true, riderName: true, status: true },
+        select: {
+          trackingUrl: true, riderName: true, status: true,
+          arrivedAt: true, lastMessageAt: true, lastMessageBody: true,
+        },
         orderBy: { createdAt: "desc" },
       });
       rider = visibleRiderTracking(booking);
+      // Both follow the tracking link's own rule: if the diner may not see the
+      // rider, they may not see what the rider said either.
+      if (rider.riderTrackingUrl) {
+        riderArrivedAt = booking?.arrivedAt?.toISOString() ?? null;
+        riderMessageAt = booking?.lastMessageAt?.toISOString() ?? null;
+        riderMessage = booking?.lastMessageBody ?? null;
+      }
     } catch {
       /* delivery_bookings not migrated here */
     }
@@ -170,6 +194,9 @@ export async function getWebOrderStatus(
       prepMinutes,
       riderTrackingUrl: rider.riderTrackingUrl,
       riderName: rider.riderName,
+      riderArrivedAt,
+      riderMessageAt,
+      riderMessage,
     };
   });
 }
