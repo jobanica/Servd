@@ -12,9 +12,13 @@
 -- 1. Accounts whose payment/delivery config reads as empty or missing.
 --    "looks_wiped" = no payment method switched on AND no delivery pricing set,
 --    which is what a defaults-overwrite leaves behind.
+-- NOTE: storefront_settings carries no timestamps, so there is no way to tell
+-- WHEN a shop last saved. r."updatedAt" is the restaurant row and moves for all
+-- sorts of reasons, so it's a weak hint at best — judge by the config itself,
+-- and by asking the owner whether they had it set up.
 SELECT r.name,
        r.slug,
-       s."updatedAt"                                          AS settings_touched,
+       r."updatedAt"                                          AS restaurant_touched,
        coalesce(s."paymentConfig"->>'gcashEnabled',  'null')  AS gcash,
        coalesce(s."paymentConfig"->>'mayaEnabled',   'null')  AS maya,
        coalesce(s."paymentConfig"->>'bankEnabled',   'null')  AS bank,
@@ -31,7 +35,7 @@ SELECT r.name,
 FROM restaurants r
 JOIN storefront_settings s ON s."restaurantId" = r.id
 WHERE r.status = 'active'
-ORDER BY looks_wiped DESC, s."updatedAt" DESC;
+ORDER BY looks_wiped DESC, r."updatedAt" DESC;
 
 -- 2. The same, as a count — how many active shops are affected.
 SELECT count(*) FILTER (WHERE wiped)     AS looks_wiped,
