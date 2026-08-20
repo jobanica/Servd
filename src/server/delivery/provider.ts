@@ -3,6 +3,7 @@ import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { decryptJson } from "@/lib/crypto/secrets";
+import { ServdGoDeliveryProvider } from "@/server/delivery/servdgo";
 
 /**
  * Provider-agnostic third-party delivery. The rest of the app talks to the
@@ -403,8 +404,14 @@ export async function resolveProvider(restaurantId: string): Promise<ResolvedPro
     } catch {
       /* bad/old key → treat as unconfigured */
     }
+    // A named provider gets its own adapter; anything else falls to the generic
+    // REST template, whose endpoints and field mapping are still TODOs.
+    const named = (row.providerKey ?? "").trim().toLowerCase();
     return {
-      provider: new ApiDeliveryProvider(row.apiBaseUrl, creds),
+      provider:
+        named === "servdgo"
+          ? new ServdGoDeliveryProvider(row.apiBaseUrl, creds)
+          : new ApiDeliveryProvider(row.apiBaseUrl, creds),
       mode: "api",
       providerKey: row.providerKey,
       enabled: row.enabled,
