@@ -51,7 +51,11 @@ export function DeliverySettingsForm({
 
       <label className="block text-sm">
         <span className="font-medium">Provider name (optional)</span>
-        <input name="providerKey" defaultValue={initial.providerKey} placeholder="e.g. Lalamove, Borzo, local rider co." className={field} />
+        <input name="providerKey" defaultValue={initial.providerKey} placeholder="e.g. ServdGo, Lalamove, local rider co." className={field} />
+        <span className="mt-1 block text-xs text-plum-ink/45">
+          Type <code>servdgo</code> here to use the built-in ServdGo adapter — it knows their
+          endpoints, so the fields below are only the URL and your credentials.
+        </span>
       </label>
 
       {/* Deep link config */}
@@ -78,12 +82,18 @@ export function DeliverySettingsForm({
       {provider === "api" && (
         <div className="space-y-4 rounded-xl border border-plum-ink/10 p-4">
           <p className="text-xs text-plum-ink/55">
-            For providers with a REST API. Credentials are stored encrypted. The adapter has
-            clearly-marked placeholders to finish once you have the provider&apos;s API docs.
+            For providers with a REST API. Credentials are stored encrypted. ServdGo has a
+            finished adapter — name it above and these three fields are all it needs. Any other
+            provider still needs its endpoints and field mapping filled in first.
           </p>
           <label className="block text-sm">
             <span className="font-medium">API base URL</span>
             <input name="apiBaseUrl" defaultValue={initial.apiBaseUrl} placeholder="https://api.provider.com/v1" className={field} />
+            <span className="mt-1 block text-xs text-plum-ink/45">
+              No trailing slash. For ServdGo this is their functions root —
+              <code> https://&lt;project-ref&gt;.supabase.co/functions/v1</code> — and the API key
+              is the <code>sgo_…</code> one their operator mints for this restaurant.
+            </span>
           </label>
           <label className="block text-sm">
             <span className="font-medium">API key</span>
