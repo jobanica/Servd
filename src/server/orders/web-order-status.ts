@@ -1,6 +1,7 @@
 "use server";
 
 import { systemDb } from "@/server/tenancy/scoped-db";
+import { visibleRiderTracking } from "@/lib/orders/rider-tracking";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
 import { ensureSettlementPayment } from "@/server/orders/settle-payment";
 
@@ -88,21 +89,6 @@ export interface WebOrderStatusResult {
    */
   riderTrackingUrl: string | null;
   riderName: string | null;
-}
-
-/**
- * What the diner may see of the rider, given the booking we hold.
- *
- * Pulled out as its own function because it is a rule, not plumbing: a link is
- * shown only while somebody is actually carrying the order, and only when the
- * provider gave us a page to link to. A manual booking never has one.
- */
-export function visibleRiderTracking(
-  booking: { trackingUrl: string | null; riderName: string | null; status: string } | null,
-): { riderTrackingUrl: string | null; riderName: string | null } {
-  const live = booking?.status === "assigned" || booking?.status === "picked_up";
-  if (!live || !booking?.trackingUrl) return { riderTrackingUrl: null, riderName: null };
-  return { riderTrackingUrl: booking.trackingUrl, riderName: booking.riderName ?? null };
 }
 
 export async function getWebOrderStatus(

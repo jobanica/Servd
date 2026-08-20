@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { visibleRiderTracking } from "@/server/orders/web-order-status";
+import { visibleRiderTracking } from "@/lib/orders/rider-tracking";
 
 /**
  * The diner sees a track-your-rider link only when there is genuinely something
