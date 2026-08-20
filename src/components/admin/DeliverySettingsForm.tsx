@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { updateDeliverySettings, type FormState, type DeliverySettingsView } from "@/server/delivery/settings";
 import { SubmitButton } from "./SubmitButton";
+import { CopyLink } from "@/components/super-admin/CopyLink";
 
 const field = "mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm";
 
@@ -102,9 +103,21 @@ export function DeliverySettingsForm({
               className={field}
             />
           </label>
+          {/* The provider asks the restaurant for this. It's unique per
+              restaurant — the id in the path is how an incoming rider update is
+              matched to the right shop — so it can't be one shared URL. */}
           <div className="rounded-lg bg-cream px-3 py-2 text-xs">
-            <p className="font-semibold text-plum-ink/70">Point the provider&apos;s status webhook to:</p>
+            <p className="font-semibold text-plum-ink/70">
+              Your webhook URL — give this to the delivery provider:
+            </p>
             <p className="mt-1 break-all font-mono text-plum-ink">{webhookUrl}</p>
+            <div className="mt-2">
+              <CopyLink url={webhookUrl} label="Copy webhook URL" />
+            </div>
+            <p className="mt-2 text-plum-ink/55">
+              They POST rider updates here — accepted, picked up, delivered — signed with the
+              webhook secret above, which is what proves the call really came from them.
+            </p>
           </div>
         </div>
       )}
