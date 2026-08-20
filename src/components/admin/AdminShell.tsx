@@ -8,6 +8,7 @@ import { brandStyle, type BrandInput } from "@/lib/theme/brand";
 import { signOut } from "@/app/(platform)/login/actions";
 import { PlatformFeedbackButton } from "./PlatformFeedbackButton";
 import { BranchSwitcher } from "./BranchSwitcher";
+import { AnnouncementBadge } from "./AnnouncementBadge";
 import type { BranchRow } from "@/server/tenancy/branches";
 
 function Icon({ d }: { d: string }) {
@@ -67,7 +68,13 @@ const ITEM_FEATURE: Record<string, string> = {
 
 type Item = { label: string; href: string; d: string };
 const NAV: { group: string; items: Item[] }[] = [
-  { group: "", items: [{ label: "Dashboard", href: "/admin", d: I.home }] },
+  {
+    group: "",
+    items: [
+      { label: "Dashboard", href: "/admin", d: I.home },
+      { label: "Announcements", href: "/admin/announcements", d: I.bell },
+    ],
+  },
   {
     group: "Menu",
     items: [
@@ -138,6 +145,7 @@ export function AdminShell({
   features,
   showTutorials = false,
   branches = [],
+  unreadAnnouncements = 0,
   children,
 }: {
   brand: { name: string; slug: string; status: string; logoUrl?: string | null };
@@ -148,6 +156,8 @@ export function AdminShell({
   showTutorials?: boolean;
   /** Every shop this login can work in. The switcher hides below two. */
   branches?: BranchRow[];
+  /** Platform notices this person hasn't read. Drives the badge. */
+  unreadAnnouncements?: number;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -197,6 +207,9 @@ export function AdminShell({
                 >
                   <Icon d={item.d} />
                   <span className="flex-1">{item.label}</span>
+                  {item.href === "/admin/announcements" && (
+                    <AnnouncementBadge count={unreadAnnouncements} />
+                  )}
                   {locked && (
                     <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-mango">
                       {/* lock icon */}

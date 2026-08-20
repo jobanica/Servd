@@ -4,6 +4,7 @@ import { getEntitledFeatures } from "@/server/billing/feature-gate";
 import { hasTutorials } from "@/server/tutorials/tutorials";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { listBranches } from "@/server/tenancy/branches";
+import { unreadCount } from "@/server/announcements/queries";
 
 /**
  * Dashboard chrome for the restaurant back-office. Wraps every /admin page in
@@ -40,6 +41,9 @@ export default async function AdminLayout({
   // Only an owner with more than one shop sees a switcher; for everyone else
   // this is one cheap query that resolves to a single row.
   const branches = await listBranches(user.authUserId, user.restaurantId);
+  // Best-effort by construction — unreadCount returns 0 rather than throwing,
+  // so a notice badge can never be the reason a dashboard fails to render.
+  const unreadAnnouncements = await unreadCount(user.staffUserId);
 
   return (
     <AdminShell
@@ -58,6 +62,7 @@ export default async function AdminLayout({
       features={[...features]}
       showTutorials={tutorialsReady}
       branches={branches}
+      unreadAnnouncements={unreadAnnouncements}
     >
       {children}
     </AdminShell>

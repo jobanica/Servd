@@ -2096,3 +2096,48 @@ model SmsCreditLedger {
   @@index([restaurantId])
   @@map("sms_credit_ledger")
 }
+
+// ----------------------------------------------------------------------------
+// Platform announcements
+// ----------------------------------------------------------------------------
+
+/// Something the platform owner needs every restaurant to see — a bug being
+/// fixed, planned downtime, a new feature.
+///
+/// Deliberately its own table rather than a column on anything existing: a new
+/// table can be missing entirely without breaking a single existing query,
+/// which is the safest shape for something added to a live system.
+model Announcement {
+  id          String    @id @default(uuid())
+  title       String
+  body        String
+  /// info | warning | incident — drives the colour, not the behaviour.
+  level       String    @default("info")
+  /// Null while a draft. Set when it goes out; only published ones are shown.
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  reads AnnouncementRead[]
+
+  @@index([publishedAt])
+  @@map("announcements")
+}
+
+/// One row per person per announcement they've read.
+///
+/// Per STAFF USER, not per restaurant: the badge is telling one person there's
+/// something they haven't seen, and a manager reading it shouldn't clear it for
+/// the owner who hasn't.
+model AnnouncementRead {
+  id             String   @id @default(uuid())
+  announcementId String
+  staffUserId    String
+  readAt         DateTime @default(now())
+
+  announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+
+  @@unique([announcementId, staffUserId])
+  @@index([staffUserId])
+  @@map("announcement_reads")
+}

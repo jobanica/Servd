@@ -37,6 +37,7 @@ const I = {
   grad: "M22 10L12 5 2 10l10 5 10-5zM6 12v5c0 1 2.7 2 6 2s6-1 6-2v-5",
   chart: "M3 3v18h18M7 15l3-4 3 3 4-6",
   back: "M19 12H5M12 19l-7-7 7-7",
+  bell: "M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0",
 };
 
 const NAV = [
@@ -56,6 +57,7 @@ const NAV = [
   { label: "Invoices", href: "/super-admin/invoices", d: I.receipt },
   { label: "Payments", href: "/super-admin/payments", d: I.card },
   { label: "Partners", href: "/super-admin/partners", d: I.card },
+  { label: "Announcements", href: "/super-admin/announcements", d: I.bell },
   { label: "Feedback", href: "/super-admin/feedback", d: I.chat },
 ];
 
