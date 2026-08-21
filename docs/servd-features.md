@@ -150,6 +150,14 @@ who wants the full view.
 **Unlocks are per branch.** Each branch is its own tenant, so a two-branch
 account that wants inventory in both pays ₱3,000 twice.
 
+**What "Powered by Servd" means in practice.** Accounts opened from 21 August
+2026 carry a small "Powered by Servd · www.servdph.com" line at the foot of
+their ordering website and their table/QR menu, plus the Servd splash after a
+QR scan. **Accounts that were already trading before that date are
+grandfathered** — nothing was added to their pages. The ₱2,500 white-label
+unlock removes all of it, for any account, however long they have been on
+Servd: the footer, the QR splash, and the line in their own dashboard.
+
 **Servd takes no cut of sales.** Customers pay by scanning the restaurant's own
 GCash, Maya or bank QR and attaching the reference; the money lands directly in
 the restaurant's account. No gateway, no gateway fee, no commission.

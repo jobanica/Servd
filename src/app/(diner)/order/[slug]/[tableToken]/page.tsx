@@ -10,6 +10,7 @@ import { getLoyaltyConfig } from "@/server/loyalty/loyalty";
 import { hasFeature } from "@/server/billing/feature-gate";
 import { getPublicRatingStats } from "@/server/feedback/queries";
 import { DinerMenu } from "@/components/diner/DinerMenu";
+import { getServdBranding } from "@/server/branding/powered-by";
 
 /**
  * Diner entry point from the QR scan: /order/{slug}/{tableToken}
@@ -34,13 +35,14 @@ export default async function DinerOrderPage({
   if (!table) notFound();
 
   const locale = await getLocale();
-  const [categories, promotions, loyalty, loyaltyOk, promoOk, rating] = await Promise.all([
+  const [categories, promotions, loyalty, loyaltyOk, promoOk, rating, branding] = await Promise.all([
     getPublicMenu(restaurant.id, locale),
     getActivePromotions(restaurant.id),
     getLoyaltyConfig(restaurant.id),
     hasFeature(restaurant.id, "loyalty"),
     hasFeature(restaurant.id, "promotions"),
     getPublicRatingStats(restaurant.id),
+    getServdBranding(restaurant.id),
   ]);
 
   return (
@@ -62,6 +64,7 @@ export default async function DinerOrderPage({
       promotions={promoOk ? promotions : []}
       loyaltyEnabled={loyaltyOk && loyalty.enabled}
       rating={rating}
+      branding={branding}
     />
   );
 }

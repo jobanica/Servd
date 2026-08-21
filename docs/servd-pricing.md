@@ -83,7 +83,7 @@ expire or be cancelled, because it was bought rather than rented.
 | Offline mode | **₱1,500** |
 | Online ordering website + delivery | **₱2,500** |
 | Accounting (sales, VAT, P&L) | **₱2,500** |
-| Full white-label (removes "Powered by Servd") | **₱2,500** |
+| Full white-label (removes "Powered by Servd" everywhere) | **₱2,500** |
 | Inventory, COGS & auto-reorder | **₱3,000** |
 | HR, attendance & payroll | **₱3,000** |
 
@@ -222,6 +222,15 @@ existed before table QRs became a paid unlock are grandfathered and keep
 unlimited tables at no charge.
 
 **Is the ₱500 for tables monthly?** No, a single payment.
+
+**Why does my ordering page say "Powered by Servd"?** Accounts opened from 21
+August 2026 carry it at the foot of their ordering website and table/QR menu.
+Restaurants that were already trading before that date don't have it and never
+will — nothing was added to pages that were already live. The ₱2,500 white-label
+unlock removes it everywhere for anyone, including the splash after a QR scan.
+
+**I've been with Servd for a year — will this appear on my site now?** No. You
+are grandfathered.
 
 **Are there setup fees or contracts?** Neither. No lock-in.
 

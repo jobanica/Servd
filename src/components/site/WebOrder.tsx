@@ -23,6 +23,7 @@ import { wrapsMidnight } from "@/lib/site/store-hours";
 import { LocationPicker } from "./LocationPicker";
 import { WebOrderTracker } from "./WebOrderTracker";
 import { haversineKm, computeDistanceFee } from "@/lib/geo/distance";
+import { PoweredByServd } from "@/components/branding/PoweredByServd";
 
 function lineId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -80,6 +81,16 @@ export interface WebOrderProps {
   acceptsBookings?: boolean;
   bookHref?: string;
   scheduleFor?: string; // ISO — preselect "schedule for later" (from the pre-order page)
+  /**
+   * Show "Powered by Servd · www.servdph.com" at the foot of the page.
+   *
+   * Decided on the server (server/branding/powered-by.ts): new accounts carry
+   * it, accounts that were already trading before it existed are grandfathered,
+   * and anyone who bought the full white-label unlock never does. Defaults to
+   * OFF, so a caller that hasn't been told about it shows nothing rather than
+   * stamping a page that shouldn't be stamped.
+   */
+  poweredBy?: boolean;
   /**
    * DIY preview: render the storefront exactly as a live one, but intercept the
    * final "Place order" tap with the activation prompt instead of creating an
@@ -350,7 +361,7 @@ function ProductCard({ item, onPick }: { item: DinerItem; onPick: (i: DinerItem)
 }
 
 export function WebOrder(props: WebOrderProps) {
-  const { slug, restaurantName, logoUrl, categories, contact, loyalty, hours, zones = [], openNow, pauseWhenClosed, ordersPaused, acceptsBookings, bookHref, demo = false, onDemoOrder } = props;
+  const { slug, restaurantName, logoUrl, categories, contact, loyalty, hours, zones = [], openNow, pauseWhenClosed, ordersPaused, acceptsBookings, bookHref, demo = false, onDemoOrder, poweredBy = false } = props;
   const home = props.homeHref ?? `/r/${slug}`;
   const book = bookHref ?? `/r/${slug}/book`;
   // Two ways ordering stops. `ordersPaused` is the owner's own switch, thrown
@@ -1351,6 +1362,11 @@ export function WebOrder(props: WebOrderProps) {
             </div>
           </section>
         ))}
+
+        {/* Below everything the diner came here to do, and above the cart bar's
+            reserved space. Only new accounts without the white-label unlock
+            reach this — see lib/branding/powered-by.ts. */}
+        {poweredBy && <PoweredByServd className="mt-4 text-plum-ink/60" />}
       </main>
       </div>
 
