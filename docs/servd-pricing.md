@@ -25,6 +25,7 @@ All amounts are Philippine Pesos (₱).
 |---|---|---|
 | **Get started** | ₱0 | Free forever |
 | **Activate online ordering** | **₱499** | One time |
+| **Each extra branch** | **₱499** | One time, per branch |
 | **Unlimited tables & QR codes** | **₱500** | One time |
 | **Any other feature** | ₱500 – ₱3,000 | One time, per feature |
 | **Content scheduler** | ₱499 / month | The only recurring charge |
@@ -97,6 +98,20 @@ Bought from **Admin → Billing & features**.
 - **SMS marketing** — every text costs real money, so it runs on credits.
 - **AI menu import** — burns API credits per import.
 - **Content scheduler** — its own monthly subscription (below).
+
+---
+
+## 4b. Extra branches — ₱499 each, one time
+
+A restaurant with more than one location runs them all from **one login**. The
+owner adds a branch at **Admin → Branches**, pays ₱499 to activate it, and then
+switches between branches inside the admin dashboard without logging out.
+
+- One payment per branch. No monthly fee for a branch.
+- A branch that hasn't been paid for can be created but **can't be entered** —
+  it stays greyed out in the switcher until activation clears.
+- Feature unlocks are **per branch**: each branch is its own account for
+  entitlement purposes, so unlocking inventory in two branches is two purchases.
 
 ---
 
