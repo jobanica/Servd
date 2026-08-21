@@ -9,6 +9,8 @@ import { printKitchenTicket } from "@/server/printing/print";
 import { runPrintDispatch } from "@/lib/print/run-dispatch";
 import { ItemConfig, lineId, addCartLine, changeLineQty } from "./NewOrderModal";
 import { PosItemTile } from "./PosItemTile";
+import { useStockMode } from "./useStockMode";
+import { StockModeButton, StockModeBanner } from "./StockModeBar";
 
 /**
  * Add more items to an existing open order — for when a customer orders, then
@@ -32,6 +34,9 @@ export function AddItemsModal({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Same sold-out switch as the new-order pad — a dish just as often runs out
+  // while the cashier is adding a second round to a table that's already open.
+  const { stockMode, busyId, note, toggleMode, toggleStock } = useStockMode(setMenu);
 
   useEffect(() => {
     getPosMenu()
@@ -43,6 +48,10 @@ export function AddItemsModal({
   const nonEmpty = (menu ?? []).filter((c) => c.items.length > 0);
 
   function pickItem(item: DinerItem) {
+    if (stockMode) {
+      void toggleStock(item);
+      return;
+    }
     if (!item.isAvailable) return;
     if (item.groups.length === 0 && !(item.variants && item.variants.length > 0)) {
       setLines((prev) =>
@@ -103,6 +112,20 @@ export function AddItemsModal({
           <div className="grid flex-1 grid-cols-1 gap-0 overflow-hidden md:grid-cols-[1fr_320px]">
             {/* Menu */}
             <div className="overflow-y-auto p-4">
+              <div className="mb-3 flex items-center justify-end">
+                <StockModeButton
+                  on={stockMode}
+                  onClick={() => {
+                    setConfigItem(null);
+                    toggleMode();
+                  }}
+                />
+              </div>
+              {stockMode && (
+                <div className="mb-3">
+                  <StockModeBanner note={note} />
+                </div>
+              )}
               {nonEmpty.length === 0 && <p className="text-sm text-plum-ink/50">No menu items yet.</p>}
               {nonEmpty.map((cat) => (
                 <section key={cat.id} className="mb-5">
@@ -123,7 +146,13 @@ export function AddItemsModal({
                           />
                         </div>
                       ) : (
-                        <PosItemTile key={item.id} item={item} onPick={pickItem} />
+                        <PosItemTile
+                          key={item.id}
+                          item={item}
+                          onPick={pickItem}
+                          stockMode={stockMode}
+                          busy={busyId === item.id}
+                        />
                       ),
                     )}
                   </div>

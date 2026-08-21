@@ -26,15 +26,36 @@ function colorFor(id: string): string {
  * One image-forward menu tile for the cashier POS grid — a photo (or a colored
  * placeholder with the name) with the item name + price overlaid, so staff can
  * order by tapping pictures, like a classic touchscreen POS.
+ *
+ * `stockMode` turns the whole grid into the sold-out switch instead of the
+ * order pad: every tile becomes tappable — the sold-out ones ESPECIALLY, since
+ * those are the ones being put back — and the label says what the tap will do.
+ * A separate mode rather than a corner button on each tile, because the corner
+ * of a tile is exactly where a thumb lands when a queue is building, and taking
+ * a dish off the menu is not something to do by accident.
  */
-export function PosItemTile({ item, onPick }: { item: DinerItem; onPick: (item: DinerItem) => void }) {
+export function PosItemTile({
+  item,
+  onPick,
+  stockMode = false,
+  busy = false,
+}: {
+  item: DinerItem;
+  onPick: (item: DinerItem) => void;
+  stockMode?: boolean;
+  busy?: boolean;
+}) {
   const soldOut = !item.isAvailable;
   return (
     <button
       type="button"
-      disabled={soldOut}
+      disabled={stockMode ? busy : soldOut}
       onClick={() => onPick(item)}
-      className="group relative aspect-square overflow-hidden rounded-lg border border-plum-ink/10 text-left transition hover:border-brand-primary disabled:opacity-50"
+      className={`group relative aspect-square overflow-hidden rounded-lg border text-left transition disabled:opacity-50 ${
+        stockMode
+          ? "border-mango ring-2 ring-mango/40 hover:border-mango"
+          : "border-plum-ink/10 hover:border-brand-primary"
+      }`}
     >
       {item.imageUrl ? (
         <>
@@ -61,6 +82,18 @@ export function PosItemTile({ item, onPick }: { item: DinerItem; onPick: (item: 
       {soldOut && (
         <span className="absolute right-1 top-1 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white">
           Sold out
+        </span>
+      )}
+
+      {/* What this tap will do, spelled out. In stock mode the tile is no
+          longer an "add to order" button, and it has to stop looking like one. */}
+      {stockMode && (
+        <span
+          className={`absolute inset-x-0 top-0 px-1 py-1 text-center text-[10px] font-bold uppercase tracking-wide text-white ${
+            busy ? "bg-plum-ink/70" : soldOut ? "bg-emerald-600/90" : "bg-guava/90"
+          }`}
+        >
+          {busy ? "Saving…" : soldOut ? "Put back" : "Sold out"}
         </span>
       )}
     </button>

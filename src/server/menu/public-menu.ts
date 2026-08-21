@@ -136,6 +136,11 @@ export async function getPublicMenu(
       videoUrl: item.videoUrl,
       videoPosterUrl: item.videoPosterUrl,
       isAvailable: item.isAvailable && !cappedOut && !allSizesOut && !stockOut,
+      // The two reasons, kept apart. Only the cashier POS reads these — its
+      // sold-out button moves the hand switch, so it has to know whether the
+      // switch is what's holding the item down or whether something ran out.
+      manualOut: !item.isAvailable,
+      autoOut: cappedOut || allSizesOut || stockOut,
       dietaryTags: item.dietaryTags ?? [],
       // Sorted by the order set on the Modifiers page, so every item asks the
       // same questions in the same sequence.
