@@ -1684,6 +1684,14 @@ model Order {
   surchargeLabel      String?
   inventoryDeductedAt DateTime? // set once stock is deducted (idempotency)
   servedAt            DateTime? // set when the cashier confirms the food was served
+  /// A second round: the table ate, asked for more, and the cashier punched it
+  /// onto the same bill. Stamped every time items are appended to an order that
+  /// already existed, so the kitchen card can say "these are extras" instead of
+  /// looking like a ticket the cook has somehow already made most of.
+  ///
+  /// Nullable with no default — it ships as a hand-run migration, and a
+  /// defaulted column is one Prisma writes into the INSERT of every order.
+  addedItemsAt        DateTime?
   voidedAt            DateTime? // set when a cashier voids the (unpaid) order
   prepMinutes         Int? // prep-time estimate (minutes) a merchant sets on accept
   cancelReason        String? // reason a merchant rejected the order

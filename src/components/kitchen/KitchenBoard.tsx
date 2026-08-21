@@ -66,6 +66,16 @@ function OrderCard({
         {order.typeLabel ?? "Dine in"}
       </p>
 
+      {/* A second round on a bill the kitchen may already have finished.
+          Without this the ticket comes back with most of its lines struck
+          through and reads as a mistake, when what it actually means is "cook
+          the ones that aren't ticked". */}
+      {order.addedItemsAt && (
+        <p className="border-b border-brand-primary/40 bg-brand-primary/10 px-3 py-2 text-sm font-extrabold uppercase tracking-wide leading-snug text-brand-primary">
+          ➕ Extra order — cook the unticked items
+        </p>
+      )}
+
       {/* An advance order, and when it's actually wanted. Stays on the card for
           as long as the ticket is up: accepting it told the kitchen the order
           exists, it didn't make it due now, and a card with no date on it looks
@@ -207,6 +217,12 @@ export function KitchenBoard({
       // Ring for tickets the kitchen hasn't seen yet. The first load only seeds
       // the seen-set, so opening the screen mid-service doesn't set it off.
       const unseen = fresh.filter((o) => !seenOrders.current.has(o.id));
+      // Forget tickets that have left the board. A table that has been served
+      // and orders more puts its ticket BACK, and the cook needs the same alert
+      // they'd get for any other order they haven't seen — a set that only ever
+      // grew meant the second round arrived in silence.
+      const live = new Set(fresh.map((o) => o.id));
+      for (const id of seenOrders.current) if (!live.has(id)) seenOrders.current.delete(id);
       for (const o of fresh) seenOrders.current.add(o.id);
       if (unseen.length > 0 && seeded.current && soundOn.current) {
         alertChime();

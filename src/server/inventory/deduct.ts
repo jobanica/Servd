@@ -19,8 +19,20 @@ import {
  * Records a `sale` movement per row (with the cost at the time, for COGS), and
  * if autoOutOfStock is on, pulls anything that hit zero off the menu.
  * Best-effort: never throws into the order flow.
+ *
+ * `only` is for a SECOND ROUND: a table that has eaten, had its stock taken
+ * out, and then ordered more onto the same bill. That order is already stamped
+ * as deducted, so the normal call returns immediately and the extra dishes come
+ * out of the kitchen without ever coming out of stock. Passing just the new
+ * lines deducts exactly those, skips the stamp check, and deliberately does NOT
+ * re-stamp — the stamp still means "the first round was accounted for", and
+ * moving it would let a genuinely undeducted order slip through.
  */
-export async function deductForOrder(restaurantId: string, orderId: string): Promise<void> {
+export async function deductForOrder(
+  restaurantId: string,
+  orderId: string,
+  only?: readonly { menuItemId: string | null; quantity: number }[],
+): Promise<void> {
   // Items that just crossed below their reorder level → alert after commit.
   const newlyLow: string[] = [];
   let alertPhone: string | null = null;
@@ -30,7 +42,12 @@ export async function deductForOrder(restaurantId: string, orderId: string): Pro
         where: { id: orderId },
         select: { inventoryDeductedAt: true, items: { select: { menuItemId: true, quantity: true } } },
       });
-      if (!order || order.inventoryDeductedAt) return;
+      if (!order) return;
+      // The stamp guards the whole-order call only; an explicit line list has
+      // already been decided to be new.
+      if (!only && order.inventoryDeductedAt) return;
+      const lines = only ?? order.items;
+      if (lines.length === 0) return;
 
       const restaurant = await tx.restaurant.findFirstOrThrow({
         select: { autoOutOfStock: true, lowStockAlertPhone: true },
@@ -38,7 +55,7 @@ export async function deductForOrder(restaurantId: string, orderId: string): Pro
       alertPhone = restaurant.lowStockAlertPhone ?? null;
 
       const menuItemIds = [
-        ...new Set(order.items.map((i) => i.menuItemId).filter((id): id is string => id != null)),
+        ...new Set(lines.map((i) => i.menuItemId).filter((id): id is string => id != null)),
       ];
 
       const recipes: StockLink[] = await tx.recipeComponent.findMany({
@@ -64,7 +81,7 @@ export async function deductForOrder(restaurantId: string, orderId: string): Pro
       const links = [...recipes, ...products];
       const depleted: string[] = [];
 
-      for (const { inventoryItemId, quantity } of planDeductions(order.items, links)) {
+      for (const { inventoryItemId, quantity } of planDeductions(lines, links)) {
         const inv = await tx.inventoryItem.findUnique({ where: { id: inventoryItemId } });
         if (!inv) continue;
         const newStock = inv.stockQty - quantity;
@@ -97,7 +114,12 @@ export async function deductForOrder(restaurantId: string, orderId: string): Pro
         }
       }
 
-      await tx.order.update({ where: { id: orderId }, data: { inventoryDeductedAt: new Date() } });
+      // Only the whole-order call owns the stamp. A second round leaves it
+      // where it is: it records that the order has been accounted for, and the
+      // extra lines were just accounted for too.
+      if (!only) {
+        await tx.order.update({ where: { id: orderId }, data: { inventoryDeductedAt: new Date() } });
+      }
     });
 
     // Low-stock SMS alert (best-effort, after commit), once per crossing.

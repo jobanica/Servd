@@ -83,6 +83,31 @@ async function preparedMap(restaurantId: string, orderIds: string[]): Promise<Ma
 }
 
 /**
+ * When each ticket last had items added to it.
+ *
+ * Its own query, best-effort: `addedItemsAt` ships as a hand-run migration, and
+ * selecting it alongside the rest would take the whole kitchen display down on
+ * a database that hasn't run the file. No column means no badge, which is how
+ * the board read before extras were flagged at all.
+ */
+async function addedItemsMap(restaurantId: string, orderIds: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (orderIds.length === 0) return out;
+  try {
+    const rows = await tenantDb(restaurantId, (tx) =>
+      tx.order.findMany({
+        where: { id: { in: orderIds }, addedItemsAt: { not: null } },
+        select: { id: true, addedItemsAt: true },
+      }),
+    );
+    for (const r of rows) if (r.addedItemsAt) out.set(r.id, r.addedItemsAt.toISOString());
+  } catch {
+    /* addedItemsAt column not migrated yet */
+  }
+  return out;
+}
+
+/**
  * Adds the card title and the type line. Shared by the live queue and the
  * history so a ticket reads identically whichever list it's in — a cook
  * checking what they just closed shouldn't have to re-read a different layout.
@@ -101,6 +126,7 @@ async function decorate(
   const addresses = new Map<string, string>();
   const scheduled = new Map<string, string>();
   const prepared = await preparedMap(restaurantId, orders.map((o) => o.id));
+  const addedItems = await addedItemsMap(restaurantId, orders.map((o) => o.id));
   try {
     const meta = await tenantDb(restaurantId, (tx) =>
       tx.order.findMany({
@@ -155,6 +181,7 @@ async function decorate(
     total: o.total,
     customerAddress: addresses.get(o.id) ?? null,
     scheduledFor: scheduled.get(o.id) ?? null,
+    addedItemsAt: addedItems.get(o.id) ?? null,
     items: o.items.map((it) => ({
       id: it.id,
       name: it.nameAtTime,

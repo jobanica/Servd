@@ -58,7 +58,7 @@ export function productStockLinks(
  * across concurrent orders. Two tills closing overlapping orders at the same
  * moment then queue instead of deadlocking.
  */
-export function planDeductions(lines: SoldLine[], links: StockLink[]): Deduction[] {
+export function planDeductions(lines: readonly SoldLine[], links: StockLink[]): Deduction[] {
   const byMenuItem = new Map<string, StockLink[]>();
   for (const l of links) {
     const list = byMenuItem.get(l.menuItemId);
