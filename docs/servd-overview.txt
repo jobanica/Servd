@@ -1,0 +1,531 @@
+==============================================================================
+                          SERVD — COMPLETE OVERVIEW                           
+==============================================================================
+
+Everything Servd is and does, in one document. Written as the single reference
+to hand to a partner, a new staff member, or an AI assistant answering
+questions.
+
+Last updated: 22 August 2026 · Currency: ₱ (stored in centavos) · Timezone:
+Asia/Manila (UTC+8)
+
+Companion documents: servd-features.md for every price, servd-pricing.md for
+the customer-facing wording, servd-knowledge-base.md for feature-level detail.
+
+------------------------------------------------------------------------------
+1. WHAT SERVD IS
+------------------------------------------------------------------------------
+
+An all-in-one restaurant and food-business operating system built for the
+Philippines. One account covers the whole business: QR menus at the table, a
+cashier POS, a kitchen display, an online ordering website, delivery,
+payments, inventory, accounting, HR and marketing.
+
+  Who it's for     Restaurants, cafés, carinderias, food parks, milk tea
+                   shops, bakeries, catering, cloud kitchens, and retail
+                   sellers of packaged goods
+  Where it runs    Any web browser — Android tablets, iPads, phones, laptops,
+                   desktops. Nothing to install
+  Money            Philippine Peso, stored in centavos so nothing rounds twice
+  Time             Every "today", day boundary and printed time is Manila
+                   wall-clock, wherever the server is
+  Languages        English interface, per-item menu translations for diners
+  Data isolation   Enforced at the database level (row-level security), not
+                   just in the application
+
+The business model, in one line
+
+There is no monthly subscription. ₱499 activates a restaurant's online
+ordering; every other paid feature is bought once and owned for good. The only
+recurring charge in the entire product is the content scheduler at ₱499/month.
+Servd takes no commission on sales.
+
+------------------------------------------------------------------------------
+2. WHAT EVERY ACCOUNT GETS FREE, FOREVER
+------------------------------------------------------------------------------
+
+Not a trial. Never gated, nothing to cancel.
+
+Ordering & service — QR dine-in ordering · counter/takeout QR with order
+numbers · 1 table QR · cashier POS · kitchen display · split payments, split
+bills and tips · void/edit with manager approval · dietary tags
+
+Printing — thermal receipts at the till · an optional separate kitchen printer
+over network, cloud or Bluetooth, so a shop with no kitchen display still gets
+the ticket printed in the kitchen when the cashier accepts an order
+
+Customers — feedback capture and Google review prompts
+
+Staff — 3 staff accounts
+
+------------------------------------------------------------------------------
+3. EVERYTHING YOU CAN BUY
+------------------------------------------------------------------------------
+
+₱499 one-time activates the ordering website. The same ₱499 activates each
+extra branch — one login manages them all, and a branch that hasn't been paid
+for can be created but not entered.
+
+16 one-time feature unlocks, ₱500 – ₱3,000 each. Bought once, owned for good;
+an unlock cannot lapse, expire or be cancelled.
+
+  Fee      Features
+  ₱500     Unlimited tables & QR codes · Custom domain · Data export
+  ₱600     Audit log
+  ₱700     Customer book + CSV export
+  ₱900     Visual floor plan · Gift cards & store credit
+  ₱1,000   Promotions, promo codes & happy hours
+  ₱1,200   Loyalty & rewards · Reservations & waitlist
+  ₱1,500   Offline mode
+  ₱2,500   Online ordering website + delivery · Accounting · Full white-label
+  ₱3,000   Inventory, COGS & reorder · HR, attendance & payroll
+
+Everything: ₱22,300 plus the ₱499 activation.
+
+Not sold as one-time unlocks: the social content scheduler (₱499/month) · SMS
+marketing (metered credits — every text costs real money) · AI menu import
+(priced but switched off; it burns API credits per import) · online card
+payments (retired — see §6).
+
+Prices are defaults. The owner changes any of them at Super-admin → Feature
+pricing with no deploy. Unlocks are per branch.
+
+How buying works. An owner who opens a locked screen gets an unlock card on
+that page — that one feature, what it does, its price — not the whole
+catalogue. The locked item stays in the sidebar with a padlock and links to
+its real page, so nothing is hidden and nothing is overwhelming.
+
+------------------------------------------------------------------------------
+4. HOW A DAY ACTUALLY RUNS
+------------------------------------------------------------------------------
+
+Order types — five names, used identically on every screen
+
+🍽️ Dine-in (at a table) · 🥡 Takeout (ordered at the counter, waits for it) ·
+🛍️ Pickup (ordered ahead, comes to collect) · 🛵 Delivery · 🏍️ Third-party
+(GrabFood, Foodpanda)
+
+Takeout and pickup are deliberately separate — the kitchen assembles them
+differently.
+
+Lifecycle
+
+pending → new → preparing → done → closed, plus cancelled.
+
+An order leaves the boards only when it is both paid and cooked. A takeout
+order paid up front stays on the kitchen display until the food is made.
+
+Four ways an order arrives
+
+  1. QR dine-in — the diner scans the table QR, browses on their phone, orders
+     with no app and no account. Live tracking, call waiter, request bill,
+     promo codes, tips, feedback afterwards.
+  2. Online ordering website — pickup and delivery, at a Servd URL or the
+     restaurant's own domain. Map location picker, scheduled orders, payment
+     proof upload, cart recovery, live tracking.
+  3. Counter / POS — the cashier punches it with the full menu, modifiers,
+     variants, discounts and any order type.
+  4. Third-party — recorded so Grab and Foodpanda sales sit in the same
+     reports as everything else.
+
+Roles
+
+  Role            Opens
+  admin (owner)   Everything
+  manager         HR and scheduling
+  cashier         Cashier POS, shift summary, closed orders
+  kitchen         Kitchen display only
+  merchant        The "Incoming Orders" screen only
+
+Plus a separate employee portal where staff see their own payslips, schedule,
+attendance and leave.
+
+------------------------------------------------------------------------------
+5. THE CASHIER POS
+------------------------------------------------------------------------------
+
+The main service screen. Updates live — new orders appear without refreshing.
+
+Orders — tables and open orders on one board · accept/decline incoming QR
+orders · create an order at the counter · add items to an open order · edit
+with manager approval · void an order or a single line with a required reason
+and a void PIN · void an already-closed order (reverses the money, stays in
+the audit log) · reopen a closed order · mark served · closed & voided list
+for the shift
+
+Mark a dish sold out from the till. A 🚫 Sold out button turns the item grid
+into the switch: tap a dish to take it off the menu, tap a sold-out one to put
+it back. It comes off the website and the QR menu immediately. Built because
+lechon runs out at seven on a Saturday and the owner is not in the shop. If
+the dish ran out by count rather than by hand, the till says so plainly
+instead of letting the button look broken.
+
+Payments — Cash · Card terminal · GCash · Maya · Bank transfer · cash tendered
+→ change due with suggested notes · split payments · split bills · tips ·
+Senior Citizen and PWD discounts · gift cards and store credit · loyalty
+redemption · the customer's payment screenshot viewable from the order card
+
+Cash handling — cash-out with a note · open drawer ("no sale") · shift notes
+
+Printing — bill · receipt · kitchen ticket · end-of-shift summary
+
+------------------------------------------------------------------------------
+6. PAYMENTS
+------------------------------------------------------------------------------
+
+At the counter: Cash, Card terminal, GCash, Maya, Bank transfer.
+
+Online: the customer scans the restaurant's own GCash, Maya or bank (InstaPay
+/ QRPH) QR, sends the money, and attaches the reference and a screenshot.
+Staff confirm it against the account before settling — a screenshot alone
+never closes a bill. The money lands directly in the restaurant's account.
+Servd never holds it and adds nothing on top.
+
+The card gateway was retired. Connected PayMongo/Xendit accounts redirected
+the diner off-site to pay by card. Almost nobody used it and the extra hop
+confused customers who already know how to scan a QR. Restaurants that bought
+it keep it; it is never sold again.
+
+Third-party orders show one button — "Picked up — settled by <platform>" —
+instead of Cash/GCash/Card. It gets its own line in the shift breakdown,
+Z-report and accounting; the drawer never opens; discounts, points and gift
+cards are hidden (the app charged the customer and ran its own promo).
+Recorded at full ticket value, not net of commission — commission is a cost
+against the remittance, not a discount the restaurant gave.
+
+Pay before the food is made. For counters where the customer orders, pays,
+then sits down. The till leads with Take payment and nothing reaches the
+kitchen until the money is in. It only decides which button is the big one —
+the cashier can always send unpaid, or take payment on one that wasn't going
+to be.
+
+Card surcharge. An optional fee (e.g. 3.5%) added on top for counter card
+payments, worked out on the server from the saved rate, shown before the
+customer taps, printed as its own line with the rate on it. On a split bill it
+applies only to the card portion. No loyalty points on the fee.
+
+------------------------------------------------------------------------------
+7. THE KITCHEN DISPLAY
+------------------------------------------------------------------------------
+
+Live tickets, colour-coded by how long they have waited — green fresh, amber
+dragging, red genuinely late. Realtime updates with a polling fallback, so it
+keeps working on flaky Wi-Fi.
+
+  - Audible new-order chime, mutable, with a visible prompt when the browser
+    is blocking sound (browsers need one tap before they will play audio)
+  - Tap individual lines to tick them off as they are plated — struck through
+    on every tablet, so the pass sees what is still to come on a five-item
+    ticket
+  - History of today's finished tickets, with the ability to bring one back
+  - Order type, customer name, item notes and modifiers on every card
+  - Optional delivery address on the ticket, for kitchens that batch by zone
+  - Optional kitchen ticket printing instead of a screen
+  - Offline mode (unlock) — keeps accepting taps with no connection and syncs
+    when it returns
+
+Extra rounds. A table that has been served and orders more used to be
+invisible here: the ticket was finished, so the extras landed on the bill and
+nowhere else, and somebody had to tell the kitchen to go and reopen it. Now
+the ticket comes back on its own, the first round already ticked off so what
+shows unticked is the extra, with an "Extra order" banner and the chime
+ringing as it would for any new ticket.
+
+------------------------------------------------------------------------------
+8. SHIFTS AND END-OF-SHIFT REPORTING
+------------------------------------------------------------------------------
+
+A shift is one cashier's turn at the till. It opens by itself the first time
+they settle an order — nobody presses "start".
+
+Per-cashier, not per-day. Each summary counts only that cashier's takings.
+
+Shifts survive midnight — bounded by how long they have run (up to 16 hours),
+not the calendar date, so a 6 PM–2 AM shift stays intact. One nobody signs out
+of closes automatically and is flagged "not signed out".
+
+The Z-report shows the cashier and start time, orders paid, sales by payment
+method, discounts, expenses, cash collected, cash taken out, expected in
+drawer, net, and the day's counter trade underneath for context — clearly
+marked as not part of this cashier's drawer. It prints as a real ESC/POS
+document, then End shift & sign out closes the shift and logs them out.
+
+Shift history keeps every transaction, totals by method and by order type, and
+the drawer figures, for 48 hours. Only the shift log is cleared; orders,
+payments and accounting records are never touched.
+
+Online payments count in shift totals but are excluded from the drawer figure
+— nobody put that money in a till.
+
+------------------------------------------------------------------------------
+9. MENU MANAGEMENT
+------------------------------------------------------------------------------
+
+  - Categories and items with photos, descriptions, prices, and videos
+    (uploaded or a YouTube/Vimeo link)
+  - Modifier groups shared across items, with required/optional and min/max
+    rules — and one order set once, so every dish asks Size → Flavour → Add-
+    ons in the same sequence instead of whatever order the database returned
+  - Individual modifier options can be marked out ("86 the add-on")
+  - Variants / sizes with their own prices and per-size stock
+  - Dietary tags, daily servings limits, food cost per item (feeding COGS and
+    profit)
+  - Counter-only items — punchable at the till, never shown online or on the
+    QR menu, and refused if a web order names one. For takeaway boxes charged
+    by size, an add-on somebody wants three of, staff meals, and dishes that
+    don't survive a delivery ride. A category whose items are all counter-only
+    disappears from the storefront entirely.
+  - Sort order, per-item translations, browser-side photo compression
+  - AI menu import — photograph a printed menu and correct the draft
+    (currently switched off; it burns API credits per import)
+
+------------------------------------------------------------------------------
+10. PRINTING AND HARDWARE
+------------------------------------------------------------------------------
+
+Four transports, set per restaurant:
+
+  Method          How it works
+  Network / USB   ESC/POS printer at a fixed station via a small local print-
+                  bridge agent. Most reliable
+  Cloud           The printer polls Servd for jobs (Star CloudPRNT, Epson
+                  Server Direct Print). Works from any device including iPad
+  Bluetooth       Web Bluetooth to a BLE ESC/POS printer. Chromium on
+                  desktop/Android only — not Safari or iOS, and not inside the
+                  Facebook, Messenger, Instagram or TikTok in-app browsers
+  OS dialog       The HTML ticket through the system print dialog / AirPrint.
+                  Device-agnostic fallback
+
+A second kitchen printer can run on a different transport from the till —
+including its own Bluetooth pairing — so the pass gets its ticket without a
+print dialog opening at the counter.
+
+Documents: bill, paid receipt, kitchen ticket, end-of-shift summary. 32-column
+thermal, with name, address, phone, website, custom footer, optional VAT
+breakdown, and a QR to order online. All times are Manila.
+
+Optional receipt lines — who the order is for (name, number, and the delivery
+address a rider actually reads) · cash received and change on cash sales · VAT
+breakdown, off for non-VAT sellers.
+
+Cash drawer plugs into the receipt printer and opens on a pulse: never / on
+cash payments (default) / on every payment. Not available through the OS print
+dialog, which cannot send control codes.
+
+------------------------------------------------------------------------------
+11. INVENTORY
+------------------------------------------------------------------------------
+
+Two ways of keeping stock, usable together. Per product for shops selling
+finished goods — one unit off the shelf per unit sold. Per ingredient for
+kitchens — recipes define consumption, deducted when the order is fulfilled.
+
+Both share: stock movements (sale, waste, adjustment, count, received, usage)
+· weighted-average cost · suppliers · purchase orders with receiving that re-
+averages cost · auto-reorder suggestions from 30-day velocity with one-tap
+draft POs · low-stock flags and an optional SMS alert · auto out-of-stock ·
+stock counts, waste write-offs, restocking · COGS reporting.
+
+Overselling protection: sellable stock is what's on hand minus what's already
+promised to orders taken but not yet fulfilled, so the last unit can't be sold
+twice.
+
+------------------------------------------------------------------------------
+12. ACCOUNTING AND ANALYTICS
+------------------------------------------------------------------------------
+
+Accounting — gross sales / sales collected, order count, discounts, expenses,
+net profit · sales by payment method · VAT (12%) with Senior/PWD exemption ·
+Profit & Loss with COGS from inventory · daily sales (Z-report) · every ticket
+in the period with a total that reconciles exactly to the headline figure ·
+voided tickets listed separately · expense recording. Periods: today, this
+month, last month.
+
+Every revenue figure in the app means the same thing: money actually
+collected, timestamped when the payment happened, bucketed in Manila time. The
+dashboard, accounting and the Z-report use one definition.
+
+Dashboard — pending acceptance, revenue today, orders today, open orders,
+average rating, recent orders, low-stock warnings, smart insights.
+
+Analytics — revenue, order count, average order value, revenue by day, best
+and worst sellers, payment mix, peak hours, rating trends.
+
+------------------------------------------------------------------------------
+13. EVERYTHING ELSE IT DOES
+------------------------------------------------------------------------------
+
+HR, attendance & payroll (unlock) — employee records with documents · time
+clock (shared screen, personal page, QR/token) · attendance and a late report
+· timesheets · shift scheduling with availability and swap requests · leave
+types, requests and balances · payroll with configurable deductions ·
+performance notes · the employee portal.
+
+Marketing & growth — loyalty points redeemable at the till · promo codes ·
+happy hours with time-windowed automatic pricing and the original struck
+through · gift cards and store credit · customer book with CSV export · SMS
+marketing with double opt-in, credit metering and unsubscribe handling · cart
+recovery · social content scheduler with an AI content engine · feedback,
+ratings over time and Google review prompting.
+
+Reservations, floor plan, delivery — public booking page and waitlist · visual
+floor plan with live table status · delivery zones and fees, a dispatch board,
+and courier booking through a provider adapter · advance orders on their own
+screen.
+
+Multi-branch — one login, many shops, switched inside the dashboard. Each
+branch is its own tenant, so staff, menus, stock and entitlements are
+separate; ₱499 activates each, and an unactivated branch cannot be entered.
+
+Branding — name, display name, logo, colours · receipt branding · the ordering
+website · custom domain (unlock) · full white-label (unlock) · printable table
+QR sheets.
+
+Operations & data — audit log (voids, price edits, item changes, table status,
+gift card redemptions, with who and the before/after) · CSV data export ·
+offline mode · in-app tutorials · guided onboarding checklist.
+
+Announcements — the Servd team publishes a notice to every restaurant, and a
+pinging unread badge appears on the admin dashboard until it is read.
+
+------------------------------------------------------------------------------
+14. "POWERED BY SERVD" AND WHITE-LABEL
+------------------------------------------------------------------------------
+
+                                  Website footer   QR menu footer   QR splash
+                                  Admin sidebar
+  Accounts opened before 21 Aug 2026—   —   ✅   ✅
+  Accounts opened from 21 Aug 2026✅   ✅   ✅   ✅
+  Bought white-label (₱2,500)     —   —   —   —
+
+Restaurants that were already trading are grandfathered — nothing was added to
+pages that were already live. The white-label unlock removes all of it for any
+account, however long they have been on Servd.
+
+------------------------------------------------------------------------------
+15. THE PARTNER PROGRAMME
+------------------------------------------------------------------------------
+
+For resellers and agencies who set restaurants up on Servd. Apply at
+/partner/apply.
+
+  - Unlimited accounts. No cap, no per-account charge to the partner.
+  - The partner sets the price. Whatever they bill a restaurant is agreed
+    directly between them; Servd never sees it and never invoices on their
+    behalf.
+  - No revenue share in either direction. No commission paid, no cut taken.
+    The old scheme — 30% year-one, 10% ongoing, milestone bonuses, clawbacks,
+    payout batches, referral credit — was withdrawn entirely and nothing
+    accrues under it.
+  - Free to join, subject to approval.
+
+How an account is created: the partner builds a demo storefront from their
+dashboard — a live ordering page with a real menu but no login — and shows it
+to the prospect. When they say yes, the partner converts it in one click: the
+same storefront gets a login (username + a one-time password to hand over),
+and the menu, link and QR codes carry over. No approval step, no cap. Each
+demo gets one menu scan.
+
+Converted accounts land on the ₱0 Free plan — Servd does not bill a restaurant
+a partner set up. They can still buy unlocks directly at the usual prices,
+separately from whatever the partner charges.
+
+------------------------------------------------------------------------------
+16. THE PLATFORM SIDE (SUPER-ADMIN)
+------------------------------------------------------------------------------
+
+Accounts · subscriptions · invoices · payments · plans · feature pricing
+(every price editable with no deploy) · storefronts and previews · partners ·
+announcements · CRM, funnel, prospecting and outreach · content engine ·
+feedback · tutorials · email settings.
+
+------------------------------------------------------------------------------
+17. HOW IT'S BUILT
+------------------------------------------------------------------------------
+
+  - Next.js 15 (App Router) · TypeScript · Prisma on PostgreSQL (Supabase) ·
+    Tailwind · Vitest (710+ tests)
+  - Tenant isolation at the database level. A tenant-scoped client for
+    restaurant data; a service-role client only where identity itself is being
+    resolved or a session-less webhook is running
+  - Manila time goes through one module, so a server in UTC never prints the
+    wrong hour on a receipt
+  - Pure logic is separated from I/O — rules live in tested pure functions,
+    the server layer does the reading and writing
+  - Migration-lag safety is the house rule. New columns ship as hand-run SQL
+    and are read in their own best-effort query, never folded into a shared
+    one. The reason is a real incident: one new field added to a shared read
+    made the whole query fail on a database that lacked the column, the catch
+    returned defaults, and a settings page then saved those defaults over live
+    payment and delivery configuration. A failed read must never become a
+    successful overwrite
+
+------------------------------------------------------------------------------
+18. GETTING STARTED
+------------------------------------------------------------------------------
+
+Two ways in:
+
+  1. Sign up and set the restaurant up from the dashboard.
+  2. Build a preview first — enter a name, add a few dishes, and instantly see
+     your own working page before deciding. Request activation when ready and
+     claim the account through a one-time secure link.
+
+Servd never emails passwords. Activation creates the login with a secret
+nobody sees; the owner sets their own through a one-time claim link.
+
+------------------------------------------------------------------------------
+19. KNOWN GAPS
+------------------------------------------------------------------------------
+
+Stated plainly, because knowing what is not there is part of knowing the
+product.
+
+  - Lalamove has no working adapter. The delivery layer is provider-agnostic
+    and ServdGo has a real one, but a Lalamove API key will not book a rider —
+    the generic REST template's auth, endpoints, field mapping and webhook
+    signature are all placeholders. Lalamove works today as a deep link: staff
+    tap through to Lalamove's own app with the details pre-filled, and status
+    stays manual.
+  - A printer-only kitchen reprints the whole ticket when extras are added,
+    not just the new items. Fine on a display; a double-cook risk on paper.
+  - Partner demo storefronts carry no Servd branding, since the demo pages
+    don't pass the branding flag.
+  - AI menu import is switched off and SMS runs on metered credits — neither
+    is a one-time unlock, and both cost real money per use.
+
+------------------------------------------------------------------------------
+20. THE QUESTIONS THAT GET ASKED MOST
+------------------------------------------------------------------------------
+
+Do customers need an app? No. Scan a QR or open the website in any browser.
+
+Do I need special hardware? No. A thermal printer and cash drawer are optional
+but supported.
+
+Do I pay monthly? No — ₱499 activates your online ordering and it's yours for
+good. Walang monthly bayad. Only the content scheduler is monthly, and only if
+you want it.
+
+Do you take a percentage of my sales? No. Customers scan your own GCash, Maya
+or bank QR, so the money goes straight to you.
+
+If I stop paying, do I lose what I bought? There is nothing to stop paying.
+One-time unlocks are owned, not rented.
+
+Can two cashiers work at once? Yes. Each has their own login and shift, so
+takings are counted separately. Any cashier can still settle any order —
+shifts decide whose money it is, never who may serve a table.
+
+Does it work if the internet drops? The kitchen and cashier keep working
+offline once that unlock is bought, and sync when the connection returns.
+
+Why doesn't the shift summary show the whole day? Because it is that cashier's
+drawer, not the restaurant's day. The day's total is underneath for reference,
+marked as not part of the drawer.
+
+Why is my dashboard revenue different from what I wrote down? Every figure in
+Servd means money actually collected. A hand-written tally usually also
+includes voided tickets and unsettled orders. Accounting lists every ticket in
+the period, with voided ones separately, so the difference can be found line
+by line.
