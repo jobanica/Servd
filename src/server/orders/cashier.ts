@@ -27,6 +27,7 @@ import { awardPointsForOrder, getBalance, getLoyaltyConfig, redeemPoints, enroll
 import { notifyCustomer, restaurantDisplayName } from "@/server/sms/notify";
 import { manilaStartOfDay } from "@/lib/time/manila";
 import { getDishStock } from "@/server/inventory/dish-stock";
+import { runAutoAccept } from "@/server/orders/auto-accept";
 import { deductForOrder } from "@/server/inventory/deduct";
 import { nextOrderNumberSafe } from "@/server/orders/next-number";
 import {
@@ -403,6 +404,10 @@ export async function getCashierTables(): Promise<CashierTable[]> {
 /** QR orders awaiting acceptance (the cashier's incoming-order queue). */
 export async function getIncomingOrders(): Promise<IncomingOrder[]> {
   const staff = await requireStaff(["cashier", "admin"]);
+  // Take anything nobody answered in time before listing, so the board never
+  // shows a card that has already run out its clock. A no-op — one small query
+  // — for every shop that hasn't switched auto-accept on.
+  await runAutoAccept(staff.restaurantId).catch(() => []);
   const orders = await tenantDb(staff.restaurantId, (tx) =>
     tx.order.findMany({
       where: { status: "pending" },

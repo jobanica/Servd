@@ -7,6 +7,10 @@ import { tenantDb } from "@/server/tenancy/scoped-db";
 import { uploadMenuImage } from "@/server/storage/menu-images";
 import { pesosToCentavos } from "@/lib/money";
 import { getStorefront, type DayHours, type DeliveryZone } from "./storefront";
+import {
+  AUTO_ACCEPT_DEFAULT_SECONDS,
+  normalizeAutoAcceptSeconds,
+} from "@/lib/orders/auto-accept";
 
 export type StorefrontState = { ok?: boolean; error?: string } | null;
 
@@ -230,4 +234,51 @@ export async function setOrdersPaused(
   revalidatePath("/r/[slug]", "page");
   revalidatePath("/sites/[host]", "page");
   return { ok: true, paused };
+}
+
+export type AutoAcceptState = { ok?: boolean; seconds?: number | null; error?: string } | null;
+
+/**
+ * Turn auto-accept on or off, and set how long it waits.
+ *
+ * Its own action, like the pause switch above and for the same reason: it is
+ * one decision, and making somebody scroll a long settings page and press Save
+ * to change it is the wrong shape. It also keeps this entirely away from
+ * `updateStorefront`, which writes the payment and delivery configuration —
+ * the one write in this file that must not gain new failure modes.
+ *
+ * updateMany with a create fallback, so a shop that has never saved storefront
+ * settings can still switch it on.
+ */
+export async function setAutoAccept(
+  _prev: AutoAcceptState,
+  formData: FormData,
+): Promise<AutoAcceptState> {
+  const { restaurantId } = await requireAdminAction();
+  const on = formData.get("on") === "true";
+  const seconds = on
+    ? normalizeAutoAcceptSeconds(formData.get("seconds")) ?? AUTO_ACCEPT_DEFAULT_SECONDS
+    : null;
+
+  try {
+    await tenantDb(restaurantId, async (tx) => {
+      const res = await tx.storefrontSetting.updateMany({
+        where: { restaurantId },
+        data: { autoAcceptSeconds: seconds },
+      });
+      if (res.count === 0) {
+        await tx.storefrontSetting.create({
+          data: { restaurantId, autoAcceptSeconds: seconds },
+          select: { id: true },
+        });
+      }
+    });
+  } catch {
+    return {
+      error: "Couldn't save that — run prisma/manual/add-auto-accept.sql, then try again.",
+    };
+  }
+
+  revalidatePath("/admin/storefront");
+  return { ok: true, seconds };
 }

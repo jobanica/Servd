@@ -2,6 +2,7 @@ import "server-only";
 
 import { tenantDb, systemDb } from "@/server/tenancy/scoped-db";
 import { isOpenAt } from "@/lib/site/store-hours";
+import { normalizeAutoAcceptSeconds } from "@/lib/orders/auto-accept";
 
 export interface DayHours {
   open: string; // "HH:MM"
@@ -88,6 +89,11 @@ export interface Storefront {
    * busy-switch, and it only comes back on when somebody turns it back on.
    */
   ordersPaused: boolean;
+  /**
+   * Accept an unanswered online order by itself after this many seconds.
+   * Null = off, which is every shop that hasn't asked for it.
+   */
+  autoAcceptSeconds: number | null;
   acceptsBookings: boolean; // website "Book a table" flow enabled
   booking: BookingConfig; // advance-order downpayment / approval settings
   payment: PaymentConfig; // manual GCash / cash settings
@@ -259,6 +265,7 @@ export async function getStorefront(restaurantId: string): Promise<Storefront> {
     );
     let acceptsBookings = false;
     let ordersPaused = false;
+    let autoAcceptSeconds: number | null = null;
     let configUnavailable = false;
     let booking = defaultBookingConfig();
     let payment = defaultPaymentConfig();
@@ -288,9 +295,18 @@ export async function getStorefront(restaurantId: string): Promise<Storefront> {
       );
       ordersPaused = !!pausedRow?.ordersPaused;
     } catch { /* ordersPaused not migrated yet */ }
-    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones), pauseWhenClosed: !!s?.pauseWhenClosed, ordersPaused, configUnavailable, acceptsBookings, booking, payment, delivery };
+    // autoAcceptSeconds is newer again, so it gets its own query and its own
+    // catch, for the same reason ordersPaused does. One best-effort read per
+    // migration generation, never a shared one.
+    try {
+      const autoRow = await tenantDb(restaurantId, (tx) =>
+        tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { autoAcceptSeconds: true } }),
+      );
+      autoAcceptSeconds = normalizeAutoAcceptSeconds(autoRow?.autoAcceptSeconds);
+    } catch { /* autoAcceptSeconds not migrated yet — stays off */ }
+    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones), pauseWhenClosed: !!s?.pauseWhenClosed, ordersPaused, autoAcceptSeconds, configUnavailable, acceptsBookings, booking, payment, delivery };
   } catch {
-    return { hours: defaultHours(), zones: [], pauseWhenClosed: false, ordersPaused: false, configUnavailable: true, acceptsBookings: false, booking: defaultBookingConfig(), payment: defaultPaymentConfig(), delivery: defaultDeliveryConfig() };
+    return { hours: defaultHours(), zones: [], pauseWhenClosed: false, ordersPaused: false, autoAcceptSeconds: null, configUnavailable: true, acceptsBookings: false, booking: defaultBookingConfig(), payment: defaultPaymentConfig(), delivery: defaultDeliveryConfig() };
   }
 }
 
@@ -302,6 +318,7 @@ export async function getPublicStorefront(restaurantId: string): Promise<Storefr
     );
     let acceptsBookings = false;
     let ordersPaused = false;
+    let autoAcceptSeconds: number | null = null;
     let configUnavailable = false;
     let booking = defaultBookingConfig();
     let payment = defaultPaymentConfig();
@@ -331,9 +348,18 @@ export async function getPublicStorefront(restaurantId: string): Promise<Storefr
       );
       ordersPaused = !!pausedRow?.ordersPaused;
     } catch { /* ordersPaused not migrated yet */ }
-    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones), pauseWhenClosed: !!s?.pauseWhenClosed, ordersPaused, configUnavailable, acceptsBookings, booking, payment, delivery };
+    // autoAcceptSeconds is newer again, so it gets its own query and its own
+    // catch, for the same reason ordersPaused does. One best-effort read per
+    // migration generation, never a shared one.
+    try {
+      const autoRow = await systemDb((tx) =>
+        tx.storefrontSetting.findFirst({ where: { restaurantId }, select: { autoAcceptSeconds: true } }),
+      );
+      autoAcceptSeconds = normalizeAutoAcceptSeconds(autoRow?.autoAcceptSeconds);
+    } catch { /* autoAcceptSeconds not migrated yet — stays off */ }
+    return { hours: normalizeHours(s?.hours), zones: normalizeZones(s?.deliveryZones), pauseWhenClosed: !!s?.pauseWhenClosed, ordersPaused, autoAcceptSeconds, configUnavailable, acceptsBookings, booking, payment, delivery };
   } catch {
-    return { hours: defaultHours(), zones: [], pauseWhenClosed: false, ordersPaused: false, configUnavailable: true, acceptsBookings: false, booking: defaultBookingConfig(), payment: defaultPaymentConfig(), delivery: defaultDeliveryConfig() };
+    return { hours: defaultHours(), zones: [], pauseWhenClosed: false, ordersPaused: false, autoAcceptSeconds: null, configUnavailable: true, acceptsBookings: false, booking: defaultBookingConfig(), payment: defaultPaymentConfig(), delivery: defaultDeliveryConfig() };
   }
 }
 
