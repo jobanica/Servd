@@ -5,6 +5,7 @@ import type {
   ApiCredentials,
   Contact,
   DeliveryProvider,
+  DeliveryMessage,
   DeliveryQuote,
   GeoPoint,
   OrderDetails,
@@ -286,16 +287,37 @@ export class ServdGoDeliveryProvider implements DeliveryProvider {
     // The body is the order view itself with an `event` added — the same flat
     // shape merchant-order returns, which is why one parser serves both.
     try {
-      const data = JSON.parse(rawBody) as { event?: string; reference?: string; status?: string };
+      const data = JSON.parse(rawBody) as {
+        event?: string;
+        reference?: string;
+        status?: string;
+        arrivedAt?: string | null;
+        rider?: { position?: { lat?: number; lng?: number } | null } | null;
+        message?: { from?: string; body?: string | null; imageUrl?: string | null; at?: string | null } | null;
+      };
       if (!data.reference || !data.status) return null;
       const parsed = this.fromOrderBody(data);
+
+      // A photo with no words still has to say something out loud.
+      const message: DeliveryMessage | null = data.message
+        ? {
+            from: data.message.from === "customer" ? "customer" : "rider",
+            body: data.message.body?.trim() || (data.message.imageUrl ? "Sent a photo" : null),
+            at: data.message.at ?? null,
+          }
+        : null;
+
+      const pos = data.rider?.position ?? null;
       return {
         bookingRef: data.reference,
         status: parsed.status,
+        event: data.event ?? null,
+        arrivedAt: data.arrivedAt ?? null,
+        message,
         riderName: parsed.riderName,
         riderPhone: parsed.riderPhone,
-        riderLat: null,
-        riderLng: null,
+        riderLat: typeof pos?.lat === "number" ? pos.lat : null,
+        riderLng: typeof pos?.lng === "number" ? pos.lng : null,
         trackingUrl: parsed.trackingUrl,
         etaMinutes: null,
         raw: data,

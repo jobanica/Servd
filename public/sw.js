@@ -7,7 +7,7 @@
  *  - Everything else (POST / server actions / API): passthrough, never cached —
  *    the app's own offline queue handles writes.
  */
-const VERSION = "servd-v3";
+const VERSION = "servd-v4";
 const PAGES = `${VERSION}-pages`;
 const ASSETS = `${VERSION}-assets`;
 
@@ -27,8 +27,10 @@ self.addEventListener("message", (event) => {
   if (event.data === "skipWaiting") self.skipWaiting();
 });
 
-// --- Web Push: alert merchants of new online orders even when the app is
-//     minimized or closed. Payload: { title, body, url }. ---
+// --- Web Push. Two audiences now: merchants being told about a new online
+//     order, and a diner being told their rider is at the door. Payload:
+//     { title, body, url, tag }. The tag is what keeps a talkative rider from
+//     stacking up five notifications instead of replacing one. ---
 self.addEventListener("push", (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch { data = {}; }
@@ -38,7 +40,7 @@ self.addEventListener("push", (event) => {
       body: data.body || "You have a new order.",
       icon: "/brand/icon-192.png",
       badge: "/brand/icon-192.png",
-      tag: "servd-order", // collapse duplicates
+      tag: data.tag || "servd-order", // collapse duplicates
       renotify: true,
       requireInteraction: true, // stays until tapped
       vibrate: [200, 100, 200, 100, 200],
@@ -52,8 +54,12 @@ self.addEventListener("notificationclick", (event) => {
   const url = (event.notification.data && event.notification.data.url) || "/merchant";
   event.waitUntil(
     (async () => {
+      // Focus the tab that is already showing this page rather than opening a
+      // second one — a diner tapping "your rider is outside" wants the tracker
+      // they left open, not a fresh copy of it.
+      const path = (() => { try { return new URL(url, self.location.origin).pathname; } catch { return url; } })();
       const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-      const existing = all.find((c) => c.url.includes("/merchant"));
+      const existing = all.find((c) => c.url.includes(path));
       if (existing) return existing.focus();
       return self.clients.openWindow(url);
     })(),

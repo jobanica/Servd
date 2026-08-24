@@ -578,6 +578,10 @@ model Restaurant {
 model PushSubscription {
   id           String   @id @default(uuid())
   restaurantId String
+  /// Set when a diner subscribed from their own order tracker rather than a
+  /// merchant subscribing their till. Merchant sends match on restaurantId and
+  /// ignore this; a diner send matches on it alone, so the two never cross.
+  orderId      String?
   endpoint     String   @unique
   p256dh       String // subscription public key
   auth         String // subscription auth secret
@@ -586,6 +590,7 @@ model PushSubscription {
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   @@index([restaurantId])
+  @@index([orderId])
   @@map("push_subscriptions")
 }
 
@@ -1787,6 +1792,15 @@ model DeliveryBooking {
   riderLat     Float?
   riderLng     Float?
   trackingUrl  String?
+  /// Set when the rider says they are at the door. Not a status on the
+  /// provider's side either — it happens during "out for delivery" and the
+  /// delivery is not over until somebody hands the food across.
+  arrivedAt    DateTime?
+  /// The last thing the rider said to this diner, kept only so the tracker can
+  /// show and announce it. The conversation itself lives on the provider's
+  /// tracking page; this is a doorbell, not a second inbox.
+  lastMessageAt   DateTime?
+  lastMessageBody String?
   raw          Json?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
