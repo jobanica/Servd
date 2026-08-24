@@ -397,7 +397,7 @@ export default async function Home() {
             [ICONS.tag, "Promotions & coupons", "Create coupon codes — % off, free item, or buy-1-get-1 — redeemed right at checkout."],
             [ICONS.users, "Customer database", "Every order builds a CRM you own — contacts, history, and segments for marketing."],
             [ICONS.book, "Accounting", "Sales, COGS, and expense tracking with clean exports your bookkeeper will love."],
-            [ICONS.spark, "AI tools", "Snap a photo to import your menu, auto-write descriptions, and get smart insights."],
+            [ICONS.spark, "AI tools", "Snap a photo to import your menu and auto-write descriptions that sell."],
           ].map(([icon, title, body]) => (
             <div key={title} className="rounded-tile border border-plum-ink/10 bg-white p-6 transition hover:shadow-lg">
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-gradient text-white">

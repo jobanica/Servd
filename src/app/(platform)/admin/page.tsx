@@ -6,13 +6,11 @@ import { getAnalytics } from "@/server/analytics/queries";
 import { getFeedbackList } from "@/server/feedback/queries";
 import { listInventory } from "@/server/inventory/queries";
 import { hasModule } from "@/server/billing/entitlements";
-import { getPlanAccess } from "@/server/billing/feature-gate";
 import { getPlanBannerData } from "@/server/billing/plan-status";
 import { PlanStatusBanner } from "@/components/billing/PlanStatusBanner";
 import { formatPeso } from "@/lib/money";
 import { manilaStartOfDay, manilaStartOfDaysAgo } from "@/lib/time/manila";
 import { RevenueChart } from "@/components/analytics/Charts";
-import { getAiInsights, aiInsightsEnabled } from "@/server/ai/insights";
 import { hasTutorials } from "@/server/tutorials/tutorials";
 
 /** Resolves a promise, returning a fallback if it throws (schema-lag safe). */
@@ -127,48 +125,26 @@ export default async function AdminHome() {
 
   const lowItems = lowStock.filter((i) => i.low).slice(0, 5);
 
-  // Rule-based insights — used as a fallback when Claude AI is unavailable.
-  const ruleInsights: string[] = [];
-  if (week?.topItems[0]) ruleInsights.push(`🔥 Best seller this week: ${week.topItems[0].name} (${week.topItems[0].qty} sold)`);
+  // Today at a glance — four facts read straight off the week's figures.
+  //
+  // These used to be the fallback for a Claude-generated version, which was
+  // removed: it cost a paid API call on every dashboard load, took a second to
+  // arrive, and said less than these four lines do. Everything here comes from
+  // numbers the page has already fetched, so it is instant and always the same
+  // for the same data.
+  const insights: string[] = [];
+  if (week?.topItems[0]) insights.push(`🔥 Best seller this week: ${week.topItems[0].name} (${week.topItems[0].qty} sold)`);
   if (week && week.peakHours.length) {
     const peak = [...week.peakHours].sort((a, b) => b.orders - a.orders)[0];
-    ruleInsights.push(`⏰ Busiest hour: ${peak.hour}:00 (UTC)`);
+    insights.push(`⏰ Busiest hour: ${peak.hour}:00 (UTC)`);
   }
-  if (lowItems.length) ruleInsights.push(`📦 ${lowItems.length} ingredient${lowItems.length > 1 ? "s" : ""} running low`);
-  if (week?.summary.avgRating != null) ruleInsights.push(`⭐ 7-day average rating: ${week.summary.avgRating}`);
-  if (ruleInsights.length === 0) ruleInsights.push("Add menu items and share your table QR codes to start seeing insights here.");
-
-  // AI (Claude) insights are a paid feature — not available on the Free plan.
-  // The free tier still gets the rule-based "Smart insights" below. Trials and
-  // Growth/Business get the AI version. Fail open if the lookup errors.
-  let aiAllowed = true;
-  try {
-    const access = await getPlanAccess(rid);
-    aiAllowed = access.onTrial || access.tier !== "Free";
-  } catch {
-    aiAllowed = true;
-  }
-
-  // Real Claude-generated insights (falls back to rule-based on any failure).
-  const aiOn = aiInsightsEnabled() && aiAllowed;
-  const aiInsights = aiOn
-    ? await safe(
-        "AI insights",
-        getAiInsights(rid, {
-          restaurantName: restaurant.displayName || restaurant.name,
-          week,
-          today,
-          lowStockCount: lowItems.length,
-        }),
-        null,
-      )
-    : null;
-  const insights = aiInsights && aiInsights.length ? aiInsights : ruleInsights;
+  if (lowItems.length) insights.push(`📦 ${lowItems.length} ingredient${lowItems.length > 1 ? "s" : ""} running low`);
+  if (week?.summary.avgRating != null) insights.push(`⭐ 7-day average rating: ${week.summary.avgRating}`);
+  if (insights.length === 0) insights.push("Add menu items and share your table QR codes to start seeing insights here.");
 
   // Orders taken today that revenue can't see yet, because nothing has been
   // collected against them.
   const unsettledToday = Math.max(0, (today?.summary.placedOrders ?? 0) - (today?.summary.orders ?? 0));
-  const insightsAreAi = !!(aiInsights && aiInsights.length);
 
   // Unified plan-status banner (trial countdown + Free-tier order cap).
   const bannerData = await safe("plan banner", getPlanBannerData(rid), null);
@@ -302,19 +278,7 @@ export default async function AdminHome() {
 
       {/* Bottom row */}
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card title="Smart insights" className="lg:col-span-2">
-          <div className="mb-3 flex items-center gap-2">
-            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${insightsAreAi ? "bg-brand-primary/10 text-brand-primary" : "bg-plum-ink/5 text-plum-ink/45"}`}>
-              {insightsAreAi ? "✨ Claude AI" : "Rule-based"}
-            </span>
-            {!aiAllowed ? (
-              <Link href="/admin/billing" className="text-[11px] font-semibold text-brand-primary">
-                ✨ Upgrade to unlock AI insights
-              </Link>
-            ) : (
-              !aiOn && <span className="text-[11px] text-plum-ink/40">AI insights unavailable right now</span>
-            )}
-          </div>
+        <Card title="Today at a glance" className="lg:col-span-2">
           <ul className="space-y-2 text-sm text-plum-ink/75">
             {insights.map((t, i) => <li key={i}>{t}</li>)}
           </ul>

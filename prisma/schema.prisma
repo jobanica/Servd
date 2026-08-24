@@ -387,6 +387,16 @@ model Restaurant {
   id            String           @id @default(uuid())
   name          String
   slug          String           @unique // used in /order/{slug}/{tableToken}
+  /// The address this shop used BEFORE the owner corrected it.
+  ///
+  /// Changing a slug rewrites the web address printed on every table QR in the
+  /// building and shared in every post the shop has ever made. Keeping the old
+  /// one here lets those keep working: the public lookup falls back to it, so a
+  /// tent card printed last year still opens the right menu.
+  ///
+  /// Nullable with no default — it ships as a hand-run migration, and it is
+  /// genuinely absent for the overwhelming majority of shops.
+  previousSlug  String?          @unique
   status        RestaurantStatus @default(pending)
   planId        String?
   // Set when a partner creates this as a DEMO storefront (no login) to pitch a
@@ -602,6 +612,19 @@ model StorefrontSetting {
   /// every insert and break saving storefront settings on a database that
   /// lacks the column. Null means not paused.
   ordersPaused    Boolean?
+  /// Accept an online order by itself if nobody has answered it within this
+  /// many seconds. Null or 0 means off, which is how every shop behaves until
+  /// somebody turns it on.
+  ///
+  /// Seconds rather than a boolean so the wait is the shop's decision: a busy
+  /// counter wants ten, a kitchen that genuinely vets every order wants a
+  /// minute or nothing at all.
+  ///
+  /// Nullable with NO default, like ordersPaused above and for the same
+  /// reason: a static default is a value Prisma writes into the INSERT of every
+  /// storefront_settings row, which breaks saving settings on a database that
+  /// has not run the migration.
+  autoAcceptSeconds Int?
   acceptsBookings Boolean  @default(false) // show the "Book a table" flow on the website
   bookingConfig   Json? // { requireDownpayment, downpaymentType, downpaymentValue, downpaymentInstructions }
   paymentConfig   Json? // { codEnabled, gcashEnabled, gcashName, gcashNumber, gcashQrUrl }
@@ -1689,6 +1712,14 @@ model Order {
   surchargeLabel      String?
   inventoryDeductedAt DateTime? // set once stock is deducted (idempotency)
   servedAt            DateTime? // set when the cashier confirms the food was served
+  /// A second round: the table ate, asked for more, and the cashier punched it
+  /// onto the same bill. Stamped every time items are appended to an order that
+  /// already existed, so the kitchen card can say "these are extras" instead of
+  /// looking like a ticket the cook has somehow already made most of.
+  ///
+  /// Nullable with no default — it ships as a hand-run migration, and a
+  /// defaulted column is one Prisma writes into the INSERT of every order.
+  addedItemsAt        DateTime?
   voidedAt            DateTime? // set when a cashier voids the (unpaid) order
   prepMinutes         Int? // prep-time estimate (minutes) a merchant sets on accept
   cancelReason        String? // reason a merchant rejected the order

@@ -36,5 +36,14 @@ export interface KitchenOrder {
    * make it due, and a card that drops the date is a card that says "cook now".
    */
   scheduledFor?: string | null;
+  /**
+   * When more items were last added to this ticket, ISO.
+   *
+   * Set for a second round: the table ate, asked for more, and the cashier put
+   * it on the same bill. The card flags it, because a ticket reappearing with
+   * most of its lines already struck through otherwise looks like a mistake
+   * rather than "cook the two things that aren't ticked".
+   */
+  addedItemsAt?: string | null;
   items: KitchenOrderItem[];
 }

@@ -3,7 +3,7 @@
 A reference describing everything Servd does. Written to be loaded into an AI
 assistant as source knowledge for answering customer and staff questions.
 
-**Last updated:** 18 August 2026
+**Last updated:** 22 August 2026
 
 ---
 
@@ -117,6 +117,14 @@ reachable at a Servd URL or the restaurant's own custom domain.
 - Promo codes and gift cards
 - Live order tracking page after checkout
 - Cart recovery: an abandoned cart can trigger a follow-up message
+- **Auto-accept** (optional, off by default) — an online order nobody has
+  answered accepts itself after a wait the shop sets, 10 seconds by default, so
+  the customer isn't left waiting on a confirmation while the counter is buried.
+  Set in Admin → Online website. Online orders only: a dine-in QR order still
+  waits for somebody at the till, and an advance order booked for later is never
+  accepted early. It runs while a staff screen is open (Incoming Orders or the
+  cashier board); with nothing open anywhere, the order waits for a person as
+  before
 
 ### 3.3 Counter / POS ordering
 The cashier can create an order directly at the till with full menu, modifiers,
@@ -146,8 +154,7 @@ new orders and changes appear without refreshing.
 - Closed & voided list for the current shift
 
 **Payments**
-- Methods: **Cash, Card terminal, GCash, Maya, Bank transfer**, plus online
-  GCash/card via the gateway
+- Methods: **Cash, Card terminal, GCash, Maya, Bank transfer**
 - **Cash tendered → change due** calculation with suggested note amounts
 - **Split payments** — several tenders against one order until it's covered
 - **Split bills** across a table
@@ -182,6 +189,9 @@ new order. Staff tap to advance a ticket through preparing → ready.
 - Sound can be muted
 - **History** — tickets finished today, with the ability to bring one back if it
   was tapped by mistake
+- **Extra rounds** — a served table that orders more puts its ticket back on the
+  board by itself, with the first round already ticked off so what shows
+  unticked is the extra, plus an "Extra order" banner and the new-order chime
 - Order type and customer name on each ticket
 - Item notes and modifiers
 - Optional **kitchen ticket printing** instead of a screen, for kitchens
@@ -241,7 +251,9 @@ the cash drawer figure, because nobody put that money in a till.
 - **Dietary tags** (allergens and diets)
 - **Daily servings limit** — cap how many of an item can be sold per day
 - **Food cost per item**, feeding COGS and profit reporting
-- Mark items available / out of stock
+- Mark items available / out of stock — from the menu editor, or straight from
+  the **cashier POS** via its "Sold out" mode, for when a dish runs out and the
+  owner isn't in the shop
 - **Counter-only items** — an item can be marked "Counter only". The cashier can
   punch it at the POS; it never appears on the online menu or the QR dine-in
   menu, and a web order that names one is refused. Built for the things a menu
@@ -406,12 +418,13 @@ The dashboard, accounting and the Z-report use one definition.
 ## 12. Analytics and dashboard
 
 **Dashboard:** pending acceptance, revenue today, orders today, open orders,
-average rating today, recent orders, low-stock warnings and smart insights.
+average rating today, recent orders, low-stock warnings and a "Today at a
+glance" panel — best seller, busiest hour, low stock and the 7-day rating,
+read straight off the shop's own figures.
 
 **Analytics:** revenue, order count, average order value, revenue by day,
 best- and worst-selling items, payment mix, peak hours, and rating trends.
 
-AI-generated insights are available on paid plans; rule-based insights on all.
 
 ---
 
@@ -468,9 +481,13 @@ reservation management.
 **Visual floor plan** — lay out the room, see table status live, and open a
 table's orders from the map.
 
-**Delivery** — delivery settings, delivery zones and fees, a delivery board for
-dispatch, and third-party courier booking through a provider adapter (Lalamove
-and similar).
+**Delivery** — delivery settings, delivery zones and fees, and a delivery board
+for dispatch. Third-party courier booking runs through a provider adapter: a
+working one ships for **ServdGo**, and any other provider is either a **deep
+link** (staff tap through to the courier's own app with details pre-filled, no
+auto-tracking) or the generic REST template, whose endpoints and field mapping
+are still placeholders. **Lalamove is deep-link only today** — an API key will
+not book a rider.
 
 **Advance orders** — orders scheduled for a later time, with their own screen.
 
@@ -482,7 +499,12 @@ and similar).
 - Receipt branding (address, phone, website, footer)
 - Online ordering website settings
 - **Custom domain** — connect your own domain (a ₱500 one-time unlock)
-- **White-label** — remove "Powered by Servd" (Business)
+- **White-label** — removes "Powered by Servd" everywhere it appears: the
+  ordering website footer, the QR menu footer, the splash after a QR scan, and
+  the line in the owner's own dashboard (a ₱2,500 one-time unlock)
+- **"Powered by Servd"** appears on accounts opened from 21 August 2026.
+  Restaurants already trading before that date are grandfathered and never get
+  it added
 - Table QR codes, printable as a sheet (one free; unlimited is a ₱500 unlock)
 - A public restaurant page at a Servd URL
 
@@ -508,6 +530,7 @@ detail is in the separate pricing document; the short version:
 | | Price | Billing |
 |---|---|---|
 | Get started | ₱0 | Free forever |
+| Each extra branch | **₱499** | One time, per branch |
 | Activate online ordering | **₱499** | One time |
 | Unlimited tables & QR codes | **₱500** | One time |
 | Any other feature | ₱500 – ₱3,000 | One time, per feature |
@@ -523,8 +546,8 @@ restaurant builds its preview free and pays only when ready to take real orders.
 
 **Everything else is a one-time unlock** bought from Admin → Billing & features:
 accounting, inventory, HR, loyalty, promotions, reservations, floor plan, gift
-cards, online payments, offline mode, custom domain, white-label, audit log,
-data export, customer book. Bought once, owned for good — an unlock can't lapse
+cards, offline mode, custom domain, white-label, audit log, data export,
+customer book. (Online card payments were retired — see §8.) Bought once, owned for good — an unlock can't lapse
 or be cancelled.
 
 **No commission.** Servd takes no cut of sales; customers pay straight into the

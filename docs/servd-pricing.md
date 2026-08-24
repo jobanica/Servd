@@ -25,6 +25,7 @@ All amounts are Philippine Pesos (₱).
 |---|---|---|
 | **Get started** | ₱0 | Free forever |
 | **Activate online ordering** | **₱499** | One time |
+| **Each extra branch** | **₱499** | One time, per branch |
 | **Unlimited tables & QR codes** | **₱500** | One time |
 | **Any other feature** | ₱500 – ₱3,000 | One time, per feature |
 | **Content scheduler** | ₱499 / month | The only recurring charge |
@@ -82,7 +83,7 @@ expire or be cancelled, because it was bought rather than rented.
 | Offline mode | **₱1,500** |
 | Online ordering website + delivery | **₱2,500** |
 | Accounting (sales, VAT, P&L) | **₱2,500** |
-| Full white-label (removes "Powered by Servd") | **₱2,500** |
+| Full white-label (removes "Powered by Servd" everywhere) | **₱2,500** |
 | Inventory, COGS & auto-reorder | **₱3,000** |
 | HR, attendance & payroll | **₱3,000** |
 
@@ -97,6 +98,20 @@ Bought from **Admin → Billing & features**.
 - **SMS marketing** — every text costs real money, so it runs on credits.
 - **AI menu import** — burns API credits per import.
 - **Content scheduler** — its own monthly subscription (below).
+
+---
+
+## 4b. Extra branches — ₱499 each, one time
+
+A restaurant with more than one location runs them all from **one login**. The
+owner adds a branch at **Admin → Branches**, pays ₱499 to activate it, and then
+switches between branches inside the admin dashboard without logging out.
+
+- One payment per branch. No monthly fee for a branch.
+- A branch that hasn't been paid for can be created but **can't be entered** —
+  it stays greyed out in the switcher until activation clears.
+- Feature unlocks are **per branch**: each branch is its own account for
+  entitlement purposes, so unlocking inventory in two branches is two purchases.
 
 ---
 
@@ -207,6 +222,15 @@ existed before table QRs became a paid unlock are grandfathered and keep
 unlimited tables at no charge.
 
 **Is the ₱500 for tables monthly?** No, a single payment.
+
+**Why does my ordering page say "Powered by Servd"?** Accounts opened from 21
+August 2026 carry it at the foot of their ordering website and table/QR menu.
+Restaurants that were already trading before that date don't have it and never
+will — nothing was added to pages that were already live. The ₱2,500 white-label
+unlock removes it everywhere for anyone, including the splash after a QR scan.
+
+**I've been with Servd for a year — will this appear on my site now?** No. You
+are grandfathered.
 
 **Are there setup fees or contracts?** Neither. No lock-in.
 

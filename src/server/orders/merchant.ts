@@ -7,6 +7,7 @@ import { deductForOrder } from "@/server/inventory/deduct";
 import { ensureSettlementPayment } from "@/server/orders/settle-payment";
 import { formatOrderNumber } from "@/lib/orders/order-number";
 import type { StaffRole } from "@prisma/client";
+import { runAutoAccept } from "@/server/orders/auto-accept";
 
 /**
  * Server controller for the merchant "Incoming Orders" screen — a focused view
@@ -143,6 +144,12 @@ export async function getMerchantOrders(): Promise<MerchantData> {
 }
 
 async function loadMerchantData(restaurantId: string): Promise<MerchantData> {
+  // Take anything nobody answered in time before reading the queue. This is the
+  // screen auto-accept exists for — the tablet on the counter that nobody is
+  // watching — so its own refresh is what drives it. A no-op for every shop
+  // that hasn't switched it on, and it can never fail the screen.
+  await runAutoAccept(restaurantId).catch(() => []);
+
   const [incomingRows, activeRows, historyRows] = await tenantDb(restaurantId, async (tx) => {
     const online = { tableId: null }; // online orders never have a table
     return Promise.all([

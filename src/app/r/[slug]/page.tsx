@@ -8,6 +8,7 @@ import { hasFeature } from "@/server/billing/feature-gate";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { WebOrder } from "@/components/site/WebOrder";
 import { storefrontMetadata } from "@/lib/site/metadata";
+import { getServdBranding } from "@/server/branding/powered-by";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -42,12 +43,13 @@ export default async function RestaurantSite({
   // Online ordering is a Growth+ feature — Free doesn't get a public order site.
   if (!(await hasFeature(restaurant.id, "onlineOrdering"))) notFound();
 
-  const [categories, loyalty, contact, sf, rating] = await Promise.all([
+  const [categories, loyalty, contact, sf, rating, branding] = await Promise.all([
     getPublicMenu(restaurant.id),
     getLoyaltyConfig(restaurant.id),
     getContact(restaurant.id),
     getPublicStorefront(restaurant.id),
     getPublicRatingStats(restaurant.id),
+    getServdBranding(restaurant.id),
   ]);
 
   return (
@@ -67,6 +69,7 @@ export default async function RestaurantSite({
       // that setting had no effect on the live site at all.
       pauseWhenClosed={sf.pauseWhenClosed}
       ordersPaused={sf.ordersPaused}
+      poweredBy={branding.showFooter}
       homeHref={`/r/${slug}`}
       acceptsBookings={sf.acceptsBookings}
       bookHref={`/r/${slug}/book`}

@@ -7,6 +7,7 @@ import { tenantDb } from "@/server/tenancy/scoped-db";
 import { qrPngDataUrl } from "@/lib/qr";
 import { CopyLink } from "@/components/super-admin/CopyLink";
 import { OnlineOrderingToggle } from "@/components/admin/OnlineOrderingToggle";
+import { AutoAcceptToggle } from "@/components/admin/AutoAcceptToggle";
 
 export default async function StorefrontPage() {
   const { restaurantId } = await requireAdminPage();
@@ -41,6 +42,9 @@ export default async function StorefrontPage() {
 
       {/* Above everything: it's the one control here that gets used mid-service. */}
       <OnlineOrderingToggle paused={sf.ordersPaused} />
+
+      {/* The other "how does the shop behave when the counter is busy" decision. */}
+      <AutoAcceptToggle seconds={sf.autoAcceptSeconds} />
 
       {/* Website QR — print it, post it, send it to customers */}
       <div className="rounded-tile border border-brand-primary/20 bg-brand-primary/5 p-4">

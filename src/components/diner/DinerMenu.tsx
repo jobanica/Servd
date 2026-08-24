@@ -18,6 +18,8 @@ import { CallWaiterButton } from "./CallWaiterButton";
 import { RewardsPanel } from "./RewardsPanel";
 import { OrderStatusTracker } from "./OrderStatusTracker";
 import { BrandSplash } from "./BrandSplash";
+import { PoweredByServd } from "@/components/branding/PoweredByServd";
+import { NO_SERVD_BRANDING, type ServdBranding } from "@/lib/branding/powered-by";
 
 interface RestaurantBrand {
   name: string;
@@ -167,6 +169,7 @@ export function DinerMenu({
   promotions = [],
   loyaltyEnabled = false,
   rating = null,
+  branding = NO_SERVD_BRANDING,
 }: {
   restaurantId: string;
   slug: string;
@@ -180,6 +183,15 @@ export function DinerMenu({
   promotions?: PromoItem[];
   loyaltyEnabled?: boolean;
   rating?: { count: number; average: number | null } | null;
+  /**
+   * Which Servd marks this table's menu carries — the splash after the scan and
+   * the line at the foot. Decided on the server; see lib/branding/powered-by.ts.
+   *
+   * Defaults to exactly how the menu behaved before any of this existed: the
+   * splash shows, nothing is added at the foot. So a caller that hasn't been
+   * told about branding neither loses the splash nor gains a badge.
+   */
+  branding?: ServdBranding;
 }) {
   const cart = useCart(restaurantId, tableToken);
   const t = useTranslations("diner");
@@ -360,8 +372,11 @@ export function DinerMenu({
 
   return (
     <div className="relative mx-auto min-h-screen max-w-md bg-brand-surface pb-24">
-      {/* "Powered by Servd" welcome splash — shown first, before the menu */}
-      {!splashDone && <BrandSplash onDone={() => setSplashDone(true)} />}
+      {/* "Powered by Servd" welcome splash — shown first, before the menu.
+          Skipped entirely for a restaurant that bought the full white-label
+          unlock: they paid for Servd's name not to appear in front of their
+          customers, and this is the most prominent place it did. */}
+      {branding.showSplash && !splashDone && <BrandSplash onDone={() => setSplashDone(true)} />}
 
       {/* Hero cover + centered logo + name + rating (scrolls away) */}
       <div className="relative">
@@ -522,6 +537,11 @@ export function DinerMenu({
             ))}
           </div>
         )}
+
+        {/* At the foot of the menu, under everything the diner scrolled for.
+            New accounts only — anyone already trading before this existed is
+            grandfathered, and the white-label unlock removes it. */}
+        {branding.showFooter && <PoweredByServd className="mt-6 text-brand-ink/60" />}
       </main>
 
       {/* Floating "Get the bill" — appears once the food is ready (dine-in only;

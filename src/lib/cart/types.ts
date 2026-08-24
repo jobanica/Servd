@@ -37,6 +37,17 @@ export interface DinerItem {
   videoUrl: string | null;
   videoPosterUrl: string | null;
   isAvailable: boolean;
+  /**
+   * WHY it's unavailable, for the one screen that can do something about it.
+   *
+   * `isAvailable` above is the answer to "can I sell this right now" and every
+   * diner-facing surface only needs that. The cashier POS needs the reason as
+   * well, because its sold-out button moves the hand switch and nothing else:
+   * `manualOut` says the switch is off, `autoOut` says something ran out. Both
+   * optional — a caller that doesn't care can carry on ignoring them.
+   */
+  manualOut?: boolean;
+  autoOut?: boolean;
   dietaryTags: string[]; // diet/allergen tag keys (see src/lib/menu/dietary.ts)
   originalPrice?: number | null; // pre-discount price when a happy hour is active
   groups: DinerModifierGroup[];

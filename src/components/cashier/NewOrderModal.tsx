@@ -31,6 +31,8 @@ import {
   type OrderTypeKey,
 } from "@/lib/orders/order-type";
 import { PosItemTile } from "./PosItemTile";
+import { useStockMode } from "./useStockMode";
+import { StockModeButton, StockModeBanner } from "./StockModeBar";
 
 export function lineId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -265,6 +267,9 @@ export function NewOrderModal({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // "86 it" — the cashier taking a dish off the menu when it runs out and the
+  // owner isn't around to do it from the office.
+  const { stockMode, busyId, note, toggleMode, toggleStock } = useStockMode(setMenu);
 
   useEffect(() => {
     (async () => {
@@ -321,6 +326,12 @@ export function NewOrderModal({
     : nonEmpty;
 
   function pickItem(item: DinerItem) {
+    // While the sold-out switch is on, a tap flips the dish rather than
+    // ordering it — including the sold-out ones, which is how they come back.
+    if (stockMode) {
+      void toggleStock(item);
+      return;
+    }
     if (!item.isAvailable) return;
     // No modifiers AND no sizes → add straight away; otherwise open the panel.
     if (item.groups.length === 0 && !(item.variants && item.variants.length > 0)) {
@@ -423,14 +434,27 @@ export function NewOrderModal({
             <div ref={menuScrollRef} className="min-h-0 overflow-y-auto">
               {/* Search + tabs stay put while the items scroll under them. */}
               <div className="sticky top-0 z-30 bg-white px-4 pt-3">
-                <input
-                  value={itemQuery}
-                  onChange={(e) => setItemQuery(e.target.value)}
-                  placeholder="🔍 Search the menu…"
-                  className="w-full rounded-lg border border-plum-ink/15 bg-cream/40 px-3 py-2 text-sm"
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    value={itemQuery}
+                    onChange={(e) => setItemQuery(e.target.value)}
+                    placeholder="🔍 Search the menu…"
+                    className="min-w-0 flex-1 rounded-lg border border-plum-ink/15 bg-cream/40 px-3 py-2 text-sm"
+                  />
+                  {/* Close any half-finished size/modifier panel on the way in:
+                      it belongs to the order pad, and in stock mode there is
+                      no order pad. */}
+                  <StockModeButton
+                    on={stockMode}
+                    onClick={() => {
+                      setConfigItem(null);
+                      toggleMode();
+                    }}
+                  />
+                </div>
+                {stockMode && <StockModeBanner note={note} />}
               </div>
-              {!q && (
+              {!q && !stockMode && (
                 <CategoryTabs
                   categories={nonEmpty.map((c) => ({ id: c.id, name: c.name }))}
                   scrollRef={menuScrollRef}
@@ -471,7 +495,13 @@ export function NewOrderModal({
                           />
                         </div>
                       ) : (
-                        <PosItemTile key={item.id} item={item} onPick={pickItem} />
+                        <PosItemTile
+                          key={item.id}
+                          item={item}
+                          onPick={pickItem}
+                          stockMode={stockMode}
+                          busy={busyId === item.id}
+                        />
                       ),
                     )}
                   </div>

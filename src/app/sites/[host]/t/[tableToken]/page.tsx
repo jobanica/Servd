@@ -7,6 +7,7 @@ import { getActivePromotions } from "@/server/promotions/queries";
 import { getLoyaltyConfig } from "@/server/loyalty/loyalty";
 import { getPublicRatingStats } from "@/server/feedback/queries";
 import { DinerMenu } from "@/components/diner/DinerMenu";
+import { getServdBranding } from "@/server/branding/powered-by";
 
 /**
  * Branded-host table entry: e.g. mango-grill.servd.app/t/<token>.
@@ -26,11 +27,12 @@ export default async function SiteTablePage({
   if (!table) notFound();
 
   const locale = await getLocale();
-  const [categories, promotions, loyalty, rating] = await Promise.all([
+  const [categories, promotions, loyalty, rating, branding] = await Promise.all([
     getPublicMenu(restaurant.id, locale),
     getActivePromotions(restaurant.id),
     getLoyaltyConfig(restaurant.id),
     getPublicRatingStats(restaurant.id),
+    getServdBranding(restaurant.id),
   ]);
 
   return (
@@ -50,6 +52,7 @@ export default async function SiteTablePage({
       promotions={promotions}
       loyaltyEnabled={loyalty.enabled}
       rating={rating}
+      branding={branding}
     />
   );
 }

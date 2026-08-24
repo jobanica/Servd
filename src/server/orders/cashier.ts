@@ -21,11 +21,14 @@ import { pesosToCentavos } from "@/lib/money";
 import { formatOrderNumber } from "@/lib/orders/order-number";
 import { orderTypeLabel, orderTypeLabelWithEmoji, type OrderTypeKey } from "@/lib/orders/order-type";
 import { isVoidReason } from "@/lib/orders/void-reasons";
+import { needsKitchenReopen, previousLineIds, reopenStatus } from "@/lib/orders/extra-round";
 import { writeAudit } from "@/server/audit/log";
 import { awardPointsForOrder, getBalance, getLoyaltyConfig, redeemPoints, enrollAccount } from "@/server/loyalty/loyalty";
 import { notifyCustomer, restaurantDisplayName } from "@/server/sms/notify";
 import { manilaStartOfDay } from "@/lib/time/manila";
 import { getDishStock } from "@/server/inventory/dish-stock";
+import { runAutoAccept } from "@/server/orders/auto-accept";
+import { deductForOrder } from "@/server/inventory/deduct";
 import { nextOrderNumberSafe } from "@/server/orders/next-number";
 import {
   applyCardSurcharge,
@@ -401,6 +404,10 @@ export async function getCashierTables(): Promise<CashierTable[]> {
 /** QR orders awaiting acceptance (the cashier's incoming-order queue). */
 export async function getIncomingOrders(): Promise<IncomingOrder[]> {
   const staff = await requireStaff(["cashier", "admin"]);
+  // Take anything nobody answered in time before listing, so the board never
+  // shows a card that has already run out its clock. A no-op — one small query
+  // — for every shop that hasn't switched auto-accept on.
+  await runAutoAccept(staff.restaurantId).catch(() => []);
   const orders = await tenantDb(staff.restaurantId, (tx) =>
     tx.order.findMany({
       where: { status: "pending" },
@@ -1498,11 +1505,91 @@ export async function getPosTables(): Promise<{ id: string; tableNumber: string 
 }
 
 /**
+ * Everything about a second round that has to be written best-effort.
+ *
+ * Three separate writes, each in its own try, and none of them able to fail the
+ * order: `addedItemsAt` and `preparedAt` both ship as hand-run migrations, and
+ * `servedAt` is only meaningful on a database that has that one too. The worst
+ * outcome on an un-migrated database is the ticket coming back with all its
+ * lines showing instead of just the new ones — the extras still get cooked,
+ * which is the part that matters.
+ *
+ * `previousIds` is null when the ticket was still on the board, and a list of
+ * the lines the kitchen had already made when it wasn't.
+ */
+async function markExtraRound(
+  restaurantId: string,
+  orderId: string,
+  previousIds: string[] | null,
+  addedLines: readonly { menuItemId: string | null; quantity: number }[],
+): Promise<void> {
+  // Stock, before anything else. An order the kitchen already finished is
+  // stamped as deducted, so the deduction that runs when it's finished a second
+  // time returns immediately — without this, a second round is cooked and sold
+  // and never comes off the shelf. Only the new lines, and only when the first
+  // round has genuinely been counted; otherwise the normal whole-order
+  // deduction is still to come and would count these twice.
+  try {
+    const alreadyCounted = await tenantDb(restaurantId, (tx) =>
+      tx.order.findFirst({ where: { id: orderId }, select: { inventoryDeductedAt: true } }),
+    );
+    if (alreadyCounted?.inventoryDeductedAt) {
+      await deductForOrder(restaurantId, orderId, addedLines);
+    }
+  } catch {
+    /* inventory must never block the till */
+  }
+
+  // Stamped on every append, board or not, so the card can flag extras on a
+  // ticket the cook is still holding as well as on one that came back.
+  try {
+    await tenantDb(restaurantId, (tx) =>
+      tx.order.updateMany({ where: { id: orderId }, data: { addedItemsAt: new Date() } }),
+    );
+  } catch {
+    /* addedItemsAt not migrated — no badge, everything else still works */
+  }
+
+  if (!previousIds) return;
+
+  // The ticket came back. Tick off what the kitchen already made, so what's
+  // left unticked on the card IS the extra order — which is the whole ask.
+  if (previousIds.length > 0) {
+    try {
+      await tenantDb(restaurantId, (tx) =>
+        tx.orderItem.updateMany({
+          where: { id: { in: previousIds }, order: { restaurantId } },
+          data: { preparedAt: new Date() },
+        }),
+      );
+    } catch {
+      /* preparedAt not migrated — the whole ticket shows, nothing is lost */
+    }
+  }
+
+  // It was marked served, and now there's food outstanding again. Leaving the
+  // stamp would show the cashier a second round as already served.
+  try {
+    await tenantDb(restaurantId, (tx) =>
+      tx.order.updateMany({ where: { id: orderId }, data: { servedAt: null } }),
+    );
+  } catch {
+    /* servedAt not migrated */
+  }
+}
+
+/**
  * Add more items to an EXISTING open, unpaid order — the "customer ordered,
  * then wants to add another item a few minutes later" case. Prices are built
  * server-side (never trusted from the client) and appended; the order total is
  * bumped by the added items' value. The kitchen display updates via realtime;
  * print-mode kitchens get a fresh ticket so the added items reach the line.
+ *
+ * If the kitchen had already finished the ticket, the extras would land on the
+ * bill and nowhere else — the cook's screen is a queue of unfinished orders, so
+ * a served table ordering more had to be spotted by somebody and reopened by
+ * hand. Appending now puts the ticket back on the board by itself, with the
+ * first round ticked off so what's showing is the extra.
  */
 export async function addItemsToOrder(
   orderId: string,
@@ -1524,25 +1611,53 @@ export async function addItemsToOrder(
     return { ok: false, error: "Could not add the items." };
   }
 
+  // Filled in when the ticket had already been cooked, so the kitchen has to be
+  // told about the second round once the write commits. Held on an object
+  // rather than a `let` so assigning it inside the transaction callback stays
+  // visible to the type checker out here.
+  const reopened: { previousLineIds: string[] | null } = { previousLineIds: null };
+
   try {
     await tenantDb(staff.restaurantId, async (tx) => {
       // Only an OPEN (in-kitchen) order that isn't paid yet can take more items.
       const order = await tx.order.findFirst({
         where: { id: orderId, paymentStatus: { not: "paid" }, status: { in: [...OPEN] } },
-        select: { id: true, total: true },
+        select: {
+          id: true,
+          total: true,
+          status: true,
+          // Read BEFORE the append, so "the lines that were already here" can't
+          // accidentally include the ones being added right now.
+          items: { select: { id: true, preparedAt: true } },
+        },
       });
       if (!order) throw new Error("This order can no longer be edited.");
       // Nested create appends the new lines; select keeps this safe on a lagging schema.
       await tx.order.update({
         where: { id: orderId },
-        data: { total: order.total + built.total, items: { create: orderItemsCreate(built.items) } },
+        data: {
+          total: order.total + built.total,
+          items: { create: orderItemsCreate(built.items) },
+          // Back in front of the kitchen. A ticket the cook has already finished
+          // is off the display, so without this the extras exist only on the
+          // bill and nobody cooks them — the whole point of this branch.
+          ...(needsKitchenReopen(order.status) ? { status: reopenStatus() } : {}),
+        },
         select: { id: true },
       });
+      if (needsKitchenReopen(order.status)) {
+        reopened.previousLineIds = previousLineIds(order.items);
+      }
     });
   } catch (e) {
     console.error("addItemsToOrder failed", e);
     return { ok: false, error: e instanceof Error ? e.message : "Could not add the items." };
   }
+
+  // Everything below is best-effort and deliberately outside the transaction
+  // above: every column it touches ships as a hand-run migration, and none of
+  // them is worth failing an order the kitchen is already cooking.
+  await markExtraRound(staff.restaurantId, orderId, reopened.previousLineIds, built.items);
 
   // Count these servings toward each item's daily cap (best-effort, own tx).
   await recordServingsSold(staff.restaurantId, built.items);

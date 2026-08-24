@@ -7,6 +7,7 @@ import { getPublicRatingStats } from "@/server/feedback/queries";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { WebOrder } from "@/components/site/WebOrder";
 import { storefrontMetadata } from "@/lib/site/metadata";
+import { getServdBranding } from "@/server/branding/powered-by";
 
 export async function generateMetadata({ params }: { params: Promise<{ host: string }> }) {
   const { host } = await params;
@@ -28,12 +29,13 @@ export default async function SiteHomePage({
   const restaurant = await getRestaurantByHost(decodeURIComponent(host));
   if (!restaurant) notFound();
 
-  const [categories, loyalty, sf, contactRow, rating] = await Promise.all([
+  const [categories, loyalty, sf, contactRow, rating, branding] = await Promise.all([
     getPublicMenu(restaurant.id),
     getLoyaltyConfig(restaurant.id),
     getPublicStorefront(restaurant.id),
     systemDb((tx) => tx.restaurant.findFirst({ where: { id: restaurant.id }, select: { printerConfig: true } })).catch(() => null),
     getPublicRatingStats(restaurant.id),
+    getServdBranding(restaurant.id),
   ]);
   const c = (contactRow?.printerConfig as { receipt?: { address?: string; phone?: string } } | null)?.receipt;
 
@@ -54,6 +56,7 @@ export default async function SiteHomePage({
       // that setting had no effect on the live site at all.
       pauseWhenClosed={sf.pauseWhenClosed}
       ordersPaused={sf.ordersPaused}
+      poweredBy={branding.showFooter}
       homeHref="/"
       acceptsBookings={sf.acceptsBookings}
       bookHref="/book"
