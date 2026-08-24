@@ -8,13 +8,14 @@ import { SubdomainForm, CustomDomainForm } from "@/components/admin/DomainForms"
 import { DomainInstructions } from "@/components/admin/DomainInstructions";
 import { UnlockCustomDomainButton } from "@/components/admin/UnlockCustomDomainButton";
 import { refreshDomainStatus, removeCustomDomain } from "@/server/domains/actions";
+import { WebAddressForm } from "@/components/admin/WebAddressForm";
 
 export default async function DomainsPage() {
   const { restaurantId } = await requireAdminPage();
   const [restaurant, access] = await Promise.all([
     tenantDb(restaurantId, (tx) =>
       tx.restaurant.findFirstOrThrow({
-        select: { subdomain: true, customDomain: true, customDomainVerifiedAt: true },
+        select: { slug: true, subdomain: true, customDomain: true, customDomainVerifiedAt: true },
       }),
     ),
     getCustomDomainAccess(restaurantId),
@@ -22,6 +23,7 @@ export default async function DomainsPage() {
   const priceLabel = formatPeso(CUSTOM_DOMAIN_PRICE);
 
   const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "servd.app";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.servdph.com";
 
   // Live DNS/verification records for a connected (unverified) domain.
   let verification: { type: string; domain: string; value: string }[] = [];
@@ -34,8 +36,13 @@ export default async function DomainsPage() {
     <div className="space-y-6">
       <div>
         <Link href="/admin" className="text-sm text-plum-ink/50">← Dashboard</Link>
-        <h1 className="font-heading text-2xl font-bold">Custom domain</h1>
+        <h1 className="font-heading text-2xl font-bold">Web address &amp; domain</h1>
       </div>
+
+      {/* Above the paywall on purpose. Correcting a typo the shop has been stuck
+          with since signup is not a premium feature, and charging ₱500 to fix
+          "mango-gril" would be indefensible. */}
+      <WebAddressForm current={restaurant.slug} appUrl={appUrl} />
 
       {!access.allowed ? (
         <div className="rounded-tile border border-plum-ink/10 bg-white p-6">

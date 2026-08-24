@@ -387,6 +387,16 @@ model Restaurant {
   id            String           @id @default(uuid())
   name          String
   slug          String           @unique // used in /order/{slug}/{tableToken}
+  /// The address this shop used BEFORE the owner corrected it.
+  ///
+  /// Changing a slug rewrites the web address printed on every table QR in the
+  /// building and shared in every post the shop has ever made. Keeping the old
+  /// one here lets those keep working: the public lookup falls back to it, so a
+  /// tent card printed last year still opens the right menu.
+  ///
+  /// Nullable with no default — it ships as a hand-run migration, and it is
+  /// genuinely absent for the overwhelming majority of shops.
+  previousSlug  String?          @unique
   status        RestaurantStatus @default(pending)
   planId        String?
   // Set when a partner creates this as a DEMO storefront (no login) to pitch a
