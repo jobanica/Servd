@@ -31,7 +31,9 @@ export async function GET(req: Request) {
 
   // Optional features (present-or-not, never required for `healthy`).
   const features = {
-    aiInsights: !!process.env.ANTHROPIC_API_KEY,
+    // Menu scanning and the content engine; dashboard insights are computed
+    // from the shop's own figures and need no API key.
+    anthropic: !!process.env.ANTHROPIC_API_KEY,
     sms: !!process.env.SEMAPHORE_API_KEY,
   };
 

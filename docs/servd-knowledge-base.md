@@ -117,6 +117,14 @@ reachable at a Servd URL or the restaurant's own custom domain.
 - Promo codes and gift cards
 - Live order tracking page after checkout
 - Cart recovery: an abandoned cart can trigger a follow-up message
+- **Auto-accept** (optional, off by default) — an online order nobody has
+  answered accepts itself after a wait the shop sets, 10 seconds by default, so
+  the customer isn't left waiting on a confirmation while the counter is buried.
+  Set in Admin → Online website. Online orders only: a dine-in QR order still
+  waits for somebody at the till, and an advance order booked for later is never
+  accepted early. It runs while a staff screen is open (Incoming Orders or the
+  cashier board); with nothing open anywhere, the order waits for a person as
+  before
 
 ### 3.3 Counter / POS ordering
 The cashier can create an order directly at the till with full menu, modifiers,
@@ -410,12 +418,13 @@ The dashboard, accounting and the Z-report use one definition.
 ## 12. Analytics and dashboard
 
 **Dashboard:** pending acceptance, revenue today, orders today, open orders,
-average rating today, recent orders, low-stock warnings and smart insights.
+average rating today, recent orders, low-stock warnings and a "Today at a
+glance" panel — best seller, busiest hour, low stock and the 7-day rating,
+read straight off the shop's own figures.
 
 **Analytics:** revenue, order count, average order value, revenue by day,
 best- and worst-selling items, payment mix, peak hours, and rating trends.
 
-AI-generated insights are available on paid plans; rule-based insights on all.
 
 ---
 

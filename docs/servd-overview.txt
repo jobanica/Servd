@@ -122,7 +122,11 @@ Four ways an order arrives
      promo codes, tips, feedback afterwards.
   2. Online ordering website — pickup and delivery, at a Servd URL or the
      restaurant's own domain. Map location picker, scheduled orders, payment
-     proof upload, cart recovery, live tracking.
+     proof upload, cart recovery, live tracking. Online orders can accept
+     themselves after a wait the shop sets (10 seconds by default, off unless
+     switched on), so a customer isn't left waiting for a confirmation nobody
+     at the counter has time to tap. Dine-in QR orders and advance orders are
+     never auto-accepted.
   3. Counter / POS — the cashier punches it with the full menu, modifiers,
      variants, discounts and any order type.
   4. Third-party — recorded so Grab and Foodpanda sales sit in the same
@@ -346,7 +350,8 @@ collected, timestamped when the payment happened, bucketed in Manila time. The
 dashboard, accounting and the Z-report use one definition.
 
 Dashboard — pending acceptance, revenue today, orders today, open orders,
-average rating, recent orders, low-stock warnings, smart insights.
+average rating, recent orders, low-stock warnings, and a "Today at a glance"
+panel (best seller, busiest hour, low stock, 7-day rating).
 
 Analytics — revenue, order count, average order value, revenue by day, best
 and worst sellers, payment mix, peak hours, rating trends.
