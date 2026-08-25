@@ -38,6 +38,7 @@ export async function updateReputationSettings(
         googleReviewUrl: parsed.data.googleReviewUrl || null,
         feedbackMode: parsed.data.feedbackMode as FeedbackMode,
       },
+      select: { id: true },
     }),
   );
 

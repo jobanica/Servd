@@ -21,7 +21,7 @@ export async function setSenderName(formData: FormData): Promise<void> {
   const restaurantId = String(formData.get("restaurantId"));
   const senderName = String(formData.get("senderName") ?? "").trim().slice(0, 11) || null;
   await systemDb((tx) =>
-    tx.restaurant.update({ where: { id: restaurantId }, data: { smsSenderName: senderName } }),
+    tx.restaurant.update({ where: { id: restaurantId }, data: { smsSenderName: senderName }, select: { id: true } }),
   );
   revalidatePath("/super-admin");
 }

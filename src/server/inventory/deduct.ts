@@ -118,7 +118,7 @@ export async function deductForOrder(
       // where it is: it records that the order has been accounted for, and the
       // extra lines were just accounted for too.
       if (!only) {
-        await tx.order.update({ where: { id: orderId }, data: { inventoryDeductedAt: new Date() } });
+        await tx.order.update({ where: { id: orderId }, data: { inventoryDeductedAt: new Date() }, select: { id: true } });
       }
     });
 

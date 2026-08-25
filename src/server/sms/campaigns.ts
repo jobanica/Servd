@@ -114,7 +114,7 @@ export async function setDoubleOptIn(formData: FormData): Promise<void> {
   const { restaurantId } = await requireAdminAction();
   const enabled = formData.get("doubleOptIn") === "on";
   await tenantDb(restaurantId, (tx) =>
-    tx.restaurant.update({ where: { id: restaurantId }, data: { smsDoubleOptIn: enabled } }),
+    tx.restaurant.update({ where: { id: restaurantId }, data: { smsDoubleOptIn: enabled }, select: { id: true } }),
   );
   revalidatePath("/admin/sms");
 }

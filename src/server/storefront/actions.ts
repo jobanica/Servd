@@ -146,14 +146,21 @@ export async function updateStorefront(
         where: { restaurantId },
         create: { restaurantId, hours: hoursJson, deliveryZones: zonesJson, pauseWhenClosed },
         update: { hours: hoursJson, deliveryZones: zonesJson, pauseWhenClosed },
+        select: { id: true },
       }),
     );
   } catch (e) {
+    // Name the column when the database says which one is missing. The old
+    // message matched the word "storefront", which appears in EVERY Prisma
+    // error on this model ("Invalid prisma.storefrontSetting.upsert()"), so
+    // any failure at all was reported as "run the migration" — sending an
+    // owner to look for a migration that was never the problem.
     const msg = String(e);
+    const column = /column "?([A-Za-z_]+)"? does not exist/i.exec(msg)?.[1];
     return {
-      error: /storefront|column|relation|table/i.test(msg)
-        ? "Storefront settings need a quick database update. Run the migration, then try again."
-        : "Couldn't save.",
+      error: column
+        ? `Your database is missing the "${column}" column. Run the pending migration in Supabase, then try again — nothing was saved.`
+        : "Couldn't save your settings, and nothing was changed. Try again; if it keeps happening, send us this screen.",
     };
   }
   // `acceptsBookings` / `bookingConfig` are newer columns — write them separately

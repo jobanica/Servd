@@ -166,6 +166,7 @@ export async function applyGiftCard(orderId: string, code: string): Promise<Appl
       await tx.order.update({
         where: { id: orderId },
         data: { creditApplied: order.creditApplied + applied, giftCardId: card.id },
+        select: { id: true },
       });
       await tx.giftCard.update({ where: { id: card.id }, data: { balance: card.balance - applied } });
       await tx.giftCardTxn.create({
@@ -209,7 +210,7 @@ export async function removeGiftCard(orderId: string): Promise<ApplyResult> {
       await tx.giftCardTxn.create({
         data: { restaurantId: staff.restaurantId, giftCardId: order.giftCardId, amount: order.creditApplied, kind: "restore", orderId },
       });
-      await tx.order.update({ where: { id: orderId }, data: { creditApplied: 0, giftCardId: null } });
+      await tx.order.update({ where: { id: orderId }, data: { creditApplied: 0, giftCardId: null }, select: { id: true } });
     });
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Couldn't remove the gift card." };

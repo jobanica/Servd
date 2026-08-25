@@ -78,7 +78,7 @@ export async function updatePhone(_prev: AccountState, formData: FormData): Prom
       const cfg = (r.printerConfig as Record<string, unknown> | null) ?? {};
       const receipt = (cfg.receipt as Record<string, unknown> | null) ?? {};
       cfg.receipt = { ...receipt, phone: phone || null };
-      await tx.restaurant.update({ where: { id: restaurantId }, data: { printerConfig: cfg as object } });
+      await tx.restaurant.update({ where: { id: restaurantId }, data: { printerConfig: cfg as object }, select: { id: true } });
     });
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Couldn't update phone." };
@@ -98,7 +98,7 @@ export async function updateAddress(_prev: AccountState, formData: FormData): Pr
       const receipt = (cfg.receipt as Record<string, unknown> | null) ?? {};
       // receipt.address is what the website + receipts read.
       cfg.receipt = { ...receipt, address: address || null };
-      await tx.restaurant.update({ where: { id: restaurantId }, data: { printerConfig: cfg as object } });
+      await tx.restaurant.update({ where: { id: restaurantId }, data: { printerConfig: cfg as object }, select: { id: true } });
     });
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Couldn't update address." };

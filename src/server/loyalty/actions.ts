@@ -21,6 +21,7 @@ export async function updateLoyaltyConfig(
       tx.restaurant.update({
         where: { id: restaurantId },
         data: { loyaltyEnabled: enabled, loyaltyPesosPerPoint: pesosPerPoint, loyaltyPointValue: pointValue },
+        select: { id: true },
       }),
     );
   } catch (e) {

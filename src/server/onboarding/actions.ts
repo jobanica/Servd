@@ -14,6 +14,7 @@ export async function finishOnboarding(): Promise<void> {
     tx.restaurant.update({
       where: { id: restaurantId },
       data: { onboardingCompletedAt: new Date() },
+      select: { id: true },
     }),
   );
   redirect("/admin");

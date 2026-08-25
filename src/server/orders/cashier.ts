@@ -1249,9 +1249,10 @@ export async function voidOrderItem(
         await tx.order.update({
           where: { id: orderId },
           data: { total: 0, status: "cancelled", billRequested: false, voidedAt: new Date() },
+          select: { id: true },
         });
       } else {
-        await tx.order.update({ where: { id: orderId }, data: { total: newTotal } });
+        await tx.order.update({ where: { id: orderId }, data: { total: newTotal }, select: { id: true } });
       }
 
       await writeAudit(tx, staff.restaurantId, {

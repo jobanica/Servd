@@ -45,7 +45,7 @@ export async function setSubdomain(
       return { error: "That subdomain is reserved." };
     }
     await tenantDb(restaurantId, (tx) =>
-      tx.restaurant.update({ where: { id: restaurantId }, data: { subdomain: sub } }),
+      tx.restaurant.update({ where: { id: restaurantId }, data: { subdomain: sub }, select: { id: true } }),
     );
   } catch (e) {
     if (e instanceof z.ZodError) return { error: e.issues[0]?.message ?? "Invalid subdomain" };
@@ -100,6 +100,7 @@ export async function connectCustomDomain(
       tx.restaurant.update({
         where: { id: restaurantId },
         data: { customDomain: domain, customDomainVerifiedAt: null },
+        select: { id: true },
       }),
     );
 
@@ -135,6 +136,7 @@ export async function refreshDomainStatus(): Promise<void> {
       tx.restaurant.update({
         where: { id: restaurantId },
         data: { customDomainVerifiedAt: new Date() },
+        select: { id: true },
       }),
     );
   }
@@ -152,6 +154,7 @@ export async function removeCustomDomain(): Promise<void> {
     tx.restaurant.update({
       where: { id: restaurantId },
       data: { customDomain: null, customDomainVerifiedAt: null },
+      select: { id: true },
     }),
   );
   revalidatePath("/admin/domains");

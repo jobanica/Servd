@@ -75,7 +75,7 @@ export async function runBillingCron(now: Date = new Date()): Promise<CronSummar
             cancelAtPeriodEnd: false,
           },
         });
-        await tx.restaurant.update({ where: { id: sub.restaurantId }, data: { planId: freePlan.id, status: "active" } });
+        await tx.restaurant.update({ where: { id: sub.restaurantId }, data: { planId: freePlan.id, status: "active" }, select: { id: true } });
       });
       continue;
     }
@@ -101,7 +101,7 @@ export async function runBillingCron(now: Date = new Date()): Promise<CronSummar
             where: { id: sub.id },
             data: { status: "active", currentPeriodEnd: addMonths(base, 1), failedCharges: 0 },
           });
-          await tx.restaurant.update({ where: { id: sub.restaurantId }, data: { status: "active" } });
+          await tx.restaurant.update({ where: { id: sub.restaurantId }, data: { status: "active" }, select: { id: true } });
         });
       }
       continue;
@@ -110,7 +110,7 @@ export async function runBillingCron(now: Date = new Date()): Promise<CronSummar
     if (decision.action === "suspend") {
       await systemDb(async (tx) => {
         await tx.subscription.update({ where: { id: sub.id }, data: { status: "past_due" } });
-        await tx.restaurant.update({ where: { id: sub.restaurantId }, data: { status: "suspended" } });
+        await tx.restaurant.update({ where: { id: sub.restaurantId }, data: { status: "suspended" }, select: { id: true } });
       });
       s.suspended++;
       continue;
@@ -145,7 +145,7 @@ export async function runBillingCron(now: Date = new Date()): Promise<CronSummar
           select: { id: true },
         });
         await tx.subscription.update({ where: { id: sub.id }, data: { status: "active", currentPeriodEnd: addMonths(base, 1), failedCharges: 0 } });
-        await tx.restaurant.update({ where: { id: sub.restaurantId }, data: { status: "active" } });
+        await tx.restaurant.update({ where: { id: sub.restaurantId }, data: { status: "active" }, select: { id: true } });
       });
       s.charged++;
     } else {

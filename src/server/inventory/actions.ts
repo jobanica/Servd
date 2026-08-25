@@ -468,6 +468,7 @@ export async function setAutoOutOfStock(formData: FormData): Promise<void> {
     tx.restaurant.update({
       where: { id: restaurantId },
       data: { autoOutOfStock: formData.get("autoOutOfStock") === "on" },
+      select: { id: true },
     }),
   );
   revalidatePath("/admin/inventory");
@@ -479,7 +480,7 @@ export async function setLowStockAlertPhone(formData: FormData): Promise<void> {
   await ensureModule(restaurantId);
   const phone = String(formData.get("lowStockAlertPhone") ?? "").trim();
   await tenantDb(restaurantId, (tx) =>
-    tx.restaurant.update({ where: { id: restaurantId }, data: { lowStockAlertPhone: phone || null } }),
+    tx.restaurant.update({ where: { id: restaurantId }, data: { lowStockAlertPhone: phone || null }, select: { id: true } }),
   );
   revalidatePath("/admin/inventory");
 }

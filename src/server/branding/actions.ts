@@ -64,6 +64,7 @@ export async function updateBranding(
         ...(logoUrl ? { logoUrl } : {}),
         ...(coverImageUrl ? { coverImageUrl } : {}),
       },
+      select: { id: true },
     }),
   );
 

@@ -41,7 +41,7 @@ export async function activateByProviderRef(
       });
     }
     // Paying clears any suspension → the subscriber's system is reactivated.
-    await tx.restaurant.update({ where: { id: invoice.restaurantId }, data: { status: "active" } });
+    await tx.restaurant.update({ where: { id: invoice.restaurantId }, data: { status: "active" }, select: { id: true } });
     return true;
   });
 }

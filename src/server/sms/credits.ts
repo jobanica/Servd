@@ -25,6 +25,7 @@ export async function adjustCredits(
     await tx.restaurant.update({
       where: { id: restaurantId },
       data: { smsCreditBalance: balanceAfter },
+      select: { id: true },
     });
     await tx.smsCreditLedger.create({
       data: { restaurantId, change, reason, balanceAfter },

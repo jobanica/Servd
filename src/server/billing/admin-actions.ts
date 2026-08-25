@@ -9,7 +9,7 @@ export async function unsuspendRestaurant(formData: FormData): Promise<void> {
   await requireSuperAdmin();
   const restaurantId = String(formData.get("restaurantId"));
   await systemDb((tx) =>
-    tx.restaurant.update({ where: { id: restaurantId }, data: { status: "active" } }),
+    tx.restaurant.update({ where: { id: restaurantId }, data: { status: "active" }, select: { id: true } }),
   );
   revalidatePath("/super-admin");
 }
