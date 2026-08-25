@@ -75,12 +75,16 @@ export function BluetoothPrinterButton({
     // No Web Bluetooth: iOS/Safari at all, and Chrome on iOS too (it's Safari
     // underneath). Nothing here can pair a printer on this device.
     if (!explainUnsupported) return null;
+    const which = station === "kitchen" ? "kitchen printer" : "receipt printer";
     return (
-      <p className="rounded-lg bg-cream px-3 py-2 text-xs text-plum-ink/60">
-        This device can&apos;t pair a Bluetooth printer — Web Bluetooth needs Chrome on Android or
-        a desktop, and never works on iPhone or iPad. Use this till on an Android tablet, or set
-        the kitchen printer to <strong>Network</strong> in Printer settings so the server drives
-        it instead.
+      <p className="rounded-lg bg-cream px-3 py-2 text-xs leading-relaxed text-plum-ink/60">
+        <strong className="text-plum-ink/80">No Connect {which} button?</strong> This device
+        can&apos;t pair one. Bluetooth printing needs Chrome or Edge on an Android tablet, a
+        Windows PC or a Mac — it never works on an iPhone or iPad, in Safari, or inside the
+        Facebook or Messenger browser, whatever browser you install. Either run this till on an
+        Android tablet or a laptop, or set the {which} to <strong>Network</strong> or{" "}
+        <strong>Cloud</strong> in Printer settings so the server drives it and no pairing is
+        needed here at all.
       </p>
     );
   }

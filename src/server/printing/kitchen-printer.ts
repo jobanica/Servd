@@ -21,3 +21,23 @@ export async function kitchenNeedsBluetoothPairing(restaurantId: string): Promis
     return false;
   }
 }
+
+/**
+ * Does the TILL printer need pairing in this browser?
+ *
+ * Same question for the receipt printer. It decides whether a device that
+ * can't do Web Bluetooth should be TOLD so: a shop on a network or cloud
+ * printer needs nothing at the till and shouldn't be shown a warning about a
+ * capability it never uses, but a shop whose only printer is Bluetooth needs to
+ * know why there's no button, or the till just looks broken.
+ */
+export async function tillNeedsBluetoothPairing(restaurantId: string): Promise<boolean> {
+  try {
+    const r = await tenantDb(restaurantId, (tx) =>
+      tx.restaurant.findFirst({ select: { printMethod: true } }),
+    );
+    return r?.printMethod === "bluetooth";
+  } catch {
+    return false;
+  }
+}

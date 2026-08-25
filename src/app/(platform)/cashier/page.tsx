@@ -10,7 +10,7 @@ import { StaffDataError } from "@/components/StaffDataError";
 import { hasTutorials } from "@/server/tutorials/tutorials";
 import { staffLabel } from "@/server/tenancy/staff-name";
 import { cardSurchargeBp } from "@/server/orders/surcharge";
-import { kitchenNeedsBluetoothPairing } from "@/server/printing/kitchen-printer";
+import { kitchenNeedsBluetoothPairing, tillNeedsBluetoothPairing } from "@/server/printing/kitchen-printer";
 import { paysBeforeCooking } from "@/server/printing/kitchen-options";
 
 export default async function CashierHome() {
@@ -51,6 +51,9 @@ export default async function CashierHome() {
   // Whether this shop takes the money before the food is made.
   const payFirst = await paysBeforeCooking(user.restaurantId);
   const kitchenBluetooth = await kitchenNeedsBluetoothPairing(user.restaurantId);
+  // Only a shop whose receipt printer IS Bluetooth gets told when the device
+  // can't pair one — otherwise it's a warning about a capability they never use.
+  const tillBluetooth = await tillNeedsBluetoothPairing(user.restaurantId);
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
@@ -86,6 +89,7 @@ export default async function CashierHome() {
         cardSurchargeBp={surchargeBp}
         payFirst={payFirst}
         kitchenBluetooth={kitchenBluetooth}
+        tillBluetooth={tillBluetooth}
       />
       {offlineEnabled && <ServiceWorkerRegister />}
     </div>

@@ -82,6 +82,7 @@ export function CashierBoard({
   cardSurchargeBp = 0,
   payFirst = false,
   kitchenBluetooth = false,
+  tillBluetooth = false,
 }: {
   restaurantId: string;
   initialTables: CashierTable[];
@@ -100,6 +101,8 @@ export function CashierBoard({
    * is the server's business and needs nothing here.
    */
   kitchenBluetooth?: boolean;
+  /** The receipt printer is Bluetooth, so a device that can't pair one must be told why. */
+  tillBluetooth?: boolean;
 }) {
   // One clock for the whole board, so every waiting time agrees and the page
   // re-renders once a minute rather than once per card. A minute is enough —
@@ -512,7 +515,7 @@ export function CashierBoard({
       <button onClick={() => setAddCustomerOpen(true)} className={sidebarBtn}>
         + Customer
       </button>
-      <BluetoothPrinterButton />
+      <BluetoothPrinterButton explainUnsupported={tillBluetooth} />
       {kitchenBluetooth && <BluetoothPrinterButton station="kitchen" explainUnsupported />}
       {/* "No sale" — the drawer without a transaction, for giving change or
           dropping a float in. Every till has one; this one didn't. */}
