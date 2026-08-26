@@ -47,6 +47,7 @@ import { WaitBadge } from "./WaitBadge";
 import { waitingFrom, waitingLabel, waitTone } from "@/lib/orders/waiting";
 import { printPaidTicket, printKitchenTicket, openCashDrawer } from "@/server/printing/print";
 import { runPrintDispatch, sendDrawerKick } from "@/lib/print/run-dispatch";
+import { printFailureMessage } from "@/lib/print/print-failure";
 
 /** One row inside an order card's "⋯ more" overflow menu. */
 function OverflowItem({
@@ -313,8 +314,11 @@ export function CashierBoard({
     try {
       const res = await printKitchenTicket(orderId);
       await runPrintDispatch(res, orderId, "kitchen");
-    } catch {
-      showToast("Couldn't print the kitchen ticket.");
+    } catch (e) {
+      // Say WHY. "Couldn't print" on its own sends the counter looking at the
+      // printer when the answer is usually the browser or the pairing.
+      const msg = printFailureMessage("kitchen", e, navigator.userAgent);
+      if (msg) showToast(msg);
     }
   }
 
@@ -1233,6 +1237,7 @@ export function CashierBoard({
           onClose={() => setNewOrderOpen(false)}
           onCreated={(t) => setTables(t)}
           onPaymentIssue={(m) => showToast(m)}
+          onPrintIssue={(m) => showToast(m)}
           payFirst={payFirst}
           cardSurchargeBp={cardSurchargeBp}
         />
@@ -1306,6 +1311,7 @@ export function CashierBoard({
           label={addItemsTarget.label}
           onClose={() => setAddItemsTarget(null)}
           onChanged={(t) => setTables(t)}
+          onPrintIssue={(m: string) => showToast(m)}
         />
       )}
 

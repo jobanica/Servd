@@ -22,6 +22,7 @@ import { printKitchenTicket, printPaidTicket } from "@/server/printing/print";
 import { PayModal } from "./PayModal";
 import { shouldPayFirst } from "@/lib/orders/pay-first";
 import { runPrintDispatch, sendDrawerKick } from "@/lib/print/run-dispatch";
+import { printFailureMessage } from "@/lib/print/print-failure";
 import { CategoryTabs, categorySectionId } from "@/components/menu/CategoryTabs";
 import {
   ORDER_TYPES,
@@ -234,6 +235,7 @@ export function NewOrderModal({
   onClose,
   onCreated,
   onPaymentIssue,
+  onPrintIssue,
   payFirst = false,
   cardSurchargeBp = 0,
 }: {
@@ -241,6 +243,8 @@ export function NewOrderModal({
   onCreated: (tables: CashierTable[]) => void;
   /** Surfaced when the order was created but its payment didn't record. */
   onPaymentIssue?: (message: string) => void;
+  /** Surfaced when a ticket couldn't be printed. The order still went through. */
+  onPrintIssue?: (message: string) => void;
   /** The shop takes payment before the food is made (Printer settings). */
   payFirst?: boolean;
   cardSurchargeBp?: number;
@@ -383,12 +387,18 @@ export function NewOrderModal({
         );
       }
       // No kitchen display → print the kitchen ticket from the browser.
+      //
+      // Non-blocking, but NOT silent. The order is already on the board either
+      // way; what changed is that a docket which didn't come out now says so,
+      // instead of leaving the counter to work it out when the food never
+      // arrives at the pass.
       if (res.printKitchen && res.printOrderId) {
         try {
           const k = await printKitchenTicket(res.printOrderId);
           await runPrintDispatch(k, res.printOrderId, "kitchen");
-        } catch {
-          /* non-blocking */
+        } catch (e) {
+          const msg = printFailureMessage("kitchen", e, navigator.userAgent);
+          if (msg) onPrintIssue?.(msg);
         }
       }
       // Browser print transports: the receipt and the drawer pulse come back
@@ -397,15 +407,18 @@ export function NewOrderModal({
         try {
           const t = await printPaidTicket(res.printOrderId);
           await runPrintDispatch(t, res.printOrderId, "receipt");
-        } catch {
-          /* non-blocking */
+        } catch (e) {
+          const msg = printFailureMessage("receipt", e, navigator.userAgent);
+          if (msg) onPrintIssue?.(msg);
         }
       }
       if (res.drawerKickBase64) {
         try {
           await sendDrawerKick(res.drawerKickBase64);
         } catch {
-          /* non-blocking */
+          // The drawer is the one thing worth staying quiet about: the money
+          // was taken, the receipt printed, and a drawer that didn't pop is
+          // opened with the No sale button in two seconds.
         }
       }
       onClose();

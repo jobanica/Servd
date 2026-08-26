@@ -7,6 +7,7 @@ import type { CartLine, DinerCategory, DinerItem } from "@/lib/cart/types";
 import { getPosMenu, addItemsToOrder, type CashierTable } from "@/server/orders/cashier";
 import { printKitchenTicket } from "@/server/printing/print";
 import { runPrintDispatch } from "@/lib/print/run-dispatch";
+import { printFailureMessage } from "@/lib/print/print-failure";
 import { ItemConfig, lineId, addCartLine, changeLineQty } from "./NewOrderModal";
 import { PosItemTile } from "./PosItemTile";
 import { useStockMode } from "./useStockMode";
@@ -22,11 +23,14 @@ export function AddItemsModal({
   label,
   onClose,
   onChanged,
+  onPrintIssue,
 }: {
   orderId: string;
   label: string;
   onClose: () => void;
   onChanged: (tables: CashierTable[]) => void;
+  /** Surfaced when the docket for the added items couldn't be printed. */
+  onPrintIssue?: (message: string) => void;
 }) {
   const [menu, setMenu] = useState<DinerCategory[] | null>(null);
   const [lines, setLines] = useState<CartLine[]>([]);
@@ -82,8 +86,9 @@ export function AddItemsModal({
         try {
           const k = await printKitchenTicket(res.printOrderId);
           await runPrintDispatch(k, res.printOrderId, "kitchen");
-        } catch {
-          /* non-blocking */
+        } catch (e) {
+          const msg = printFailureMessage("kitchen", e, navigator.userAgent);
+          if (msg) onPrintIssue?.(msg);
         }
       }
       onClose();

@@ -8,6 +8,7 @@ import {
   type PrinterStation,
 } from "@/lib/printing/bt-printer";
 import { printViaBluetooth } from "@/lib/printing/bluetooth";
+import { isUserCancel } from "@/lib/printing/bluetooth-help";
 
 /**
  * Send a bare drawer pulse to the paired Bluetooth printer.
@@ -77,15 +78,43 @@ async function finishDispatch(
   // A paired Web Bluetooth printer prints the exact bytes we got back.
   // printBytes silently reconnects if the BLE link dropped while idle, so we
   // never re-open the device chooser once a printer has been paired.
+  //
+  // Both Bluetooth attempts fall through to the OS dialog rather than throwing.
+  // A shop that chose "Print kitchen tickets" is told by that settings screen
+  // that on Bluetooth "the order opens on the cashier device for printing" —
+  // and that was only true when Bluetooth had never been set up. Once it WAS
+  // configured but no printer was paired on the till (or the device can't pair
+  // one at all, like an iPad), the attempt threw and the docket went nowhere.
+  // Falling through keeps the promise: the ticket page opens, and AirPrint or
+  // any system printer can take it.
+  //
+  // A cancelled chooser is deliberately NOT recovered — they closed it on
+  // purpose, and popping a print dialog straight afterwards would fight them.
   if (isPrinterPaired(station) && res.ticketBase64) {
-    await printBytes(base64ToBytes(res.ticketBase64), station);
-    return "Printed.";
+    try {
+      await printBytes(base64ToBytes(res.ticketBase64), station);
+      return "Printed.";
+    } catch (e) {
+      if (isUserCancel(errText(e))) throw e;
+      fallback();
+      return "The printer didn't answer — opening the ticket so you can print it.";
+    }
   }
   if (res.clientAction === "bluetooth" && res.ticketBase64) {
-    await printViaBluetooth(base64ToBytes(res.ticketBase64));
-    return "Printed.";
+    try {
+      await printViaBluetooth(base64ToBytes(res.ticketBase64));
+      return "Printed.";
+    } catch (e) {
+      if (isUserCancel(errText(e))) throw e;
+      fallback();
+      return "No Bluetooth printer on this device — opening the ticket so you can print it.";
+    }
   }
   // OS dialog / AirPrint fallback.
   fallback();
   return null;
+}
+
+function errText(e: unknown): string {
+  return e instanceof Error ? e.message : String(e ?? "");
 }
