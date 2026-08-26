@@ -133,6 +133,7 @@ export async function getOrderTicket(
       showCashTendered: receipt.showCashTendered,
       kitchenShowAddress: cfg.kitchen.showAddress,
       tableNumber: order.table?.tableNumber ?? ticketNumber ?? "—",
+      orderNumber: ticketNumber,
       orderType,
       customerName,
       customerAddress,

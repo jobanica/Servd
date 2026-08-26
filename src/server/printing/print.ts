@@ -9,6 +9,7 @@ import { drawerPolicy, shouldOpenDrawer } from "@/lib/printing/drawer";
 import { parsePrinterConfig, kitchenDestination, isServerDriven } from "@/lib/printing/printer-config";
 import { restaurantSiteUrl } from "@/lib/qr";
 import { getShiftReport } from "./shift-report";
+import { formatOrderNumber } from "@/lib/orders/order-number";
 
 /**
  * PLUGGABLE PRINTING
@@ -149,7 +150,27 @@ async function loadTicket(restaurantId: string, orderId: string) {
         /* not migrated yet */
       }
     }
-    return { restaurant, order, meta, payment, settings };
+    // The day's ticket number, on its own best-effort read.
+    //
+    // It was never read here at all, which is why an automatically-printed
+    // docket came out with no number on it while the kitchen DISPLAY showed
+    // one — a shop that runs on order numbers instead of tables had nothing on
+    // the paper to call the customer by. Its own query and its own catch, so a
+    // lagging column can't take the discount and order-type block down with it.
+    let ticketNumber: string | null = null;
+    if (order) {
+      try {
+        const n = await tx.order.findFirst({
+          where: { id: orderId },
+          select: { orderNumber: true },
+        });
+        if (n?.orderNumber != null) ticketNumber = formatOrderNumber(n.orderNumber);
+      } catch {
+        /* orderNumber not migrated yet */
+      }
+    }
+
+    return { restaurant, order, meta, payment, settings, ticketNumber };
   });
 }
 
@@ -159,7 +180,7 @@ async function ticketFor(
   orderId: string,
   kind: TicketKind = "receipt",
 ): Promise<Ticket | null> {
-  const { restaurant, order, meta, payment } = await loadTicket(restaurantId, orderId);
+  const { restaurant, order, meta, payment, ticketNumber } = await loadTicket(restaurantId, orderId);
   if (!order) return null;
   const config = (restaurant.printerConfig as PrinterConfig | null) ?? {};
   const r = config.receipt ?? {};
@@ -172,6 +193,7 @@ async function ticketFor(
     footer: r.footer,
     showVat: r.showVat,
     tableNumber: order.table?.tableNumber ?? "—",
+    orderNumber: ticketNumber,
     orderType: meta.orderType,
     customerName: meta.customerName,
     customerAddress: meta.customerAddress,

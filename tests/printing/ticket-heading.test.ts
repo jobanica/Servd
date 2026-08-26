@@ -53,3 +53,52 @@ describe("everything else is unchanged", () => {
     expect(out).toContain("Ana");
   });
 });
+
+/**
+ * The reported bug: a shop that uses order numbers instead of tables got a
+ * kitchen docket with no number on it. Two causes — the auto-print path never
+ * read orderNumber at all, and the heading only ever showed a number for
+ * dine-in, so a takeout ticket said "TAKEOUT - Ana" and nothing else.
+ */
+describe("order numbers on the paper", () => {
+  it("puts the number on a takeout docket", () => {
+    expect(heading({ orderType: "takeout", orderNumber: "#007", customerName: "Ana" })).toBe(
+      "TAKEOUT #007 - Ana",
+    );
+  });
+
+  it("puts the number on a pickup and a delivery too", () => {
+    expect(heading({ orderType: "pickup", orderNumber: "#012" })).toContain("#012");
+    expect(heading({ orderType: "delivery", orderNumber: "#012" })).toContain("#012");
+  });
+
+  it("prints the number alone when there is no customer name", () => {
+    expect(heading({ orderType: "takeout", orderNumber: "#007" })).toBe("TAKEOUT #007");
+  });
+
+  it("keeps the number and drops the name when the line won't fit the paper", () => {
+    // 32 characters is the whole width. The number is what gets called out.
+    const out = heading({
+      orderType: "takeout",
+      orderNumber: "#007",
+      customerName: "Maria Fernanda Dela Cruz-Santos",
+    });
+    expect(out).toBe("TAKEOUT #007");
+  });
+
+  it("uses the number for a dine-in order taken before anyone sat down", () => {
+    expect(heading({ orderType: "dine_in", tableNumber: "—", orderNumber: "#003" })).toBe(
+      "ORDER #003",
+    );
+  });
+
+  it("still prefers a real table over the number", () => {
+    // Both can exist. The table is where the food goes.
+    expect(heading({ orderType: "dine_in", tableNumber: "5", orderNumber: "#003" })).toBe("TABLE 5");
+  });
+
+  it("still accepts a number smuggled through tableNumber", () => {
+    // One caller has always passed it that way; nothing may regress there.
+    expect(heading({ orderType: "dine_in", tableNumber: "#001" })).toBe("ORDER #001");
+  });
+});

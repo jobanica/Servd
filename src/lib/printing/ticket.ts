@@ -70,6 +70,14 @@ export interface Ticket {
   showCashTendered: boolean;
   kitchenShowAddress: boolean;
   tableNumber: string;
+  /**
+   * The day's ticket number, already formatted ("#007"), or null.
+   *
+   * What a counter customer is actually called by. Separate from tableNumber
+   * because an order can have both, one, or neither, and the heading has to
+   * pick — a takeout ticket has a number and never a table.
+   */
+  orderNumber: string | null;
   orderType: OrderTypeKey;
   customerName: string | null;
   customerAddress: string | null;
@@ -95,6 +103,7 @@ export interface TicketSource extends ReceiptBranding {
   kind?: TicketKind;
   restaurantName: string;
   tableNumber: string;
+  orderNumber?: string | null;
   orderType?: OrderTypeKey;
   customerName?: string | null;
   customerAddress?: string | null;
@@ -128,6 +137,7 @@ export function buildTicket(src: TicketSource): Ticket {
     showCashTendered: src.showCashTendered !== false,
     kitchenShowAddress: src.kitchenShowAddress === true,
     tableNumber: src.tableNumber,
+    orderNumber: src.orderNumber ?? null,
     orderType: src.orderType ?? "dine_in",
     customerName: src.customerName ?? null,
     customerAddress: src.customerAddress ?? null,
@@ -179,14 +189,29 @@ export function ticketTotals(t: Ticket) {
  * "TABLE —" is not something anyone can shout across a room.
  */
 export function ticketHeading(t: Ticket): string {
+  // A "#001" arriving in tableNumber is a ticket number, not a table — one
+  // caller has always smuggled it through that field, so both are accepted.
+  const number =
+    t.orderNumber?.trim() || (t.tableNumber.startsWith("#") ? t.tableNumber : null);
+
   if (t.orderType === "dine_in") {
-    // A "#001" here is a ticket number, not a table — it already reads as one,
-    // so it goes on the paper as-is rather than as "TABLE #001".
-    if (t.tableNumber.startsWith("#")) return `ORDER ${t.tableNumber}`;
-    return t.tableNumber && t.tableNumber !== "—" ? `TABLE ${t.tableNumber}` : "ORDER";
+    if (t.tableNumber && t.tableNumber !== "—" && !t.tableNumber.startsWith("#")) {
+      return `TABLE ${t.tableNumber}`;
+    }
+    return number ? `ORDER ${number}` : "ORDER";
   }
+
   // Same word as the cashier screen and the kitchen display, in caps for paper.
-  return `${orderTypeLabel(t.orderType).toUpperCase()} - ${t.customerName ?? ""}`.trim();
+  // The NUMBER goes next to it: a shop running on ticket numbers calls "takeout
+  // seven", and a docket that says only "TAKEOUT - Ana" leaves the pass with
+  // nothing to match against the customer waiting at the counter.
+  const label = orderTypeLabel(t.orderType).toUpperCase();
+  const head = number ? `${label} ${number}` : label;
+  const name = t.customerName?.trim();
+  if (!name) return head;
+  // The number is what gets called out, so it wins if the line won't fit.
+  const withName = `${head} - ${name}`;
+  return withName.length <= WIDTH ? withName : head;
 }
 
 /** Centered header: restaurant name + any contact lines. */
