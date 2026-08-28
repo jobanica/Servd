@@ -19,6 +19,7 @@
  */
 
 import { writeToPrinter } from "./ble-write";
+import { forgetPrinter, recallPrinter, rememberPrinter } from "./printer-memory";
 
 const DEFAULT_SERVICE = "000018f0-0000-1000-8000-00805f9b34fb";
 const DEFAULT_CHAR = "00002af1-0000-1000-8000-00805f9b34fb";
@@ -114,13 +115,105 @@ export async function connectPrinter(opts?: {
     );
   }
 
+  attach(station, device);
+  await connectGatt(station);
+  // Remembered only after the link actually came up. Storing on selection alone
+  // would have the till reconnecting every morning to a device that was picked
+  // by mistake and never worked.
+  rememberPrinter(station, {
+    id: device.id,
+    name: device.name ?? null,
+    serviceUuid: slot.serviceUuid,
+    charUuid: slot.charUuid,
+  });
+  notify(station);
+}
+
+/** Put a device into a slot and watch for the link dropping. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function attach(station: PrinterStation, device: any): void {
+  const slot = slots[station];
   slot.device = device;
   device.addEventListener("gattserverdisconnected", () => {
+    // Only the live link is cleared, never the pairing. A BLE printer drops
+    // GATT whenever it is idle — that is normal, and printBytes brings it back
+    // on demand. Treating it as an unpair is what made the till ask to be
+    // reconnected several times a shift.
     slot.characteristic = null;
     notify(station);
   });
-  await connectGatt(station);
-  notify(station);
+}
+
+/** In flight, so two mounting buttons don't both restore the same printer. */
+let restoring: Promise<void> | null = null;
+
+/**
+ * Reconnect to the printers this browser already has permission for.
+ *
+ * The pairing never expired — the page just forgot it. Chrome keeps the device
+ * grant for the origin, and getDevices() returns those devices with no chooser
+ * and no user gesture, so a till that paired once in January opens in March
+ * already connected.
+ *
+ * Everything here fails soft. A printer that is switched off, out of range or
+ * paired to somebody else's phone still gets restored as PAIRED without a live
+ * link, which is the same state it sits in between prints anyway — printBytes
+ * opens the link when there is something to print.
+ */
+export async function restorePairedPrinters(): Promise<void> {
+  if (restoring) return restoring;
+  restoring = (async () => {
+    if (!isBluetoothSupported()) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const bt = (navigator as any).bluetooth;
+    // Older Chromium has Web Bluetooth but not the permissions backend that
+    // getDevices() needs. Nothing to do there: the button still pairs by hand.
+    if (typeof bt.getDevices !== "function") return;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let known: any[] = [];
+    try {
+      known = await bt.getDevices();
+    } catch {
+      return;
+    }
+
+    for (const station of ["till", "kitchen"] as PrinterStation[]) {
+      const slot = slots[station];
+      if (slot.device) continue; // already paired in this session
+      const saved = recallPrinter(station);
+      if (!saved) continue;
+      // Never let one physical printer end up on both stations — every docket
+      // would come out of the receipt roll as well.
+      const other: PrinterStation = station === "till" ? "kitchen" : "till";
+      if (slots[other].device?.id === saved.id) continue;
+
+      const device = known.find((d) => d?.id === saved.id);
+      if (!device) {
+        // Permission revoked, a different browser profile, or the site data was
+        // cleared. Drop the note so the button offers a fresh pairing instead
+        // of pretending a printer is there.
+        forgetPrinter(station);
+        continue;
+      }
+
+      slot.serviceUuid = saved.serviceUuid;
+      slot.charUuid = saved.charUuid;
+      attach(station, device);
+      notify(station);
+
+      // Warm the link now rather than making the first sale of the day wait.
+      try {
+        await connectGatt(station);
+        notify(station);
+      } catch {
+        /* printer off or out of range — printBytes will connect when needed */
+      }
+    }
+  })().finally(() => {
+    restoring = null;
+  });
+  return restoring;
 }
 
 async function connectGatt(station: PrinterStation): Promise<void> {
@@ -179,9 +272,11 @@ export function disconnectPrinter(station: PrinterStation = "till"): void {
     /* ignore */
   }
   // Fully unpair so the status reverts and the next print won't silently
-  // reconnect to a printer the user deliberately disconnected.
+  // reconnect to a printer the user deliberately disconnected — including on
+  // the next page load, which is why the stored note goes too.
   slot.device = null;
   slot.characteristic = null;
+  forgetPrinter(station);
   notify(station);
 }
 

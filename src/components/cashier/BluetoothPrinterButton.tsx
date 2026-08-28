@@ -8,6 +8,7 @@ import {
   isPrinterPaired,
   onPrinterChange,
   printerName,
+  restorePairedPrinters,
   type PrinterStation,
 } from "@/lib/printing/bt-printer";
 import { bluetoothHelp, isUserCancel } from "@/lib/printing/bluetooth-help";
@@ -47,9 +48,15 @@ export function BluetoothPrinterButton({
     setConnected(isPrinterPaired(station));
     // Ignore the other station's events, or pairing the kitchen printer would
     // light up the till's button too.
-    return onPrinterChange((live, which) => {
+    const stop = onPrinterChange((live, which) => {
       if (which === station) setConnected(live);
     });
+    // Pick the printer back up from the browser's own permission list. Pairing
+    // survives closing the app; only the page's memory of it didn't, which is
+    // why this used to ask to be reconnected every morning. Deduped inside, so
+    // both buttons mounting is one restore.
+    void restorePairedPrinters();
+    return stop;
   }, [station]);
 
   async function connect() {
