@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { countdownFor, type PrepTone } from "@/lib/orders/prep-countdown";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { formatPeso } from "@/lib/money";
 import { printKitchenTicket } from "@/server/printing/print";
@@ -80,6 +81,39 @@ async function enableBackgroundPush(): Promise<void> {
 function minsAgo(iso: string): string {
   const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
   return m < 1 ? "just now" : `${m} min ago`;
+}
+
+const COUNTDOWN_TONE: Record<PrepTone, string> = {
+  fresh: "bg-emerald-100 text-emerald-800",
+  soon: "bg-amber-100 text-amber-900",
+  late: "bg-red-600 text-white",
+};
+
+/**
+ * How long is left of the time the merchant promised.
+ *
+ * A static "~20m" told the counter nothing once ten of those minutes had gone.
+ * This is the same promise, counted down — and it turns red and keeps counting
+ * UP once it's blown, because "how late am I" is the question at that point and
+ * a timer that stops at zero stops answering it.
+ *
+ * Nothing renders on an order with no accepted-at or no promised time: an
+ * invented countdown is worse than none.
+ */
+function PrepCountdownChip({ order, nowMs }: { order: MerchantOrder; nowMs: number }) {
+  // Once the food is ready the promise has been kept (or missed) and the number
+  // is history — the card says "Ready" instead.
+  if (order.status === "done" || order.status === "closed" || order.status === "cancelled") return null;
+  const c = countdownFor(order.acceptedAt, order.prepMinutes, nowMs);
+  if (!c) return null;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-heading text-sm font-extrabold tabular-nums ${COUNTDOWN_TONE[c.tone]}`}
+      title={c.overdue ? "Past the time you promised" : "Time left of the time you promised"}
+    >
+      {c.overdue ? "⏰" : "⏱"} {c.label}
+    </span>
+  );
 }
 
 /** "Mon, Jul 20 · 6:00 PM" (PH time) for an advance order's requested time. */
@@ -170,6 +204,15 @@ export function MerchantBoard({
   const [pulse, setPulse] = useState(0); // bumped on refresh → rider panels re-fetch
   const alarm = useOrderAlarm();
   useWakeLock(true);
+
+  // One clock for every countdown on the screen, ticking each second. A timer
+  // per card would drift them apart, and a kitchen reading two cards a second
+  // out of step trusts neither.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -527,7 +570,8 @@ export function MerchantBoard({
                         {o.customerPhone ? ` · ${o.customerPhone}` : ""} · {o.ref}
                       </p>
                     </div>
-                    <div className="text-right">
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <PrepCountdownChip order={o} nowMs={nowMs} />
                       <p className="font-semibold">{formatPeso(o.total)}</p>
                       <p className="text-xs text-plum-ink/40">
                         {o.status === "done" && o.deliveryStatus === "out_for_delivery"
@@ -537,7 +581,7 @@ export function MerchantBoard({
                             : o.status === "preparing"
                               ? "Preparing"
                               : "Accepted"}
-                        {o.prepMinutes != null ? ` · ~${o.prepMinutes}m` : ""}
+                        {o.prepMinutes != null ? ` · promised ${o.prepMinutes}m` : ""}
                       </p>
                     </div>
                   </div>

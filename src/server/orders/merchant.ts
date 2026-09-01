@@ -48,6 +48,8 @@ export interface MerchantOrder {
   customerAddress: string | null;
   total: number; // centavos, server-authoritative
   prepMinutes: number | null;
+  /** When it was accepted, ISO. The point prepMinutes counts down from. */
+  acceptedAt: string | null;
   cancelReason: string | null;
   scheduledFor: string | null; // ISO — advance order requested time (null = ASAP)
   paymentChoice: string | null; // "cod" | "gcash"
@@ -121,6 +123,7 @@ function shape(o: Row, extra: OrderExtra): MerchantOrder {
     customerAddress: o.customerAddress,
     total: o.total,
     prepMinutes: extra.prepMinutes,
+    acceptedAt: extra.acceptedAt,
     cancelReason: extra.cancelReason,
     scheduledFor: extra.scheduledFor,
     paymentChoice: extra.paymentChoice,
@@ -176,7 +179,7 @@ async function loadMerchantData(restaurantId: string): Promise<MerchantData> {
   // screen still works before the migration runs.
   const allIds = [...incomingRows, ...activeRows, ...historyRows].map((o) => o.id);
   const extras = await loadExtras(restaurantId, allIds);
-  const get = (id: string): OrderExtra => extras.get(id) ?? { prepMinutes: null, cancelReason: null, scheduledFor: null, paymentChoice: null, paymentRef: null, paymentReceiptUrl: null, customerNote: null };
+  const get = (id: string): OrderExtra => extras.get(id) ?? { prepMinutes: null, acceptedAt: null, cancelReason: null, scheduledFor: null, paymentChoice: null, paymentRef: null, paymentReceiptUrl: null, customerNote: null };
 
   // Scheduled orders still awaiting acceptance + upcoming table bookings.
   const upcoming = await loadUpcoming(
@@ -240,6 +243,8 @@ async function loadUpcoming(
 
 type OrderExtra = {
   prepMinutes: number | null;
+  /** When it was accepted, ISO. The point prepMinutes counts down from. */
+  acceptedAt: string | null;
   cancelReason: string | null;
   scheduledFor: string | null;
   paymentChoice: string | null;
@@ -251,7 +256,7 @@ type OrderExtra = {
 async function loadExtras(restaurantId: string, ids: string[]): Promise<Map<string, OrderExtra>> {
   const map = new Map<string, OrderExtra>();
   if (ids.length === 0) return map;
-  const blank = (): OrderExtra => ({ prepMinutes: null, cancelReason: null, scheduledFor: null, paymentChoice: null, paymentRef: null, paymentReceiptUrl: null, customerNote: null });
+  const blank = (): OrderExtra => ({ prepMinutes: null, acceptedAt: null, cancelReason: null, scheduledFor: null, paymentChoice: null, paymentRef: null, paymentReceiptUrl: null, customerNote: null });
   for (const id of ids) map.set(id, blank());
 
   // Fast path: read every optional column in ONE query (all migrations run on
@@ -261,12 +266,13 @@ async function loadExtras(restaurantId: string, ids: string[]): Promise<Map<stri
     const rows = await tenantDb(restaurantId, (tx) =>
       tx.order.findMany({
         where: { id: { in: ids } },
-        select: { id: true, prepMinutes: true, cancelReason: true, scheduledFor: true, paymentChoice: true, paymentRef: true, paymentReceiptUrl: true, customerNote: true },
+        select: { id: true, prepMinutes: true, acceptedAt: true, cancelReason: true, scheduledFor: true, paymentChoice: true, paymentRef: true, paymentReceiptUrl: true, customerNote: true },
       }),
     );
     for (const r of rows) {
       const e = map.get(r.id)!;
       e.prepMinutes = r.prepMinutes ?? null;
+      e.acceptedAt = r.acceptedAt ? r.acceptedAt.toISOString() : null;
       e.cancelReason = r.cancelReason ?? null;
       e.scheduledFor = r.scheduledFor ? r.scheduledFor.toISOString() : null;
       e.paymentChoice = r.paymentChoice ?? null;
@@ -284,6 +290,12 @@ async function loadExtras(restaurantId: string, ids: string[]): Promise<Map<stri
     );
     for (const r of rows) { const e = map.get(r.id)!; e.prepMinutes = r.prepMinutes ?? null; e.cancelReason = r.cancelReason ?? null; }
   } catch { /* prepMinutes/cancelReason not migrated yet */ }
+  try {
+    const rows = await tenantDb(restaurantId, (tx) =>
+      tx.order.findMany({ where: { id: { in: ids } }, select: { id: true, acceptedAt: true } }),
+    );
+    for (const r of rows) map.get(r.id)!.acceptedAt = r.acceptedAt ? r.acceptedAt.toISOString() : null;
+  } catch { /* acceptedAt not migrated yet — no countdown, which is honest */ }
   try {
     const rows = await tenantDb(restaurantId, (tx) =>
       tx.order.findMany({ where: { id: { in: ids } }, select: { id: true, scheduledFor: true } }),
@@ -341,6 +353,17 @@ export async function acceptMerchantOrder(
     } catch {
       /* prepMinutes not migrated yet */
     }
+  }
+
+  // The moment the clock starts. Its own write and its own catch: a duration
+  // without a start is only a label, but neither is worth failing an order the
+  // kitchen is about to cook.
+  try {
+    await tenantDb(staff.restaurantId, (tx) =>
+      tx.order.updateMany({ where: { id: orderId }, data: { acceptedAt: new Date() } }),
+    );
+  } catch {
+    /* acceptedAt not migrated yet — the card just shows no countdown */
   }
 
   await notifyOrdersChanged(staff.restaurantId); // → customer live tracker updates

@@ -1722,6 +1722,17 @@ model Order {
   addedItemsAt        DateTime?
   voidedAt            DateTime? // set when a cashier voids the (unpaid) order
   prepMinutes         Int? // prep-time estimate (minutes) a merchant sets on accept
+  /// When the order was accepted, which is where prepMinutes counts down FROM.
+  ///
+  /// A duration on its own is not a deadline. Without this the merchant screen
+  /// could only show a static "~20m", and the moment of acceptance cannot be
+  /// inferred from createdAt: an advance order booked this morning would read
+  /// as hours late the instant somebody accepted it.
+  ///
+  /// Nullable with no default — it ships as a hand-run migration, and an order
+  /// accepted before that ran genuinely has no known acceptance time. Null
+  /// means no countdown, rather than a made-up one.
+  acceptedAt          DateTime?
   cancelReason        String? // reason a merchant rejected the order
   scheduledFor        DateTime? // advance order: requested pickup/delivery time (null = ASAP)
   approvalStatus      String? // advance order: awaiting | approved | declined (null = not an advance order)

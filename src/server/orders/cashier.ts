@@ -520,6 +520,16 @@ export async function acceptOrder(orderId: string): Promise<CashierState> {
 
   let printKitchen = false;
   if (res.count > 0) {
+    // Stamp when the clock started, so a shop watching the merchant screen sees
+    // a countdown on an order accepted from the till. Best-effort and on its
+    // own: a missing column must never fail an accept.
+    try {
+      await tenantDb(staff.restaurantId, (tx) =>
+        tx.order.updateMany({ where: { id: orderId }, data: { acceptedAt: new Date() } }),
+      );
+    } catch {
+      /* acceptedAt not migrated yet */
+    }
     await notifyOrdersChanged(staff.restaurantId);
     await autoPrintIfEnabled(staff.restaurantId, orderId);
     // No kitchen display → print a kitchen ticket on accept.
