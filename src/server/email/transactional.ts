@@ -121,3 +121,31 @@ export async function sendPasswordSetEmail(restaurantId: string): Promise<boolea
     return false;
   }
 }
+
+/**
+ * The Servd team's answer to feedback an owner sent from their dashboard.
+ *
+ * Quotes what they wrote back to them. Weeks can pass between sending feedback
+ * and getting a reply, and an answer with no question attached reads like a
+ * stranger's email.
+ *
+ * An account email, not marketing: somebody who asked us a question is owed the
+ * answer whether or not they take our newsletter.
+ */
+export async function sendFeedbackReplyEmail(
+  to: string,
+  original: string,
+  reply: string,
+): Promise<boolean> {
+  try {
+    return await send(to, "Re: your feedback to Servd", [
+      "Thanks for writing to us — here's our reply.",
+      reply,
+      "———",
+      `You wrote: "${original.slice(0, 500)}${original.length > 500 ? "…" : ""}"`,
+      "You can also read this in your Servd dashboard under Send feedback.",
+    ]);
+  } catch {
+    return false;
+  }
+}

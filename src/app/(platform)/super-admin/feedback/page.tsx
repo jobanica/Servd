@@ -1,6 +1,19 @@
 import { listPlatformFeedback } from "@/server/platform-feedback/queries";
 import { setFeedbackResolved } from "@/server/platform-feedback/actions";
 import { manilaDateTime } from "@/lib/time/manila";
+import { FeedbackReply } from "@/components/super-admin/FeedbackReply";
+
+/**
+ * Whether an answer will also reach them by email.
+ *
+ * A DIY account signs in with a synthetic address at staff.servdph.com — a real
+ * auth row, but not an inbox. The reply form says which it is, so nobody writes
+ * a careful answer believing it was emailed when it wasn't.
+ */
+function isRealInbox(email: string | null): boolean {
+  if (!email || !email.includes("@")) return false;
+  return !email.toLowerCase().endsWith("@staff.servdph.com");
+}
 
 export default async function SuperAdminFeedbackPage() {
   const items = await listPlatformFeedback();
@@ -64,6 +77,13 @@ function Section({
               </form>
             </div>
             <p className="mt-2 whitespace-pre-wrap text-sm text-plum-ink/80">{f.message}</p>
+            <FeedbackReply
+              id={f.id}
+              reply={f.reply}
+              repliedAt={f.repliedAt}
+              replyReadAt={f.replyReadAt}
+              emailable={isRealInbox(f.authorEmail)}
+            />
           </div>
         ))}
       </div>

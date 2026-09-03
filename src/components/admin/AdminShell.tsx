@@ -7,6 +7,7 @@ import { Wordmark } from "@/components/Wordmark";
 import { brandStyle, type BrandInput } from "@/lib/theme/brand";
 import { signOut } from "@/app/(platform)/login/actions";
 import { PlatformFeedbackButton } from "./PlatformFeedbackButton";
+import type { PlatformFeedbackRow } from "@/server/platform-feedback/queries";
 import { BranchSwitcher } from "./BranchSwitcher";
 import { AnnouncementBadge } from "./AnnouncementBadge";
 import type { BranchRow } from "@/server/tenancy/branches";
@@ -146,6 +147,8 @@ export function AdminShell({
   showTutorials = false,
   branches = [],
   unreadAnnouncements = 0,
+  feedbackHistory = [],
+  unreadFeedbackReplies = 0,
   children,
 }: {
   brand: { name: string; slug: string; status: string; logoUrl?: string | null };
@@ -158,6 +161,9 @@ export function AdminShell({
   branches?: BranchRow[];
   /** Platform notices this person hasn't read. Drives the badge. */
   unreadAnnouncements?: number;
+  /** This restaurant's own feedback, so the owner can read what Servd wrote back. */
+  feedbackHistory?: PlatformFeedbackRow[];
+  unreadFeedbackReplies?: number;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -266,7 +272,7 @@ export function AdminShell({
             <span className="text-plum-ink/30">↗</span>
           </a>
         )}
-        <PlatformFeedbackButton />
+        <PlatformFeedbackButton history={feedbackHistory} unreadReplies={unreadFeedbackReplies} />
         <form action={signOut}>
           <button className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-plum-ink/60 hover:bg-plum-ink/5">
             Sign out

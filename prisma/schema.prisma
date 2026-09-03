@@ -150,9 +150,22 @@ model PlatformFeedback {
   rating         Int? // optional 1–5
   message        String
   resolved       Boolean  @default(false)
+  /// What the Servd team wrote back, shown to the owner in their own dashboard.
+  ///
+  /// Kept on the feedback row rather than as a thread: this is a reply to one
+  /// message, and a message that has been answered is the whole state anybody
+  /// needs. A conversation would need its own table and a place to hold it.
+  ///
+  /// Nullable with no default, and read best-effort — they ship as a hand-run
+  /// migration, and an unanswered message is the normal case.
+  reply          String?
+  repliedAt      DateTime?
+  /// When the owner saw the reply. Drives the unread dot on their sidebar.
+  replyReadAt    DateTime?
   createdAt      DateTime @default(now())
 
   @@index([createdAt])
+  @@index([restaurantId])
   @@map("platform_feedback")
 }
 

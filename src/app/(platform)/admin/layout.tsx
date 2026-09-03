@@ -5,6 +5,7 @@ import { hasTutorials } from "@/server/tutorials/tutorials";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { listBranches } from "@/server/tenancy/branches";
 import { unreadCount } from "@/server/announcements/queries";
+import { listMyFeedback, unreadReplyCount } from "@/server/platform-feedback/queries";
 
 /**
  * Dashboard chrome for the restaurant back-office. Wraps every /admin page in
@@ -44,6 +45,12 @@ export default async function AdminLayout({
   // Best-effort by construction — unreadCount returns 0 rather than throwing,
   // so a notice badge can never be the reason a dashboard fails to render.
   const unreadAnnouncements = await unreadCount(user.staffUserId);
+  // What this restaurant has written to Servd, and anything written back. Both
+  // return empty/zero on any failure, so the dashboard can't fail over a reply.
+  const [feedbackHistory, unreadFeedbackReplies] = await Promise.all([
+    listMyFeedback(user.restaurantId),
+    unreadReplyCount(user.restaurantId),
+  ]);
 
   return (
     <AdminShell
@@ -63,6 +70,8 @@ export default async function AdminLayout({
       showTutorials={tutorialsReady}
       branches={branches}
       unreadAnnouncements={unreadAnnouncements}
+      feedbackHistory={feedbackHistory}
+      unreadFeedbackReplies={unreadFeedbackReplies}
     >
       {children}
     </AdminShell>
