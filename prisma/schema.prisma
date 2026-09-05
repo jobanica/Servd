@@ -303,6 +303,25 @@ model CustomerEvent {
   @@map("customer_events")
 }
 
+/// Manual ad-spend entry, so cost per lead and CAC have a real numerator.
+///
+/// Typed in by hand rather than pulled from Facebook: this layer never holds a
+/// third-party credential, and a founder who spends on three platforms would
+/// have to reconcile them by hand anyway. Super-admin only.
+model AdSpend {
+  id        String   @id @default(uuid())
+  /// The day the spend belongs to, Manila. Stored as a date-only midnight.
+  spendDate DateTime
+  platform  String   @default("facebook")
+  campaign  String?
+  /// Centavos, like every other money column in this schema.
+  amount    Int
+  createdAt DateTime @default(now())
+
+  @@index([spendDate])
+  @@map("ad_spend")
+}
+
 model CrmTouch {
   id        String    @id @default(uuid())
   clientId  String

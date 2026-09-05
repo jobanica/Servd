@@ -2,6 +2,9 @@ import Link from "next/link";
 import { requireSuperAdminPage } from "@/server/tenancy/require-admin";
 import { getAcquisition, getRevenue, periodStart, type Period } from "@/server/bizops/queries";
 import { listDueFollowUps } from "@/server/bizops/follow-ups";
+import { getPortfolio } from "@/server/bizops/portfolio";
+import { getCac } from "@/server/bizops/analytics";
+import { buildAlerts } from "@/lib/bizops/alerts";
 import { fmtCount, fmtPeso, fmtRate, rate, type Maybe } from "@/lib/bizops/metrics";
 
 export const dynamic = "force-dynamic";
@@ -32,13 +35,26 @@ export default async function BizOpsPage({
   const period: Period = raw === "today" || raw === "month" ? raw : "week";
   const since = periodStart(period);
 
-  const [revenue, acq, due] = await Promise.all([
+  const [revenue, acq, due, portfolio, cac] = await Promise.all([
     getRevenue(since),
     getAcquisition(since),
     listDueFollowUps(),
+    getPortfolio(),
+    getCac(since),
   ]);
 
   const overdue = due.filter((d) => d.overdue || !d.dueAt);
+  const p = portfolio ?? [];
+  const alerts = buildAlerts({
+    followUpsDue: due.length,
+    neverChased: due.filter((d) => d.step === 0).length,
+    atCap: p.filter((r) => r.band === "capped").length,
+    nearCap: p.filter((r) => r.band === "notify" || r.band === "prompt").length,
+    warmPreviews: due.filter((d) => d.track === "diy_preview").length,
+    dormant: p.filter((r) => r.segment === "dormant").length,
+    activations: acq.activated ?? 0,
+    hasAdSpend: cac.spend != null && cac.spend > 0,
+  });
   const conversion = rate(acq.activated ?? 0, acq.diyRequested ?? 0);
 
   return (
@@ -65,6 +81,14 @@ export default async function BizOpsPage({
         </div>
       </div>
 
+      {/* Computed here from what's already on the page — no background job, no
+          storage, nothing to debug at 2am. */}
+      <div className="space-y-2">
+        {alerts.map((a) => (
+          <AlertRow key={a.title} alert={a} />
+        ))}
+      </div>
+
       {/* The one thing worth acting on, above everything else. */}
       <Link
         href="/super-admin/bizops/follow-ups"
@@ -84,6 +108,12 @@ export default async function BizOpsPage({
           </span>
         </div>
       </Link>
+
+      <div className="grid gap-2 sm:grid-cols-3">
+        <NavCard href="/super-admin/bizops/usage" title="Usage & segments" blurb="Who is near a cap, who has gone quiet." />
+        <NavCard href="/super-admin/bizops/upsells" title="Upsells" blurb="Who to offer what, and why." />
+        <NavCard href="/super-admin/bizops/analytics" title="Analytics" blurb="Funnel, CAC, cohorts, who chased." />
+      </div>
 
       <Section title="Revenue collected">
         {revenue == null ? (
@@ -144,18 +174,43 @@ export default async function BizOpsPage({
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <Stat label="Outreach prospects added" value={fmtCount(acq.outreachAdded)} />
-          <div className="rounded-tile border border-plum-ink/10 bg-cream/40 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-plum-ink/45">
-              Cost per lead
-            </p>
-            <p className="mt-1 font-heading text-lg font-bold text-plum-ink/30">—</p>
-            <p className="text-xs text-plum-ink/50">
-              Needs ad spend entry, which isn&apos;t built yet (Phase 3).
-            </p>
-          </div>
+          <Stat
+            label="Cost per lead"
+            value={fmtPeso(cac.costPerLead)}
+            hint={
+              cac.spend == null || cac.spend === 0
+                ? "no ad spend entered for this window"
+                : `${fmtPeso(cac.spend)} spent`
+            }
+          />
         </div>
       </Section>
     </div>
+  );
+}
+
+const ALERT_STYLE = {
+  urgent: "border-guava/50 bg-guava/5",
+  attention: "border-mango/40 bg-mango/5",
+  good: "border-emerald-300 bg-emerald-50",
+} as const;
+
+function AlertRow({ alert }: { alert: ReturnType<typeof buildAlerts>[number] }) {
+  const body = (
+    <div className={`rounded-tile border p-3 ${ALERT_STYLE[alert.level]}`}>
+      <p className="text-sm font-bold text-plum-ink">
+        {alert.level === "urgent" ? "🔴 " : alert.level === "good" ? "✅ " : "🟠 "}
+        {alert.title}
+      </p>
+      <p className="mt-0.5 text-xs text-plum-ink/65">{alert.detail}</p>
+    </div>
+  );
+  return alert.href ? (
+    <Link href={alert.href} className="block transition hover:opacity-80">
+      {body}
+    </Link>
+  ) : (
+    body
   );
 }
 
@@ -185,6 +240,18 @@ function Stat({
       <p className={`mt-1 font-heading font-extrabold ${big ? "text-3xl" : "text-2xl"}`}>{value}</p>
       {hint && <p className="mt-0.5 text-xs text-plum-ink/40">{hint}</p>}
     </div>
+  );
+}
+
+function NavCard({ href, title, blurb }: { href: string; title: string; blurb: string }) {
+  return (
+    <Link
+      href={href}
+      className="rounded-tile border border-plum-ink/10 bg-white p-4 transition hover:border-brand-primary"
+    >
+      <p className="font-heading font-bold">{title}</p>
+      <p className="mt-0.5 text-xs text-plum-ink/55">{blurb}</p>
+    </Link>
   );
 }
 

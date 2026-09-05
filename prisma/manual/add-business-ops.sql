@@ -68,3 +68,29 @@ SELECT
           AND table_name='crm_clients' AND column_name='previewSentAt') AS crm_preview_sent_at,
   EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public'
           AND table_name='crm_clients' AND column_name='paidAt')        AS crm_paid_at;
+
+-- ------------------------------------------------------- Phase 3: ad spend
+-- Typed in by hand so cost-per-lead and CAC have a real numerator. Centavos,
+-- like every other money column here — the dashboard divides it by a lead
+-- count, and mixing pesos and centavos in one division is how a CAC figure
+-- ends up a hundred times wrong.
+CREATE TABLE IF NOT EXISTS "ad_spend" (
+  "id"        TEXT PRIMARY KEY,
+  "spendDate" TIMESTAMP(3) NOT NULL,
+  "platform"  TEXT NOT NULL DEFAULT 'facebook',
+  "campaign"  TEXT,
+  "amount"    INTEGER NOT NULL,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS "ad_spend_spendDate_idx" ON "ad_spend" ("spendDate");
+
+DO $$
+BEGIN
+  EXECUTE 'ALTER TABLE "ad_spend" ENABLE ROW LEVEL SECURITY';
+  IF to_regprocedure('app.is_super_admin()') IS NOT NULL THEN
+    EXECUTE 'DROP POLICY IF EXISTS ad_spend_super ON "ad_spend"';
+    EXECUTE 'CREATE POLICY ad_spend_super ON "ad_spend" FOR ALL USING (app.is_super_admin()) WITH CHECK (app.is_super_admin())';
+  END IF;
+END $$;
+
+SELECT to_regclass('public.ad_spend') IS NOT NULL AS ad_spend_table;
