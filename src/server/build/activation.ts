@@ -12,6 +12,7 @@ import { sendActivationEmail } from "@/server/email/transactional";
 import { suppressOnActivation } from "@/server/email/followup";
 import { ACTIVATION_PRICE } from "./queries";
 import { BRANCH_NOTE } from "@/server/tenancy/branch-activation";
+import { logEvent } from "@/server/bizops/events";
 
 /**
  * Turning a paid DIY preview into a real account.
@@ -276,6 +277,16 @@ async function activateRequest(requestId: string): Promise<boolean> {
   // failure must never undo an activation that already succeeded — the success
   // page and super-admin both still show the link.
   await sendActivationEmail(restaurant.id);
+
+  // Business-ops timeline. Outside the transaction, after everything that
+  // matters has committed, and it cannot throw — an analytics row must never
+  // be the reason a paid activation reports failure and gets retried.
+  await logEvent({
+    restaurantId: restaurant.id,
+    eventType: "activation",
+    amount: ACTIVATION_PRICE,
+    meta: { requestId: request.id, track: "diy" },
+  });
   return true;
 }
 

@@ -215,11 +215,35 @@ model CrmClient {
   revisitAt        DateTime? // when to re-approach a no-reply prospect (revisit bucket)
   demoRestaurantId String? // the demo storefront created for this client, if any
   source           String          @default("manual")
+
+  // --- Business-operations layer (super-admin only) ------------------------
+  // Added so ONE pipeline covers both intake tracks. The manual/VA track walks
+  // the stages below; a DIY signup is created already paid and skips them.
+  // Every column here is nullable with no default and read best-effort: they
+  // ship as a hand-run migration, and the outreach board this model already
+  // drives must keep working on a database that hasn't run it.
+  //
+  /// The tenant this lead became, once it exists. Null while still a prospect.
+  restaurantId     String?
+  /// Fulfillment milestones. Null means "not reached", never "unknown date" —
+  /// inventing a timestamp would quietly corrupt every funnel average.
+  materialsAt      DateTime?
+  productionAt     DateTime?
+  previewSentAt    DateTime?
+  paidAt           DateTime?
+  activatedAt      DateTime?
+  /// Who is working it, and why it died. Free text: the VA roster is a handful
+  /// of people, and a foreign key to auth.users would be a schema change to a
+  /// table this layer is forbidden from touching.
+  assignedTo       String?
+  lostReason       String?
+
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
   touches          CrmTouch[]
   outreachVideos   OutreachVideo[]
 
+  @@index([restaurantId])
   @@index([stage])
   @@index([nextDueAt])
   @@index([revisitAt])
@@ -249,6 +273,36 @@ model OutreachVideo {
 }
 
 /// One logged outreach touch (initial message / follow-up) for a CRM client.
+/// Immutable audit trail for the business-operations layer: every notable
+/// moment in a customer's life, newest-first on their profile.
+///
+/// Write-only from the business's point of view — nothing reads it to decide
+/// anything, which is what makes it safe to log from inside live paths. Every
+/// call site is fire-and-forget: an analytics row that fails to write must
+/// never be the reason an order, a payment or an activation fails.
+model CustomerEvent {
+  id           String   @id @default(uuid())
+  /// Either or both. A DIY signup has a restaurant before it has a CRM row;
+  /// an outreach prospect has a CRM row long before it has a restaurant.
+  leadId       String?
+  restaurantId String?
+  /// lead_created | preview_sent | stage_change | payment | activation |
+  /// cap_reached | upsell_offered | upsell_sold | note
+  eventType    String
+  /// Who did it — a super-admin email, or null when the system did.
+  actor        String?
+  /// Centavos, matching every other money column in the schema. Null when the
+  /// event isn't a payment.
+  amount       Int?
+  meta         Json?
+  occurredAt   DateTime @default(now())
+
+  @@index([restaurantId, occurredAt])
+  @@index([leadId, occurredAt])
+  @@index([eventType, occurredAt])
+  @@map("customer_events")
+}
+
 model CrmTouch {
   id        String    @id @default(uuid())
   clientId  String

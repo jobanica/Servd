@@ -42,6 +42,9 @@ const I = {
 
 const NAV = [
   { label: "Overview", href: "/super-admin", d: I.home },
+  // Second, deliberately: it's the screen that answers "what do I do today".
+  { label: "Business", href: "/super-admin/bizops", d: I.chart },
+  { label: "Follow-ups", href: "/super-admin/bizops/follow-ups", d: I.inbox },
   { label: "Subscriptions", href: "/super-admin/subscriptions", d: I.card },
   { label: "Create account", href: "/super-admin/accounts", d: I.userPlus },
   { label: "Demo storefronts", href: "/super-admin/storefronts", d: I.store },
