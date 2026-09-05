@@ -133,8 +133,11 @@ export async function getAcquisition(since: Date): Promise<AcquisitionCounts> {
     /* leave null */
   }
   try {
+    // Excludes the backfill for the same reason as getFullFunnel: those rows
+    // carry the restaurant's createdAt, so they'd land in this window and
+    // report self-serve signups as prospects the team went and found.
     out.outreachAdded = await systemDb((tx) =>
-      tx.crmClient.count({ where: { createdAt: { gte: since } } }),
+      tx.crmClient.count({ where: { createdAt: { gte: since }, source: { not: "backfill" } } }),
     );
   } catch {
     /* leave null */

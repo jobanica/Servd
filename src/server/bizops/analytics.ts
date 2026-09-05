@@ -85,8 +85,12 @@ export async function getFullFunnel(since: Date): Promise<FunnelStep[]> {
     activated: null,
   };
   try {
+    // Backfilled rows are excluded on purpose. The backfill gave each one the
+    // restaurant's real createdAt, so a self-serve signup from last week is now
+    // also a crm_clients row dated last week — counting it here would report
+    // every DIY signup as an outreach prospect somebody went out and found.
     counts.outreach = await systemDb((tx) =>
-      tx.crmClient.count({ where: { createdAt: { gte: since } } }),
+      tx.crmClient.count({ where: { createdAt: { gte: since }, source: { not: "backfill" } } }),
     );
   } catch {
     /* null */
