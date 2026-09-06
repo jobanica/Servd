@@ -15,6 +15,30 @@
 
 ALTER TABLE "platform_admins" ADD COLUMN IF NOT EXISTS "role" TEXT;
 
+-- ---------------------------------------------------- creating an ops admin
+-- Use the script, which goes through the Supabase Auth API:
+--
+--   npm run user:create -- superadmin ops@servdph.com 'the-password' ops
+--
+-- Do NOT hand-write the auth.users row unless you have to. GoTrue reads
+-- confirmation_token, recovery_token, email_change, email_change_token_new,
+-- email_change_token_current, phone_change, phone_change_token and
+-- reauthentication_token into a type that cannot hold NULL, so a row inserted
+-- with NULLs there fails login as "invalid credentials" even though the
+-- password hash is perfectly good and verifies in SQL. They must be ''.
+-- If you have already made that mistake:
+--
+--   UPDATE auth.users SET
+--     confirmation_token = coalesce(confirmation_token, ''),
+--     recovery_token = coalesce(recovery_token, ''),
+--     email_change = coalesce(email_change, ''),
+--     email_change_token_new = coalesce(email_change_token_new, ''),
+--     email_change_token_current = coalesce(email_change_token_current, ''),
+--     phone_change = coalesce(phone_change, ''),
+--     phone_change_token = coalesce(phone_change_token, ''),
+--     reauthentication_token = coalesce(reauthentication_token, '')
+--   WHERE lower(email) = 'the-address';
+
 -- Check it. Expect true.
 SELECT EXISTS (
   SELECT 1 FROM information_schema.columns
