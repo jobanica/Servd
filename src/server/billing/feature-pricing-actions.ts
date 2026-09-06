@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireSuperAdmin } from "@/server/tenancy/current-user";
+import { requireOwnerAction } from "@/server/tenancy/require-admin";
 import { pesosToCentavos } from "@/lib/money";
 import { ALL_FEATURES } from "@/lib/billing/features";
 import {
@@ -18,7 +18,7 @@ export async function updateFeaturePrices(
   _prev: PricingState,
   formData: FormData,
 ): Promise<PricingState> {
-  await requireSuperAdmin();
+  await requireOwnerAction();
 
   const current = await getFeaturePrices();
   const next = {} as FeaturePriceMap;

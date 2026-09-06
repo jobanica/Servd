@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireSuperAdmin } from "@/server/tenancy/current-user";
+import { requireOwnerAction } from "@/server/tenancy/require-admin";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { getOrCreateBrand } from "@/server/content/brand";
 import { isScriptStatus, cleanMetric, type ScriptStatus } from "@/lib/content/stats";
@@ -19,7 +19,7 @@ export async function rescheduleScript(
   id: string,
   isoDate: string | null,
 ): Promise<{ ok?: boolean; error?: string }> {
-  await requireSuperAdmin();
+  await requireOwnerAction();
   if (!id) return { error: "Missing script." };
 
   let when: Date | null = null;
@@ -53,7 +53,7 @@ export async function updateScriptStats(
   id: string,
   patch: { saves?: unknown; shares?: unknown; dms?: unknown; status?: unknown },
 ): Promise<{ ok?: boolean; error?: string }> {
-  await requireSuperAdmin();
+  await requireOwnerAction();
   if (!id) return { error: "Missing script." };
 
   const data: {
@@ -87,7 +87,7 @@ export async function updateBrandVoice(
   systemPrompt: string,
   jabRatio: number,
 ): Promise<{ ok?: boolean; error?: string }> {
-  await requireSuperAdmin();
+  await requireOwnerAction();
   const prompt = (systemPrompt ?? "").trim();
   if (prompt.length < 20) return { error: "The brand prompt looks too short." };
   const ratio = Math.max(1, Math.min(6, Math.round(Number(jabRatio) || 3)));
@@ -115,7 +115,7 @@ export async function addPillar(input: {
   name: string;
   description: string;
 }): Promise<{ ok?: boolean; error?: string }> {
-  await requireSuperAdmin();
+  await requireOwnerAction();
   const name = (input.name ?? "").trim();
   const description = (input.description ?? "").trim();
   if (input.kind !== "JAB" && input.kind !== "RIGHT_HOOK") return { error: "Invalid kind." };
@@ -142,7 +142,7 @@ export async function updatePillar(
   id: string,
   patch: { name?: string; description?: string; active?: boolean },
 ): Promise<{ ok?: boolean; error?: string }> {
-  await requireSuperAdmin();
+  await requireOwnerAction();
   if (!id) return { error: "Missing pillar." };
   const data: { name?: string; description?: string; active?: boolean } = {};
   if (patch.name !== undefined) {

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireSuperAdminAction } from "@/server/tenancy/require-admin";
+import { requireOwnerAction } from "@/server/tenancy/require-admin";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { isSupportedVideoUrl } from "@/lib/video";
 import { invalidateLandingConfig } from "./settings";
@@ -21,7 +21,7 @@ export async function saveLandingVideo(
   _prev: LandingVideoState,
   formData: FormData,
 ): Promise<LandingVideoState> {
-  await requireSuperAdminAction();
+  await requireOwnerAction();
   const url = String(formData.get("videoUrl") ?? "").trim();
 
   if (url && !isSupportedVideoUrl(url)) {

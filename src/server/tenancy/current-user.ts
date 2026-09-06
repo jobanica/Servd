@@ -2,7 +2,8 @@ import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { pickBranch, BRANCH_COOKIE } from "@/lib/tenancy/active-branch";
-import type { StaffRole } from "@prisma/client";
+import type { Prisma, StaffRole } from "@prisma/client";
+import { parseAdminRole, type AdminRole } from "@/lib/platform/admin-scope";
 
 /**
  * Resolves the currently-authenticated principal from the Supabase session.
@@ -30,8 +31,32 @@ export type CurrentUser =
        */
       branchCount: number;
     }
-  | { kind: "super"; authUserId: string; email: string }
+  | { kind: "super"; authUserId: string; email: string; role: AdminRole }
   | null;
+
+/**
+ * The admin's back-office scope, read separately and best-effort.
+ *
+ * Deliberately its own query. `role` ships as a hand-run migration, and a
+ * database that hasn't had it must still let the founder log in — so a failure
+ * here falls back to "owner", which is what every admin row meant before the
+ * column existed. Restricting on a failed read would lock the owner out of
+ * their own back office at the worst possible moment.
+ */
+async function readAdminRole(
+  tx: Prisma.TransactionClient,
+  authUserId: string,
+): Promise<AdminRole> {
+  try {
+    const row = await tx.platformAdmin.findUnique({
+      where: { authUserId },
+      select: { role: true },
+    });
+    return parseAdminRole(row?.role);
+  } catch {
+    return "owner";
+  }
+}
 
 export async function getCurrentUser(): Promise<CurrentUser> {
   const supabase = await createSupabaseServerClient();
@@ -44,11 +69,21 @@ export async function getCurrentUser(): Promise<CurrentUser> {
   // Look up the profile rows in a trusted (super-admin) context: we're resolving
   // identity itself, so we can't yet be tenant-scoped.
   return systemDb(async (tx) => {
+    // Named columns, not a bare findUnique. This is the query that decides who
+    // you are — if it throws, nobody can log in at all — and Prisma returns
+    // every scalar when there is no select, so a column added to this model
+    // later must not be able to reach this line.
     const admin = await tx.platformAdmin.findUnique({
       where: { authUserId: user.id },
+      select: { email: true },
     });
     if (admin) {
-      return { kind: "super", authUserId: user.id, email: admin.email };
+      return {
+        kind: "super",
+        authUserId: user.id,
+        email: admin.email,
+        role: await readAdminRole(tx, user.id),
+      };
     }
 
     // findMany, not findUnique: one login can be staff at several restaurants

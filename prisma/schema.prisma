@@ -113,6 +113,11 @@ model PlatformAdmin {
   authUserId  String   @unique // FK to Supabase auth.users
   email       String   @unique
   displayName String?
+  /// Back-office scope: "ops" is restricted to the pipeline sections, NULL is
+  /// full access. Nullable with NO default on purpose — a default would be
+  /// written into the INSERT of every admin row, and NULL already means the
+  /// right thing for every admin that existed before roles did.
+  role        String?
   createdAt   DateTime @default(now())
 
   @@map("platform_admins")

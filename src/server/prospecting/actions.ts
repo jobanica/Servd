@@ -3,7 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
-import { requireSuperAdmin } from "@/server/tenancy/current-user";
+import { requireOwnerAction } from "@/server/tenancy/require-admin";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { discoverRestaurants, type DiscoverResponse } from "./discover";
 import { scrapeContacts } from "./enrich";
@@ -17,7 +17,7 @@ const PATH = "/super-admin/prospecting";
 
 /** Search OpenStreetMap for restaurants in a city/area (super-admin only). */
 export async function searchProspects(query: string): Promise<DiscoverResponse> {
-  await requireSuperAdmin();
+  await requireOwnerAction();
   return discoverRestaurants(query);
 }
 
@@ -40,7 +40,7 @@ function leadData(r: ProspectResult) {
 
 /** Save one discovered venue as a lead (idempotent on source+sourceId). */
 export async function saveProspect(r: ProspectResult): Promise<{ ok?: boolean; error?: string }> {
-  await requireSuperAdmin();
+  await requireOwnerAction();
   try {
     await systemDb(async (tx) => {
       const existing = await tx.prospectLead.findFirst({
@@ -60,7 +60,7 @@ export async function saveProspect(r: ProspectResult): Promise<{ ok?: boolean; e
 export async function saveAllProspects(
   results: ProspectResult[],
 ): Promise<{ ok?: boolean; saved?: number; error?: string }> {
-  await requireSuperAdmin();
+  await requireOwnerAction();
   let saved = 0;
   try {
     await systemDb(async (tx) => {
@@ -85,7 +85,7 @@ export async function saveAllProspects(
 export async function enrichProspect(
   id: string,
 ): Promise<{ ok?: boolean; email?: string | null; facebook?: string | null; error?: string }> {
-  await requireSuperAdmin();
+  await requireOwnerAction();
   const lead = await systemDb((tx) =>
     tx.prospectLead.findUnique({ where: { id }, select: { website: true } }),
   );
@@ -108,7 +108,7 @@ export async function enrichProspect(
 
 /** Move a lead through the pipeline (new → contacted → … → converted). */
 export async function setProspectStatus(id: string, status: ProspectStatus): Promise<void> {
-  await requireSuperAdmin();
+  await requireOwnerAction();
   if (!PROSPECT_STATUSES.includes(status)) return;
   await systemDb((tx) => tx.prospectLead.update({ where: { id }, data: { status } }));
   revalidatePath(PATH);
@@ -116,7 +116,7 @@ export async function setProspectStatus(id: string, status: ProspectStatus): Pro
 
 /** Save a free-text note against a lead. */
 export async function setProspectNotes(id: string, notes: string): Promise<void> {
-  await requireSuperAdmin();
+  await requireOwnerAction();
   await systemDb((tx) =>
     tx.prospectLead.update({ where: { id }, data: { notes: notes.slice(0, 1000) || null } }),
   );
@@ -125,7 +125,7 @@ export async function setProspectNotes(id: string, notes: string): Promise<void>
 
 /** Remove a lead. */
 export async function deleteProspect(id: string): Promise<void> {
-  await requireSuperAdmin();
+  await requireOwnerAction();
   await systemDb((tx) => tx.prospectLead.delete({ where: { id } }));
   revalidatePath(PATH);
 }

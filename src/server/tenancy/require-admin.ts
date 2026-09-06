@@ -56,3 +56,23 @@ export async function requireSuperAdminAction() {
   }
   return user;
 }
+
+/**
+ * Action guard for the things only the founder may do: pricing, plans,
+ * invoices, partner payouts, and anything that speaks to every customer at
+ * once.
+ *
+ * Server actions are their own entry points — a POST reaches them whether or
+ * not the sidebar offered a link — so hiding the page is not enough. The scope
+ * has to be re-checked at the action, which is what this is for.
+ */
+export async function requireOwnerAction() {
+  const user = await getCurrentUser();
+  if (!user || user.kind !== "super") {
+    throw new Error("UNAUTHORIZED");
+  }
+  if (user.role !== "owner") {
+    throw new Error("FORBIDDEN");
+  }
+  return user;
+}

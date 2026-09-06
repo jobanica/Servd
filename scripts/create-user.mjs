@@ -2,11 +2,12 @@
 // The seed creates restaurants but no logins, so run this to get in.
 //
 // Usage (note the `--` so npm passes the args through):
-//   npm run user:create -- superadmin <email> <password>
+//   npm run user:create -- superadmin <email> <password> [ops]
 //   npm run user:create -- staff <restaurantSlug> <kitchen|cashier|admin> <email> <password>
 //
 // Examples:
 //   npm run user:create -- superadmin me@servd.app 'StrongPass123!'
+//   npm run user:create -- superadmin ops@servd.app 'StrongPass123!' ops
 //   npm run user:create -- staff mango-grill admin owner@mango.test 'StrongPass123!'
 import { PrismaClient } from "@prisma/client";
 import { createClient } from "@supabase/supabase-js";
@@ -53,11 +54,18 @@ async function main() {
   const [kind, ...rest] = process.argv.slice(2);
 
   if (kind === "superadmin") {
-    const [email, password] = rest;
-    if (!email || !password) throw new Error("Usage: superadmin <email> <password>");
+    const [email, password, scope] = rest;
+    if (!email || !password) {
+      throw new Error("Usage: superadmin <email> <password> [ops]");
+    }
+    // Anything other than an explicit "ops" is full access. Stored as NULL so
+    // it reads the same as every admin row created before roles existed.
+    if (scope && scope !== "ops") throw new Error('Third arg, if given, must be "ops"');
+    const role = scope === "ops" ? "ops" : null;
+
     const authUserId = await createAuthUser(email, password);
-    await asSuper((tx) => tx.platformAdmin.create({ data: { authUserId, email } }));
-    console.log(`✅ Super-admin created: ${email}`);
+    await asSuper((tx) => tx.platformAdmin.create({ data: { authUserId, email, role } }));
+    console.log(`✅ Super-admin created: ${email}${role ? ` (${role})` : " (full access)"}`);
     return;
   }
 

@@ -3,7 +3,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
-import { requireSuperAdmin } from "@/server/tenancy/current-user";
+import { requireOwnerAction } from "@/server/tenancy/require-admin";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { qrPngDataUrl } from "@/lib/qr";
 import { createDownloadUrl } from "@/server/outreach/storage";
@@ -33,7 +33,7 @@ function appUrl(): string {
 
 /** Create an outreach-video row + QR to the phone record page for one prospect. */
 export async function createOutreachVideo(crmClientId: string): Promise<CreateResult> {
-  await requireSuperAdmin();
+  await requireOwnerAction();
   const token = randomBytes(24).toString("base64url"); // ~32 chars, unguessable
   const id = randomUUID();
   try {
@@ -64,7 +64,7 @@ export async function createOutreachVideo(crmClientId: string): Promise<CreateRe
 
 /** Poll one video's status (for the QR modal). */
 export async function getOutreachStatus(id: string): Promise<OutreachStatus | null> {
-  await requireSuperAdmin();
+  await requireOwnerAction();
   try {
     const v = await systemDb((tx) =>
       tx.outreachVideo.findUnique({
@@ -81,7 +81,7 @@ export async function getOutreachStatus(id: string): Promise<OutreachStatus | nu
 
 /** Signed download URL for the finished MP4. */
 export async function getOutreachDownloadUrl(id: string): Promise<{ ok: boolean; url?: string; error?: string }> {
-  await requireSuperAdmin();
+  await requireOwnerAction();
   const v = await systemDb((tx) =>
     tx.outreachVideo.findUnique({ where: { id }, select: { finalPath: true, status: true } }),
   ).catch(() => null);
@@ -93,7 +93,7 @@ export async function getOutreachDownloadUrl(id: string): Promise<{ ok: boolean;
 
 /** Re-run rendering with the existing recording (after a failure). */
 export async function retryOutreachRender(id: string): Promise<{ ok: boolean; error?: string }> {
-  await requireSuperAdmin();
+  await requireOwnerAction();
   const v = await systemDb((tx) =>
     tx.outreachVideo.findUnique({ where: { id }, select: { introPath: true } }),
   ).catch(() => null);
@@ -108,7 +108,7 @@ export async function retryOutreachRender(id: string): Promise<{ ok: boolean; er
 
 /** Remove an outreach video row. */
 export async function deleteOutreachVideo(id: string): Promise<void> {
-  await requireSuperAdmin();
+  await requireOwnerAction();
   await systemDb((tx) => tx.outreachVideo.deleteMany({ where: { id } }));
   revalidatePath(PATH);
 }

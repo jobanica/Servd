@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { requireSuperAdminAction } from "@/server/tenancy/require-admin";
+import { requireOwnerAction } from "@/server/tenancy/require-admin";
 import { getCurrentUser } from "@/server/tenancy/current-user";
 import { systemDb } from "@/server/tenancy/scoped-db";
 
@@ -27,7 +27,7 @@ export async function publishAnnouncement(
   _prev: AnnouncementState,
   formData: FormData,
 ): Promise<AnnouncementState> {
-  await requireSuperAdminAction();
+  await requireOwnerAction();
   const parsed = schema.safeParse({
     title: formData.get("title"),
     body: formData.get("body"),
@@ -67,7 +67,7 @@ export async function publishAnnouncement(
 
 /** Unsend one. Keeps the text, clears the badge it was causing. */
 export async function unpublishAnnouncement(formData: FormData): Promise<void> {
-  await requireSuperAdminAction();
+  await requireOwnerAction();
   const id = String(formData.get("id") ?? "");
   if (!id) return;
   try {
@@ -82,7 +82,7 @@ export async function unpublishAnnouncement(formData: FormData): Promise<void> {
 }
 
 export async function deleteAnnouncement(formData: FormData): Promise<void> {
-  await requireSuperAdminAction();
+  await requireOwnerAction();
   const id = String(formData.get("id") ?? "");
   if (!id) return;
   try {

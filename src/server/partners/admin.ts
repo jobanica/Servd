@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireSuperAdmin } from "@/server/tenancy/current-user";
+import { requireOwnerAction } from "@/server/tenancy/require-admin";
 import { systemDb } from "@/server/tenancy/scoped-db";
 
 function revalidate() {
@@ -15,7 +15,7 @@ export async function setPartnerTrainingUrl(
   _prev: TrainingState,
   formData: FormData,
 ): Promise<TrainingState> {
-  await requireSuperAdmin();
+  await requireOwnerAction();
   const url = String(formData.get("url") ?? "").trim();
   if (url && !/^https?:\/\//i.test(url)) {
     return { error: "Enter a full URL starting with http(s):// (or leave blank to remove)." };
@@ -44,7 +44,7 @@ export async function setPartnerTrainingUrl(
  * restaurants up directly and bills them itself — so approval is just approval.
  */
 export async function setPartnerStatus(formData: FormData): Promise<void> {
-  await requireSuperAdmin();
+  await requireOwnerAction();
   const id = String(formData.get("id") ?? "");
   const status = String(formData.get("status") ?? "");
   if (!id || !["approved", "suspended", "rejected", "pending"].includes(status)) return;

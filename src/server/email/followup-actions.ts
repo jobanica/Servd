@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { requireSuperAdminAction } from "@/server/tenancy/require-admin";
+import { requireOwnerAction } from "@/server/tenancy/require-admin";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { stepDef } from "@/lib/email/tracks";
 import { DEFAULT_COPY } from "@/lib/email/default-copy";
@@ -31,7 +31,7 @@ export async function saveTemplate(
   _prev: FollowUpActionState,
   formData: FormData,
 ): Promise<FollowUpActionState> {
-  await requireSuperAdminAction();
+  await requireOwnerAction();
   const stepKey = String(formData.get("stepKey") ?? "");
   if (!stepDef(stepKey)) return { error: "Unknown step." };
 
@@ -58,7 +58,7 @@ export async function saveTemplate(
 
 /** Put the original copy back — an escape hatch from a bad edit. */
 export async function resetTemplate(formData: FormData): Promise<void> {
-  await requireSuperAdminAction();
+  await requireOwnerAction();
   const stepKey = String(formData.get("stepKey") ?? "");
   const copy = DEFAULT_COPY[stepKey];
   if (!copy) return;
@@ -81,7 +81,7 @@ export async function resetTemplate(formData: FormData): Promise<void> {
  * skipped when its turn comes, so resuming later doesn't replay the sequence.
  */
 export async function toggleStep(formData: FormData): Promise<void> {
-  await requireSuperAdminAction();
+  await requireOwnerAction();
   const stepKey = String(formData.get("stepKey") ?? "");
   const enabled = formData.get("enabled") === "on";
   const copy = DEFAULT_COPY[stepKey];
@@ -107,7 +107,7 @@ export async function toggleStep(formData: FormData): Promise<void> {
 
 /** The master switch. Off means the cron sends nothing at all. */
 export async function setFollowUpEnabled(formData: FormData): Promise<void> {
-  await requireSuperAdminAction();
+  await requireOwnerAction();
   const enabled = formData.get("enabled") === "on";
   try {
     await systemDb((tx) =>
@@ -131,7 +131,7 @@ export async function runFollowUpsNow(
   _prev: FollowUpActionState,
   _formData: FormData,
 ): Promise<FollowUpActionState> {
-  await requireSuperAdminAction();
+  await requireOwnerAction();
   const run = await runFollowUps();
   revalidatePath(PATH);
   if (!run.enabled) return { error: "Turn the follow-up on first." };

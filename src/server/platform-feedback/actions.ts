@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { systemDb } from "@/server/tenancy/scoped-db";
-import { requireStaff, requireSuperAdmin } from "@/server/tenancy/current-user";
+import { requireStaff, } from "@/server/tenancy/current-user";
+import { requireOwnerAction } from "@/server/tenancy/require-admin";
 import { sendFeedbackReplyEmail } from "@/server/email/transactional";
 
 export type FeedbackState = { ok?: boolean; error?: string } | null;
@@ -49,7 +50,7 @@ export async function submitPlatformFeedback(
 
 /** Super-admin: mark a feedback item resolved / unresolved. */
 export async function setFeedbackResolved(formData: FormData): Promise<void> {
-  await requireSuperAdmin();
+  await requireOwnerAction();
   const id = String(formData.get("id"));
   const resolved = formData.get("resolved") === "true";
   await systemDb((tx) =>
@@ -78,7 +79,7 @@ export async function replyToFeedback(
   _prev: ReplyState,
   formData: FormData,
 ): Promise<ReplyState> {
-  await requireSuperAdmin();
+  await requireOwnerAction();
   const id = String(formData.get("id") ?? "");
   const reply = String(formData.get("reply") ?? "").trim();
   if (!id) return { error: "No message selected." };

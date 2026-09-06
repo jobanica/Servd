@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AppIcon, Wordmark } from "@/components/Wordmark";
 import { signOut } from "@/app/(platform)/login/actions";
+import { visibleNav, type AdminRole } from "@/lib/platform/admin-scope";
 
 function Icon({ d }: { d: string }) {
   return (
@@ -67,9 +68,19 @@ const NAV = [
   { label: "Feedback", href: "/super-admin/feedback", d: I.chat },
 ];
 
-export function SuperAdminShell({ children }: { children: React.ReactNode }) {
+export function SuperAdminShell({
+  children,
+  role = "owner",
+}: {
+  children: React.ReactNode;
+  /** Scope of the signed-in admin. Defaults to full access. */
+  role?: AdminRole;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  // Hiding a link is not access control — the layout enforces the same rules on
+  // the way in. This just stops the sidebar offering doors that won't open.
+  const items = visibleNav(role, NAV);
   const isActive = (href: string) =>
     href === "/super-admin" ? pathname === "/super-admin" : pathname.startsWith(href);
 
@@ -78,7 +89,7 @@ export function SuperAdminShell({ children }: { children: React.ReactNode }) {
       <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-plum-ink/35">
         Platform
       </p>
-      {NAV.map((item) => {
+      {items.map((item) => {
         const active = isActive(item.href);
         return (
           <Link

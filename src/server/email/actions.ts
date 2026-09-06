@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { requireSuperAdminAction } from "@/server/tenancy/require-admin";
+import { requireOwnerAction } from "@/server/tenancy/require-admin";
 import { setEmailCreds, getEmailCreds, sendBatch } from "./provider";
 import { countSegment } from "./audience";
 import { isSegment, type SegmentKey } from "@/lib/email/segments";
@@ -28,7 +28,7 @@ export async function saveEmailSettings(
   _prev: EmailSettingsState,
   formData: FormData,
 ): Promise<EmailSettingsState> {
-  await requireSuperAdminAction();
+  await requireOwnerAction();
   const parsed = credsSchema.safeParse({
     apiKey: formData.get("apiKey") ?? "",
     fromName: formData.get("fromName") ?? "",
@@ -71,7 +71,7 @@ export async function sendEmailCampaign(
   _prev: CampaignState,
   formData: FormData,
 ): Promise<CampaignState> {
-  await requireSuperAdminAction();
+  await requireOwnerAction();
   const parsed = campaignSchema.safeParse({
     subject: formData.get("subject"),
     body: formData.get("body"),
@@ -99,7 +99,7 @@ export async function sendTestEmail(
   _prev: CampaignState,
   formData: FormData,
 ): Promise<CampaignState> {
-  await requireSuperAdminAction();
+  await requireOwnerAction();
   const to = String(formData.get("testTo") ?? "").trim();
   if (!z.string().email().safeParse(to).success) {
     return { ok: false, error: "Enter a valid address to send the test to." };
@@ -140,6 +140,6 @@ export async function sendTestEmail(
 
 /** Live recipient count for the composer's segment picker. */
 export async function getSegmentCount(segment: string): Promise<number> {
-  await requireSuperAdminAction();
+  await requireOwnerAction();
   return isSegment(segment) ? countSegment(segment) : 0;
 }

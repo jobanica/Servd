@@ -3,7 +3,7 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { systemDb } from "@/server/tenancy/scoped-db";
-import { requireSuperAdminAction } from "@/server/tenancy/require-admin";
+import { requireOwnerAction } from "@/server/tenancy/require-admin";
 import { normalizeTutorials, TUTORIALS_TAG, type TutorialsData } from "@/server/tutorials/tutorials";
 
 export type SaveTutorialsResult = { ok: true } | { ok: false; error: string };
@@ -15,7 +15,7 @@ export type SaveTutorialsResult = { ok: true } | { ok: false; error: string };
  */
 export async function saveTutorials(data: TutorialsData): Promise<SaveTutorialsResult> {
   try {
-    await requireSuperAdminAction();
+    await requireOwnerAction();
   } catch {
     return { ok: false, error: "You're not allowed to do that." };
   }

@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { parseHost } from "@/lib/host";
 import { readUtmParams, encodeUtm, UTM_COOKIE, UTM_MAX_AGE } from "@/lib/utm";
+import { PATH_HEADER } from "@/lib/platform/admin-scope";
 
 /**
  * Host-based multi-tenant routing.
@@ -126,7 +127,16 @@ export async function middleware(req: NextRequest) {
     // Renew the session before rendering, so an expired access token is
     // refreshed instead of logging staff out mid-shift.
     const session = await refreshSession(req);
-    return withSession(captureAttribution(req, NextResponse.next({ request: req })), session);
+    // Layouts can't read the pathname, and the /super-admin layout is the one
+    // place that gates back-office sections by role. Setting it here overwrites
+    // anything the browser sent under the same name, so it can't be spoofed
+    // into unlocking a section.
+    const headers = new Headers(req.headers);
+    headers.set(PATH_HEADER, pathname);
+    return withSession(
+      captureAttribution(req, NextResponse.next({ request: { headers } })),
+      session,
+    );
   }
 
   // Tenant host → rewrite to the internal sites segment.
