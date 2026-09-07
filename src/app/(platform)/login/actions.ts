@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { getCurrentUser } from "@/server/tenancy/current-user";
+import { homeForAdmin } from "@/lib/platform/admin-scope";
 
 /** Resolve a login identifier to the auth email. Accepts an email OR a username. */
 async function resolveEmail(identifier: string): Promise<string | null> {
@@ -44,7 +45,10 @@ export async function signIn(_prev: unknown, formData: FormData) {
     return { error: "No Servd account is linked to this login." };
   }
 
-  if (user.kind === "super") redirect("/super-admin");
+  // Straight to a section this admin can actually open. Landing everyone on
+  // the overview would make the layout bounce a restricted one, and a redirect
+  // out of a redirect renders blank until the page is reloaded.
+  if (user.kind === "super") redirect(homeForAdmin(user.role));
   if (user.role === "kitchen") redirect("/kitchen");
   if (user.role === "cashier") redirect("/cashier");
   if (user.role === "merchant") redirect("/merchant");

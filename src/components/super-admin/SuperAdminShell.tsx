@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AppIcon, Wordmark } from "@/components/Wordmark";
 import { signOut } from "@/app/(platform)/login/actions";
-import { visibleNav, type AdminRole } from "@/lib/platform/admin-scope";
+import { homeForAdmin, visibleNav, type AdminRole } from "@/lib/platform/admin-scope";
 
 function Icon({ d }: { d: string }) {
   return (
@@ -81,6 +81,8 @@ export function SuperAdminShell({
   // Hiding a link is not access control — the layout enforces the same rules on
   // the way in. This just stops the sidebar offering doors that won't open.
   const items = visibleNav(role, NAV);
+  // The wordmark goes somewhere this admin can open, not to a page that bounces.
+  const home = homeForAdmin(role);
   const isActive = (href: string) =>
     href === "/super-admin" ? pathname === "/super-admin" : pathname.startsWith(href);
 
@@ -112,7 +114,7 @@ export function SuperAdminShell({
 
   const sidebar = (
     <div className="flex h-full flex-col">
-      <Link href="/super-admin" className="flex items-center gap-2 px-5 py-4">
+      <Link href={home} className="flex items-center gap-2 px-5 py-4">
         <AppIcon size={28} />
         <Wordmark size="1.15rem" />
       </Link>

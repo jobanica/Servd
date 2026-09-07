@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   canAccessPath,
+  homeForAdmin,
   OPS_SECTIONS,
   parseAdminRole,
   visibleNav,
@@ -90,6 +91,26 @@ describe("canAccessPath", () => {
     // The rule is fail-closed: a back-office page added next month is invisible
     // to ops until somebody deliberately adds it to OPS_SECTIONS.
     expect(canAccessPath("ops", "/super-admin/payouts")).toBe(false);
+  });
+});
+
+describe("homeForAdmin", () => {
+  it("never sends anyone somewhere they'd be bounced from", () => {
+    // The bug this pins down: sign-in sent every admin to the overview, the
+    // layout redirected the restricted ones away, and a redirect chained out of
+    // the sign-in action's own redirect rendered as a blank page until reload.
+    // A landing page the role can't open is the defect, whatever it looks like.
+    for (const role of ["owner", "ops"] as AdminRole[]) {
+      expect(canAccessPath(role, homeForAdmin(role))).toBe(true);
+    }
+  });
+
+  it("keeps the founder on the overview", () => {
+    expect(homeForAdmin("owner")).toBe("/super-admin");
+  });
+
+  it("starts ops on the business screen", () => {
+    expect(homeForAdmin("ops")).toBe("/super-admin/bizops");
   });
 });
 

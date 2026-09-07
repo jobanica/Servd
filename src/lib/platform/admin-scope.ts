@@ -46,6 +46,22 @@ export const OPS_SECTIONS = [
 /** Where an ops admin lands, and where they're sent when they overreach. */
 export const OPS_HOME = "/super-admin/bizops";
 
+/** The platform overview. Full access only — it totals the whole business. */
+export const OWNER_HOME = "/super-admin";
+
+/**
+ * Where to send an admin after they sign in.
+ *
+ * Landing everyone on the overview and letting the layout bounce the ones who
+ * can't see it produces a redirect chained out of the sign-in action's own
+ * redirect, and the browser renders that as a blank page until it's reloaded.
+ * Sending each role somewhere it's actually allowed avoids the second hop —
+ * and is the honest behaviour regardless of what it renders.
+ */
+export function homeForAdmin(role: AdminRole): string {
+  return role === "ops" ? OPS_HOME : OWNER_HOME;
+}
+
 /**
  * Is this path inside one of the allowed sections?
  *
