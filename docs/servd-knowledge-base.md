@@ -501,11 +501,11 @@ not book a rider.
 - **Custom domain** — connect your own domain (a ₱500 one-time unlock)
 - **White-label** — removes "Powered by Servd" everywhere it appears: the
   ordering website footer, the QR menu footer, the splash after a QR scan, and
-  the line in the owner's own dashboard (a ₱2,500 one-time unlock)
+  the line in the owner's own dashboard (a ₱800 one-time unlock)
 - **"Powered by Servd"** appears on accounts opened from 21 August 2026.
   Restaurants already trading before that date are grandfathered and never get
   it added
-- Table QR codes, printable as a sheet (one free; unlimited is a ₱500 unlock)
+- Table QR codes, printable as a sheet (one free; unlimited is a ₱700 unlock)
 - A public restaurant page at a Servd URL
 
 ---
@@ -532,9 +532,9 @@ detail is in the separate pricing document; the short version:
 | Get started | ₱0 | Free forever |
 | Each extra branch | **₱499** | One time, per branch |
 | Activate online ordering | **₱499** | One time |
-| Unlimited tables & QR codes | **₱500** | One time |
-| Any other feature | ₱500 – ₱3,000 | One time, per feature |
-| Content scheduler | ₱499 / month | The only recurring charge |
+| Unlimited tables & QR codes | **₱700** | One time |
+| Any other feature | ₱500 – ₱2,000 | One time, per feature |
+| Monthly charges | none | Nothing in the product bills monthly |
 
 **Free forever, on every account:** QR dine-in, counter/takeout QR and order
 numbers, cashier POS, kitchen display, 1 table QR, split payments, split bills,

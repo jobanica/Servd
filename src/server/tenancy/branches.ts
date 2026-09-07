@@ -12,7 +12,7 @@ import { systemDb } from "@/server/tenancy/scoped-db";
  *
  * Deliberately no shared entitlements: an unlock bought for one shop applies to
  * that shop. Two branches are two businesses that happen to share an owner, and
- * pretending otherwise would let one ₱3,000 purchase cover ten kitchens.
+ * pretending otherwise would let one ₱1,500 purchase cover ten kitchens.
  */
 
 export interface BranchRow {

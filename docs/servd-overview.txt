@@ -6,7 +6,7 @@ Everything Servd is and does, in one document. Written as the single reference
 to hand to a partner, a new staff member, or an AI assistant answering
 questions.
 
-Last updated: 22 August 2026 · Currency: ₱ (stored in centavos) · Timezone:
+Last updated: 7 September 2026 · Currency: ₱ (stored in centavos) · Timezone:
 Asia/Manila (UTC+8)
 
 Companion documents: servd-features.md for every price, servd-pricing.md for
@@ -36,9 +36,8 @@ payments, inventory, accounting, HR and marketing.
 The business model, in one line
 
 There is no monthly subscription. ₱499 activates a restaurant's online
-ordering; every other paid feature is bought once and owned for good. The only
-recurring charge in the entire product is the content scheduler at ₱499/month.
-Servd takes no commission on sales.
+ordering; every other paid feature is bought once and owned for good. Nothing
+in the product bills monthly. Servd takes no commission on sales.
 
 ------------------------------------------------------------------------------
 2. WHAT EVERY ACCOUNT GETS FREE, FOREVER
@@ -66,23 +65,22 @@ Staff — 3 staff accounts
 extra branch — one login manages them all, and a branch that hasn't been paid
 for can be created but not entered.
 
-16 one-time feature unlocks, ₱500 – ₱3,000 each. Bought once, owned for good;
+15 one-time feature unlocks, ₱500 – ₱2,000 each. Bought once, owned for good;
 an unlock cannot lapse, expire or be cancelled.
 
   Fee      Features
-  ₱500     Unlimited tables & QR codes · Custom domain · Data export
-  ₱600     Audit log
-  ₱700     Customer book + CSV export
-  ₱900     Visual floor plan · Gift cards & store credit
-  ₱1,000   Promotions, promo codes & happy hours
-  ₱1,200   Loyalty & rewards · Reservations & waitlist
-  ₱1,500   Offline mode
-  ₱2,500   Online ordering website + delivery · Accounting · Full white-label
-  ₱3,000   Inventory, COGS & reorder · HR, attendance & payroll
+  ₱500     Visual floor plan · Reservations & waitlist · Gift cards & store
+           credit · Promotions & happy hours · Customer book + CSV export ·
+           Data export · Audit log · Offline mode · Custom domain
+  ₱700     Unlimited tables & QR codes · Loyalty & rewards
+  ₱800     Full white-label
+  ₱1,500   Accounting · Inventory, COGS & reorder
+  ₱2,000   HR, attendance & payroll
 
-Everything: ₱22,300 plus the ₱499 activation.
+Everything: ₱11,700 plus the ₱499 activation. Online ordering and delivery are
+not an unlock — the ₱499 activation is what turns them on.
 
-Not sold as one-time unlocks: the social content scheduler (₱499/month) · SMS
+Not sold as one-time unlocks: the social content scheduler (switched off) · SMS
 marketing (metered credits — every text costs real money) · AI menu import
 (priced but switched off; it burns API credits per import) · online card
 payments (retired — see §6).
@@ -401,7 +399,7 @@ pinging unread badge appears on the admin dashboard until it is read.
                                   Admin sidebar
   Accounts opened before 21 Aug 2026—   —   ✅   ✅
   Accounts opened from 21 Aug 2026✅   ✅   ✅   ✅
-  Bought white-label (₱2,500)     —   —   —   —
+  Bought white-label (₱800)       —   —   —   —
 
 Restaurants that were already trading are grandfathered — nothing was added to
 pages that were already live. The white-label unlock removes all of it for any

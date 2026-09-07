@@ -5,12 +5,12 @@ as source knowledge for answering pricing questions.
 
 All amounts are Philippine Pesos (₱).
 
-**Last updated:** 18 August 2026
+**Last updated:** 7 September 2026 — every figure verified against the live
+`platform_settings.featurePrices` on that date.
 
 > **There is no monthly subscription.** Servd is a one-time-payment product.
 > ₱499 activates a restaurant's online ordering, and every other paid feature is
-> bought once and owned for good. The only recurring charge in the whole product
-> is the content scheduler (§5).
+> bought once and owned for good. Nothing in the product bills monthly today.
 >
 > **Note for the assistant:** these are the prices configured today. The owner
 > can change any of them from the admin panel without this document being
@@ -26,9 +26,9 @@ All amounts are Philippine Pesos (₱).
 | **Get started** | ₱0 | Free forever |
 | **Activate online ordering** | **₱499** | One time |
 | **Each extra branch** | **₱499** | One time, per branch |
-| **Unlimited tables & QR codes** | **₱500** | One time |
-| **Any other feature** | ₱500 – ₱3,000 | One time, per feature |
-| **Content scheduler** | ₱499 / month | The only recurring charge |
+| **Unlimited tables & QR codes** | **₱700** | One time |
+| **Any other feature** | ₱500 – ₱2,000 | One time, per feature |
+| **Monthly charges** | none | Nothing in the product bills monthly |
 
 No monthly plan. No setup fee. No contract. No commission on sales.
 
@@ -70,22 +70,24 @@ expire or be cancelled, because it was bought rather than rented.
 
 | Feature | Price |
 |---|---|
-| Unlimited tables & QR codes | **₱500** |
-| Custom domain | **₱500** |
+| Visual floor plan & live table status | **₱500** |
+| Reservations & waitlist | **₱500** |
+| Gift cards & store credit | **₱500** |
+| Promotions, promo codes & happy hours | **₱500** |
+| Customer book + CSV export | **₱500** |
 | Data export (sales, orders, menu) | **₱500** |
-| Audit log | **₱600** |
-| Customer book + CSV export | **₱700** |
-| Visual floor plan & live table status | **₱900** |
-| Gift cards & store credit | **₱900** |
-| Promotions, promo codes & happy hours | **₱1,000** |
-| Loyalty & rewards | **₱1,200** |
-| Reservations & waitlist | **₱1,200** |
-| Offline mode | **₱1,500** |
-| Online ordering website + delivery | **₱2,500** |
-| Accounting (sales, VAT, P&L) | **₱2,500** |
-| Full white-label (removes "Powered by Servd" everywhere) | **₱2,500** |
-| Inventory, COGS & auto-reorder | **₱3,000** |
-| HR, attendance & payroll | **₱3,000** |
+| Audit log | **₱500** |
+| Offline mode | **₱500** |
+| Custom domain | **₱500** |
+| Unlimited tables & QR codes | **₱700** |
+| Loyalty & rewards | **₱700** |
+| Full white-label (removes "Powered by Servd" everywhere) | **₱800** |
+| Accounting (sales, VAT, P&L) | **₱1,500** |
+| Inventory, COGS & auto-reorder | **₱1,500** |
+| HR, attendance & payroll | **₱2,000** |
+
+All fifteen together come to **₱11,700**. The online ordering website and
+delivery are not on this list: they are what the ₱499 activation turns on.
 
 Bought from **Admin → Billing & features**.
 
@@ -97,7 +99,7 @@ Bought from **Admin → Billing & features**.
   and it is never sold again.
 - **SMS marketing** — every text costs real money, so it runs on credits.
 - **AI menu import** — burns API credits per import.
-- **Content scheduler** — its own monthly subscription (below).
+- **Content scheduler** — switched off entirely (§5).
 
 ---
 
@@ -115,15 +117,13 @@ switches between branches inside the admin dashboard without logging out.
 
 ---
 
-## 5. Content scheduler — ₱499 / month
+## 5. Content scheduler — not currently sold
 
-The one recurring charge in the product. Social post scheduling with the AI
-content engine.
+Social post scheduling with the AI content engine. It was priced at ₱499/month,
+but the subscription is **switched off** and no account is on it.
 
-- Billed monthly, cancel any time
-- **Not** unlocked by the free trial — the first month must be paid before it
-  opens, and access ends when the paid period does
-- Bought from **Admin → Content scheduler**
+If a customer asks for it, the honest answer is that it isn't available to buy
+right now — not that it costs ₱499/month.
 
 ---
 
@@ -135,7 +135,7 @@ Every account, free, on any plan:
   on the wall
 - **1 table QR**
 
-**Unlimited tables and QR codes: ₱500, one time.** Paid once, kept for good.
+**Unlimited tables and QR codes: ₱700, one time.** Paid once, kept for good.
 
 **Grandfathering:** accounts that existed before this became a paid unlock keep
 unlimited tables and QR codes at no charge, however many they have. They are
@@ -198,10 +198,9 @@ under it any more.
 
 ## 9. Common pricing questions
 
-**Do I pay monthly?** No. ₱499 activates your online ordering and it's yours for
-good — walang monthly bayad. Other features are optional one-time unlocks. The
-only monthly charge in the product is the content scheduler at ₱499/month, and
-only if you want it.
+**Do I pay monthly?** No — walang monthly bayad. ₱499 activates your online
+ordering and it's yours for good. Other features are optional one-time unlocks.
+There is no recurring charge in the product at all.
 
 **Is there a free plan?** Yes, ₱0 forever, and it isn't a trial that expires. It
 includes QR ordering, the POS, the kitchen display, your counter QR and one
@@ -217,16 +216,16 @@ real orders.
 **If I stop paying, do I lose what I bought?** There's nothing to stop paying.
 One-time unlocks are owned, not rented — they survive everything.
 
-**I already have 20 tables — do I now have to pay ₱500?** No. Accounts that
+**I already have 20 tables — do I now have to pay ₱700?** No. Accounts that
 existed before table QRs became a paid unlock are grandfathered and keep
 unlimited tables at no charge.
 
-**Is the ₱500 for tables monthly?** No, a single payment.
+**Is the ₱700 for tables monthly?** No, a single payment.
 
 **Why does my ordering page say "Powered by Servd"?** Accounts opened from 21
 August 2026 carry it at the foot of their ordering website and table/QR menu.
 Restaurants that were already trading before that date don't have it and never
-will — nothing was added to pages that were already live. The ₱2,500 white-label
+will — nothing was added to pages that were already live. The ₱800 white-label
 unlock removes it everywhere for anyone, including the splash after a QR scan.
 
 **I've been with Servd for a year — will this appear on my site now?** No. You
