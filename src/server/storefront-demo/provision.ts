@@ -16,6 +16,8 @@ export interface DemoInput {
   phone: string;
   tagline: string;
   logoUrl: string;
+  /** Storefront hero, and the picture that shows when the link is shared. */
+  coverImageUrl?: string;
   /** Set when a partner creates the demo (attribution). */
   demoPartnerId?: string | null;
 }
@@ -38,6 +40,7 @@ export async function provisionDemo(d: DemoInput): Promise<string> {
         slug,
         status: "active",
         logoUrl: d.logoUrl || null,
+        coverImageUrl: d.coverImageUrl || null,
         tagline: d.tagline || null,
         ...(d.demoPartnerId ? { demoPartnerId: d.demoPartnerId } : {}),
         printerConfig: receiptJson(d.address, d.phone),

@@ -64,6 +64,7 @@ export interface DemoStorefront {
   slug: string;
   status: string;
   logoUrl: string | null;
+  coverImageUrl: string | null;
   tagline: string | null;
   address: string | null;
   phone: string | null;
@@ -82,6 +83,7 @@ export async function getDemoStorefront(id: string): Promise<DemoStorefront | nu
           slug: true,
           status: true,
           logoUrl: true,
+          coverImageUrl: true,
           tagline: true,
           printerConfig: true,
         },
@@ -106,6 +108,7 @@ export async function getDemoStorefront(id: string): Promise<DemoStorefront | nu
         slug: r.slug,
         status: r.status,
         logoUrl: r.logoUrl,
+        coverImageUrl: r.coverImageUrl,
         tagline: r.tagline,
         address: contact?.address || null,
         phone: contact?.phone || null,

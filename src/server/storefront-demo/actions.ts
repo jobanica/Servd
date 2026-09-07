@@ -24,6 +24,7 @@ const createSchema = z.object({
   phone: z.string().trim().max(40).optional().or(z.literal("")),
   tagline: z.string().trim().max(120).optional().or(z.literal("")),
   logoUrl: z.string().trim().max(400).optional().or(z.literal("")),
+  coverImageUrl: z.string().trim().max(400).optional().or(z.literal("")),
 });
 
 /**
@@ -39,6 +40,7 @@ export async function createDemoStorefront(_prev: FormState, formData: FormData)
     phone: formData.get("phone") ?? "",
     tagline: formData.get("tagline") ?? "",
     logoUrl: formData.get("logoUrl") ?? "",
+    coverImageUrl: formData.get("coverImageUrl") ?? "",
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   const d = parsed.data;
@@ -51,14 +53,60 @@ export async function createDemoStorefront(_prev: FormState, formData: FormData)
       phone: d.phone ?? "",
       tagline: d.tagline ?? "",
       logoUrl: d.logoUrl ?? "",
+      coverImageUrl: d.coverImageUrl ?? "",
     });
   } catch (e) {
     // A raw "The column `x` does not exist in the current database" reads like
     // the app is broken; it only ever means this database is behind the code.
     return { error: migrationHint(e, "full-schema-sync.sql", "Couldn't create the storefront.") };
   }
+
+  // Uploads happen after provisioning because the storage path is namespaced by
+  // restaurant id, which doesn't exist until the row does. A failure here is
+  // reported on the detail page rather than thrown: the storefront is already
+  // created, and losing it over a photo would be worse than arriving without one.
+  const uploadError = await applyBrandingUploads(id, formData);
+
   revalidatePath(PATH);
-  redirect(detailPath(id));
+  redirect(uploadError ? `${detailPath(id)}?upload=failed` : detailPath(id));
+}
+
+/**
+ * Upload whichever of logo/cover were picked and store their URLs.
+ *
+ * Returns an error message rather than throwing. Both are optional, and the
+ * two are independent: a cover that's too large must not also discard a logo
+ * that uploaded fine.
+ */
+async function applyBrandingUploads(id: string, formData: FormData): Promise<string | null> {
+  const data: { logoUrl?: string; coverImageUrl?: string } = {};
+  let failure: string | null = null;
+
+  const logo = formData.get("logo");
+  if (logo instanceof File && logo.size > 0) {
+    try {
+      data.logoUrl = await uploadMenuImage(id, logo);
+    } catch (e) {
+      failure = e instanceof Error ? e.message : "Logo upload failed.";
+    }
+  }
+
+  const cover = formData.get("cover");
+  if (cover instanceof File && cover.size > 0) {
+    try {
+      data.coverImageUrl = await uploadMenuImage(id, cover);
+    } catch (e) {
+      failure = e instanceof Error ? e.message : "Cover photo upload failed.";
+    }
+  }
+
+  if (Object.keys(data).length === 0) return failure;
+  try {
+    await systemDb((tx) => tx.restaurant.update({ where: { id }, data, select: { id: true } }));
+  } catch {
+    failure = "The photos uploaded but couldn't be saved to the storefront.";
+  }
+  return failure;
 }
 
 /** One-click: build a demo storefront pre-filled from a CRM client's details. */
@@ -100,15 +148,10 @@ export async function updateDemoDetails(formData: FormData): Promise<void> {
   const address = String(formData.get("address") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
 
-  // Logo: an uploaded file wins over the pasted URL. Blank both → leave as-is.
-  let logoUpdate: { logoUrl?: string | null } = {};
-  const logoFile = formData.get("logo");
-  const logoUrl = String(formData.get("logoUrl") ?? "").trim();
-  if (logoFile instanceof File && logoFile.size > 0) {
-    logoUpdate = { logoUrl: await uploadMenuImage(id, logoFile) };
-  } else if (formData.has("logoUrl")) {
-    logoUpdate = { logoUrl: logoUrl || null };
-  }
+  // An uploaded file wins over the pasted URL; blank both leaves the image as
+  // it is, so saving a name change can't quietly wipe the branding.
+  const logoUpdate = await imageUpdate(id, formData, "logo", "logoUrl");
+  const coverUpdate = await imageUpdate(id, formData, "cover", "coverImageUrl");
 
   await systemDb((tx) =>
     tx.restaurant.update({
@@ -116,13 +159,32 @@ export async function updateDemoDetails(formData: FormData): Promise<void> {
       data: {
         ...(name ? { name, displayName: name } : {}),
         tagline: tagline || null,
-        ...logoUpdate,
+        ...(logoUpdate === undefined ? {} : { logoUrl: logoUpdate }),
+        ...(coverUpdate === undefined ? {} : { coverImageUrl: coverUpdate }),
         printerConfig: receiptJson(address, phone),
       },
       select: { id: true },
     }),
   );
   revalidatePath(detailPath(id));
+}
+
+/**
+ * Resolve one image field from the form.
+ *
+ * `undefined` means "don't touch it", which is different from `null` — clearing
+ * the URL box is a deliberate "remove this picture" and has to survive.
+ */
+async function imageUpdate(
+  id: string,
+  formData: FormData,
+  fileField: string,
+  urlField: string,
+): Promise<string | null | undefined> {
+  const file = formData.get(fileField);
+  if (file instanceof File && file.size > 0) return uploadMenuImage(id, file);
+  if (formData.has(urlField)) return String(formData.get(urlField) ?? "").trim() || null;
+  return undefined;
 }
 
 export async function addCategory(formData: FormData): Promise<void> {

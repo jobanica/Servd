@@ -18,10 +18,20 @@ import { ConvertDemoForm } from "@/components/super-admin/ConvertDemoForm";
 import { formatPeso } from "@/lib/money";
 import { qrPngDataUrl } from "@/lib/qr";
 
-export default async function StorefrontDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function StorefrontDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ upload?: string }>;
+}) {
   const { id } = await params;
   const s = await getDemoStorefront(id);
   if (!s) notFound();
+  // The storefront is created before its photos upload, so a failed picture
+  // must say so here rather than leave someone wondering why the banner is
+  // empty on a demo they are about to send a customer.
+  const uploadFailed = (await searchParams).upload === "failed";
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://servdph.com";
   const url = `${appUrl}/r/${s.slug}`;
@@ -36,6 +46,13 @@ export default async function StorefrontDetailPage({ params }: { params: Promise
         </Link>
         <h1 className="font-heading text-2xl font-bold">{s.name}</h1>
       </div>
+
+      {uploadFailed && (
+        <p className="rounded-tile border border-guava/30 bg-guava/5 p-3 text-sm text-guava">
+          The storefront was created, but a photo didn&apos;t upload — it was probably over 4 MB.
+          Add it again below.
+        </p>
+      )}
 
       {/* Public link + QR */}
       <div className="rounded-tile border border-brand-primary/20 bg-brand-primary/5 p-4">
@@ -109,7 +126,30 @@ export default async function StorefrontDetailPage({ params }: { params: Promise
               <input name="logoUrl" defaultValue={s.logoUrl ?? ""} placeholder="…or paste a logo image URL" className={`${field} text-xs`} />
             </div>
           </div>
-          <p className="mt-1 text-[11px] text-plum-ink/40">JPEG / PNG / WebP, up to 5 MB. Uploading a file replaces the URL.</p>
+          <p className="mt-1 text-[11px] text-plum-ink/40">JPEG / PNG / WebP, up to 4 MB. Uploading a file replaces the URL.</p>
+        </div>
+
+        {/* Cover photo — the banner across the top of their storefront, and the
+            picture that appears when the link is shared in Messenger. */}
+        <div className="sm:col-span-2">
+          <label className="mb-1 block text-xs font-semibold text-plum-ink/55">Cover photo</label>
+          <div className="flex items-center gap-3">
+            {s.coverImageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={s.coverImageUrl} alt="Current cover photo" className="h-14 w-24 shrink-0 rounded-lg border border-plum-ink/10 object-cover" />
+            ) : (
+              <span className="flex h-14 w-24 shrink-0 items-center justify-center rounded-lg bg-cream text-[10px] text-plum-ink/40">
+                no cover
+              </span>
+            )}
+            <div className="min-w-0 flex-1 space-y-2">
+              <input name="cover" type="file" accept="image/jpeg,image/png,image/webp" className="block w-full text-xs" />
+              <input name="coverImageUrl" defaultValue={s.coverImageUrl ?? ""} placeholder="…or paste a cover image URL" className={`${field} text-xs`} />
+            </div>
+          </div>
+          <p className="mt-1 text-[11px] text-plum-ink/40">
+            Wide shot of the food or the shop, around 1200×600. JPEG / PNG / WebP, up to 4 MB.
+          </p>
         </div>
 
         <div className="sm:col-span-2">
