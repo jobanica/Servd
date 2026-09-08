@@ -33,11 +33,23 @@ export default async function MerchantPage() {
     );
   }
 
-  const [restaurant, initial, bannerData] = await Promise.all([
-    tenantDb(user.restaurantId, (tx) => tx.restaurant.findFirst({ select: { name: true } })),
-    getMerchantOrders(),
-    getPlanBannerData(user.restaurantId).catch(() => null),
-  ]);
+  // getMerchantOrders resolves the session again for itself, and on a tablet
+  // left open all service that second lookup can come back empty — the access
+  // token expires and a concurrent refresh loses the race, so the refresh token
+  // is already spent by the time this runs. Throwing there turned a lapsed
+  // session into a 500 on the screen the shop watches for orders. Send them to
+  // sign in instead, which is what an expired session actually means.
+  let restaurant, initial, bannerData;
+  try {
+    [restaurant, initial, bannerData] = await Promise.all([
+      tenantDb(user.restaurantId, (tx) => tx.restaurant.findFirst({ select: { name: true } })),
+      getMerchantOrders(),
+      getPlanBannerData(user.restaurantId).catch(() => null),
+    ]);
+  } catch (e) {
+    if (e instanceof Error && /UNAUTHORIZED|FORBIDDEN/.test(e.message)) redirect("/login");
+    throw e;
+  }
 
   return (
     <MerchantBoard

@@ -3,7 +3,7 @@
   "short_name": "Orders",
   "description": "Servd incoming online orders for merchants",
   "start_url": "/merchant",
-  "scope": "/merchant",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#3B1E54",
