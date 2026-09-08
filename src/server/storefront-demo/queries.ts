@@ -11,14 +11,20 @@ export interface DemoStorefrontRow {
   createdAt: string;
 }
 
-/** Demo storefronts = tenants with NO login account (created from super-admin). */
+/**
+ * Demo storefronts = tenants with no REAL login account.
+ *
+ * "No staff at all" would be wrong now: a demo can carry a temporary preview
+ * login while it's being pitched, and that must not make it disappear from the
+ * very list the person pitching it is working from.
+ */
 export async function listDemoStorefronts(): Promise<DemoStorefrontRow[]> {
   try {
     const rows = await systemDb((tx) =>
       tx.restaurant.findMany({
         // Also login-less, but a different funnel entirely: DIY previews belong
         // on the funnel page, not in the partner/super-admin demo list.
-        where: { staff: { none: {} }, status: { notIn: ["preview", "archived"] } },
+        where: { staff: { none: { previewExpiresAt: null } }, status: { notIn: ["preview", "archived"] } },
         orderBy: { createdAt: "desc" },
         take: 300,
         select: {
@@ -32,17 +38,52 @@ export async function listDemoStorefronts(): Promise<DemoStorefrontRow[]> {
         },
       }),
     );
-    return rows.map((r) => ({
-      id: r.id,
-      name: r.displayName || r.name,
-      slug: r.slug,
-      status: r.status,
-      itemCount: r._count.menuItems,
-      createdAt: r.createdAt.toISOString(),
-    }));
+    return rows.map(toRow);
   } catch {
-    return [];
+    // The preview column isn't migrated here. Fall back to the original
+    // "no staff at all" rule rather than returning nothing: an empty demo list
+    // looks like the demos were deleted.
+    try {
+      const rows = await systemDb((tx) =>
+        tx.restaurant.findMany({
+          where: { staff: { none: {} }, status: { notIn: ["preview", "archived"] } },
+          orderBy: { createdAt: "desc" },
+          take: 300,
+          select: {
+            id: true,
+            name: true,
+            displayName: true,
+            slug: true,
+            status: true,
+            createdAt: true,
+            _count: { select: { menuItems: true } },
+          },
+        }),
+      );
+      return rows.map(toRow);
+    } catch {
+      return [];
+    }
   }
+}
+
+function toRow(r: {
+  id: string;
+  name: string;
+  displayName: string | null;
+  slug: string;
+  status: string;
+  createdAt: Date;
+  _count: { menuItems: number };
+}): DemoStorefrontRow {
+  return {
+    id: r.id,
+    name: r.displayName || r.name,
+    slug: r.slug,
+    status: r.status,
+    itemCount: r._count.menuItems,
+    createdAt: r.createdAt.toISOString(),
+  };
 }
 
 export interface DemoMenuItem {

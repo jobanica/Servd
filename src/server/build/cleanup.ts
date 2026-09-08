@@ -2,6 +2,7 @@ import "server-only";
 
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { pruneRateLimits } from "./rate-limit";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 /**
  * Previews that never activate pile up. Nightly we archive the stale ones and
@@ -14,6 +15,7 @@ const STALE_DAYS = 30;
 export interface PreviewCleanupSummary {
   archived: number;
   rateLimitsPruned: number;
+  previewLoginsRemoved: number;
 }
 
 export async function runPreviewCleanup(now = new Date()): Promise<PreviewCleanupSummary> {
@@ -56,5 +58,46 @@ export async function runPreviewCleanup(now = new Date()): Promise<PreviewCleanu
     /* builder columns not migrated yet — nothing to clean */
   }
 
-  return { archived, rateLimitsPruned: await pruneRateLimits() };
+  return {
+    archived,
+    previewLoginsRemoved: await sweepExpiredPreviewLogins(now),
+    rateLimitsPruned: await pruneRateLimits(),
+  };
+}
+
+/**
+ * Delete demo logins that have run out.
+ *
+ * Tidiness, not enforcement. An expired login already stops working — the
+ * session layer checks the expiry on every request — so this only clears the
+ * rows and their Supabase auth users so they don't accumulate. It must never
+ * throw: the nightly job also archives stale previews, and losing that over a
+ * leftover demo account would be the wrong trade.
+ */
+async function sweepExpiredPreviewLogins(now: Date): Promise<number> {
+  try {
+    const dead = await systemDb((tx) =>
+      tx.staffUser.findMany({
+        where: { previewExpiresAt: { not: null, lte: now } },
+        select: { id: true, authUserId: true },
+      }),
+    );
+    if (dead.length === 0) return 0;
+
+    await systemDb((tx) =>
+      tx.staffUser.deleteMany({ where: { id: { in: dead.map((d) => d.id) } } }),
+    );
+
+    const admin = createSupabaseAdminClient();
+    for (const d of dead) {
+      try {
+        await admin.auth.admin.deleteUser(d.authUserId);
+      } catch {
+        /* the staff row is gone, so the login no longer resolves */
+      }
+    }
+    return dead.length;
+  } catch {
+    return 0; // column not migrated — no preview login can exist
+  }
 }

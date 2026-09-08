@@ -44,7 +44,11 @@ export async function updateEmail(_prev: AccountState, formData: FormData): Prom
   // Keep our own record in sync (the app shows email from StaffUser).
   try {
     await tenantDb(user.restaurantId, (tx) =>
-      tx.staffUser.update({ where: { id: user.staffUserId }, data: { email } }),
+      tx.staffUser.update({
+        where: { id: user.staffUserId },
+        data: { email },
+        select: { id: true },
+      }),
     );
   } catch {
     /* auth email already changed; record sync is best-effort */

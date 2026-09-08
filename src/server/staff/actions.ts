@@ -78,7 +78,7 @@ export async function updateStaffRole(formData: FormData): Promise<void> {
   const role = formData.get("role") as "kitchen" | "cashier" | "merchant" | "manager" | "admin";
   if (id === me.staffUserId) return; // can't change your own role (lockout guard)
   await tenantDb(me.restaurantId, (tx) =>
-    tx.staffUser.update({ where: { id }, data: { role } }),
+    tx.staffUser.update({ where: { id }, data: { role }, select: { id: true } }),
   );
   revalidatePath("/admin/staff");
 }
@@ -115,7 +115,9 @@ export async function updateStaffEmail(_prev: StaffCredState, formData: FormData
     email_confirm: true,
   });
   if (error) return { error: error.message };
-  await tenantDb(me.restaurantId, (tx) => tx.staffUser.update({ where: { id }, data: { email } }));
+  await tenantDb(me.restaurantId, (tx) =>
+    tx.staffUser.update({ where: { id }, data: { email }, select: { id: true } }),
+  );
   revalidatePath("/admin/staff");
   return { ok: true, message: "Email updated." };
 }
@@ -126,7 +128,10 @@ export async function deleteStaff(formData: FormData): Promise<void> {
   if (id === me.staffUserId) return; // can't delete yourself
 
   const staff = await tenantDb(me.restaurantId, async (tx) => {
-    const row = await tx.staffUser.findFirst({ where: { id } });
+    const row = await tx.staffUser.findFirst({
+      where: { id },
+      select: { id: true, authUserId: true },
+    });
     if (row) await tx.staffUser.delete({ where: { id } });
     return row;
   });

@@ -4,6 +4,7 @@ import { systemDb } from "@/server/tenancy/scoped-db";
 import { pickBranch, BRANCH_COOKIE } from "@/lib/tenancy/active-branch";
 import type { Prisma, StaffRole } from "@prisma/client";
 import { parseAdminRole, type AdminRole } from "@/lib/platform/admin-scope";
+import { isExpired } from "@/lib/preview-login/expiry";
 
 /**
  * Resolves the currently-authenticated principal from the Supabase session.
@@ -58,6 +59,37 @@ async function readAdminRole(
   }
 }
 
+/**
+ * Remove memberships whose temporary demo login has lapsed.
+ *
+ * The expiry is read in its own query, so a database that hasn't run the
+ * migration still logs everyone in. That falls open, which is safe here for a
+ * specific reason rather than by hope: without the column no preview login can
+ * ever have been created, so on such a database every staff row is a permanent
+ * account and there is nothing to expire. Where the column does exist, this is
+ * the check that enforces it, on every request.
+ */
+async function withoutExpiredPreviews<T extends { id: string }>(
+  tx: Prisma.TransactionClient,
+  rows: T[],
+): Promise<T[]> {
+  if (rows.length === 0) return rows;
+  let expiries: { id: string; previewExpiresAt: Date | null }[];
+  try {
+    expiries = await tx.staffUser.findMany({
+      where: { id: { in: rows.map((r) => r.id) } },
+      select: { id: true, previewExpiresAt: true },
+    });
+  } catch {
+    return rows; // column not migrated — no preview login can exist yet
+  }
+  const now = new Date();
+  const dead = new Set(
+    expiries.filter((e) => isExpired(e.previewExpiresAt, now)).map((e) => e.id),
+  );
+  return dead.size === 0 ? rows : rows.filter((r) => !dead.has(r.id));
+}
+
 export async function getCurrentUser(): Promise<CurrentUser> {
   const supabase = await createSupabaseServerClient();
   const {
@@ -90,7 +122,7 @@ export async function getCurrentUser(): Promise<CurrentUser> {
     // (an owner with branches). Which one they're looking at comes from the
     // branch cookie, checked against these rows — the cookie is a request from
     // the browser, so membership is verified here rather than trusted.
-    const memberships = await tx.staffUser.findMany({
+    const allMemberships = await tx.staffUser.findMany({
       where: { authUserId: user.id },
       select: {
         id: true,
@@ -104,6 +136,11 @@ export async function getCurrentUser(): Promise<CurrentUser> {
         restaurant: { select: { status: true } },
       },
     });
+
+    // Drop any membership whose temporary demo login has run out. Enforced on
+    // every request rather than left to a cleanup job: a login that keeps
+    // working because a cron didn't run is not expired in any useful sense.
+    const memberships = await withoutExpiredPreviews(tx, allMemberships);
 
     if (memberships.length > 0) {
       const requested = (await cookies()).get(BRANCH_COOKIE)?.value ?? null;

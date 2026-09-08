@@ -15,6 +15,8 @@ import {
 import { CopyLink } from "@/components/super-admin/CopyLink";
 import { ScanMenuForm } from "@/components/super-admin/ScanMenuForm";
 import { ConvertDemoForm } from "@/components/super-admin/ConvertDemoForm";
+import { PreviewLoginPanel } from "@/components/super-admin/PreviewLoginPanel";
+import { getPreviewLogin } from "@/server/storefront-demo/preview-login";
 import { formatPeso } from "@/lib/money";
 import { qrPngDataUrl } from "@/lib/qr";
 
@@ -32,6 +34,7 @@ export default async function StorefrontDetailPage({
   // must say so here rather than leave someone wondering why the banner is
   // empty on a demo they are about to send a customer.
   const uploadFailed = (await searchParams).upload === "failed";
+  const previewLogin = await getPreviewLogin(id);
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://servdph.com";
   const url = `${appUrl}/r/${s.slug}`;
@@ -158,6 +161,9 @@ export default async function StorefrontDetailPage({
           </button>
         </div>
       </form>
+
+      {/* Temporary login for pitching this storefront */}
+      <PreviewLoginPanel restaurantId={s.id} existing={previewLogin} />
 
       {/* Convert demo → real account */}
       <ConvertDemoForm restaurantId={s.id} />

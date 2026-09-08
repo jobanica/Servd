@@ -11,6 +11,7 @@ import { migrationHint } from "@/lib/db/migration-hint";
 import { uploadMenuImage } from "@/server/storage/menu-images";
 import { provisionDemo, receiptJson } from "./provision";
 import { convertDemo } from "./convert";
+import { createPreviewLogin, revokePreviewLogin } from "./preview-login";
 import { scanAndSaveMenu } from "./scan-save";
 
 export type FormState = { ok?: boolean; error?: string } | null;
@@ -331,4 +332,41 @@ export async function deleteDemoStorefront(formData: FormData): Promise<void> {
   await systemDb((tx) => tx.restaurant.delete({ where: { id } }));
   revalidatePath(PATH);
   redirect(PATH);
+}
+
+
+/**
+ * Issue a temporary merchant login so a prospect can watch an order land.
+ *
+ * Returns the credentials to read out. They are shown once on the screen that
+ * called this; the password is never stored anywhere readable, exactly like the
+ * one conversion hands over.
+ */
+export type PreviewLoginState =
+  | { ok: true; username: string; password: string; expiresAt: string }
+  | { error: string }
+  | null;
+
+export async function issuePreviewLogin(
+  _prev: PreviewLoginState,
+  formData: FormData,
+): Promise<PreviewLoginState> {
+  await requireSuperAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { error: "Missing storefront." };
+
+  const result = await createPreviewLogin(id);
+  if (!result.ok) return { error: result.error };
+
+  revalidatePath(detailPath(id));
+  return { ok: true, ...result.credentials };
+}
+
+/** Kill the temporary login now, without waiting for it to expire. */
+export async function endPreviewLogin(formData: FormData): Promise<void> {
+  await requireSuperAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  await revokePreviewLogin(id);
+  revalidatePath(detailPath(id));
 }

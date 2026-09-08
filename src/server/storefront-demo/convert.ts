@@ -6,6 +6,7 @@ import { systemDb } from "@/server/tenancy/scoped-db";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { normalizeUsername } from "@/lib/partners/login-username";
 import { getFreePlan, getDefaultPlan, getTopPlan, SIGNUP_TRIAL_DAYS } from "@/server/billing/subscription";
+import { revokePreviewLogin } from "./preview-login";
 
 /**
  * Turning a demo storefront into a real account.
@@ -49,6 +50,23 @@ function tempPassword(): string {
   let out = "";
   for (let i = 0; i < 10; i++) out += chars[bytes[i] % chars.length];
   return out;
+}
+
+/**
+ * Logins that make a storefront "already converted".
+ *
+ * Excludes the temporary preview login, which is a sales tool rather than an
+ * account. Falls back to counting everything if the column isn't migrated —
+ * where it doesn't exist no preview login can, so every staff row is real.
+ */
+async function countRealLogins(restaurantId: string): Promise<number> {
+  try {
+    return await systemDb((tx) =>
+      tx.staffUser.count({ where: { restaurantId, previewExpiresAt: null } }),
+    );
+  } catch {
+    return systemDb((tx) => tx.staffUser.count({ where: { restaurantId } }));
+  }
 }
 
 export type ConvertBilling = "trial30" | "free";
@@ -129,11 +147,16 @@ export async function convertDemo(
   const info = await systemDb((tx) =>
     tx.restaurant.findFirst({
       where: { id: restaurantId },
-      select: { id: true, _count: { select: { staff: true } } },
+      select: { id: true },
     }),
   );
   if (!info) return { ok: false, error: "Storefront not found." };
-  if (info._count.staff > 0) return { ok: false, error: "This storefront already has a login." };
+
+  // Count only REAL logins. A temporary preview login is issued to demo the
+  // storefront to this very prospect, so treating it as "already converted"
+  // would block the sale it exists to help close.
+  const realLogins = await countRealLogins(restaurantId);
+  if (realLogins > 0) return { ok: false, error: "This storefront already has a login." };
 
   const taken = await systemDb((tx) =>
     tx.staffUser.findFirst({ where: { username }, select: { id: true } }),
@@ -171,6 +194,15 @@ export async function convertDemo(
     }
     const msg = e instanceof Error ? e.message : "Couldn't convert.";
     return { ok: false, error: /unique/i.test(msg) ? "That username is taken." : msg };
+  }
+
+  // The demo is now a real account, so the throwaway login has done its job.
+  // After the conversion committed, deliberately: a failure to tidy up must not
+  // undo a sale, and the preview login expires on its own regardless.
+  try {
+    await revokePreviewLogin(restaurantId);
+  } catch {
+    /* it expires by itself; never fail a completed conversion over cleanup */
   }
 
   return { ok: true, credentials: { username, password } };

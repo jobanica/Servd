@@ -864,6 +864,11 @@ model StaffUser {
   email        String
   username     String?   @unique // optional login handle (super-admin can create by username)
   displayName  String?
+  /// Set only on a throwaway login made to demo a storefront to a prospect.
+  /// Carrying an expiry IS what makes it temporary — there is no second boolean
+  /// to fall out of step with it. NULL on every real staff account, which is
+  /// what the conversion check and the staff list both rely on.
+  previewExpiresAt DateTime?
   createdAt    DateTime  @default(now())
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
