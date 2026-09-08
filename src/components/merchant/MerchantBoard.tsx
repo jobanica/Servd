@@ -22,6 +22,7 @@ import { savePushSubscription } from "@/server/push/actions";
 import { useOrderAlarm } from "./useOrderAlarm";
 import { useWakeLock } from "./useWakeLock";
 import { InstallButton } from "./InstallButton";
+import { SignOutButton } from "@/components/merchant/SignOutButton";
 import { PlanStatusBanner } from "@/components/billing/PlanStatusBanner";
 import type { PlanBannerData } from "@/lib/billing/planBanner";
 import { DeliveryRiderPanel } from "@/components/delivery/DeliveryRiderPanel";
@@ -351,6 +352,7 @@ export function MerchantBoard({
           🔔 Tap to start
         </button>
         <InstallButton subtle />
+        <SignOutButton dark />
       </div>
     );
   }
@@ -360,12 +362,14 @@ export function MerchantBoard({
   return (
     <div className="min-h-screen bg-cream pb-24">
       {/* Header */}
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-plum-ink/10 bg-white px-4 py-3">
-        <div>
-          <h1 className="font-heading text-lg font-extrabold leading-none">{restaurantName}</h1>
+      <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-plum-ink/10 bg-white px-4 py-3">
+        <div className="min-w-0">
+          <h1 className="truncate font-heading text-lg font-extrabold leading-none">{restaurantName}</h1>
           <p className="text-xs text-plum-ink/50">Incoming online orders</p>
         </div>
-        <div className="flex items-center gap-3 text-sm">
+        {/* Wraps rather than overflowing: a long shop name on a phone must not
+            push the sign-out or the Live indicator off the edge of the screen. */}
+        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-sm">
           <InstallButton />
           <label className="flex items-center gap-2 font-semibold text-plum-ink/70">
             <input type="checkbox" checked={autoPrint} onChange={(e) => setAutoPrint(e.target.checked)} />
@@ -375,6 +379,7 @@ export function MerchantBoard({
             <span className={`h-2 w-2 rounded-full ${live ? "bg-green-500" : "bg-plum-ink/30"}`} />
             {live ? "Live" : "Reconnecting"}
           </span>
+          <SignOutButton />
         </div>
       </header>
 
