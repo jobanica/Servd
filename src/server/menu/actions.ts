@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { tenantDb } from "@/server/tenancy/scoped-db";
-import { requireAdminAction } from "@/server/tenancy/require-admin";
+import { requireManagerAction } from "@/server/tenancy/require-admin";
 import { writeAudit } from "@/server/audit/log";
 import { uploadMenuImage } from "@/server/storage/menu-images";
 import { uploadMenuVideo } from "@/server/storage/menu-videos";
@@ -37,7 +37,7 @@ export async function createCategory(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const parsed = categorySchema.safeParse({
     name: formData.get("name"),
     sortOrder: formData.get("sortOrder") ?? 0,
@@ -52,7 +52,7 @@ export async function createCategory(
 }
 
 export async function renameCategory(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const id = String(formData.get("id"));
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return;
@@ -63,7 +63,7 @@ export async function renameCategory(formData: FormData): Promise<void> {
 }
 
 export async function deleteCategory(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const id = String(formData.get("id"));
   // Cascade removes the category's items (see schema onDelete: Cascade).
   await tenantDb(restaurantId, (tx) =>
@@ -112,7 +112,7 @@ export async function createItem(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const parsed = menuItemSchema.safeParse({
     categoryId: formData.get("categoryId"),
     name: formData.get("name"),
@@ -181,7 +181,7 @@ const bundleSectionsSchema = z
  * pipeline with no special-casing.
  */
 export async function createBundle(_prev: FormState, formData: FormData): Promise<FormState> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const parsed = bundleSchema.safeParse({
     categoryId: formData.get("categoryId"),
     name: formData.get("name"),
@@ -267,7 +267,7 @@ export async function updateItem(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const { restaurantId, staffUserId, email } = await requireAdminAction();
+  const { restaurantId, staffUserId, email } = await requireManagerAction();
   const id = String(formData.get("id"));
   const parsed = menuItemSchema.safeParse({
     categoryId: formData.get("categoryId"),
@@ -426,7 +426,7 @@ async function saveFoodCost(
  * Submitted as parallel arrays: variantName[] + variantPrice[] (pesos).
  */
 export async function saveItemVariants(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const id = String(formData.get("id"));
   const names = formData.getAll("variantName").map(String);
   const prices = formData.getAll("variantPrice").map(String);
@@ -446,7 +446,7 @@ export async function saveItemVariants(formData: FormData): Promise<void> {
 
 /** Out-of-stock toggle, used straight from the menu list. */
 export async function toggleItemAvailability(formData: FormData): Promise<void> {
-  const { restaurantId, staffUserId, email } = await requireAdminAction();
+  const { restaurantId, staffUserId, email } = await requireManagerAction();
   const id = String(formData.get("id"));
   const available = formData.get("available") === "true";
   await tenantDb(restaurantId, async (tx) => {
@@ -470,7 +470,7 @@ export async function toggleItemAvailability(formData: FormData): Promise<void> 
 }
 
 export async function deleteItem(formData: FormData): Promise<void> {
-  const { restaurantId, staffUserId, email } = await requireAdminAction();
+  const { restaurantId, staffUserId, email } = await requireManagerAction();
   const id = String(formData.get("id"));
   await tenantDb(restaurantId, async (tx) => {
     // Snapshot before it's gone — after the delete there is nothing left to
@@ -498,7 +498,7 @@ const orderIds = z.array(z.string().uuid()).max(500);
 
 /** Persist a new category order (sortOrder = position). Tenant-scoped. */
 export async function reorderCategories(orderedIds: string[]): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const ids = orderIds.parse(orderedIds);
   await tenantDb(restaurantId, async (tx) => {
     // updateMany scoped by id + restaurantId so a foreign id just matches nothing.
@@ -518,7 +518,7 @@ export async function reorderCategories(orderedIds: string[]): Promise<void> {
  * whatever sequence the database felt like returning.
  */
 export async function reorderModifierGroups(orderedIds: string[]): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const ids = orderIds.parse(orderedIds);
   try {
     await tenantDb(restaurantId, (tx) =>
@@ -536,7 +536,7 @@ export async function reorderModifierGroups(orderedIds: string[]): Promise<void>
 
 /** Persist a new item order within one category (sortOrder = position). */
 export async function reorderItems(categoryId: string, orderedIds: string[]): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const ids = orderIds.parse(orderedIds);
   await tenantDb(restaurantId, async (tx) => {
     const cat = await tx.category.findFirst({ where: { id: categoryId, restaurantId }, select: { id: true } });
@@ -555,7 +555,7 @@ export async function createModifierGroup(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const parsed = modifierGroupSchema.safeParse({
     name: formData.get("name"),
     required: formData.get("required") === "on",
@@ -575,7 +575,7 @@ export async function updateModifierGroup(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const id = String(formData.get("id"));
   const parsed = modifierGroupSchema.safeParse({
     name: formData.get("name"),
@@ -594,7 +594,7 @@ export async function updateModifierGroup(
 }
 
 export async function deleteModifierGroup(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const id = String(formData.get("id"));
   await tenantDb(restaurantId, (tx) =>
     tx.modifierGroup.delete({ where: { id } }),
@@ -606,7 +606,7 @@ export async function createModifier(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const groupId = String(formData.get("modifierGroupId"));
   const parsed = modifierSchema.safeParse({
     name: formData.get("name"),
@@ -634,7 +634,7 @@ export async function updateModifier(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const id = String(formData.get("id"));
   const parsed = modifierSchema.safeParse({
     name: formData.get("name"),
@@ -661,7 +661,7 @@ export async function updateModifier(
  * accept it on an order while it's out.
  */
 export async function setModifierAvailability(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const id = String(formData.get("id"));
   const isAvailable = formData.get("isAvailable") === "on";
   try {
@@ -676,7 +676,7 @@ export async function setModifierAvailability(formData: FormData): Promise<void>
 }
 
 export async function deleteModifier(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const id = String(formData.get("id"));
   // RLS via the modifiers->modifier_groups policy ensures cross-tenant deletes fail.
   await tenantDb(restaurantId, (tx) =>
@@ -688,7 +688,7 @@ export async function deleteModifier(formData: FormData): Promise<void> {
 // ------------------------------------------------ attach groups to an item
 
 export async function setItemModifierGroup(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const menuItemId = String(formData.get("menuItemId"));
   const modifierGroupId = String(formData.get("modifierGroupId"));
   const attach = formData.get("attach") === "true";

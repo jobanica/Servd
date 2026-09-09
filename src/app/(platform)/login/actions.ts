@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { getCurrentUser } from "@/server/tenancy/current-user";
 import { homeForAdmin } from "@/lib/platform/admin-scope";
+import { MANAGER_HOME } from "@/lib/admin/manager-scope";
 
 /** Resolve a login identifier to the auth email. Accepts an email OR a username. */
 async function resolveEmail(identifier: string): Promise<string | null> {
@@ -52,7 +53,7 @@ export async function signIn(_prev: unknown, formData: FormData) {
   if (user.role === "kitchen") redirect("/kitchen");
   if (user.role === "cashier") redirect("/cashier");
   if (user.role === "merchant") redirect("/merchant");
-  if (user.role === "manager") redirect("/admin/hr");
+  if (user.role === "manager") redirect(MANAGER_HOME);
   redirect("/admin");
 }
 

@@ -20,7 +20,7 @@ export function AddStaffForm() {
           <option value="cashier">Cashier — POS only</option>
           <option value="kitchen">Kitchen — kitchen display only</option>
           <option value="merchant">Merchant — incoming online orders only</option>
-          <option value="manager">Manager — HR &amp; scheduling</option>
+          <option value="manager">Manager — menu, service, marketing &amp; back office (no settings)</option>
           <option value="admin">Admin — full access</option>
         </select>
         <input name="email" type="email" placeholder="Email" required className="rounded-lg border border-plum-ink/15 px-3 py-2 text-sm" />

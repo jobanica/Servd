@@ -72,6 +72,7 @@ export default async function AdminLayout({
       unreadAnnouncements={unreadAnnouncements}
       feedbackHistory={feedbackHistory}
       unreadFeedbackReplies={unreadFeedbackReplies}
+      role={user.role === "manager" ? "manager" : "admin"}
     >
       {children}
     </AdminShell>

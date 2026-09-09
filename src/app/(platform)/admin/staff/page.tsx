@@ -8,7 +8,7 @@ import { updateStaffRole, deleteStaff } from "@/server/staff/actions";
 const ROLES = ["cashier", "kitchen", "merchant", "manager", "admin"] as const;
 const ACCESS: Record<string, string> = {
   admin: "Full dashboard",
-  manager: "HR & scheduling",
+  manager: "Menu, service, marketing & back office — not settings",
   cashier: "Cashier POS only",
   kitchen: "Kitchen display only",
   merchant: "Incoming online orders only",

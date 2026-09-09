@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { tenantDb } from "@/server/tenancy/scoped-db";
-import { requireAdminAction } from "@/server/tenancy/require-admin";
+import { requireManagerAction } from "@/server/tenancy/require-admin";
 import type { FeedbackMode } from "@prisma/client";
 
 export type FormState = { ok?: boolean; error?: string } | null;
@@ -22,7 +22,7 @@ export async function updateReputationSettings(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const parsed = schema.safeParse({
     googleReviewUrl: formData.get("googleReviewUrl") ?? "",
     feedbackMode: formData.get("feedbackMode"),

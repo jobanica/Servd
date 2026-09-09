@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdminAction } from "@/server/tenancy/require-admin";
+import { requireManagerAction } from "@/server/tenancy/require-admin";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 
 export type LoyaltyFormState = { ok?: boolean; error?: string } | null;
@@ -10,7 +10,7 @@ export async function updateLoyaltyConfig(
   _prev: LoyaltyFormState,
   formData: FormData,
 ): Promise<LoyaltyFormState> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const enabled = formData.get("enabled") === "on";
   const pesosPerPoint = Math.max(1, Math.round(Number(formData.get("pesosPerPoint")) || 20));
   const pointValuePesos = Math.max(0.01, Number(formData.get("pointValue")) || 1);

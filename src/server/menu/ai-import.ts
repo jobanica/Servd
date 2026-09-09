@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { tenantDb } from "@/server/tenancy/scoped-db";
-import { requireAdminAction } from "@/server/tenancy/require-admin";
+import { requireManagerAction } from "@/server/tenancy/require-admin";
 import { hasFeature } from "@/server/billing/feature-gate";
 import {
   MAX_IMPORT_FILES,
@@ -48,7 +48,7 @@ export type CreateUploadsResult =
  * files straight to Supabase Storage, bypassing the serverless body limit.
  */
 export async function createMenuImportUploads(types: string[]): Promise<CreateUploadsResult> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return { ok: false, error: "AI menu import isn't configured on this server." };
@@ -79,7 +79,7 @@ export async function analyzeMenuMedia(input: {
   paths: string[];
   generateDescriptions: boolean;
 }): Promise<AnalyzeResult> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
 
   if (!(await hasFeature(restaurantId, "aiMenuImport"))) {
     return { ok: false, error: "AI menu import is available on the Growth and Business plans. Upgrade to use it." };
@@ -97,7 +97,7 @@ export type ImportResult =
 
 /** Step 2 — write the reviewed draft into the menu (idempotent-ish). */
 export async function importParsedMenu(input: unknown): Promise<ImportResult> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
 
   const parsed = reviewedMenuSchema.safeParse(input);
   if (!parsed.success) {

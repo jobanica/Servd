@@ -4,7 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireStaff } from "@/server/tenancy/current-user";
-import { requireAdminAction } from "@/server/tenancy/require-admin";
+import { requireManagerAction } from "@/server/tenancy/require-admin";
 import { getSmsProvider } from "@/server/sms";
 import { adjustCredits } from "@/server/sms/credits";
 
@@ -38,7 +38,7 @@ export async function sendCampaign(input: {
 }): Promise<{ ok: boolean; sent?: number; failed?: number; error?: string }> {
   let staff;
   try {
-    staff = await requireStaff(["admin"]);
+    staff = await requireStaff(["admin", "manager"]);
   } catch {
     return { ok: false, error: "Not allowed." };
   }
@@ -111,7 +111,7 @@ export async function sendCampaign(input: {
 
 /** Admin toggles double vs single opt-in for their restaurant. */
 export async function setDoubleOptIn(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const enabled = formData.get("doubleOptIn") === "on";
   await tenantDb(restaurantId, (tx) =>
     tx.restaurant.update({ where: { id: restaurantId }, data: { smsDoubleOptIn: enabled }, select: { id: true } }),

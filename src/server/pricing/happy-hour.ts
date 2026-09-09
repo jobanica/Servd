@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { systemDb, tenantDb } from "@/server/tenancy/scoped-db";
-import { requireAdminAction } from "@/server/tenancy/require-admin";
+import { requireManagerAction } from "@/server/tenancy/require-admin";
 import { pesosToCentavos } from "@/lib/money";
 import type { HappyHourRule } from "@/lib/pricing/happy-hour";
 
@@ -95,7 +95,7 @@ function hhmm(s: string): number {
 }
 
 export async function createHappyHour(_prev: FormState, formData: FormData): Promise<FormState> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const parsed = schema.safeParse({
     name: formData.get("name"),
     discountType: formData.get("discountType"),
@@ -139,7 +139,7 @@ export async function createHappyHour(_prev: FormState, formData: FormData): Pro
 }
 
 export async function toggleHappyHour(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const id = String(formData.get("id") ?? "");
   const active = String(formData.get("active") ?? "") === "true";
   await tenantDb(restaurantId, (tx) =>
@@ -149,7 +149,7 @@ export async function toggleHappyHour(formData: FormData): Promise<void> {
 }
 
 export async function deleteHappyHour(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const id = String(formData.get("id") ?? "");
   await tenantDb(restaurantId, (tx) => tx.happyHour.deleteMany({ where: { id } }));
   revalidatePath("/admin/happy-hours");

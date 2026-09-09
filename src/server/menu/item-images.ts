@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { tenantDb } from "@/server/tenancy/scoped-db";
-import { requireAdminAction } from "@/server/tenancy/require-admin";
+import { requireManagerAction } from "@/server/tenancy/require-admin";
 import { hasFeature } from "@/server/billing/feature-gate";
 import { uploadMenuImageBytes } from "@/server/storage/menu-images";
 
@@ -18,7 +18,7 @@ import { uploadMenuImageBytes } from "@/server/storage/menu-images";
 export type GenImageResult = { ok: true; imageUrl: string } | { ok: false; error: string };
 
 export async function generateItemImage(itemId: string): Promise<GenImageResult> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
 
   if (!process.env.OPENAI_API_KEY) {
     return { ok: false, error: "Image generation isn't configured on this server." };

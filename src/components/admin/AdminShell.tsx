@@ -9,6 +9,7 @@ import { signOut } from "@/app/(platform)/login/actions";
 import { PlatformFeedbackButton } from "./PlatformFeedbackButton";
 import type { PlatformFeedbackRow } from "@/server/platform-feedback/queries";
 import { BranchSwitcher } from "./BranchSwitcher";
+import { visibleAdminNav, type DashboardRole } from "@/lib/admin/manager-scope";
 import { AnnouncementBadge } from "./AnnouncementBadge";
 import type { BranchRow } from "@/server/tenancy/branches";
 
@@ -149,6 +150,7 @@ export function AdminShell({
   unreadAnnouncements = 0,
   feedbackHistory = [],
   unreadFeedbackReplies = 0,
+  role = "admin",
   children,
 }: {
   brand: { name: string; slug: string; status: string; logoUrl?: string | null };
@@ -164,6 +166,8 @@ export function AdminShell({
   /** This restaurant's own feedback, so the owner can read what Servd wrote back. */
   feedbackHistory?: PlatformFeedbackRow[];
   unreadFeedbackReplies?: number;
+  /** Managers see only the sections they can open; owners see everything. */
+  role?: DashboardRole;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -180,10 +184,15 @@ export function AdminShell({
     return !!f && !!allowed && !allowed.has(f);
   };
 
+  // Hiding a link is not access control — requireAdminPage enforces the same
+  // rules on the way in. This stops the sidebar offering a manager a dozen
+  // settings links that all bounce them back to the dashboard.
+  const sections = visibleAdminNav(role, NAV);
+
   const nav = (
     <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
       <BranchSwitcher branches={branches} />
-      {NAV.map((section, i) => (
+      {sections.map((section, i) => (
         <div key={i}>
           {section.group && (
             <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-plum-ink/35">

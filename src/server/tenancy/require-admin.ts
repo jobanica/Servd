@@ -1,6 +1,9 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/server/tenancy/current-user";
 import { tenantDb } from "@/server/tenancy/scoped-db";
+import { dashboardCanAccess, MANAGER_HOME } from "@/lib/admin/manager-scope";
+import { PATH_HEADER } from "@/lib/platform/admin-scope";
 
 /**
  * Page guard: returns the logged-in restaurant admin, or redirects to /login.
@@ -12,14 +15,31 @@ import { tenantDb } from "@/server/tenancy/scoped-db";
  */
 export async function requireAdminPage(opts?: { allowSuspended?: boolean }) {
   const user = await getCurrentUser();
-  if (!user || user.kind !== "staff" || user.role !== "admin") {
+  if (!user || user.kind !== "staff" || !["admin", "manager"].includes(user.role)) {
     redirect("/login");
+  }
+
+  // A manager runs the floor, not the business. Which pages that covers is
+  // decided by path here rather than page by page, so a dashboard screen added
+  // later is closed to them until somebody opens it deliberately.
+  if (user.role === "manager") {
+    const pathname = (await headers()).get(PATH_HEADER) ?? "";
+    // No header means the middleware didn't run, so there is no path to judge.
+    // Sign-in rather than the manager's home: refusing is the fail-closed
+    // answer, and /login is the one target that can't bounce back here and
+    // loop. In practice the middleware covers every dashboard route.
+    if (!pathname) redirect("/login");
+    if (!dashboardCanAccess("manager", pathname)) redirect(MANAGER_HOME);
   }
   if (!opts?.allowSuspended) {
     const r = await tenantDb(user.restaurantId, (tx) =>
       tx.restaurant.findFirstOrThrow({ select: { status: true } }),
     );
-    if (r.status === "suspended") redirect("/admin/billing");
+    // Only the owner can pay, and a manager can't open billing — sending them
+    // there would bounce them straight back here and loop forever.
+    if (r.status === "suspended") {
+      redirect(user.role === "manager" ? "/suspended" : "/admin/billing");
+    }
   }
   return user;
 }
@@ -28,6 +48,24 @@ export async function requireAdminPage(opts?: { allowSuspended?: boolean }) {
  * Action guard: returns the admin, or throws. Server actions catch this and
  * surface a friendly error rather than redirecting mid-submit.
  */
+/**
+ * Action guard for work a manager may do: the menu, service, marketing and the
+ * back office.
+ *
+ * Separate from requireAdminAction, and NOT decided by the request path. A
+ * server action is reachable by its id from any page, so gating one on "which
+ * screen was open" would let a manager invoke a settings action from a screen
+ * they are allowed on. Each module states what it needs instead.
+ */
+export async function requireManagerAction() {
+  const user = await getCurrentUser();
+  if (!user || user.kind !== "staff" || !["admin", "manager"].includes(user.role)) {
+    throw new Error("UNAUTHORIZED");
+  }
+  return user;
+}
+
+/** Action guard for owner-only work: pricing, billing, credentials, access. */
 export async function requireAdminAction() {
   const user = await getCurrentUser();
   if (!user || user.kind !== "staff" || user.role !== "admin") {

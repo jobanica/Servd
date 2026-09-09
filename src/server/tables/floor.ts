@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireStaff } from "@/server/tenancy/current-user";
-import { requireAdminAction } from "@/server/tenancy/require-admin";
+import { requireManagerAction } from "@/server/tenancy/require-admin";
 import { audit } from "@/server/audit/log";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
 
@@ -176,7 +176,7 @@ export async function setTablePosition(input: {
   x: number;
   y: number;
 }): Promise<{ ok: boolean; error?: string }> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const parsed = POS.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Invalid position." };
   try {

@@ -6,7 +6,7 @@ import { getTableQrAccess } from "@/server/billing/addons";
 import { TABLE_LIMIT_MESSAGE } from "@/lib/billing/table-quota";
 import { z } from "zod";
 import { tenantDb } from "@/server/tenancy/scoped-db";
-import { requireAdminAction } from "@/server/tenancy/require-admin";
+import { requireManagerAction } from "@/server/tenancy/require-admin";
 
 export type FormState = { ok?: boolean; error?: string } | null;
 
@@ -23,7 +23,7 @@ export async function createTable(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const parsed = tableSchema.safeParse({
     tableNumber: formData.get("tableNumber"),
   });
@@ -61,7 +61,7 @@ export async function createTable(
  * (no table). No-op if one already exists.
  */
 export async function createCounterTable(): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   await tenantDb(restaurantId, async (tx) => {
     const existing = await tx.table.findFirst({ where: { isCounter: true }, select: { id: true } });
     if (existing) return;
@@ -73,7 +73,7 @@ export async function createCounterTable(): Promise<void> {
 }
 
 export async function deleteTable(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const id = String(formData.get("id"));
   await tenantDb(restaurantId, async (tx) => {
     // Detach any orders so a foreign key can't block the delete; order history
@@ -89,7 +89,7 @@ export async function deleteTable(formData: FormData): Promise<void> {
  * to retire old prints. The old URL stops working immediately.
  */
 export async function regenerateQrToken(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const id = String(formData.get("id"));
   await tenantDb(restaurantId, (tx) =>
     tx.table.update({ where: { id }, data: { qrToken: newQrToken() } }),

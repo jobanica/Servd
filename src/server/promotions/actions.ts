@@ -65,7 +65,7 @@ export async function createPromotion(
   _prev: PromoFormState,
   formData: FormData,
 ): Promise<PromoFormState> {
-  const staff = await requireStaff(["admin"]);
+  const staff = await requireStaff(["admin", "manager"]);
   const parsed = schema.safeParse(fields(formData));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   const v = parsed.data;
@@ -124,7 +124,7 @@ export async function createPromotion(
 }
 
 export async function deletePromotion(formData: FormData): Promise<void> {
-  const staff = await requireStaff(["admin"]);
+  const staff = await requireStaff(["admin", "manager"]);
   const id = String(formData.get("id") ?? "");
   await tenantDb(staff.restaurantId, (tx) =>
     tx.promotion.deleteMany({ where: { id, restaurantId: staff.restaurantId } }),
@@ -133,7 +133,7 @@ export async function deletePromotion(formData: FormData): Promise<void> {
 }
 
 export async function togglePromotion(formData: FormData): Promise<void> {
-  const staff = await requireStaff(["admin"]);
+  const staff = await requireStaff(["admin", "manager"]);
   const id = String(formData.get("id") ?? "");
   const active = String(formData.get("active") ?? "") === "true";
   await tenantDb(staff.restaurantId, (tx) =>

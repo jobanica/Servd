@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { randomBytes } from "node:crypto";
 import { tenantDb } from "@/server/tenancy/scoped-db";
-import { requireAdminAction } from "@/server/tenancy/require-admin";
+import { requireManagerAction } from "@/server/tenancy/require-admin";
 import { hasFeature } from "@/server/billing/feature-gate";
 import { uploadMenuImageBytes } from "@/server/storage/menu-images";
 import {
@@ -18,7 +18,7 @@ import {
 export type SocialState = { ok?: boolean; error?: string } | null;
 
 async function requireScheduler() {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   if (!(await hasFeature(restaurantId, "contentScheduler"))) {
     throw new Error("The content scheduler isn't unlocked for this account.");
   }

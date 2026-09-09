@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { requireStaff } from "@/server/tenancy/current-user";
-import { requireAdminAction } from "@/server/tenancy/require-admin";
+import { requireManagerAction } from "@/server/tenancy/require-admin";
 
 /**
  * Reservations & waitlist. A booking with a time is a reservation; a walk-in
@@ -78,7 +78,7 @@ const schema = z
   });
 
 export async function createReservation(_prev: FormState, formData: FormData): Promise<FormState> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const parsed = schema.safeParse({
     customerName: formData.get("customerName"),
     customerPhone: formData.get("customerPhone") ?? "",

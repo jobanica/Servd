@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { tenantDb } from "@/server/tenancy/scoped-db";
-import { requireAdminAction } from "@/server/tenancy/require-admin";
+import { requireManagerAction } from "@/server/tenancy/require-admin";
 import { hasModule } from "@/server/billing/entitlements";
 import { getReorderSuggestions } from "@/server/inventory/queries";
 import { pesosToCentavos } from "@/lib/money";
@@ -30,7 +30,7 @@ const itemSchema = z.object({
 });
 
 export async function createInventoryItem(_p: FormState, formData: FormData): Promise<FormState> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   try {
     await ensureModule(restaurantId);
     const d = itemSchema.parse({
@@ -75,7 +75,7 @@ export async function createInventoryItem(_p: FormState, formData: FormData): Pr
 }
 
 export async function updateInventoryItem(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   await ensureModule(restaurantId);
   const id = String(formData.get("id"));
   await tenantDb(restaurantId, (tx) =>
@@ -93,7 +93,7 @@ export async function updateInventoryItem(formData: FormData): Promise<void> {
 }
 
 export async function deleteInventoryItem(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   await ensureModule(restaurantId);
   await tenantDb(restaurantId, (tx) =>
     tx.inventoryItem.delete({ where: { id: String(formData.get("id")) } }),
@@ -115,7 +115,7 @@ export async function deleteInventoryItem(formData: FormData): Promise<void> {
  * that already entered what a thing costs them doesn't type it again.
  */
 export async function startTrackingProduct(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   await ensureModule(restaurantId);
   const menuItemId = String(formData.get("menuItemId"));
   const opening = Math.max(0, Number(formData.get("stockQty") ?? 0) || 0);
@@ -173,7 +173,7 @@ export async function startTrackingProduct(formData: FormData): Promise<void> {
  * marked sold out would reasonably think the switch did nothing.
  */
 export async function stopTrackingProduct(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   await ensureModule(restaurantId);
   const menuItemId = String(formData.get("menuItemId"));
   await tenantDb(restaurantId, async (tx) => {
@@ -186,7 +186,7 @@ export async function stopTrackingProduct(formData: FormData): Promise<void> {
 
 /** Change a tracked product's reorder level without touching its stock. */
 export async function setProductReorderLevel(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   await ensureModule(restaurantId);
   await tenantDb(restaurantId, (tx) =>
     tx.inventoryItem.updateMany({
@@ -208,7 +208,7 @@ export async function setProductReorderLevel(formData: FormData): Promise<void> 
  * next time it runs down nobody gets told.
  */
 export async function recordRestock(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   await ensureModule(restaurantId);
   const id = String(formData.get("id"));
   const qty = Number(formData.get("qty") ?? 0);
@@ -258,7 +258,7 @@ export async function recordRestock(formData: FormData): Promise<void> {
  */
 export async function restockAndRelist(formData: FormData): Promise<void> {
   await recordRestock(formData);
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const menuItemId = String(formData.get("menuItemId") ?? "");
   if (!menuItemId) return;
   await tenantDb(restaurantId, (tx) =>
@@ -291,7 +291,7 @@ async function applyMovement(
 }
 
 export async function recordWaste(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   await ensureModule(restaurantId);
   const id = String(formData.get("id"));
   const amount = Number(formData.get("qty") ?? 0);
@@ -308,7 +308,7 @@ export async function recordWaste(formData: FormData): Promise<void> {
  * `usage` enum value hasn't been migrated yet.
  */
 export async function recordWithdrawal(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   await ensureModule(restaurantId);
   const id = String(formData.get("id"));
   const amount = Number(formData.get("qty") ?? 0);
@@ -329,7 +329,7 @@ export async function recordWithdrawal(formData: FormData): Promise<void> {
 }
 
 export async function recordCount(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   await ensureModule(restaurantId);
   const id = String(formData.get("id"));
   const counted = Number(formData.get("counted") ?? 0);
@@ -340,7 +340,7 @@ export async function recordCount(formData: FormData): Promise<void> {
 
 // -------------------------------------------------------------- suppliers
 export async function createSupplier(_p: FormState, formData: FormData): Promise<FormState> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   try {
     await ensureModule(restaurantId);
     const name = z.string().trim().min(1).max(80).parse(formData.get("name"));
@@ -358,7 +358,7 @@ export async function createSupplier(_p: FormState, formData: FormData): Promise
 }
 
 export async function deleteSupplier(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   await ensureModule(restaurantId);
   await tenantDb(restaurantId, (tx) =>
     tx.supplier.delete({ where: { id: String(formData.get("id")) } }),
@@ -368,7 +368,7 @@ export async function deleteSupplier(formData: FormData): Promise<void> {
 
 // --------------------------------------------------------- purchase orders
 export async function createPurchaseOrder(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   await ensureModule(restaurantId);
   const supplierId = String(formData.get("supplierId") ?? "") || null;
   await tenantDb(restaurantId, (tx) =>
@@ -378,7 +378,7 @@ export async function createPurchaseOrder(formData: FormData): Promise<void> {
 }
 
 export async function addPurchaseOrderItem(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   await ensureModule(restaurantId);
   const purchaseOrderId = String(formData.get("purchaseOrderId"));
   const inventoryItemId = String(formData.get("inventoryItemId"));
@@ -397,7 +397,7 @@ export async function addPurchaseOrderItem(formData: FormData): Promise<void> {
 
 /** Receives a PO: adds stock and updates each item's WEIGHTED-AVERAGE cost. */
 export async function receivePurchaseOrder(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   await ensureModule(restaurantId);
   const purchaseOrderId = String(formData.get("purchaseOrderId"));
   await tenantDb(restaurantId, async (tx) => {
@@ -439,7 +439,7 @@ export async function receivePurchaseOrder(formData: FormData): Promise<void> {
 
 // -------------------------------------------------------------- recipes
 export async function setRecipeComponent(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   await ensureModule(restaurantId);
   const menuItemId = String(formData.get("menuItemId"));
   const inventoryItemId = String(formData.get("inventoryItemId"));
@@ -462,7 +462,7 @@ export async function setRecipeComponent(formData: FormData): Promise<void> {
 
 // -------------------------------------------------------------- settings
 export async function setAutoOutOfStock(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   await ensureModule(restaurantId);
   await tenantDb(restaurantId, (tx) =>
     tx.restaurant.update({
@@ -476,7 +476,7 @@ export async function setAutoOutOfStock(formData: FormData): Promise<void> {
 
 /** Phone that receives a low-stock SMS when an ingredient hits its reorder level. */
 export async function setLowStockAlertPhone(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   await ensureModule(restaurantId);
   const phone = String(formData.get("lowStockAlertPhone") ?? "").trim();
   await tenantDb(restaurantId, (tx) =>
@@ -491,7 +491,7 @@ export async function setLowStockAlertPhone(formData: FormData): Promise<void> {
  * server-side. Returns the new PO id so the caller can open it.
  */
 export async function createDraftPoFromSuggestions(supplierId: string | null): Promise<string | null> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   await ensureModule(restaurantId);
   const suggestions = await getReorderSuggestions(restaurantId);
   const forSupplier = suggestions.filter((s) => (s.supplierId ?? null) === (supplierId || null) && s.suggestedQty > 0);

@@ -4,7 +4,7 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { tenantDb } from "@/server/tenancy/scoped-db";
-import { requireAdminAction } from "@/server/tenancy/require-admin";
+import { requireManagerAction } from "@/server/tenancy/require-admin";
 import { requireStaff } from "@/server/tenancy/current-user";
 import { pesosToCentavos } from "@/lib/money";
 import { writeAudit } from "@/server/audit/log";
@@ -74,7 +74,7 @@ const issueSchema = z.object({
 });
 
 export async function issueGiftCard(_prev: FormState, formData: FormData): Promise<FormState> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const parsed = issueSchema.safeParse({
     amountPesos: formData.get("amountPesos"),
     code: formData.get("code") ?? "",
@@ -120,7 +120,7 @@ export async function issueGiftCard(_prev: FormState, formData: FormData): Promi
 }
 
 export async function setGiftCardActive(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminAction();
+  const { restaurantId } = await requireManagerAction();
   const id = String(formData.get("id") ?? "");
   const active = String(formData.get("active") ?? "") === "true";
   await tenantDb(restaurantId, (tx) =>
