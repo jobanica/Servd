@@ -7,6 +7,7 @@ import {
   type PreviewLoginState,
 } from "@/server/storefront-demo/actions";
 import { expiryLabel, PREVIEW_LOGIN_DAYS } from "@/lib/preview-login/expiry";
+import { CopyValue } from "@/components/super-admin/CopyValue";
 
 /**
  * Issue a throwaway merchant login so a prospect can watch an order arrive.
@@ -46,18 +47,12 @@ export function PreviewLoginPanel({
       {issued && (
         <div className="mt-3 rounded-lg border border-brand-primary/25 bg-brand-primary/5 p-3">
           <p className="text-xs font-semibold text-plum-ink/70">
-            Write this down now — the password isn&apos;t shown again.
+            Copy these now — the password isn&apos;t shown again.
           </p>
-          <dl className="mt-2 space-y-1 font-mono text-sm">
-            <div className="flex gap-2">
-              <dt className="w-20 shrink-0 text-plum-ink/45">Username</dt>
-              <dd className="break-all font-semibold">{issued.username}</dd>
-            </div>
-            <div className="flex gap-2">
-              <dt className="w-20 shrink-0 text-plum-ink/45">Password</dt>
-              <dd className="font-semibold">{issued.password}</dd>
-            </div>
-          </dl>
+          <div className="mt-2 space-y-1.5 font-mono text-sm">
+            <CopyValue label="Username" value={issued.username} />
+            <CopyValue label="Password" value={issued.password} />
+          </div>
           <p className="mt-2 text-[11px] text-plum-ink/45">
             Sign in at /login, then open Incoming Orders. {expiryLabel(issued.expiresAt)}.
           </p>
