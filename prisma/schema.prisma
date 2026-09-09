@@ -584,6 +584,10 @@ model Restaurant {
   contactEmail          String? // lead capture — required on a DIY build (email marketing)
   contactPhone          String?
   contactFb             String?
+  /// The Facebook post showing this prospect their preview storefront. Kept
+  /// apart from contactFb, which is how to REACH them and feeds the follow-up
+  /// list — a post link there would break chasing them.
+  previewPostUrl        String?
   emailOptOut           Boolean   @default(false) // unsubscribed from platform marketing email
   unsubToken            String?   @unique // one-click unsubscribe link, no login needed
   previewCreatedAt      DateTime? // build started

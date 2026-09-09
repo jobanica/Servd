@@ -154,6 +154,13 @@ export async function updateDemoDetails(formData: FormData): Promise<void> {
   const logoUpdate = await imageUpdate(id, formData, "logo", "logoUrl");
   const coverUpdate = await imageUpdate(id, formData, "cover", "coverImageUrl");
 
+  // The Facebook post showing this prospect their preview. Clearing the box is
+  // a deliberate "there is no post", so an empty string stores NULL rather than
+  // being ignored.
+  const previewPostUrl = formData.has("previewPostUrl")
+    ? String(formData.get("previewPostUrl") ?? "").trim().slice(0, 500) || null
+    : undefined;
+
   await systemDb((tx) =>
     tx.restaurant.update({
       where: { id },
@@ -162,6 +169,7 @@ export async function updateDemoDetails(formData: FormData): Promise<void> {
         tagline: tagline || null,
         ...(logoUpdate === undefined ? {} : { logoUrl: logoUpdate }),
         ...(coverUpdate === undefined ? {} : { coverImageUrl: coverUpdate }),
+        ...(previewPostUrl === undefined ? {} : { previewPostUrl }),
         printerConfig: receiptJson(address, phone),
       },
       select: { id: true },

@@ -106,6 +106,7 @@ export interface DemoStorefront {
   status: string;
   logoUrl: string | null;
   coverImageUrl: string | null;
+  previewPostUrl: string | null;
   tagline: string | null;
   address: string | null;
   phone: string | null;
@@ -125,6 +126,7 @@ export async function getDemoStorefront(id: string): Promise<DemoStorefront | nu
           status: true,
           logoUrl: true,
           coverImageUrl: true,
+          previewPostUrl: true,
           tagline: true,
           printerConfig: true,
         },
@@ -150,6 +152,7 @@ export async function getDemoStorefront(id: string): Promise<DemoStorefront | nu
         status: r.status,
         logoUrl: r.logoUrl,
         coverImageUrl: r.coverImageUrl,
+        previewPostUrl: r.previewPostUrl,
         tagline: r.tagline,
         address: contact?.address || null,
         phone: contact?.phone || null,

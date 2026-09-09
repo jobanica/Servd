@@ -99,6 +99,31 @@ export default async function StorefrontDetailPage({
             <p className="mt-1 text-[11px] text-plum-ink/45">Scan to open the menu</p>
           </div>
         </div>
+
+        {/* The Facebook post showing this prospect their preview. Sits with the
+            other shareable things, because sending it is the job it exists for. */}
+        <div className="mt-4 border-t border-brand-primary/15 pt-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-plum-ink/45">
+            Facebook preview post
+          </p>
+          {s.previewPostUrl ? (
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <a
+                href={s.previewPostUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="min-w-0 break-all font-mono text-sm text-brand-primary underline"
+              >
+                {s.previewPostUrl}
+              </a>
+              <CopyLink url={s.previewPostUrl} label="Copy post link" />
+            </div>
+          ) : (
+            <p className="mt-1 text-sm text-plum-ink/45">
+              None yet — paste it in Business details below, and it shows here for the team to send.
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Business details */}
@@ -111,6 +136,25 @@ export default async function StorefrontDetailPage({
         <input name="phone" defaultValue={s.phone ?? ""} placeholder="Phone" className={field} />
         <input name="address" defaultValue={s.address ?? ""} placeholder="Address" className={`sm:col-span-2 ${field}`} />
         <input name="tagline" defaultValue={s.tagline ?? ""} placeholder="Tagline" className={field} />
+
+        {/* Where the team gets the link they actually send to the customer. */}
+        <div className="sm:col-span-2">
+          <label className="mb-1 block text-xs font-semibold text-plum-ink/55">
+            Facebook preview post link
+          </label>
+          <input
+            name="previewPostUrl"
+            type="url"
+            inputMode="url"
+            defaultValue={s.previewPostUrl ?? ""}
+            placeholder="https://www.facebook.com/…"
+            className={field}
+          />
+          <p className="mt-1 text-[11px] text-plum-ink/40">
+            Paste the post you made showing this business their preview. It appears at the top of
+            this page so the team can copy it straight to the customer. Clear the box to remove it.
+          </p>
+        </div>
 
         {/* Business logo — upload a file, or paste an image URL. */}
         <div className="sm:col-span-2">
