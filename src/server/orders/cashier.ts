@@ -829,6 +829,13 @@ export async function recordPartialPayment(
   orderId: string,
   amountPesos: number,
   method: CounterMethod,
+  /**
+   * Cash the customer physically handed over, when it's more than the amount
+   * being applied. Recorded so the receipt can print it and the change beside
+   * it; the money owed is unaffected — change comes out of the drawer, it is
+   * not a payment.
+   */
+  cashTenderedPesos?: number,
 ): Promise<PartialPaymentResult> {
   let staff;
   try {
@@ -838,6 +845,7 @@ export async function recordPartialPayment(
   }
   const requested = pesosToCentavos(Number(amountPesos) || 0);
   if (requested <= 0) return { ok: false, error: "Enter an amount." };
+  const tendered = cashTenderedPesos ? pesosToCentavos(Number(cashTenderedPesos) || 0) : null;
 
   const disc = (await discountMap(staff.restaurantId, [orderId])).get(orderId);
   const credit = (await creditMap(staff.restaurantId, [orderId])).get(orderId) ?? 0;
@@ -891,6 +899,18 @@ export async function recordPartialPayment(
         select: { id: true },
       });
       partialPaymentId = p.id;
+
+      // Only worth storing when it exceeds what was applied — equal amounts
+      // mean exact money and no change, and a "Change 0.00" line on every cash
+      // receipt is noise. Best-effort: a till that can't record the note the
+      // customer handed over must still be able to take their money.
+      if (method === "cash" && tendered != null && tendered > amount) {
+        try {
+          await tx.order.updateMany({ where: { id: orderId }, data: { cashTendered: tendered } });
+        } catch {
+          /* cashTendered not migrated — the payment itself still stands */
+        }
+      }
       remaining = owed - amount;
       if (remaining <= 0) {
         settled = true;

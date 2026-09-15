@@ -124,6 +124,36 @@ describe("cash received and change", () => {
     expect(change).toContain("0.00");
   });
 
+  it("measures change against the cash portion of a split bill", () => {
+    // ₱1,000 bill settled with ₱400 cash and the rest on GCash, and the
+    // customer hands over ₱500. Change is ₱100 — the ₱100 over the cash
+    // portion, not ₱500 less the whole bill. Measuring from the order total
+    // used to hand back money the customer never had coming.
+    const split = buildTicket({
+      ...base,
+      kind: "receipt",
+      total: 100_000,
+      paymentMethod: "cash",
+      paymentAmount: 40_000,
+      cashTendered: 50_000,
+    });
+    const change = ticketBodyLines(split).find((l) => l.startsWith("Change"));
+    expect(change).toContain("100.00");
+  });
+
+  it("falls back to the order total when the payment amount is unknown", () => {
+    const noAmount = buildTicket({
+      ...base,
+      kind: "receipt",
+      total: 100_000,
+      paymentMethod: "cash",
+      paymentAmount: null,
+      cashTendered: 150_000,
+    });
+    const change = ticketBodyLines(noAmount).find((l) => l.startsWith("Change"));
+    expect(change).toContain("500.00");
+  });
+
   // A bill isn't a receipt: nothing has been handed over yet.
   it("says nothing on a bill", () => {
     const bill = buildTicket({ ...base, kind: "bill", cashTendered: 150_000 });

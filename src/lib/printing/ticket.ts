@@ -360,8 +360,12 @@ export function ticketBodyLines(t: Ticket): string[] {
     // that starts when somebody says they gave a thousand, and it lets the
     // customer check their change on the walk out rather than at the counter.
     if (t.showCashTendered && t.paymentMethod === "cash" && t.cashTendered != null && t.cashTendered > 0) {
+      // Change is against the cash actually applied, not the order total. On a
+      // split bill — ₱100 cash and the rest on GCash — measuring from the total
+      // would hand back change the customer never had coming.
+      const cashDue = t.paymentAmount ?? net;
       lines.push(pad("Cash received", amt(t.cashTendered)));
-      lines.push(pad("Change", amt(Math.max(0, t.cashTendered - net))));
+      lines.push(pad("Change", amt(Math.max(0, t.cashTendered - cashDue))));
     }
     lines.push("*** PAID ***");
   }

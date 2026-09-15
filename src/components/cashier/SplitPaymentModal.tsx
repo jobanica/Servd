@@ -31,6 +31,8 @@ export function SplitPaymentModal({
   const [owed, setOwed] = useState(remaining);
   const [amount, setAmount] = useState((remaining / 100).toFixed(2));
   const [method, setMethod] = useState<CounterMethod>("cash");
+  // What the customer physically handed over. Blank means exact money.
+  const [cashGiven, setCashGiven] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -42,7 +44,9 @@ export function SplitPaymentModal({
     }
     setBusy(true);
     setError(null);
-    const res = await recordPartialPayment(orderId, value, method);
+    const given = Number(cashGiven);
+    const tendered = method === "cash" && Number.isFinite(given) && given > value ? given : undefined;
+    const res = await recordPartialPayment(orderId, value, method, tendered);
     setBusy(false);
     if (!res.ok) {
       setError(res.error);
@@ -70,6 +74,7 @@ export function SplitPaymentModal({
     } else {
       setOwed(res.remaining);
       setAmount((res.remaining / 100).toFixed(2));
+      setCashGiven("");
     }
   }
 
@@ -111,6 +116,43 @@ export function SplitPaymentModal({
             </select>
           </label>
         </div>
+
+        {/* Cash handed over, so the receipt can print it with the change and
+            the cashier doesn't do the subtraction in their head at a queue.
+            Optional: leaving it blank means exact money. */}
+        {method === "cash" && (
+          <label className="mt-2 block text-sm">
+            <span className="font-medium">Cash received (₱)</span>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              inputMode="decimal"
+              value={cashGiven}
+              onChange={(e) => setCashGiven(e.target.value)}
+              placeholder="Leave blank for exact money"
+              className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2"
+            />
+            {(() => {
+              const given = Number(cashGiven);
+              const due = Number(amount);
+              if (!cashGiven || !Number.isFinite(given) || !Number.isFinite(due)) return null;
+              const change = Math.round(given * 100) - Math.round(due * 100);
+              if (change < 0) {
+                return (
+                  <span className="mt-1 block text-sm font-semibold text-guava">
+                    That&apos;s {peso(-change)} short of the amount above.
+                  </span>
+                );
+              }
+              return (
+                <span className="mt-1 block text-lg font-bold text-plum-ink">
+                  Change {peso(change)}
+                </span>
+              );
+            })()}
+          </label>
+        )}
 
         {/* The fee lands on the card portion only, so a split bill isn't
             charged 3.5% of the whole thing. */}
