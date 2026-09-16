@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/server/tenancy/current-user";
+import { requireAdminPage } from "@/server/tenancy/require-admin";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { getAnalytics } from "@/server/analytics/queries";
 import { getFeedbackList } from "@/server/feedback/queries";
@@ -64,8 +64,12 @@ function Stars({ n }: { n: number }) {
 const OPEN = ["new", "preparing", "done"] as const;
 
 export default async function AdminHome() {
-  const user = await getCurrentUser();
-  if (!user || user.kind !== "staff" || user.role !== "admin") redirect("/login");
+  // The shared guard, not a local role check. This page is where a manager
+  // lands after signing in, and its own "admin only" test sent them straight
+  // back to /login — which reads as being logged out two seconds after
+  // logging in. requireAdminPage also owns the suspended-shop redirect, which
+  // has to differ by role because a manager cannot open billing.
+  const user = await requireAdminPage();
   const rid = user.restaurantId;
 
   const restaurant = await tenantDb(rid, (tx) =>
@@ -73,8 +77,11 @@ export default async function AdminHome() {
       select: { name: true, displayName: true, slug: true, status: true, onboardingCompletedAt: true },
     }),
   );
-  if (restaurant.status === "suspended") redirect("/admin/billing");
-  if (!restaurant.onboardingCompletedAt) redirect("/admin/onboarding");
+  // Setup is the owner's job, and /admin/onboarding is not a manager's to
+  // open — pushing them into it would bounce them back here and loop.
+  if (user.role === "admin" && !restaurant.onboardingCompletedAt) {
+    redirect("/admin/onboarding");
+  }
 
   const now = new Date();
   // Manila day boundaries — the server runs in UTC, so a plain setHours(0,0,0,0)

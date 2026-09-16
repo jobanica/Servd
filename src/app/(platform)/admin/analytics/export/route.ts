@@ -21,8 +21,11 @@ function toCsv(headers: string[], rows: (string | number)[][]): string {
  * somebody trusts and shouldn't.
  */
 export async function GET(req: NextRequest) {
+  // Managers too: the Analytics page is theirs, and the export button sits on
+  // it. Refusing here would leave a visible button that fails. This is the same
+  // figures they are already reading, not the owner-only bulk data export.
   const user = await getCurrentUser();
-  if (!user || user.kind !== "staff" || user.role !== "admin") {
+  if (!user || user.kind !== "staff" || !["admin", "manager"].includes(user.role)) {
     return new Response("Unauthorized", { status: 401 });
   }
 
