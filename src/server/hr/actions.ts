@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { tenantDb, systemDb } from "@/server/tenancy/scoped-db";
-import { requireHrAction } from "@/server/hr/guard";
+import { requireHrAction, requireHrOwnerAction } from "@/server/hr/guard";
+import { canEditPay } from "@/lib/hr/permissions";
 import { requireStaff } from "@/server/tenancy/current-user";
 import { uploadEmployeeDoc } from "@/server/storage/employee-docs";
 import { pesosToCentavos } from "@/lib/money";
@@ -25,7 +26,7 @@ const employeeSchema = z.object({
 });
 
 export async function createEmployee(_p: FormState, formData: FormData): Promise<FormState> {
-  const { restaurantId } = await requireHrAction();
+  const { restaurantId } = await requireHrOwnerAction();
   try {
     const d = employeeSchema.parse({
       fullName: formData.get("fullName"),
@@ -67,7 +68,7 @@ export async function createEmployee(_p: FormState, formData: FormData): Promise
  * (not deleted). To keep records instead, set status to "inactive".
  */
 export async function deleteEmployee(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireHrAction();
+  const { restaurantId } = await requireHrOwnerAction();
   const id = String(formData.get("id") ?? "");
   if (!id) return;
   // Scope by restaurantId so an admin can only delete their own staff.
@@ -79,8 +80,12 @@ export async function deleteEmployee(formData: FormData): Promise<void> {
 }
 
 export async function updateEmployee(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireHrAction();
+  const { restaurantId, role } = await requireHrAction();
   const id = String(formData.get("id"));
+  // A manager keeps the roster tidy — names, phones, clock PINs — but pay is
+  // not theirs to set. The form doesn't render those fields for them; this is
+  // the half that matters, because a server action is reachable without it.
+  const mayEditPay = canEditPay(role);
   const phoneRaw = String(formData.get("phone") ?? "").trim();
   const phone = phoneRaw ? phoneRaw.replace(/[^\d+]/g, "") : null;
   await tenantDb(restaurantId, async (tx) => {
@@ -94,8 +99,12 @@ export async function updateEmployee(formData: FormData): Promise<void> {
       data: {
         fullName: String(formData.get("fullName") ?? "").trim() || undefined,
         title: (String(formData.get("title") ?? "").trim() || null) as string | null,
-        payRate: pesosToCentavos(Number(formData.get("payPesos") ?? 0)),
-        payType: (formData.get("payType") as "hourly" | "daily" | "monthly") ?? undefined,
+        ...(mayEditPay
+          ? {
+              payRate: pesosToCentavos(Number(formData.get("payPesos") ?? 0)),
+              payType: (formData.get("payType") as "hourly" | "daily" | "monthly") ?? undefined,
+            }
+          : {}),
         status: (formData.get("status") as "active" | "inactive") ?? undefined,
         clockPin: (String(formData.get("clockPin") ?? "").trim() || null) as string | null,
         contactJson: { ...contact, phone },
@@ -364,7 +373,7 @@ function toMinutes(hhmm: string): number | null {
  * payroll period `appliedOn` falls in, so it's taken once and never repeats.
  */
 export async function addPayrollDeduction(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireHrAction();
+  const { restaurantId } = await requireHrOwnerAction();
   const employeeId = String(formData.get("employeeId") ?? "").trim();
   const label = String(formData.get("label") ?? "").trim().slice(0, 80);
   const pesos = Number(formData.get("amountPesos"));
@@ -386,7 +395,7 @@ export async function addPayrollDeduction(formData: FormData): Promise<void> {
 }
 
 export async function deletePayrollDeduction(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireHrAction();
+  const { restaurantId } = await requireHrOwnerAction();
   const id = String(formData.get("id") ?? "");
   if (!id) return;
   await tenantDb(restaurantId, (tx) => tx.payrollDeduction.deleteMany({ where: { id } }));

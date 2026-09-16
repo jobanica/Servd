@@ -10,7 +10,8 @@ function cell(v: string | number) {
 
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
-  if (!user || user.kind !== "staff" || !["admin", "manager"].includes(user.role)) {
+  // Payroll is the owner's: a payslip export is every colleague's pay in one file.
+  if (!user || user.kind !== "staff" || user.role !== "admin") {
     return new Response("Unauthorized", { status: 401 });
   }
   if (!(await hasModule(user.restaurantId, "hris"))) {

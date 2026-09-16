@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireHrAction } from "@/server/hr/guard";
+import { requireHrOwnerAction } from "@/server/hr/guard";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { pesosToCentavos } from "@/lib/money";
 
@@ -11,7 +11,7 @@ export async function updatePayrollConfig(
   _prev: PayrollCfgState,
   formData: FormData,
 ): Promise<PayrollCfgState> {
-  const { restaurantId } = await requireHrAction();
+  const { restaurantId } = await requireHrOwnerAction();
   const amt = (k: string) => pesosToCentavos(Math.max(0, Number(formData.get(k)) || 0));
   const data = {
     sssAmount: amt("sss"),

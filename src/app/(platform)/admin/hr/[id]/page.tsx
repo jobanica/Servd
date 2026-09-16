@@ -14,13 +14,14 @@ import {
   deleteEmployee,
 } from "@/server/hr/actions";
 import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
+import { canAddEmployees, canEditPay, canSeePay, PAY_HIDDEN } from "@/lib/hr/permissions";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 
 export default async function EmployeePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { restaurantId, eligible } = await requireHrPage();
+  const { restaurantId, role, staffUserId, eligible } = await requireHrPage();
   if (!eligible) notFound();
   const [employee, leaveTypes] = await Promise.all([
     getEmployee(restaurantId, id),
@@ -44,12 +45,29 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="text-sm">Name<input name="fullName" defaultValue={employee.fullName} className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2" /></label>
           <label className="text-sm">Title<input name="title" defaultValue={employee.title ?? ""} className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2" /></label>
-          <label className="text-sm">Pay rate (₱)<input name="payPesos" type="number" step="0.01" defaultValue={(employee.payRate / 100).toFixed(2)} className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2" /></label>
-          <label className="text-sm">Pay type
-            <select name="payType" defaultValue={employee.payType} className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2">
-              <option value="hourly">Hourly</option><option value="daily">Daily</option><option value="monthly">Monthly</option>
-            </select>
-          </label>
+          {/* Seeing and changing are separate questions. A manager may read
+              their OWN rate, but nobody except the owner edits one — deciding
+              the input on visibility would let a manager give themselves a
+              raise. updateEmployee ignores these fields from a manager too. */}
+          {canEditPay(role) ? (
+            <>
+              <label className="text-sm">Pay rate (₱)<input name="payPesos" type="number" step="0.01" defaultValue={(employee.payRate / 100).toFixed(2)} className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2" /></label>
+              <label className="text-sm">Pay type
+                <select name="payType" defaultValue={employee.payType} className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2">
+                  <option value="hourly">Hourly</option><option value="daily">Daily</option><option value="monthly">Monthly</option>
+                </select>
+              </label>
+            </>
+          ) : (
+            <div className="text-sm">
+              <span className="block">Pay rate</span>
+              <p className="mt-1 rounded-lg border border-plum-ink/10 bg-cream/60 px-3 py-2 text-plum-ink/60">
+                {canSeePay(role, employee.staffUserId === staffUserId)
+                  ? `${formatPeso(employee.payRate)} / ${employee.payType}`
+                  : `${PAY_HIDDEN} Set by the owner`}
+              </p>
+            </div>
+          )}
           <label className="text-sm">Phone (login)<input name="phone" defaultValue={(employee.contactJson as { phone?: string } | null)?.phone ?? ""} className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2" /></label>
           <label className="text-sm">PIN (login + clock)<input name="clockPin" defaultValue={employee.clockPin ?? ""} className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2" /></label>
           <label className="text-sm">Status
@@ -143,6 +161,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
       </div>
 
       {/* Danger zone */}
+      {canAddEmployees(role) && (
       <div className="rounded-tile border border-guava/30 bg-guava/5 p-5">
         <h2 className="font-heading text-lg font-bold text-guava">Danger zone</h2>
         <p className="mt-1 text-sm text-plum-ink/60">
@@ -159,6 +178,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
           </ConfirmSubmitButton>
         </form>
       </div>
+      )}
     </div>
   );
 }

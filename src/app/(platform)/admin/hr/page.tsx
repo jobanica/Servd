@@ -6,9 +6,10 @@ import { listEmployees } from "@/server/hr/queries";
 import { qrSvg } from "@/lib/qr";
 import { formatPeso } from "@/lib/money";
 import { AddEmployeeForm } from "@/components/admin/hr/AddEmployeeForm";
+import { canAccessPayroll, canAddEmployees, canSeePay, PAY_HIDDEN } from "@/lib/hr/permissions";
 
 export default async function HrPage() {
-  const { restaurantId, eligible } = await requireHrPage();
+  const { restaurantId, role, staffUserId, eligible } = await requireHrPage();
   const locked = await featureLockOr(restaurantId, "hr", "HR");
   if (locked) return locked;
   const employees = await listEmployees(restaurantId);
@@ -32,7 +33,9 @@ export default async function HrPage() {
             ["Schedule", "/admin/hr/schedule"],
             ["Timesheets", "/admin/hr/timesheets"],
             ["Leave", "/admin/hr/leave"],
-            ["Payroll", "/admin/hr/payroll"],
+            // Payroll is the owner's. Showing a manager a tab that bounces
+            // them is worse than not showing it.
+            ...(canAccessPayroll(role) ? [["Payroll", "/admin/hr/payroll"]] : []),
           ].map(([l, h]) => (
             <Link key={h} href={h} className="rounded-full border border-plum-ink/15 px-3 py-1 font-semibold">
               {l}
@@ -55,7 +58,8 @@ export default async function HrPage() {
         </div>
       </div>
 
-      <AddEmployeeForm />
+      {/* Hiring is the owner's decision; the action refuses a manager too. */}
+      {canAddEmployees(role) && <AddEmployeeForm />}
 
       <ul className="space-y-2">
         {employees.map((e) => (
@@ -68,8 +72,13 @@ export default async function HrPage() {
                   {e.title ?? "—"} · {e.employmentType.replace("_", "-")}
                 </span>
               </div>
+              {/* A manager runs the roster without knowing what colleagues
+                  earn. Their own rate stays visible — everyone is entitled to
+                  know what they make. */}
               <span className="text-sm text-plum-ink/60">
-                {formatPeso(e.payRate)}/{e.payType === "hourly" ? "hr" : "mo"}
+                {canSeePay(role, e.staffUserId === staffUserId)
+                  ? `${formatPeso(e.payRate)}/${e.payType === "hourly" ? "hr" : "mo"}`
+                  : PAY_HIDDEN}
               </span>
             </Link>
           </li>

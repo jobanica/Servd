@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { requireHrPage } from "@/server/hr/guard";
+import { requireHrOwnerPage } from "@/server/hr/guard";
 import { getPayrollConfig } from "@/server/hr/payroll-config";
 import { PayrollSettingsForm } from "@/components/admin/hr/PayrollSettingsForm";
 
 export default async function PayrollSettingsPage() {
-  const { restaurantId, eligible } = await requireHrPage();
+  const { restaurantId, eligible } = await requireHrOwnerPage();
   if (!eligible) return <p className="text-sm text-plum-ink/60">HRIS not enabled.</p>;
   const cfg = await getPayrollConfig(restaurantId);
 

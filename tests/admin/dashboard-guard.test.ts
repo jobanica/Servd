@@ -20,7 +20,12 @@ function walk(dir: string): string[] {
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) out.push(...walk(full));
-    else if (/\.(ts|tsx)$/.test(entry)) out.push(full);
+    // Pages and layouts only. A route handler cannot use requireAdminPage —
+    // that redirects, which is meaningless for a file download — so they
+    // legitimately do their own check, and payroll's export is owner-only on
+    // purpose. The bug this guards against was a PAGE stepping around the
+    // shared rules.
+    else if (/^(page|layout)\.tsx?$/.test(entry)) out.push(full);
   }
   return out;
 }
@@ -28,7 +33,7 @@ function walk(dir: string): string[] {
 describe("the dashboard gates managers in one place", () => {
   const files = walk(ADMIN_APP);
 
-  it("finds the admin app to check", () => {
+  it("finds the admin pages to check", () => {
     expect(files.length).toBeGreaterThan(20);
   });
 

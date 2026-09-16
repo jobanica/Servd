@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/server/tenancy/current-user";
 import { hasModule } from "@/server/billing/entitlements";
+import type { HrRole } from "@/lib/hr/permissions";
 
 /**
  * HRIS access: owner (admin) or manager, and the plan must include `hris`.
@@ -13,7 +14,28 @@ export async function requireHrPage() {
     redirect("/login");
   }
   const eligible = await hasModule(user.restaurantId, "hris");
-  return { restaurantId: user.restaurantId, role: user.role, eligible };
+  // staffUserId comes back so a screen can tell "this is your own record" from
+  // "this is a colleague's" — the line pay visibility is drawn on.
+  return {
+    restaurantId: user.restaurantId,
+    role: user.role as HrRole,
+    staffUserId: user.staffUserId,
+    eligible,
+  };
+}
+
+/** Pages only the owner may open: payroll, and anything that sets pay. */
+export async function requireHrOwnerPage() {
+  const hr = await requireHrPage();
+  if (hr.role !== "admin") redirect("/admin/hr");
+  return hr;
+}
+
+/** Actions only the owner may run: hiring, payroll, contribution settings. */
+export async function requireHrOwnerAction() {
+  const user = await requireHrAction();
+  if (user.role !== "admin") throw new Error("FORBIDDEN");
+  return user;
 }
 
 export async function requireHrAction() {
@@ -24,5 +46,7 @@ export async function requireHrAction() {
   if (!(await hasModule(user.restaurantId, "hris"))) {
     throw new Error("Your plan doesn't include HRIS. Upgrade to enable it.");
   }
-  return user;
+  // Narrowed: the check above already rejects every other role, and callers
+  // need to branch on it without re-proving that.
+  return { ...user, role: user.role as HrRole };
 }

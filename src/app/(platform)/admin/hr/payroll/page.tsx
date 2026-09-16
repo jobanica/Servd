@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireHrPage } from "@/server/hr/guard";
+import { requireHrOwnerPage } from "@/server/hr/guard";
 import { getPayroll } from "@/server/hr/payroll";
 import { listEmployees } from "@/server/hr/queries";
 import { tenantDb } from "@/server/tenancy/scoped-db";
@@ -33,7 +33,7 @@ export default async function PayrollPage({
 }: {
   searchParams: Promise<{ period?: string; from?: string; to?: string }>;
 }) {
-  const { restaurantId, eligible } = await requireHrPage();
+  const { restaurantId, eligible } = await requireHrOwnerPage();
   if (!eligible) return <p className="text-sm text-plum-ink/60">HRIS not enabled.</p>;
 
   const sp = await searchParams;

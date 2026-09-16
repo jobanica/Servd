@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireHrPage } from "@/server/hr/guard";
+import { requireHrOwnerPage } from "@/server/hr/guard";
 import { getPayslip } from "@/server/hr/payroll";
 import { formatPeso } from "@/lib/money";
 import { manilaDate } from "@/lib/time/manila";
@@ -25,7 +25,7 @@ export default async function PayslipPage({
   params: Promise<{ employeeId: string }>;
   searchParams: Promise<{ period?: string; from?: string; to?: string }>;
 }) {
-  const { restaurantId, eligible } = await requireHrPage();
+  const { restaurantId, eligible } = await requireHrOwnerPage();
   if (!eligible) return <p className="text-sm text-plum-ink/60">HRIS not enabled.</p>;
 
   const { employeeId } = await params;
