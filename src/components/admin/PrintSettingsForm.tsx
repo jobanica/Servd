@@ -90,6 +90,45 @@ export function PrintSettingsForm({
         <p className="mt-2 text-sm text-plum-ink/60">{METHOD_HELP[method]}</p>
       </div>
 
+      {/* Handheld Android POS units with the printer built into the case.
+          Their printer is driven through Android, not the browser, so no option
+          here talks to it directly — which of the three transports reaches it
+          depends on the model. Ordered by what to try first. */}
+      <details className="rounded-lg border border-plum-ink/10 bg-cream/40 p-3">
+        <summary className="cursor-pointer text-sm font-semibold">
+          Using a handheld with a built-in printer?
+        </summary>
+        <p className="mt-2 text-sm text-plum-ink/60">
+          The printer inside those units is wired to Android, not to the browser,
+          so nothing here talks to it directly. Which route reaches it depends on
+          the model — try them in this order:
+        </p>
+        <ol className="mt-2 space-y-2 text-sm text-plum-ink/70">
+          <li>
+            <strong>OS print dialog</strong> — start here. Most of these units
+            ship an Android print service for their own printer, and this route
+            goes through it. The ticket prints as a page rather than printer
+            codes, so the spacing is looser than a normal receipt.
+          </li>
+          <li>
+            <strong>Cloud poll</strong> — always works, but needs a small app on
+            the handheld that fetches jobs from the URL shown when you pick it,
+            and hands them to the printer. Use this if the print dialog doesn&apos;t
+            list the built-in printer.
+          </li>
+          <li>
+            <strong>Bluetooth</strong> — only for a <em>separate</em> Bluetooth
+            printer. Browsers can reach Bluetooth Low Energy devices only, and a
+            built-in printer is wired inside the unit rather than paired, so it
+            won&apos;t appear here.
+          </li>
+        </ol>
+        <p className="mt-2 text-xs text-plum-ink/45">
+          Not sure? Choose OS print dialog, run a test print, and see whether the
+          unit&apos;s own printer is offered.
+        </p>
+      </details>
+
       {/* Kitchen routing: on-screen display vs printed tickets */}
       <div className="rounded-lg border border-plum-ink/10 bg-cream/40 p-3">
         <label className="flex items-start gap-2 text-sm">
