@@ -36,9 +36,45 @@ self.addEventListener("activate", (event) => {
       const keys = await caches.keys();
       await Promise.all(keys.filter((k) => !k.startsWith(VERSION)).map((k) => caches.delete(k)));
       await self.clients.claim();
+      await warmOpenPages();
     })(),
   );
 });
+
+/**
+ * Cache the screens that are already open the moment we take control.
+ *
+ * A worker is registered BY the page it protects, so that first load was
+ * fetched before this worker existed and never went through the fetch handler
+ * — the till a cashier opened at the start of their shift was not in the cache
+ * at all. The connection would then drop and there was nothing to fall back
+ * to, which looked like "Back to the till does nothing".
+ *
+ * Keyed by pathname, because a later plain /cashier navigation must match what
+ * was stored even if the open tab carried a query string.
+ */
+async function warmOpenPages() {
+  try {
+    const cache = await caches.open(PAGES);
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    const paths = new Set();
+    for (const c of windows) {
+      try {
+        const u = new URL(c.url);
+        if (u.origin === self.location.origin) paths.add(u.pathname);
+      } catch {
+        /* skip anything unparseable */
+      }
+    }
+    await Promise.all(
+      [...paths].map((path) =>
+        cache.add(new Request(path, { cache: "reload" })).catch(() => {}),
+      ),
+    );
+  } catch {
+    /* warming is an optimisation; never fail activation over it */
+  }
+}
 
 self.addEventListener("message", (event) => {
   if (event.data === "skipWaiting") self.skipWaiting();

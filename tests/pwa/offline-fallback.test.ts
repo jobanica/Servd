@@ -54,6 +54,21 @@ describe("the service worker", () => {
     expect(SW).toMatch(/const cached = await caches\.match\(req\)/);
   });
 
+  it("caches the screens already open when it takes control", () => {
+    // A worker is registered BY the page it protects, so that first load never
+    // went through the fetch handler. Without this the till a cashier opened at
+    // the start of their shift was not cached at all, and "Back to the till"
+    // during a dropout returned the offline page again — which is exactly what
+    // was reported.
+    expect(SW).toMatch(/warmOpenPages/);
+    expect(SW).toMatch(/clients\.matchAll\(/);
+    expect(SW).toMatch(/activate/);
+  });
+
+  it("warms by pathname, so a plain navigation matches a tab with a query", () => {
+    expect(SW).toMatch(/u\.pathname/);
+  });
+
   it("leaves writes alone so the outbox owns them", () => {
     expect(SW).toMatch(/req\.method !== "GET"/);
   });
