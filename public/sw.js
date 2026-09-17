@@ -2,16 +2,33 @@
  *
  * Conservative on purpose:
  *  - Navigations (GET documents): NETWORK-FIRST, fall back to a cached copy so a
- *    previously-opened /cashier or /kitchen still loads during a dropout.
+ *    previously-opened /cashier or /kitchen still loads during a dropout. A page
+ *    that was never cached gets /offline.html — never a different cached page,
+ *    which made a sign-in attempt look like it had worked.
  *  - Static assets (/_next/static, images): stale-while-revalidate.
  *  - Everything else (POST / server actions / API): passthrough, never cached —
  *    the app's own offline queue handles writes.
  */
-const VERSION = "servd-v4";
+const VERSION = "servd-v5";
 const PAGES = `${VERSION}-pages`;
 const ASSETS = `${VERSION}-assets`;
+const OFFLINE_PAGE = "/offline.html";
 
-self.addEventListener("install", () => self.skipWaiting());
+// Precached at install, because it is the one page that has to be there when
+// the network isn't. Everything else gets cached by being visited.
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    (async () => {
+      try {
+        const cache = await caches.open(PAGES);
+        await cache.add(new Request(OFFLINE_PAGE, { cache: "reload" }));
+      } catch {
+        /* an install must not fail over this; the fetch handler copes without it */
+      }
+      await self.skipWaiting();
+    })(),
+  );
+});
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
@@ -86,8 +103,15 @@ self.addEventListener("fetch", (event) => {
           cache.put(req, fresh.clone());
           return fresh;
         } catch {
+          // The page itself if it was opened while online — that is what
+          // offline mode is for.
           const cached = await caches.match(req);
-          return cached || (await caches.match("/cashier")) || Response.error();
+          if (cached) return cached;
+          // Otherwise say so. This used to serve the cached till for ANY
+          // uncached page, so asking to sign in handed back a screen that
+          // looked live, wasn't, and would never save anything.
+          const offline = await caches.match(OFFLINE_PAGE);
+          return offline || Response.error();
         }
       })(),
     );
