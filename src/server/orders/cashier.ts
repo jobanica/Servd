@@ -1724,6 +1724,12 @@ export async function createCashierOrder(input: {
    * flow. Omitted, the order is created unpaid exactly as it always was.
    */
   payNow?: { method: CounterMethod; tenderedCentavos?: number };
+  /**
+   * Idempotency key for an order rung up offline and replayed on reconnect.
+   * The till picks it before its first attempt, so if the reply is lost the
+   * retry lands on the same order instead of ringing the sale up twice.
+   */
+  clientRef?: string;
 }): Promise<{
   ok: boolean;
   tables?: CashierTable[];
@@ -1756,6 +1762,24 @@ export async function createCashierOrder(input: {
   }
   if (!input.lines?.length) return { ok: false, error: "Add at least one item." };
 
+  // A replay of something already recorded. Checked before any work so a
+  // duplicate costs a lookup rather than a second sale, and answered as success
+  // because from the till's point of view the order did go through.
+  let clientRef = input.clientRef?.trim() || null;
+  if (clientRef) {
+    try {
+      const existing = await tenantDb(staff.restaurantId, (tx) =>
+        tx.order.findFirst({ where: { clientRef }, select: { id: true } }),
+      );
+      if (existing) return { ok: true, tables: await getCashierTables() };
+    } catch {
+      // The column isn't here. Drop the key rather than writing it into the
+      // INSERT below, which would fail the sale outright — losing a real order
+      // to protect against a duplicate is the wrong way round.
+      clientRef = null;
+    }
+  }
+
   let built;
   try {
     built = await buildValidatedOrder(staff.restaurantId, input.lines, { channel: "pos" });
@@ -1781,6 +1805,7 @@ export async function createCashierOrder(input: {
         status: "new" as const,
         paymentStatus: "unpaid" as const,
         total: built.total,
+        ...(clientRef ? { clientRef } : {}),
         items: { create: orderItemsCreate(built.items) },
       };
 

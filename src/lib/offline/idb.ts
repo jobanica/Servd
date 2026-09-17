@@ -7,13 +7,33 @@
 const DB_NAME = "servd-offline";
 const DB_VERSION = 1;
 
-export interface OutboxOp {
+/** Kitchen: move an existing order along. */
+export interface AdvanceOp {
   opId: string;
-  type: "advance"; // Phase 0: kitchen status advance only
+  type: "advance";
   orderId: string;
   toStatus: "preparing" | "done";
   createdAt: number;
 }
+
+/**
+ * Till: an order rung up while offline.
+ *
+ * `opId` doubles as the idempotency key sent to the server, so a replay after a
+ * lost reply settles onto the same order rather than ringing the sale up twice.
+ * `input` is whatever createCashierOrder takes — kept opaque here so the queue
+ * doesn't have to be edited every time that call gains a field.
+ */
+export interface CreateOrderOp {
+  opId: string;
+  type: "create-order";
+  input: unknown;
+  /** For showing the cashier what is waiting, without replaying it. */
+  summary: { label: string; total: number; lines: number };
+  createdAt: number;
+}
+
+export type OutboxOp = AdvanceOp | CreateOrderOp;
 
 function hasIDB(): boolean {
   return typeof window !== "undefined" && typeof indexedDB !== "undefined";

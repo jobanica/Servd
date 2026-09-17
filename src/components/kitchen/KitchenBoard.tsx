@@ -242,7 +242,9 @@ export function KitchenBoard({
     if (!offlineEnabled || syncing.current) return;
     syncing.current = true;
     try {
-      const ops = await outboxAll();
+      // Only this board's own work. The till shares the queue now, and its
+      // orders must neither be replayed here nor block this loop.
+      const ops = (await outboxAll()).filter((op) => op.type === "advance");
       for (const op of ops) {
         try {
           await advanceOrderStatus(op.orderId, op.toStatus);
@@ -251,7 +253,7 @@ export function KitchenBoard({
           break; // still offline / transient — try again next tick
         }
       }
-      setPending((await outboxAll()).length);
+      setPending((await outboxAll()).filter((o) => o.type === "advance").length);
     } finally {
       syncing.current = false;
     }
@@ -312,7 +314,7 @@ export function KitchenBoard({
   useEffect(() => {
     if (!offlineEnabled) return;
     (async () => {
-      setPending((await outboxAll()).length);
+      setPending((await outboxAll()).filter((o) => o.type === "advance").length);
       if (!navigator.onLine) {
         const cached = await kvGet<KitchenOrder[]>(CACHE_KEY);
         if (cached) setOrders(cached);
@@ -361,7 +363,7 @@ export function KitchenBoard({
     };
     await outboxAdd(op);
     applyLocal(id, to);
-    setPending((await outboxAll()).length);
+    setPending((await outboxAll()).filter((o) => o.type === "advance").length);
   }
 
   async function handleAdvance(id: string, to: "preparing" | "done") {

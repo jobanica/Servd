@@ -14,6 +14,7 @@ import {
   markServed,
   closeOrder,
   settleThirdParty,
+  createCashierOrder,
   type CashierTable,
   type IncomingOrder,
 } from "@/server/orders/cashier";
@@ -38,6 +39,7 @@ import { GiftCardModal } from "./GiftCardModal";
 import { SplitPaymentModal } from "./SplitPaymentModal";
 import { removeGiftCard } from "@/server/gift-cards/gift-cards";
 import { useOnline } from "@/lib/offline/useOnline";
+import { outboxAll, outboxRemove, type CreateOrderOp } from "@/lib/offline/idb";
 import { ConnectivityPill } from "@/components/offline/ConnectivityPill";
 import { CashOutModal } from "./CashOutModal";
 import { PaymentBadge } from "./PaymentBadge";
@@ -118,6 +120,65 @@ export function CashierBoard({
   const [incoming, setIncoming] = useState<IncomingOrder[]>(initialIncoming);
   const [live, setLive] = useState(false);
   const online = useOnline();
+  // Orders rung up during a dropout, still sitting on this device.
+  const [pendingOrders, setPendingOrders] = useState(0);
+  const draining = useRef(false);
+
+  /**
+   * Send the orders rung up during a dropout.
+   *
+   * One at a time and stopping at the first failure, so a queue replayed on a
+   * connection that is still flapping doesn't half-send and scramble the order
+   * the tickets were taken in. Each carries the clientRef it was queued with,
+   * so a reply lost mid-flight settles onto the same order on the retry rather
+   * than ringing the sale up twice.
+   */
+  const drainOrders = useCallback(async () => {
+    if (!offlineEnabled || draining.current) return;
+    draining.current = true;
+    try {
+      const queued = (await outboxAll()).filter(
+        (o): o is CreateOrderOp => o.type === "create-order",
+      );
+      let sent = 0;
+      for (const op of queued) {
+        try {
+          const res = await createCashierOrder(
+            op.input as Parameters<typeof createCashierOrder>[0],
+          );
+          // A rejected order — a deleted item, say — would otherwise be retried
+          // forever and block everything queued behind it. Drop it and say so.
+          if (!res.ok) {
+            await outboxRemove(op.opId);
+            showToast(`A parked order couldn't be sent: ${res.error ?? "rejected"}`);
+            continue;
+          }
+          await outboxRemove(op.opId);
+          sent += 1;
+          if (res.tables) setTables(res.tables);
+        } catch {
+          break; // still down — leave the rest for the next attempt
+        }
+      }
+      const left = (await outboxAll()).filter((o) => o.type === "create-order").length;
+      setPendingOrders(left);
+      if (sent > 0) showToast(`${sent} parked order${sent === 1 ? "" : "s"} sent.`);
+    } finally {
+      draining.current = false;
+    }
+  }, [offlineEnabled, showToast]);
+
+  // Count what's waiting on load, and flush the moment the line comes back.
+  useEffect(() => {
+    if (!offlineEnabled) return;
+    outboxAll()
+      .then((ops) => setPendingOrders(ops.filter((o) => o.type === "create-order").length))
+      .catch(() => {});
+  }, [offlineEnabled]);
+
+  useEffect(() => {
+    if (offlineEnabled && online) void drainOrders();
+  }, [offlineEnabled, online, drainOrders]);
   const [busy, setBusy] = useState<string | null>(null);
   const [newOrderOpen, setNewOrderOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -510,7 +571,7 @@ export function CashierBoard({
           <span className={`inline-block h-2 w-2 rounded-full ${live ? "bg-mango" : "bg-muted"}`} />
           {live ? "Live" : "Polling (offline)"}
         </span>
-        {offlineEnabled && <ConnectivityPill online={online} pending={0} />}
+        {offlineEnabled && <ConnectivityPill online={online} pending={pendingOrders} />}
       </div>
 
       <button onClick={() => setNewOrderOpen(true)} className="w-full rounded-full px-4 py-2.5 text-sm font-semibold btn-brand">
@@ -609,7 +670,7 @@ export function CashierBoard({
           </svg>
         </button>
         {offlineEnabled ? (
-          <ConnectivityPill online={online} pending={0} />
+          <ConnectivityPill online={online} pending={pendingOrders} />
         ) : (
           <span className="flex items-center gap-1.5 text-xs text-plum-ink/50">
             <span className={`inline-block h-2 w-2 rounded-full ${live ? "bg-mango" : "bg-muted"}`} />
@@ -1240,6 +1301,13 @@ export function CashierBoard({
           onPrintIssue={(m) => showToast(m)}
           payFirst={payFirst}
           cardSurchargeBp={cardSurchargeBp}
+          offlineEnabled={offlineEnabled}
+          onQueued={(n, label) => {
+            setPendingOrders(n);
+            showToast(
+              `${label} saved on this device — it'll send when you're back online. ${n} waiting.`,
+            );
+          }}
         />
       )}
 

@@ -1820,6 +1820,10 @@ model Order {
   /// Nullable with no default — it ships as a hand-run migration, and a
   /// defaulted column is one Prisma writes into the INSERT of every order.
   addedItemsAt        DateTime?
+  /// Idempotency key for an order rung up offline and replayed on reconnect.
+  /// The till picks it before the first attempt, so a retry after a lost reply
+  /// settles onto the same order instead of ringing up the sale twice.
+  clientRef           String?   @unique
   voidedAt            DateTime? // set when a cashier voids the (unpaid) order
   prepMinutes         Int? // prep-time estimate (minutes) a merchant sets on accept
   /// When the order was accepted, which is where prepMinutes counts down FROM.

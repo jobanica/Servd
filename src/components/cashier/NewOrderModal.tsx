@@ -32,6 +32,11 @@ import {
   type OrderTypeKey,
 } from "@/lib/orders/order-type";
 import { PosItemTile } from "./PosItemTile";
+import { kvGet, kvSet, outboxAdd, outboxAll, type CreateOrderOp } from "@/lib/offline/idb";
+import { useOnline } from "@/lib/offline/useOnline";
+
+export const MENU_CACHE_KEY = "pos-menu";
+export const TABLES_CACHE_KEY = "pos-tables";
 import { useStockMode } from "./useStockMode";
 import { StockModeButton, StockModeBanner } from "./StockModeBar";
 
@@ -238,6 +243,8 @@ export function NewOrderModal({
   onPrintIssue,
   payFirst = false,
   cardSurchargeBp = 0,
+  offlineEnabled = false,
+  onQueued,
 }: {
   onClose: () => void;
   onCreated: (tables: CashierTable[]) => void;
@@ -248,6 +255,10 @@ export function NewOrderModal({
   /** The shop takes payment before the food is made (Printer settings). */
   payFirst?: boolean;
   cardSurchargeBp?: number;
+  /** The shop bought offline mode: cache the menu and queue orders on a drop. */
+  offlineEnabled?: boolean;
+  /** An order was parked on this device: what it was, and how many now wait. */
+  onQueued?: (pending: number, label: string) => void;
 }) {
   const [menu, setMenu] = useState<DinerCategory[] | null>(null);
   const [tables, setTables] = useState<{ id: string; tableNumber: string }[]>([]);
@@ -269,6 +280,9 @@ export function NewOrderModal({
   // part of ringing the order up rather than settling it later off the board.
   const [payOpen, setPayOpen] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  /** Working from the cached menu because the network is down. */
+  const [fromCache, setFromCache] = useState(false);
+  const online = useOnline();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   // "86 it" — the cashier taking a dish off the menu when it runs out and the
@@ -282,11 +296,30 @@ export function NewOrderModal({
         setMenu(m);
         setTables(t);
         if (t.length === 1) setTableId(t[0].id);
+        // Keep the last good copy, because these are server calls: without it
+        // the till can't even open a new order during a dropout, never mind
+        // finish one.
+        if (offlineEnabled) {
+          void kvSet(MENU_CACHE_KEY, m);
+          void kvSet(TABLES_CACHE_KEY, t);
+        }
       } catch {
-        setLoadError("Couldn't load the menu. Please try again.");
+        const [m, t] = offlineEnabled
+          ? await Promise.all([
+              kvGet<DinerCategory[]>(MENU_CACHE_KEY),
+              kvGet<{ id: string; tableNumber: string }[]>(TABLES_CACHE_KEY),
+            ])
+          : [null, null];
+        if (m) {
+          setMenu(m);
+          setTables(t ?? []);
+          setFromCache(true);
+        } else {
+          setLoadError("Couldn't load the menu. Please try again.");
+        }
       }
     })();
-  }, []);
+  }, [offlineEnabled]);
 
   // Debounced saved-customer search.
   useEffect(() => {
@@ -358,6 +391,62 @@ export function NewOrderModal({
   async function submit(payNow?: { method: CounterMethod; tenderedCentavos?: number }) {
     setSubmitError(null);
     setSubmitting(true);
+
+    const input = {
+      orderType,
+      tableId: orderType === "dine_in" ? tableId || undefined : undefined,
+      customerName: orderType === "dine_in" ? undefined : customerName,
+      customerPhone: orderType === "dine_in" ? undefined : customerPhone,
+      customerAddress: needsAddress(orderType) ? customerAddress : undefined,
+      payNow,
+      lines: lines.map((l) => ({
+        itemId: l.itemId,
+        quantity: l.quantity,
+        note: l.note,
+        modifierIds: l.modifiers.map((m) => m.modifierId),
+        variantId: l.variantId,
+      })),
+    };
+
+    // No connection: keep the order rather than lose it. It goes in the queue
+    // with the key the server will use to recognise a replay, so a retry after
+    // a lost reply settles onto the same order instead of ringing it twice.
+    if (offlineEnabled && !online) {
+      const opId =
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const op: CreateOrderOp = {
+        opId,
+        type: "create-order",
+        input: { ...input, clientRef: opId },
+        summary: {
+          label:
+            orderType === "dine_in"
+              ? `Table ${tables.find((t) => t.id === tableId)?.tableNumber ?? "—"}`
+              : customerName || "Walk-in",
+          total,
+          lines: lines.length,
+        },
+        createdAt: Date.now(),
+      };
+      try {
+        await outboxAdd(op);
+      } catch {
+        setSubmitting(false);
+        setSubmitError("Couldn't save the order on this device. Write it down and re-punch it.");
+        return;
+      }
+      setSubmitting(false);
+      setPayOpen(false);
+      onQueued?.(
+        (await outboxAll()).filter((o) => o.type === "create-order").length,
+        op.summary.label,
+      );
+      onClose();
+      return;
+    }
+
     const res = await createCashierOrder({
       orderType,
       // Blank means no table — the server gives the ticket a number instead.
@@ -436,6 +525,16 @@ export function NewOrderModal({
             ×
           </button>
         </div>
+
+        {/* Working from the last menu this device saw. Worth saying plainly:
+            a dish added in the office this morning won't be on it, and the
+            order is parked here rather than sent. */}
+        {fromCache && (
+          <p className="border-b border-mango/30 bg-mango/10 px-4 py-2 text-xs font-semibold text-plum-ink/75">
+            Offline — using the last saved menu. The order will be kept on this
+            device and sent when you&apos;re back online.
+          </p>
+        )}
 
         {loadError ? (
           <p className="p-6 text-sm text-guava">{loadError}</p>
