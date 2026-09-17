@@ -1855,6 +1855,14 @@ export async function createCashierOrder(input: {
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Could not create the order.";
+    // Two replays of the same parked order arriving together — a second tab, or
+    // a retry overlapping the first attempt. The unique index on clientRef stops
+    // the second, and that means the order already exists: success, not failure.
+    // Reporting it as an error would make the till drop a sale it actually made
+    // and tell the cashier it was rejected.
+    if (clientRef && /unique|duplicate|clientRef/i.test(msg)) {
+      return { ok: true, tables: await getCashierTables() };
+    }
     if (/orderType|customer|column/i.test(msg)) {
       return {
         ok: false,
