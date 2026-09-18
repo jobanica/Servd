@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   buildTicket,
   ticketBodyLines,
@@ -152,6 +154,22 @@ describe("cash received and change", () => {
     });
     const change = ticketBodyLines(noAmount).find((l) => l.startsWith("Change"));
     expect(change).toContain("500.00");
+  });
+
+  it("is fetched by every builder, not just one of them", () => {
+    // There are two ticket loaders. print.ts built its own Ticket and simply
+    // never read cashTendered, so a real ₱1,000 tender recorded on the order
+    // printed no change line — the same way it had already silently dropped the
+    // order number. A field the receipt can show has to be read by both.
+    const printTs = readFileSync(join(process.cwd(), "src/server/printing/print.ts"), "utf8");
+    expect(printTs).toMatch(/cashTendered/);
+    expect(printTs).toMatch(/showCashTendered/);
+
+    const queryTs = readFileSync(
+      join(process.cwd(), "src/server/printing/ticket-query.ts"),
+      "utf8",
+    );
+    expect(queryTs).toMatch(/cashTendered/);
   });
 
   // A bill isn't a receipt: nothing has been handed over yet.

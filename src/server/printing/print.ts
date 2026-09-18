@@ -55,6 +55,8 @@ type PrinterConfig = {
     website?: string | null;
     footer?: string | null;
     showVat?: boolean;
+    /** Print the cash received and the change. Absent means on. */
+    showCashTendered?: boolean;
   };
 };
 
@@ -170,7 +172,24 @@ async function loadTicket(restaurantId: string, orderId: string) {
       }
     }
 
-    return { restaurant, order, meta, payment, settings, ticketNumber };
+    // What the customer handed over, for the change line. Its own query, and
+    // the second field this builder has silently omitted — the order number was
+    // the first. Anything the receipt gained after this file was written has to
+    // be fetched deliberately or it just never prints.
+    let cashTendered: number | null = null;
+    if (order) {
+      try {
+        const c = await tx.order.findFirst({
+          where: { id: orderId },
+          select: { cashTendered: true },
+        });
+        cashTendered = c?.cashTendered ?? null;
+      } catch {
+        /* cashTendered not migrated yet */
+      }
+    }
+
+    return { restaurant, order, meta, payment, settings, ticketNumber, cashTendered };
   });
 }
 
@@ -180,7 +199,10 @@ async function ticketFor(
   orderId: string,
   kind: TicketKind = "receipt",
 ): Promise<Ticket | null> {
-  const { restaurant, order, meta, payment, ticketNumber } = await loadTicket(restaurantId, orderId);
+  const { restaurant, order, meta, payment, ticketNumber, cashTendered } = await loadTicket(
+    restaurantId,
+    orderId,
+  );
   if (!order) return null;
   const config = (restaurant.printerConfig as PrinterConfig | null) ?? {};
   const r = config.receipt ?? {};
@@ -204,6 +226,10 @@ async function ticketFor(
     discountLabel: meta.discountLabel,
     paymentMethod: payment?.method ?? null,
     paymentAmount: payment?.amount ?? null,
+    cashTendered,
+    // Defaults to on, exactly as buildTicket treats it — reading the saved
+    // setting here keeps a shop that switched it off switched off.
+    showCashTendered: r.showCashTendered !== false,
     qrUrl: restaurantSiteUrl(restaurant.slug),
     items: order.items.map((i) => {
       const unit = i.unitPrice + i.modifiers.reduce((s, m) => s + m.priceDeltaAtTime, 0);
