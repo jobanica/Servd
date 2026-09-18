@@ -666,6 +666,7 @@ model Restaurant {
 
   @@index([demoPartnerId])
   @@map("restaurants")
+  cashAdvances CashAdvance[]
 }
 
 /// Web Push subscriptions for merchant devices — lets a new online order alert
@@ -1618,6 +1619,7 @@ model Employee {
 
   @@index([restaurantId])
   @@map("employees")
+  cashAdvances CashAdvance[]
 }
 
 /// A one-off payroll deduction entered by hand (cash advance, loan, uniform,
@@ -1630,14 +1632,48 @@ model PayrollDeduction {
   label        String
   amount       Int // centavos
   appliedOn    DateTime // date this belongs to (matched against the payroll period)
+  /// The advance this repaid, when it was one. Null for an ordinary deduction
+  /// (uniform, breakage) and for every deduction made before advances existed.
+  advanceId    String?
   createdAt    DateTime @default(now())
 
-  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  employee   Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  restaurant Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  employee   Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  advance    CashAdvance? @relation(fields: [advanceId], references: [id], onDelete: SetNull)
 
   @@index([restaurantId, appliedOn])
   @@index([employeeId])
+  @@index([advanceId])
   @@map("payroll_deductions")
+}
+
+/// A cash advance the staff member repays a little each cutoff.
+///
+/// The loan itself. Each repayment stays an ordinary PayrollDeduction, so
+/// payroll needs no special case — it just points back here, which is what
+/// makes an outstanding balance knowable instead of something the owner has to
+/// remember.
+model CashAdvance {
+  id           String    @id @default(uuid())
+  restaurantId String
+  employeeId   String
+  /// Centavos handed over.
+  principal    Int
+  /// Centavos to take each cutoff. The last one is capped at what is left.
+  perPeriod    Int
+  /// active | paused | settled | cancelled
+  status       String    @default("active")
+  note         String?
+  createdAt    DateTime  @default(now())
+  settledAt    DateTime?
+
+  restaurant Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  employee   Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  repayments PayrollDeduction[]
+
+  @@index([employeeId])
+  @@index([restaurantId, status])
+  @@map("cash_advances")
 }
 
 model EmployeeDocument {

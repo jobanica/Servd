@@ -15,6 +15,9 @@ import {
 } from "@/server/hr/actions";
 import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
 import { canAddEmployees, canEditPay, canSeePay, PAY_HIDDEN } from "@/lib/hr/permissions";
+import { canAccessPayroll } from "@/lib/hr/permissions";
+import { CashAdvancePanel } from "@/components/admin/hr/CashAdvancePanel";
+import { listAdvances } from "@/server/hr/cash-advance";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
@@ -22,6 +25,9 @@ const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${St
 export default async function EmployeePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { restaurantId, role, staffUserId, eligible } = await requireHrPage();
+  // Money owed by a named person — same door as payroll, so a manager never
+  // learns what a colleague borrowed.
+  const advances = canAccessPayroll(role) ? await listAdvances(restaurantId, id) : [];
   if (!eligible) notFound();
   const [employee, leaveTypes] = await Promise.all([
     getEmployee(restaurantId, id),
@@ -161,6 +167,8 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
       </div>
 
       {/* Danger zone */}
+      {canAccessPayroll(role) && <CashAdvancePanel employeeId={employee.id} advances={advances} />}
+
       {canAddEmployees(role) && (
       <div className="rounded-tile border border-guava/30 bg-guava/5 p-5">
         <h2 className="font-heading text-lg font-bold text-guava">Danger zone</h2>
