@@ -9,6 +9,7 @@ import { getUnavailableModifierIds } from "@/server/menu/modifier-availability";
 import { getModifierGroupOrder } from "@/server/menu/modifier-order";
 import { sortModifierGroups } from "@/lib/menu/modifier-order";
 import { getPosOnlyItemIds } from "@/server/menu/pos-only";
+import { getNoPackagingItemIds } from "@/server/menu/packaging";
 import { variantPrice } from "@/lib/menu/variant-price";
 
 /**
@@ -38,16 +39,27 @@ export async function getPublicMenu(
         translations: { where: { locale } },
         menuItems: {
           orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-          include: {
-            translations: { where: { locale } },
+          // Explicit columns throughout, on the item itself as well as on its
+          // modifiers: `posOnly`, `noPackaging`, `isAvailable` on a modifier
+          // and `sortOrder` on a group each arrive in a manual migration, and
+          // Prisma asks for every column it knows about unless told otherwise
+          // — which would break the whole menu on a database that hasn't run
+          // them. Each is layered on below from a best-effort query instead.
+          select: {
+            id: true,
+            categoryId: true,
+            name: true,
+            description: true,
+            price: true,
+            imageUrl: true,
+            videoUrl: true,
+            videoPosterUrl: true,
+            isAvailable: true,
+            dietaryTags: true,
+            translations: { where: { locale }, select: { name: true, description: true } },
             modifierGroups: {
               include: {
                 group: {
-                  // Explicit columns throughout: `isAvailable` on a modifier and
-                  // `sortOrder` on a group each arrive in a manual migration, and
-                  // a wide include would break the whole menu on a database that
-                  // hasn't run them. Both are layered on below from best-effort
-                  // queries instead.
                   select: {
                     id: true,
                     name: true,
@@ -89,6 +101,9 @@ export async function getPublicMenu(
 
   // Counter-only items — hidden from every diner-facing surface.
   const posOnly = opts.includePosOnly ? new Set<string>() : await getPosOnlyItemIds(restaurantId);
+  // Items that need no container, so checkout can quote a packaging fee that
+  // matches the one the order path will actually charge.
+  const noPackaging = await getNoPackagingItemIds(restaurantId);
 
   // A category emptied entirely by that filter goes with it — a "Staff meals"
   // heading with nothing under it advertises the hidden menu it's meant to hide.
@@ -142,6 +157,7 @@ export async function getPublicMenu(
       manualOut: !item.isAvailable,
       autoOut: cappedOut || allSizesOut || stockOut,
       dietaryTags: item.dietaryTags ?? [],
+      noPackaging: noPackaging.has(item.id),
       // Sorted by the order set on the Modifiers page, so every item asks the
       // same questions in the same sequence.
       groups: sortModifierGroups(

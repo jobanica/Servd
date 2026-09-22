@@ -145,6 +145,7 @@ export async function createItem(
     }),
   );
   await savePosOnly(restaurantId, created.id, formData);
+  await saveNoPackaging(restaurantId, created.id, formData);
   const costError = await saveFoodCost(restaurantId, created.id, formData.get("costPesos"));
   await refresh();
   return costError ? { error: costError } : { ok: true };
@@ -332,6 +333,7 @@ export async function updateItem(
     }
   });
   await savePosOnly(restaurantId, id, formData);
+  await saveNoPackaging(restaurantId, id, formData);
   const costError = await saveFoodCost(restaurantId, id, formData.get("costPesos"));
   const limitError = await saveDailyLimit(restaurantId, id, formData.get("dailyLimit"));
   await refresh();
@@ -372,6 +374,30 @@ async function savePosOnly(
     );
   } catch {
     /* posOnly column not migrated yet */
+  }
+}
+
+/**
+ * "No packaging fee", written on its own and best-effort — same reasoning as
+ * savePosOnly above: the column arrives in a hand-run migration
+ * (prisma/manual/add-no-packaging.sql), and a menu editor that refuses to save
+ * an item is a far worse failure than a checkbox that doesn't stick.
+ */
+async function saveNoPackaging(
+  restaurantId: string,
+  menuItemId: string,
+  formData: FormData,
+): Promise<void> {
+  if (!formData.has("noPackagingField")) return;
+  try {
+    await tenantDb(restaurantId, (tx) =>
+      tx.menuItem.updateMany({
+        where: { id: menuItemId },
+        data: { noPackaging: formData.get("noPackaging") === "on" },
+      }),
+    );
+  } catch {
+    /* noPackaging column not migrated yet */
   }
 }
 

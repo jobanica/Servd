@@ -23,6 +23,7 @@ import { wrapsMidnight } from "@/lib/site/store-hours";
 import { LocationPicker } from "./LocationPicker";
 import { WebOrderTracker } from "./WebOrderTracker";
 import { haversineKm, computeDistanceFee } from "@/lib/geo/distance";
+import { computePackagingFee, packagedUnits } from "@/lib/pricing/packaging";
 import { PoweredByServd } from "@/components/branding/PoweredByServd";
 
 function lineId(): string {
@@ -512,6 +513,15 @@ export function WebOrder(props: WebOrderProps) {
 
   const count = cartCount(lines);
   const subtotal = cartTotal(lines);
+  // Menu items that need no container. Derived from the menu the page was
+  // rendered with, so the fee shown here is the fee the server will charge.
+  const noPackagingIds = useMemo(
+    () =>
+      new Set(
+        categories.flatMap((c) => c.items.filter((i) => i.noPackaging).map((i) => i.id)),
+      ),
+    [categories],
+  );
   // Distance-based delivery: live fee from the store origin to the pinned drop-off.
   const dcfg = props.delivery;
   // Nationwide shipping: typed postal address + region fee, no map pin.
@@ -551,14 +561,20 @@ export function WebOrder(props: WebOrderProps) {
   const isCod = orderType === "delivery" && payMethod === "cod";
   const cashTenderedCentavos = pesosToCentavos(Number(cashWith) || 0);
   const codFee = isCod && props.payment?.codFeeEnabled ? props.payment.codFee ?? 0 : 0;
-  // Packaging fee for food packaging (tubs/containers) on to-go orders. Delivery
-  // only, or pickup + delivery, per config — charged once per order, or per item
-  // (× total quantity) when packagingFeeMode is "item".
-  const packagingFee =
-    props.payment?.packagingFeeEnabled &&
-    (props.payment.packagingFeeScope === "all" || orderType === "delivery")
-      ? (props.payment.packagingFee ?? 0) * (props.payment.packagingFeeMode === "item" ? count : 1)
-      : 0;
+  // Packaging fee for food packaging (tubs/containers) on to-go orders, quoted
+  // through the same function the server charges through — items the owner
+  // marked as needing no container (bottled drinks) are left out of the count.
+  const packedUnits = packagedUnits(lines, noPackagingIds);
+  const packagingFee = computePackagingFee(
+    {
+      packagingFeeEnabled: !!props.payment?.packagingFeeEnabled,
+      packagingFee: props.payment?.packagingFee ?? 0,
+      packagingFeeScope: props.payment?.packagingFeeScope ?? "delivery",
+      packagingFeeMode: props.payment?.packagingFeeMode ?? "order",
+    },
+    orderType,
+    packedUnits,
+  );
   const discount = appliedPromo?.amount ?? 0;
   const total = Math.max(0, subtotal + deliveryFee + codFee + packagingFee - discount);
   // Change preview, shown live so the customer picks a note that actually works.
@@ -1104,7 +1120,10 @@ export function WebOrder(props: WebOrderProps) {
             ))}
             {packagingFee > 0 && (
               <div className="flex justify-between">
-                <span>Packaging fee{props.payment?.packagingFeeMode === "item" ? ` (×${count})` : ""}</span>
+                {/* The count is the packed units, not the cart count — a
+                    receipt reading "(×5)" on an order with two exempt drinks
+                    is the same overcharge, just written down. */}
+                <span>Packaging fee{props.payment?.packagingFeeMode === "item" ? ` (×${packedUnits})` : ""}</span>
                 <span>{formatPeso(packagingFee)}</span>
               </div>
             )}

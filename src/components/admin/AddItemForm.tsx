@@ -71,6 +71,12 @@ export function AddItemForm({ categoryId }: { categoryId: string }) {
           <input type="checkbox" name="posOnly" />
           Counter only
         </label>
+        {/* Drinks and anything else that arrives in its own container. */}
+        <label className="flex items-center gap-2 text-sm">
+          <input type="hidden" name="noPackagingField" value="1" />
+          <input type="checkbox" name="noPackaging" />
+          No packaging fee
+        </label>
         <ImageField name="image" className="w-full sm:w-auto sm:min-w-[16rem]" />
       </div>
       {state?.error && <p className="text-sm text-guava">{state.error}</p>}

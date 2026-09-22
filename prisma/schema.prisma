@@ -1302,6 +1302,14 @@ model MenuItem {
   /// defaulted column would go into the INSERT of every menu item created
   /// before that migration is run. Treat null as false.
   posOnly        Boolean?
+  /// Exempt from the storefront packaging fee. A canned drink travels in its
+  /// own can and a bottle in its own bottle — charging the tub-and-container
+  /// fee on one overcharges the customer for packaging that was never used.
+  ///
+  /// Nullable with no default, same reasoning as posOnly: it ships as a
+  /// hand-run migration. Treat null as false, so every existing menu keeps
+  /// charging exactly what it charged before anyone ticks a box.
+  noPackaging    Boolean?
   dietaryTags    String[] @default([]) // diet/allergen tag keys (see src/lib/menu/dietary.ts)
   sortOrder      Int      @default(0)
   createdAt      DateTime @default(now())

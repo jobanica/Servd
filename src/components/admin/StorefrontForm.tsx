@@ -4,6 +4,10 @@ import { useActionState, useEffect, useState } from "react";
 import { updateStorefront, type StorefrontState } from "@/server/storefront/actions";
 import { LocationPicker } from "@/components/site/LocationPicker";
 import { SubmitButton } from "./SubmitButton";
+import {
+  PackagingExemptPicker,
+  type PackagingMenuCategory,
+} from "./PackagingExemptPicker";
 import { wrapsMidnight } from "@/lib/site/store-hours";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -150,7 +154,10 @@ function WalletCard({
 
 export function StorefrontForm({
   initial,
+  menuForPackaging = [],
 }: {
+  /** The menu, so the owner can say which items need no packaging. */
+  menuForPackaging?: PackagingMenuCategory[];
   initial: {
     hours: DayHours[];
     zones: { name: string; feePesos: number }[];
@@ -213,6 +220,7 @@ export function StorefrontForm({
   const [codFeeOn, setCodFeeOn] = useState(initial.payment.codFeeEnabled);
   const [selfRiderOn, setSelfRiderOn] = useState(initial.delivery.selfBookRider);
   const [packagingOn, setPackagingOn] = useState(initial.payment.packagingFeeEnabled);
+  const [packagingMode, setPackagingMode] = useState<"order" | "item">(initial.payment.packagingFeeMode);
   const [deliveryMode, setDeliveryMode] = useState<"zones" | "distance" | "shipping">(initial.delivery.mode);
   const [fulfillment, setFulfillment] = useState<"both" | "pickup" | "delivery">(initial.delivery.fulfillment);
   const [origin, setOrigin] = useState<{ lat: number; lng: number } | null>(
@@ -519,7 +527,8 @@ export function StorefrontForm({
                 <label className="mb-1 block text-xs font-semibold text-plum-ink/60">Charge</label>
                 <select
                   name="packagingFeeMode"
-                  defaultValue={initial.payment.packagingFeeMode}
+                  value={packagingMode}
+                  onChange={(e) => setPackagingMode(e.target.value === "item" ? "item" : "order")}
                   className="w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm sm:w-56"
                 >
                   <option value="order">Once per order</option>
@@ -536,6 +545,15 @@ export function StorefrontForm({
                   <option value="delivery">Delivery only</option>
                   <option value="all">Pickup &amp; delivery</option>
                 </select>
+              </div>
+              {/* Not every item needs a tub. Without this the fee lands on
+                  bottled drinks too, which is an overcharge on every order
+                  that has one. */}
+              <div className="border-t border-plum-ink/10 pt-2">
+                <PackagingExemptPicker
+                  categories={menuForPackaging}
+                  perItem={packagingMode === "item"}
+                />
               </div>
             </div>
           ) : (

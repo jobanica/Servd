@@ -7,6 +7,7 @@ import { tenantDb } from "@/server/tenancy/scoped-db";
 import { uploadMenuImage } from "@/server/storage/menu-images";
 import { pesosToCentavos } from "@/lib/money";
 import { getStorefront, type DayHours, type DeliveryZone } from "./storefront";
+import { setNoPackagingItemIds } from "@/server/menu/packaging";
 import {
   AUTO_ACCEPT_DEFAULT_SECONDS,
   normalizeAutoAcceptSeconds,
@@ -185,6 +186,14 @@ export async function updateStorefront(
         tx.storefrontSetting.update({ where: { restaurantId }, data: { acceptsBookings }, select: { id: true } }),
       );
     } catch { /* columns not migrated yet */ }
+  }
+  // Which menu items the packaging fee skips. It rides along with this form
+  // because that's where the fee is set — an owner who has just typed "₱10 per
+  // item" is exactly the person who needs to say the softdrinks are exempt.
+  // Only written when the picker was actually on the form.
+  if (formData.has("packagingExemptField")) {
+    await setNoPackagingItemIds(restaurantId, formData.getAll("packagingExemptItemId").map(String));
+    revalidatePath("/admin/menu");
   }
   revalidatePath("/admin/storefront");
   // ALSO refresh the customer-facing site — without this the storefront keeps

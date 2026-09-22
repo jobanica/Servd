@@ -11,7 +11,9 @@ import { recordServingsSold } from "@/server/menu/servings";
 import { recordVariantsSold } from "@/server/menu/variants";
 import { notifyOrdersChanged } from "@/server/realtime/notify";
 import { sendOrderPush } from "@/server/push/send";
-import { getPublicStorefront, isOpenNow, computeDownpayment, computePackagingFee } from "@/server/storefront/storefront";
+import { getPublicStorefront, isOpenNow, computeDownpayment } from "@/server/storefront/storefront";
+import { computePackagingFee, packagedUnits } from "@/lib/pricing/packaging";
+import { getNoPackagingItemIds } from "@/server/menu/packaging";
 import { uploadMenuImageBytes } from "@/server/storage/menu-images";
 import { haversineKm, computeDistanceFee } from "@/lib/geo/distance";
 import { resolvePromo } from "@/server/promotions/redeem";
@@ -214,9 +216,15 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
 
   // Packaging fee for food packaging (tubs/containers) on to-go online orders.
   // Applies to delivery only, or pickup + delivery, per config — and either a
-  // flat charge per order or per item (× total quantity), per packagingFeeMode.
-  const packagedUnits = built.items.reduce((n, i) => n + i.quantity, 0);
-  const packagingFee = computePackagingFee(storefront.payment, d.orderType, packagedUnits);
+  // flat charge per order or per item, per packagingFeeMode. Items the owner
+  // marked as needing no container (bottled drinks and the like) are left out
+  // of the count, so a per-item fee isn't charged for a tub nobody used.
+  const noPackaging = await getNoPackagingItemIds(restaurant.id);
+  const packedUnits = packagedUnits(
+    built.items.map((i) => ({ itemId: i.menuItemId, quantity: i.quantity })),
+    noPackaging,
+  );
+  const packagingFee = computePackagingFee(storefront.payment, d.orderType, packedUnits);
 
   // Coupon — re-resolved server-side against the real prices (never trust the
   // client for money). free_delivery waives the delivery fee; percent/amount cut

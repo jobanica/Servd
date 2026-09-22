@@ -182,21 +182,8 @@ function normalizePaymentConfig(raw: unknown): PaymentConfig {
   return d;
 }
 
-/**
- * The packaging fee that applies to an online order of the given type (centavos).
- * "order" mode charges the flat fee once; "item" mode charges it per item unit,
- * so it scales with the total quantity in the cart.
- */
-export function computePackagingFee(
-  cfg: PaymentConfig,
-  orderType: "pickup" | "delivery",
-  itemCount = 1,
-): number {
-  if (!cfg.packagingFeeEnabled || cfg.packagingFee <= 0) return 0;
-  if (cfg.packagingFeeScope === "delivery" && orderType !== "delivery") return 0;
-  const units = cfg.packagingFeeMode === "item" ? Math.max(1, Math.round(itemCount)) : 1;
-  return cfg.packagingFee * units;
-}
+// The packaging fee itself lives in @/lib/pricing/packaging — pure, so the
+// checkout page quotes the customer the same number this server charges them.
 
 export function defaultBookingConfig(): BookingConfig {
   return { requireDownpayment: false, downpaymentType: "percent", downpaymentValue: 50, downpaymentInstructions: "" };

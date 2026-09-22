@@ -49,6 +49,12 @@ export interface DinerItem {
   manualOut?: boolean;
   autoOut?: boolean;
   dietaryTags: string[]; // diet/allergen tag keys (see src/lib/menu/dietary.ts)
+  /**
+   * Needs no container, so the packaging fee skips it — a bottled drink comes
+   * in its own bottle. Optional: absent means packed, which is how every menu
+   * behaved before the flag existed.
+   */
+  noPackaging?: boolean;
   originalPrice?: number | null; // pre-discount price when a happy hour is active
   groups: DinerModifierGroup[];
   variants?: DinerVariant[]; // sizes — when present the diner must pick one

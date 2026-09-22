@@ -72,12 +72,24 @@ export async function buildValidatedOrder(
   const dbItems = await tenantDb(restaurantId, (tx) =>
     tx.menuItem.findMany({
       where: { id: { in: itemIds } },
-      include: {
+      // Explicit columns throughout — on the item as much as on its modifiers.
+      // `posOnly`, `noPackaging`, `isAvailable` on a modifier and `sortOrder`
+      // on a group each land in a manual migration and are layered on
+      // separately, and Prisma asks for every column it knows about unless
+      // told otherwise. Naming them keeps an un-migrated database able to take
+      // orders: a till that can't ring up a sale is the worst failure here.
+      select: {
+        id: true,
+        categoryId: true,
+        name: true,
+        description: true,
+        price: true,
+        imageUrl: true,
+        videoUrl: true,
+        videoPosterUrl: true,
+        isAvailable: true,
+        dietaryTags: true,
         modifierGroups: {
-          // Explicit columns throughout — `isAvailable` on a modifier and
-          // `sortOrder` on a group each land in a manual migration and are
-          // layered on separately, so an un-migrated database can still take
-          // orders. A till that can't ring up a sale is the worst failure here.
           include: {
             group: {
               select: {

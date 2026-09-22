@@ -6,7 +6,15 @@ import { tenantDb } from "@/server/tenancy/scoped-db";
  * come back even though the queries themselves don't repeat the filter.
  */
 
-/** Categories (sorted) each with their items (sorted). */
+/**
+ * Categories (sorted) each with their items (sorted).
+ *
+ * Item columns are listed explicitly for the same reason the group columns are
+ * below: `posOnly` and `noPackaging` arrive in hand-run migrations, and Prisma
+ * asks for every column it knows about unless told otherwise — which would
+ * break the menu editor outright on a database that hasn't run them. Both are
+ * read separately, best-effort.
+ */
 export function getMenu(restaurantId: string) {
   return tenantDb(restaurantId, (tx) =>
     tx.category.findMany({
@@ -14,6 +22,19 @@ export function getMenu(restaurantId: string) {
       include: {
         menuItems: {
           orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          select: {
+            id: true,
+            categoryId: true,
+            name: true,
+            description: true,
+            price: true,
+            imageUrl: true,
+            videoUrl: true,
+            videoPosterUrl: true,
+            isAvailable: true,
+            dietaryTags: true,
+            sortOrder: true,
+          },
         },
       },
     }),
@@ -38,7 +59,17 @@ export function getItem(restaurantId: string, itemId: string) {
   return tenantDb(restaurantId, (tx) =>
     tx.menuItem.findFirst({
       where: { id: itemId },
-      include: {
+      select: {
+        id: true,
+        categoryId: true,
+        name: true,
+        description: true,
+        price: true,
+        imageUrl: true,
+        videoUrl: true,
+        videoPosterUrl: true,
+        isAvailable: true,
+        dietaryTags: true,
         modifierGroups: {
           include: {
             group: {

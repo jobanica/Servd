@@ -3,6 +3,8 @@ import { requireAdminPage } from "@/server/tenancy/require-admin";
 import { featureLockOr } from "@/server/billing/feature-lock-gate";
 import { getStorefront } from "@/server/storefront/storefront";
 import { StorefrontForm } from "@/components/admin/StorefrontForm";
+import { getMenu } from "@/server/menu/queries";
+import { getNoPackagingItemIds } from "@/server/menu/packaging";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { qrPngDataUrl } from "@/lib/qr";
 import { CopyLink } from "@/components/super-admin/CopyLink";
@@ -31,6 +33,17 @@ export default async function StorefrontPage() {
       ? `https://${r.customDomain}`
       : `${appUrl}/r/${r?.slug ?? ""}`;
   const qr = await qrPngDataUrl(url);
+
+  // The menu, so the packaging fee can be told which items need no container.
+  // Read here rather than inside the form because the exemption is a property
+  // of the menu item, not of the storefront settings row.
+  const menu = await getMenu(restaurantId);
+  const exempt = await getNoPackagingItemIds(restaurantId);
+  const menuForPackaging = menu.map((c) => ({
+    id: c.id,
+    name: c.name,
+    items: c.menuItems.map((i) => ({ id: i.id, name: i.name, noPackaging: exempt.has(i.id) })),
+  }));
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -83,6 +96,7 @@ export default async function StorefrontPage() {
       </div>
 
       <StorefrontForm
+        menuForPackaging={menuForPackaging}
         initial={{
           hours: sf.hours,
           zones: sf.zones.map((z) => ({ name: z.name, feePesos: z.fee / 100 })),

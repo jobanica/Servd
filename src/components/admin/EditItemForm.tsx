@@ -20,6 +20,7 @@ type Item = {
   dietaryTags?: string[];
   dailyLimit?: number | null;
   posOnly?: boolean;
+  noPackaging?: boolean;
 };
 
 export function EditItemForm({
@@ -106,6 +107,23 @@ export function EditItemForm({
               The cashier can still punch it; customers never see it. For takeaway
               boxes, add-ons somebody wants three of, staff meals, and anything
               that doesn&apos;t travel well.
+            </span>
+          </span>
+        </label>
+        {/* Packaging fee exemption. Same hidden-marker trick as above. */}
+        <label className="flex items-start gap-2 text-sm sm:col-span-2">
+          <input type="hidden" name="noPackagingField" value="1" />
+          <input
+            type="checkbox"
+            name="noPackaging"
+            defaultChecked={item.noPackaging === true}
+            className="mt-1"
+          />
+          <span>
+            No packaging fee
+            <span className="mt-0.5 block text-xs font-normal text-plum-ink/50">
+              For anything that comes in its own container — bottled and canned
+              drinks, packed chips. The storefront packaging fee skips it.
             </span>
           </span>
         </label>
