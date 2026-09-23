@@ -80,23 +80,40 @@ async function refreshSession(req: NextRequest): Promise<PendingCookie[]> {
   if (!hasSession) return [];
 
   const pending: PendingCookie[] = [];
+  let renewed = false;
   try {
     const supabase = createServerClient(url, key, {
       cookies: {
         getAll: () => req.cookies.getAll(),
+        // Buffer only. Nothing touches the request or the response until we
+        // know the renewal actually worked — see below.
         setAll: (list: PendingCookie[]) => {
-          for (const c of list) {
-            req.cookies.set(c.name, c.value);
-            pending.push(c);
-          }
+          pending.push(...list);
         },
       },
     });
-    await supabase.auth.getUser();
+    const { data, error } = await supabase.auth.getUser();
+    renewed = !error && !!data.user;
   } catch {
     /* Supabase unreachable — keep serving with the cookies we already have
        rather than bouncing the user to /login. */
   }
+
+  // A FAILED renewal must never be written back. When a refresh doesn't work,
+  // @supabase/ssr hands us blank cookies to clear the session with — so one bad
+  // answer from Supabase (a 429, a 5xx, a refresh token a concurrent request
+  // already spent) would delete a perfectly good session and dump the shop at
+  // the login screen while it was just sitting there waiting for orders.
+  //
+  // Keeping the old cookies is safe, and not merely optimistic: this function
+  // grants nothing. Every page and action resolves the session itself and
+  // refuses if it's really dead. The worst case here is a stale cookie that
+  // the next request tries again with; the worst case the other way is signing
+  // out a restaurant mid-service.
+  if (!renewed) return [];
+
+  // Let the rest of THIS request see the fresh token too.
+  for (const c of pending) req.cookies.set(c.name, c.value);
   return pending;
 }
 

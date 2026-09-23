@@ -188,14 +188,18 @@ export function MerchantBoard({
   restaurantId,
   restaurantName,
   initial,
+  initialStale = false,
   bannerData,
 }: {
   restaurantId: string;
   restaurantName: string;
   initial: MerchantData;
+  /** The server couldn't read the queue, so `initial` is empty, not quiet. */
+  initialStale?: boolean;
   bannerData?: PlanBannerData | null;
 }) {
   const [data, setData] = useState<MerchantData>(initial);
+  const [stale, setStale] = useState(initialStale);
   const [busy, setBusy] = useState<string | null>(null);
   const [autoPrint, setAutoPrint] = useState(false);
   const [rejecting, setRejecting] = useState<string | null>(null);
@@ -218,9 +222,13 @@ export function MerchantBoard({
   const refresh = useCallback(async () => {
     try {
       setData(await getMerchantOrders());
+      setStale(false);
       setPulse((p) => p + 1);
     } catch {
-      /* transient — the poll will retry */
+      // Keep the orders already on screen and say the list is not current.
+      // Silently swallowing this is how a screen that can't read the queue
+      // ends up looking like a quiet night.
+      setStale(true);
     }
   }, []);
 
@@ -382,6 +390,15 @@ export function MerchantBoard({
           <SignOutButton />
         </div>
       </header>
+
+      {/* The queue couldn't be read. Said out loud rather than shown as an
+          empty screen: this is the one screen where "no orders" has to mean
+          no orders. Nobody is signed out — the poll keeps trying. */}
+      {stale && (
+        <div className="bg-mango/25 px-4 py-2 text-center text-sm font-semibold text-plum-ink/80">
+          Couldn&apos;t refresh the order list just now — still trying. You&apos;re still signed in.
+        </div>
+      )}
 
       {/* Audio got suspended (app was minimized/closed and reopened). Sound
           needs a fresh tap to come back — make that obvious and one-tap. */}

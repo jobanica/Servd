@@ -9,7 +9,9 @@
  *  - Everything else (POST / server actions / API): passthrough, never cached —
  *    the app's own offline queue handles writes.
  */
-const VERSION = "servd-v5";
+// Bumped to v6 to drop any page cached before the checks below existed — a
+// till or Orders screen whose stored copy is really a login page.
+const VERSION = "servd-v6";
 const PAGES = `${VERSION}-pages`;
 const ASSETS = `${VERSION}-assets`;
 const OFFLINE_PAGE = "/offline.html";
@@ -67,9 +69,17 @@ async function warmOpenPages() {
       }
     }
     await Promise.all(
-      [...paths].map((path) =>
-        cache.add(new Request(path, { cache: "reload" })).catch(() => {}),
-      ),
+      [...paths].map(async (path) => {
+        try {
+          const req = new Request(path, { cache: "reload" });
+          const res = await fetch(req);
+          // Same rule as the fetch handler: never store the login screen under
+          // the till's or the Orders screen's own address.
+          if (res.ok && !res.redirected) await cache.put(req, res);
+        } catch {
+          /* one page failing to warm must not stop the others */
+        }
+      }),
     );
   } catch {
     /* warming is an optimisation; never fail activation over it */
@@ -135,8 +145,17 @@ self.addEventListener("fetch", (event) => {
       (async () => {
         try {
           const fresh = await fetch(req);
-          const cache = await caches.open(PAGES);
-          cache.put(req, fresh.clone());
+          // Only store a page that IS the page. A request made with a lapsed
+          // session is answered with the login screen, and storing that under
+          // /merchant means the next time the tablet opens its Orders app
+          // offline it is handed a sign-in form — the app looking signed out
+          // when the session is fine. A redirected response can't be replayed
+          // for a navigation anyway: returning one later throws and the
+          // navigation fails outright.
+          if (fresh.ok && !fresh.redirected) {
+            const cache = await caches.open(PAGES);
+            cache.put(req, fresh.clone());
+          }
           return fresh;
         } catch {
           // The page itself if it was opened while online — that is what

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { systemDb } from "@/server/tenancy/scoped-db";
@@ -90,7 +91,22 @@ async function withoutExpiredPreviews<T extends { id: string }>(
   return dead.size === 0 ? rows : rows.filter((r) => !dead.has(r.id));
 }
 
-export async function getCurrentUser(): Promise<CurrentUser> {
+/**
+ * Memoised for the lifetime of ONE request.
+ *
+ * It used to run in full every time it was called, and a page calls it more
+ * than once — the merchant screen resolves the session in its guard and then
+ * `getMerchantOrders()` resolves it again. Two `auth.getUser()` round-trips
+ * against an access token that is about to expire is a race with itself: the
+ * first one refreshes, the second presents a refresh token that has just been
+ * spent, comes back empty, and the screen the shop watches for orders decides
+ * nobody is logged in. React's cache collapses them into one answer per
+ * request, which removes the race rather than handling it — and halves the
+ * auth latency of every signed-in page as a side effect.
+ *
+ * Per-request only: nothing is shared between requests or between users.
+ */
+export const getCurrentUser = cache(async function getCurrentUser(): Promise<CurrentUser> {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -167,7 +183,7 @@ export async function getCurrentUser(): Promise<CurrentUser> {
     // Authenticated with Supabase but no Servd profile — treat as logged out.
     return null;
   });
-}
+});
 
 /** Throws unless a staff/admin user is logged in. Returns the user. */
 export async function requireStaff(allowed?: StaffRole[]): Promise<
