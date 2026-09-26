@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
 import { listShiftHistory } from "@/server/orders/shift-history";
+import { floatLabel } from "@/lib/orders/opening-float";
 import { formatPeso } from "@/lib/money";
 import { manilaShortDateTime, manilaTime } from "@/lib/time/manila";
 import { methodLabel } from "@/lib/orders/shift-breakdown";
@@ -40,7 +41,8 @@ export default async function ShiftsPage() {
 
       {shifts.length === 0 ? (
         <p className="rounded-tile border border-plum-ink/10 bg-white p-8 text-center text-sm text-plum-ink/45">
-          No shifts recorded yet. One opens by itself the first time a cashier settles an order.
+          No shifts recorded yet. A cashier opens one at the till, counting the cash
+          they start the drawer with.
         </p>
       ) : (
         <ul className="space-y-3">
@@ -112,6 +114,19 @@ export default async function ShiftsPage() {
                     Cash drawer
                   </p>
                   <ul className="space-y-0.5 text-sm">
+                    {/* What the cashier counted in when they opened. "Not
+                        counted" is a shift opened before the till started
+                        asking, or one a payment opened by itself — the
+                        expected total below is short by whatever was really
+                        in there, and saying so is the only honest option. */}
+                    <li className="flex justify-between gap-2">
+                      <span className="text-plum-ink/70">Opening fund</span>
+                      <span
+                        className={`tabular-nums ${s.openingFloat == null ? "text-plum-ink/40" : ""}`}
+                      >
+                        {floatLabel(s.openingFloat, formatPeso)}
+                      </span>
+                    </li>
                     <li className="flex justify-between gap-2">
                       <span className="text-plum-ink/70">Cash collected</span>
                       <span className="tabular-nums">{formatPeso(s.cashCollected)}</span>

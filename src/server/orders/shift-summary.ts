@@ -38,7 +38,9 @@ export interface ShiftSummary {
   cashOutTotal: number;
   cashOuts: { amount: number; note: string | null; at: string }[];
   cashCollected: number; // cash payments today
-  expectedCash: number; // cash collected − cash-outs (what should be in the drawer)
+  /** The fund counted in at open, centavos. Null = nobody was asked. */
+  openingFloat: number | null;
+  expectedCash: number; // fund + cash collected − cash-outs (what's in the drawer)
   net: number; // gross − expenses
   /** Every counter sale today, across all shifts — context, not drawer money. */
   dayGross: number;
@@ -144,7 +146,8 @@ export async function getShiftSummary(): Promise<ShiftSummary | null> {
     cashOutTotal,
     cashOuts,
     cashCollected,
-    expectedCash: expectedCash(cashCollected, cashOutTotal),
+    openingFloat: shift?.openingFloat ?? null,
+    expectedCash: expectedCash(shift?.openingFloat ?? null, cashCollected, cashOutTotal),
     net: sales.gross - expensesTotal,
     dayGross: day.gross,
     dayOrderCount: day.orderCount,

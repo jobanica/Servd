@@ -24,8 +24,9 @@ const base: ShiftReportSource = {
   expenses: [{ category: "Supplies", amount: 25000, note: "ice" }],
   expensesTotal: 25000,
   cashCollected: 300000,
+  openingFloat: 100000,
   cashOuts: [{ amount: 100000, note: "bank" }],
-  expectedCash: 200000,
+  expectedCash: 300000,
   net: 433000,
 };
 
@@ -41,10 +42,21 @@ describe("buildShiftReport", () => {
     expect(out).toContain("GROSS SALES");
     expect(out).toContain("4580.00");
     expect(out).toContain("TOTAL EXPENSES");
+    expect(out).toContain("Opening fund");
     expect(out).toContain("EXPECTED IN DRAWER");
-    expect(out).toContain("2000.00");
+    // Fund 1000 + cash 3000 - cash out 1000. Before the fund was carried it
+    // printed 2000.00 and the drawer never matched it.
+    expect(out).toContain("3000.00");
     expect(out).toContain("NET (PHP)");
     expect(out).toContain("4330.00");
+  });
+
+  it("says so when no fund was counted, rather than printing zero", () => {
+    // A shift opened by a payment arriving, not by a person. Claiming the
+    // drawer started empty would hand someone a variance they can't explain.
+    const out = text({ ...base, openingFloat: null });
+    expect(out).toContain("not counted");
+    expect(out).not.toMatch(/Opening fund\s+0\.00/);
   });
 
   it("shows discounts and cash-outs as deductions", () => {

@@ -19,6 +19,7 @@ import {
   type IncomingOrder,
 } from "@/server/orders/cashier";
 import { formatPeso } from "@/lib/money";
+import { floatLabel } from "@/lib/orders/opening-float";
 import { chime, unlockAudio } from "@/lib/sound";
 import { dueBucket, isForAnotherDay, scheduledLabel } from "@/lib/orders/scheduled";
 import { getAdvanceQueue } from "@/server/orders/advance-orders";
@@ -76,6 +77,7 @@ function OverflowItem({
 }
 
 export function CashierBoard({
+  shift,
   restaurantId,
   initialTables,
   initialIncoming = [],
@@ -87,6 +89,12 @@ export function CashierBoard({
   kitchenBluetooth = false,
   tillBluetooth = false,
 }: {
+  /**
+   * The open shift this till is running on. The page only renders the board
+   * when there is one — before that the cashier is asked to open it and count
+   * the drawer in — so this is never null here.
+   */
+  shift: { openedAt: string; openingFloat: number | null };
   restaurantId: string;
   initialTables: CashierTable[];
   initialIncoming?: IncomingOrder[];
@@ -560,6 +568,12 @@ export function CashierBoard({
   const showPopup = incoming.length > 0 && !popupDismissed;
   const showReady = readyOrders.length > 0 && !readyDismissed && !showPopup;
 
+  // When this drawer was opened, in the shop's own clock.
+  const shiftOpenedLabel = new Date(shift.openedAt).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
   const sidebarBtn =
     "w-full rounded-full border border-plum-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-plum-ink hover:bg-cream";
 
@@ -572,6 +586,23 @@ export function CashierBoard({
           {live ? "Live" : "Polling (offline)"}
         </span>
         {offlineEnabled && <ConnectivityPill online={online} pending={pendingOrders} />}
+      </div>
+
+      {/* The drawer this till is counting. Shown rather than hidden behind the
+          summary, because the fund is what the count at the end is checked
+          against and a cashier who can't see it has no way to notice it's
+          wrong until the money is already short. */}
+      <div className="mb-1 rounded-lg border border-plum-ink/10 bg-white px-3 py-2 text-xs">
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-semibold text-plum-ink/60">Shift open</span>
+          <span className="text-plum-ink/45">{shiftOpenedLabel}</span>
+        </div>
+        <div className="mt-0.5 flex items-center justify-between gap-2">
+          <span className="text-plum-ink/50">Opening fund</span>
+          <span className="font-bold tabular-nums">
+            {floatLabel(shift.openingFloat, formatPeso)}
+          </span>
+        </div>
       </div>
 
       <button onClick={() => setNewOrderOpen(true)} className="w-full rounded-full px-4 py-2.5 text-sm font-semibold btn-brand">

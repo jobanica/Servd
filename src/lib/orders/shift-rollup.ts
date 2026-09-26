@@ -49,10 +49,25 @@ export function rollupShiftPayments(rows: ShiftPaymentRow[]): ShiftRollup {
 }
 
 /**
- * What should physically be in the drawer: cash taken, less cash removed.
- * Floored at zero — a negative "expected cash" is a data problem, and printing
+ * What should physically be in the drawer.
+ *
+ * The fund the shift opened with, plus the cash taken, less the cash removed.
+ * The opening fund is the term that used to be missing, and it made the figure
+ * wrong for every till that keeps change on hand: open with ₱1,000, take
+ * ₱3,000, and the drawer holds ₱4,000 while the report said ₱3,000 — so the
+ * count never agreed and the number stopped being worth checking.
+ *
+ * `openingFloat` is null on a shift opened before anyone was asked for one.
+ * Counted as zero here, which restores exactly the old arithmetic for those,
+ * while the summary shows it as "not counted" rather than as an actual zero.
+ *
+ * Still floored at zero: a negative expectation is a data problem, and putting
  * one on a report someone signs invites them to hand over money they don't have.
  */
-export function expectedCash(cashCollected: number, cashOutTotal: number): number {
-  return Math.max(0, cashCollected - cashOutTotal);
+export function expectedCash(
+  openingFloat: number | null,
+  cashCollected: number,
+  cashOutTotal: number,
+): number {
+  return Math.max(0, (openingFloat ?? 0) + cashCollected - cashOutTotal);
 }

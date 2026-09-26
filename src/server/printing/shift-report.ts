@@ -63,6 +63,7 @@ export async function getShiftReport(): Promise<ShiftReportBundle | null> {
     expenses: summary.expenses,
     expensesTotal: summary.expensesTotal,
     cashCollected: summary.cashCollected,
+    openingFloat: summary.openingFloat,
     cashOuts: summary.cashOuts,
     expectedCash: summary.expectedCash,
     net: summary.net,

@@ -6,6 +6,7 @@ import { getShiftTransactions } from "./shift-transactions";
 import { summariseShift, type ShiftBreakdown, type ShiftTransaction } from "@/lib/orders/shift-breakdown";
 import { expectedCash } from "@/lib/orders/shift-rollup";
 import { shiftRetentionCutoff } from "@/lib/orders/shift-retention";
+import { readOpeningFloats } from "./shift-session";
 
 /**
  * Past shifts and what each one took.
@@ -32,6 +33,8 @@ export interface ShiftHistoryRow {
   orderCount: number;
   cashCollected: number;
   cashOutTotal: number;
+  /** The fund counted in at open, centavos. Null = nobody was asked. */
+  openingFloat: number | null;
   expectedCash: number;
   byMethod: { method: string; amount: number; count: number }[];
   /** Everything that happened on the shift — counter and online, by type. */
@@ -68,6 +71,9 @@ export async function listShiftHistory(
     return []; // cashier_shifts not migrated yet
   }
 
+  // Read on its own so a database without the column still shows the history.
+  const floats = await readOpeningFloats(shifts.map((s) => s.id));
+
   return Promise.all(
     shifts.map(async (s) => {
       const [sales, cashOuts, transactions] = await Promise.all([
@@ -88,7 +94,8 @@ export async function listShiftHistory(
         orderCount: sales.orderCount,
         cashCollected,
         cashOutTotal,
-        expectedCash: expectedCash(cashCollected, cashOutTotal),
+        openingFloat: floats.get(s.id) ?? null,
+        expectedCash: expectedCash(floats.get(s.id) ?? null, cashCollected, cashOutTotal),
         byMethod: sales.byMethod,
         breakdown: summariseShift(transactions),
         transactions,

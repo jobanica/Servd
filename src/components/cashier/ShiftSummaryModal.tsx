@@ -7,6 +7,7 @@ import { endMyShift } from "@/server/orders/shift-actions";
 import { signOut } from "@/app/(platform)/login/actions";
 import { runReportDispatch } from "@/lib/print/run-dispatch";
 import { formatPeso } from "@/lib/money";
+import { floatLabel } from "@/lib/orders/opening-float";
 import { manilaTime } from "@/lib/time/manila";
 import { useOrdersRefresh } from "@/lib/realtime/useOrdersRefresh";
 
@@ -176,9 +177,19 @@ export function ShiftSummaryModal({
               <div className={`${row} border-t border-plum-ink/10 font-bold`}><span>Total expenses</span><span>{formatPeso(s.expensesTotal)}</span></div>
             </div>
 
-            {(s.cashOutTotal > 0 || s.cashCollected > 0) && (
+            {(s.cashOutTotal > 0 || s.cashCollected > 0 || s.openingFloat != null) && (
               <div className="mt-3 rounded-lg border border-plum-ink/10 p-3">
                 <p className="text-[11px] font-bold uppercase tracking-widest text-plum-ink/40">Cash drawer</p>
+                {/* The fund first: it is where the drawer started, and the
+                    total below only makes sense counting up from it. Shown as
+                    "not counted" rather than ₱0.00 when nobody was asked — a
+                    zero there would be a claim, and the wrong one. */}
+                <div className={row}>
+                  <span className="text-plum-ink/60">Opening fund</span>
+                  <span className={s.openingFloat == null ? "text-plum-ink/40" : ""}>
+                    {floatLabel(s.openingFloat, formatPeso)}
+                  </span>
+                </div>
                 <div className={row}><span className="text-plum-ink/60">Cash collected</span><span>{formatPeso(s.cashCollected)}</span></div>
                 {s.cashOuts.map((c, i) => (
                   <div key={i} className={row}>

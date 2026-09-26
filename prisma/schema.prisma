@@ -815,6 +815,16 @@ model CashierShift {
   closedAt     DateTime?
   status       String    @default("open") // open | closed
   closedReason String? // ended | auto_end_of_day
+  /// The revolving fund: cash put into the drawer when the shift was opened,
+  /// in centavos. Counted at the start so the end-of-shift figure is what
+  /// should physically be there, not just what was taken during the shift.
+  ///
+  /// Nullable with NO default, and null is not zero — it means nobody was
+  /// asked. Every shift opened before this existed is one of those, and the
+  /// summary says "not counted" for them rather than claiming the drawer
+  /// started empty. It ships as a hand-run migration, so it is also read on
+  /// its own: a till that can't ring up a sale is the worst failure here.
+  openingFloat Int?
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 

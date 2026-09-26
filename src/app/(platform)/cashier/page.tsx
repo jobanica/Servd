@@ -12,6 +12,9 @@ import { staffLabel } from "@/server/tenancy/staff-name";
 import { cardSurchargeBp } from "@/server/orders/surcharge";
 import { kitchenNeedsBluetoothPairing, tillNeedsBluetoothPairing } from "@/server/printing/kitchen-printer";
 import { paysBeforeCooking } from "@/server/printing/kitchen-options";
+import { currentShift } from "@/server/orders/shift-session";
+import { isShiftCurrent } from "@/lib/orders/shift-window";
+import { OpenShiftScreen } from "@/components/cashier/OpenShiftScreen";
 
 export default async function CashierHome() {
   const user = await getCurrentUser();
@@ -55,6 +58,13 @@ export default async function CashierHome() {
   // can't pair one — otherwise it's a warning about a capability they never use.
   const tillBluetooth = await tillNeedsBluetoothPairing(user.restaurantId);
 
+  // Whose drawer this is, and what went into it. A shift past the 16-hour cap
+  // is somebody who never signed out, not somebody still working — treated as
+  // closed so the next cashier counts their own drawer in rather than
+  // inheriting a stranger's expected cash.
+  const open = await currentShift(user.restaurantId, user.staffUserId);
+  const shift = open && isShiftCurrent(open.openedAt) ? open : null;
+
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       {user.role === "admin" && (
@@ -79,7 +89,9 @@ export default async function CashierHome() {
         Open tables, payments, bill requests, and ticket printing.
       </p>
 
+      {shift ? (
       <CashierBoard
+        shift={{ openedAt: shift.openedAt.toISOString(), openingFloat: shift.openingFloat }}
         restaurantId={user.restaurantId}
         initialTables={initialTables}
         initialIncoming={initialIncoming}
@@ -91,6 +103,9 @@ export default async function CashierHome() {
         kitchenBluetooth={kitchenBluetooth}
         tillBluetooth={tillBluetooth}
       />
+      ) : (
+        <OpenShiftScreen cashierName={cashierName} hadStaleShift={!!open} />
+      )}
       {offlineEnabled && <ServiceWorkerRegister />}
     </div>
   );

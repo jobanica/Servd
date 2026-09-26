@@ -12,10 +12,16 @@ import { isShiftCurrent, staleShiftCutoff, MAX_SHIFT_HOURS } from "@/lib/orders/
  * it used to do, and why the second cashier of the day inherited the first
  * one's takings.
  *
- * Deliberately NOT a gate on anything. A shift decides whose money it is; it
- * never decides who may serve a table. Any cashier can still settle any order,
- * because the alternative strands a customer the moment the person who served
- * them goes on break.
+ * The till screen now asks for a shift before it will take an order, and asks
+ * what went into the drawer when it opens one. Nothing in THIS file enforces
+ * that, and that is the point: the gate is a working practice, kept where the
+ * cashier can see it. Down here a shift still decides only whose money it is,
+ * never who may serve a table — any cashier can settle any order, because the
+ * alternative strands a customer the moment the person who served them goes on
+ * break, and a sale that a screen refuses to ring up is worse than a sale
+ * attributed to the wrong shift. ensureShift below stays for exactly that: a
+ * payment arriving without an open shift still lands, against a shift opened
+ * for it with no fund counted.
  *
  * Written through systemDb with an explicit restaurantId: this is called from
  * paths that must not fail on an RLS edge, and every query is scoped by hand.
@@ -26,6 +32,53 @@ export interface OpenShift {
   staffUserId: string;
   staffName: string;
   openedAt: Date;
+  /**
+   * The revolving fund counted into the drawer at open, in centavos. Null
+   * means nobody was asked — a shift from before the fund existed, or one a
+   * money path opened by itself. Null is not zero anywhere it is shown.
+   */
+  openingFloat: number | null;
+}
+
+/**
+ * The fund, read on its own.
+ *
+ * `openingFloat` ships as a hand-run migration, and asking for it alongside
+ * the shift would make a database that hasn't run the file answer "no shift"
+ * to every lookup — which, now that the till waits for a shift, is a till that
+ * cannot sell. Its own query, failing to null, costs one number.
+ */
+async function readFloat(shiftId: string): Promise<number | null> {
+  try {
+    const row = await systemDb((tx) =>
+      tx.cashierShift.findFirst({ where: { id: shiftId }, select: { openingFloat: true } }),
+    );
+    return row?.openingFloat ?? null;
+  } catch {
+    return null; // column not migrated yet
+  }
+}
+
+/**
+ * The funds for a list of shifts, in one query. Same best-effort reasoning as
+ * readFloat: a missing column costs a column of the history table, not the
+ * history.
+ */
+export async function readOpeningFloats(
+  shiftIds: string[],
+): Promise<Map<string, number | null>> {
+  if (shiftIds.length === 0) return new Map();
+  try {
+    const rows = await systemDb((tx) =>
+      tx.cashierShift.findMany({
+        where: { id: { in: shiftIds } },
+        select: { id: true, openingFloat: true },
+      }),
+    );
+    return new Map(rows.map((r) => [r.id, r.openingFloat ?? null]));
+  } catch {
+    return new Map(); // column not migrated yet
+  }
 }
 
 /** Best-effort: null when the table isn't migrated yet, so nothing breaks. */
@@ -41,9 +94,46 @@ export async function currentShift(
         select: { id: true, staffUserId: true, staffName: true, openedAt: true },
       }),
     );
-    return row ?? null;
+    if (!row) return null;
+    return { ...row, openingFloat: await readFloat(row.id) };
   } catch {
     return null;
+  }
+}
+
+/**
+ * Open a shift deliberately, counting the drawer in.
+ *
+ * The difference from ensureShift below is who decided: this is a cashier
+ * pressing "Open shift" and typing what they put in the drawer. If a shift is
+ * already open it is returned untouched — pressing the button twice must not
+ * restate the fund, because the first figure is the one the count at the end
+ * will be checked against.
+ *
+ * The fund is written in a second statement on purpose. A database without the
+ * column still opens the shift; it just doesn't remember the number. The shift
+ * is what the till needs, so the shift is what must not fail.
+ */
+export async function openShift(
+  restaurantId: string,
+  staffUserId: string,
+  openingFloat: number,
+  resolveName: () => Promise<string>,
+): Promise<OpenShift | null> {
+  const existing = await currentShift(restaurantId, staffUserId);
+  if (existing && isShiftCurrent(existing.openedAt)) return existing;
+
+  const shift = await ensureShift(restaurantId, staffUserId, resolveName);
+  if (!shift) return null;
+
+  const float = Math.max(0, Math.round(openingFloat) || 0);
+  try {
+    await systemDb((tx) =>
+      tx.cashierShift.updateMany({ where: { id: shift.id }, data: { openingFloat: float } }),
+    );
+    return { ...shift, openingFloat: float };
+  } catch {
+    return shift; // column not migrated — the shift still opened
   }
 }
 
@@ -81,7 +171,8 @@ export async function ensureShift(
         select: { id: true, staffUserId: true, staffName: true, openedAt: true },
       }),
     );
-    return row;
+    // Opened by a money path rather than by a person, so no fund was counted.
+    return { ...row, openingFloat: null };
   } catch {
     // Lost a race with another tab — the partial unique index rejected the
     // second insert, which is exactly what it's for. Re-read the winner.

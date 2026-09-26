@@ -30,6 +30,8 @@ export interface ShiftReportSource {
   expenses: { category: string; amount: number; note: string | null }[];
   expensesTotal: number;
   cashCollected: number;
+  /** The fund counted into the drawer at open. Null = nobody was asked. */
+  openingFloat?: number | null;
   cashOuts: { amount: number; note: string | null }[];
   expectedCash: number;
   net: number;
@@ -89,6 +91,11 @@ export function buildShiftReport(src: ShiftReportSource): ShiftReport {
 
   b.push(RULE);
   b.push("CASH DRAWER");
+  // The fund first, because the figure at the bottom starts from it. Printed
+  // even when it wasn't counted: a line saying so is what tells the person
+  // signing the report why the total may not match the drawer.
+  if (src.openingFloat != null) b.push(money("Opening fund", src.openingFloat));
+  else b.push(pad("Opening fund", "not counted"));
   b.push(money("Cash collected", src.cashCollected));
   for (const c of src.cashOuts) {
     b.push(money(c.note ? `Cash out - ${c.note}` : "Cash out", c.amount, "-"));
