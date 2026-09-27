@@ -3,6 +3,7 @@ import {
   ticketHeaderLines,
   ticketHeading,
   ticketDocLabel,
+  ticketServiceLine,
   ticketBodyLines,
   ticketCustomerLines,
   ticketFooterLines,
@@ -133,6 +134,10 @@ export function encodeTicket(ticket: Ticket, openDrawer = false): Uint8Array {
   for (const line of header.slice(1)) b.line(line);
   b.size(true).line(ticketHeading(ticket)).size(false);
   b.bold(true).line(ticketDocLabel(ticket)).bold(false);
+  // Plate it or pack it. Bold and centred with the KITCHEN label, not tucked
+  // into the body — a cook reads the top of the docket and nothing else.
+  const service = ticketServiceLine(ticket);
+  if (service) b.bold(true).line(service).bold(false);
 
   // Who it's for and where it's going — left-aligned and bold, because this is
   // the block a rider reads at a gate in the dark.

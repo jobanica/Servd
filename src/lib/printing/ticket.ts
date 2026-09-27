@@ -174,6 +174,28 @@ export function ticketDocLabel(t: Ticket): string {
   return "*** OFFICIAL RECEIPT ***";
 }
 
+/**
+ * Plate it or pack it — the line the kitchen docket was missing.
+ *
+ * A dine-in ticket said "TABLE 1" and nothing more, so the only thing telling
+ * the kitchen how to send the food out was the absence of a word. Takeout said
+ * "TAKEOUT" in the heading, dine-in said nothing, and a cook reading a docket
+ * mid-service was left inferring from what wasn't printed. Now every kitchen
+ * ticket states it in the same place, whichever it is.
+ *
+ * Kitchen only: on a bill or a receipt the heading already carries it, and the
+ * diner is not the one deciding whether it goes in a tub.
+ *
+ * Worded through orderTypeLabel so the paper cannot drift from the screens —
+ * that is the whole point of lib/orders/order-type. ASCII only: the ESC/POS
+ * encoder drops anything past 0xFF and a codepage printer renders the pretty
+ * separators as box-drawing junk.
+ */
+export function ticketServiceLine(t: Ticket): string | null {
+  if (t.kind !== "kitchen") return null;
+  return `*** ${orderTypeLabel(t.orderType).toUpperCase()} ***`;
+}
+
 /** Net payable + VAT-of-net (centavos). */
 export function ticketTotals(t: Ticket) {
   const net = Math.max(0, t.total - t.discountAmount + Math.max(0, t.surchargeAmount));
@@ -381,10 +403,12 @@ export function ticketFooterLines(t: Ticket): string[] {
 /** Full plain-text rendering (HTML fallback / preview). */
 export function ticketLines(ticket: Ticket): string[] {
   const footer = ticketFooterLines(ticket);
+  const service = ticketServiceLine(ticket);
   return [
     ...ticketHeaderLines(ticket),
     ticketHeading(ticket),
     ticketDocLabel(ticket),
+    ...(service ? [service] : []),
     ...ticketCustomerLines(ticket),
     ...ticketBodyLines(ticket),
     ...(footer.length ? ["", ...footer] : []),
