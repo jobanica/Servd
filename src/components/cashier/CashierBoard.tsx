@@ -67,7 +67,9 @@ function OverflowItem({
   return (
     <button
       onClick={onClick}
-      className={`block w-full rounded-md px-3 py-2 text-left text-xs font-semibold hover:bg-cream ${
+      // Roomy on a phone, where this is a bottom sheet and gets tapped with a
+      // thumb mid-service; compact on a desktop dropdown driven by a mouse.
+      className={`block w-full rounded-md px-3 py-3 text-left text-sm font-semibold hover:bg-cream sm:py-2 sm:text-xs ${
         danger ? "text-guava" : accent ? "text-brand-primary" : "text-plum-ink"
       }`}
     >
@@ -957,9 +959,43 @@ export function CashierBoard({
                           </button>
                           {menuOrderId === o.id && (
                             <>
-                              {/* Click-away layer closes the menu. */}
-                              <div className="fixed inset-0 z-10" onClick={() => setMenuOrderId(null)} />
-                              <div className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-plum-ink/10 bg-white p-1 shadow-lg">
+                              {/* Click-away layer closes the menu. Dimmed on a
+                                  phone, where the menu is a sheet over the
+                                  board rather than a flap off a button. */}
+                              <div
+                                className="fixed inset-0 z-10 bg-black/30 sm:bg-transparent"
+                                onClick={() => setMenuOrderId(null)}
+                              />
+                              {/*
+                                A bottom sheet on a phone, a dropdown on a desktop.
+                                It was a dropdown everywhere, anchored right-0 and
+                                11rem wide — and "More" wraps onto its own line at
+                                the LEFT of the card, so the menu was laid out from
+                                about x=-55px and half the actions sat off the side
+                                of the screen. Voiding and discounting an order were
+                                unreachable on the device the till actually runs on.
+                                A sheet pinned to the bottom edge cannot be pushed
+                                off anything, whatever the button does.
+                              */}
+                              <div className="fixed inset-x-0 bottom-0 z-20 max-h-[70vh] overflow-y-auto rounded-t-2xl border border-plum-ink/10 bg-white p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-lg sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:mt-1 sm:w-44 sm:rounded-lg sm:p-1 sm:pb-1">
+                                {/* Which order this is about. The sheet covers
+                                    the board, so without this the cashier is
+                                    voiding something they can no longer see. */}
+                                <div className="mb-1 flex items-center justify-between gap-2 border-b border-plum-ink/10 px-3 pb-2 pt-1 sm:hidden">
+                                  <span className="min-w-0 truncate text-sm font-bold">
+                                    {t.label}
+                                    <span className="ml-2 font-normal text-plum-ink/50">
+                                      {formatPeso(Math.max(0, o.net - o.paid))} due
+                                    </span>
+                                  </span>
+                                  <button
+                                    onClick={() => setMenuOrderId(null)}
+                                    aria-label="Close"
+                                    className="shrink-0 rounded-full px-2 py-1 text-plum-ink/40 hover:bg-cream"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
                                 {o.status === "done" && !o.served && (
                                   <OverflowItem onClick={() => { setMenuOrderId(null); serve(o.id); }}>
                                     🍽️ Mark served
