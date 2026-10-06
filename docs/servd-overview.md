@@ -1,5 +1,13 @@
 # Servd — Complete Overview
 
+> **PRICING UPDATE — 6 October 2026.** New accounts are on **All Access:
+> ₱800 a month** for every feature except the Content Calendar, after a 30-day
+> free trial. Restaurants that went live **before** 6 October 2026 are
+> grandfathered on the one-time pricing described below and are never moved.
+> Partner-set-up restaurants still land on the Free plan. **`servd-pricing.md`
+> is the authority on prices** — where this document disagrees with it, it wins.
+
+
 Everything Servd is and does, in one document. Written as the single reference
 to hand to a partner, a new staff member, or an AI assistant answering
 questions.
@@ -31,7 +39,7 @@ inventory, accounting, HR and marketing.
 
 ### The business model, in one line
 
-**There is no monthly subscription.** ₱499 activates a restaurant's online
+**Grandfathered accounts have no monthly subscription** (new accounts: see the update above). ₱499 activates a restaurant's online
 ordering; every other paid feature is bought once and owned for good. Nothing
 in the product bills monthly. Servd takes **no commission** on sales.
 
@@ -494,7 +502,7 @@ product.
 **Do I need special hardware?** No. A thermal printer and cash drawer are
 optional but supported.
 
-**Do I pay monthly?** No — ₱499 activates your online ordering and it's yours
+**Do I pay monthly?** New accounts pay ₱800 a month (after a 30-day free trial). Grandfathered accounts don't — ₱499 activated their online ordering and it's yours
 for good. *Walang monthly bayad.* Only the content scheduler is monthly, and
 only if you want it.
 

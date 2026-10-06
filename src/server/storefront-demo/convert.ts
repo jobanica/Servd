@@ -5,7 +5,14 @@ import { randomBytes } from "node:crypto";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { normalizeUsername } from "@/lib/partners/login-username";
-import { getFreePlan, getDefaultPlan, getTopPlan, SIGNUP_TRIAL_DAYS } from "@/server/billing/subscription";
+import {
+  getAllAccessPlan,
+  getFreePlan,
+  getDefaultPlan,
+  getTopPlan,
+  SIGNUP_TRIAL_DAYS,
+} from "@/server/billing/subscription";
+import { ALL_ACCESS_TRIAL_DAYS } from "@/lib/billing/all-access";
 import { revokePreviewLogin } from "./preview-login";
 
 /**
@@ -92,16 +99,32 @@ async function applyBilling(
   restaurantId: string,
   billing: ConvertBilling,
 ) {
+  // A demo the Servd team converts ("trial30") is a NEW account, so it goes on
+  // the ₱800 All Access plan with the same 30-day trial as a signup.
+  //
+  // A PARTNER conversion ("free") deliberately does not. The partner programme
+  // promises that Servd never bills a restaurant a partner set up — the
+  // partner charges their own client, and the account lands on Free. Moving
+  // those onto ₱800 would break that promise to every partner, so it is left
+  // exactly as it was.
+  //
+  // Without the All Access row (migration not run) "trial30" falls back to the
+  // old top-plan trial, so a conversion never fails over it.
+  const allAccess = billing === "trial30" ? await getAllAccessPlan(tx) : null;
+  const mode: ConvertBilling = billing;
   const plan =
-    billing === "free"
+    allAccess ??
+    (mode === "free"
       ? ((await getFreePlan(tx)) ?? (await getDefaultPlan(tx)))
-      : ((await getTopPlan(tx)) ?? (await getDefaultPlan(tx)));
+      : ((await getTopPlan(tx)) ?? (await getDefaultPlan(tx))));
   if (!plan) return; // no plans seeded — leave the tenant as it is
 
   let trialEndsAt: Date | null = null;
-  if (billing === "trial30") {
+  if (mode === "trial30") {
     trialEndsAt = new Date();
-    trialEndsAt.setDate(trialEndsAt.getDate() + SIGNUP_TRIAL_DAYS);
+    trialEndsAt.setDate(
+      trialEndsAt.getDate() + (allAccess ? ALL_ACCESS_TRIAL_DAYS : SIGNUP_TRIAL_DAYS),
+    );
   }
 
   await tx.restaurant.update({
@@ -118,7 +141,7 @@ async function applyBilling(
   // Free is `active` and never expires; a trial is `trialing` and does.
   const data = {
     planId: plan.id,
-    status: billing === "free" ? ("active" as const) : ("trialing" as const),
+    status: mode === "free" ? ("active" as const) : ("trialing" as const),
     trialEndsAt,
     currentPeriodEnd: trialEndsAt,
   };

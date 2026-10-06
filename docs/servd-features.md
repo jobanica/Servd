@@ -1,5 +1,13 @@
 # Servd — Every feature and what it costs
 
+> **PRICING UPDATE — 6 October 2026.** New accounts are on **All Access:
+> ₱800 a month** for every feature except the Content Calendar, after a 30-day
+> free trial. Restaurants that went live **before** 6 October 2026 are
+> grandfathered on the one-time pricing described below and are never moved.
+> Partner-set-up restaurants still land on the Free plan. **`servd-pricing.md`
+> is the authority on prices** — where this document disagrees with it, it wins.
+
+
 One page listing everything Servd does, split into what's free and what's a paid
 unlock, with the one-time fee for each.
 
@@ -132,7 +140,7 @@ what the ₱499 activation in §3 turns on, and it ships with every plan.
 
 | Feature | Why not |
 |---|---|
-| **Social content scheduler** | **Switched off — not sold.** It was priced at ₱499/month; that subscription is not currently offered and no account is on it |
+| **Social content scheduler (Content Calendar)** | **₱499/month**, sold separately to every account — never part of any plan, All Access included |
 | **SMS marketing** | Metered — every text costs real money, so it runs on credits |
 | **AI menu import** | **Switched off** — burns API credits per import. Partner demos get 1 scan per demo restaurant |
 | **Online payments (card gateway)** | **Retired.** It redirected the diner off-site to pay by card; customers found the extra hop confusing. They scan the shop's own GCash / Maya / bank QR instead, which ships with online ordering. Accounts that already bought it keep it; it is never sold again |

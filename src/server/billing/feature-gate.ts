@@ -1,4 +1,5 @@
 import "server-only";
+import { isAllAccessPlan } from "@/lib/billing/all-access";
 
 import { systemDb } from "@/server/tenancy/scoped-db";
 import type { Tier } from "@/lib/billing/catalog";
@@ -27,6 +28,8 @@ export type { Feature };
 export interface PlanAccess {
   tier: Tier | null;
   onTrial: boolean;
+  /** On the ₱800 All Access plan (identified by id, not name). */
+  allAccess: boolean;
   /** The features this restaurant's plan currently grants. */
   features: Set<Feature>;
 }
@@ -39,7 +42,12 @@ export async function getPlanAccess(restaurantId: string): Promise<PlanAccess> {
       const sub = await tx.subscription.findFirst({
         where: { restaurantId },
         orderBy: { createdAt: "desc" },
-        select: { status: true, trialEndsAt: true, plan: { select: { name: true, features: true } } },
+        select: {
+          status: true,
+          trialEndsAt: true,
+          planId: true,
+          plan: { select: { name: true, features: true } },
+        },
       });
       const isTrialing = sub?.status === "trialing";
       const onTrial = isTrialing && sub?.trialEndsAt != null && sub.trialEndsAt.getTime() > Date.now();
@@ -47,7 +55,14 @@ export async function getPlanAccess(restaurantId: string): Promise<PlanAccess> {
       // paid plan without a card, or a lapsed signup trial). It must grant only
       // Free-tier access until payment flips the status to "active" — otherwise a
       // post-trial account could switch to Growth/Business and get it for free.
-      const lapsed = isTrialing && !onTrial;
+      //
+      // Not on All Access, where a trial that ends unpaid becomes a bill with
+      // seven days' grace — and the plan keeps working through that grace, so
+      // the days are worth something. Dropping it to Free here, in the hours
+      // before the nightly run raises the bill, would lock the till the moment
+      // the trial ran out and then hand it back, before the grace even began.
+      // The run suspends it if the bill goes unpaid; that is the lock.
+      const lapsed = isTrialing && !onTrial && !isAllAccessPlan(sub?.planId);
       const tier = lapsed ? "Free" : asTier(sub?.plan?.name);
       const tierDefaults = tier ? defaultFeaturesForTier(tier) : ALL_FEATURES;
       const stored = lapsed ? [] : sanitizeFeatures(sub?.plan?.features ?? []);
@@ -56,7 +71,7 @@ export async function getPlanAccess(restaurantId: string): Promise<PlanAccess> {
       const features = new Set<Feature>(
         onTrial ? ALL_FEATURES : stored.length ? stored : tierDefaults,
       );
-      return { tier, onTrial, features };
+      return { tier, onTrial, allAccess: isAllAccessPlan(sub?.planId), features };
     });
   } catch {
     // `plan.features` column not migrated yet → resolve from tier defaults.
@@ -71,20 +86,22 @@ async function getPlanAccessByTier(restaurantId: string): Promise<PlanAccess> {
       const sub = await tx.subscription.findFirst({
         where: { restaurantId },
         orderBy: { createdAt: "desc" },
-        select: { status: true, trialEndsAt: true, plan: { select: { name: true } } },
+        select: { status: true, trialEndsAt: true, planId: true, plan: { select: { name: true } } },
       });
       const isTrialing = sub?.status === "trialing";
       const onTrial = isTrialing && sub?.trialEndsAt != null && sub.trialEndsAt.getTime() > Date.now();
-      // Lapsed/unpaid trial → Free access until they pay (see getPlanAccess).
-      const lapsed = isTrialing && !onTrial;
+      const allAccess = isAllAccessPlan(sub?.planId);
+      // Lapsed/unpaid trial → Free access until they pay (see getPlanAccess) —
+      // except on All Access, which is billed and graced instead.
+      const lapsed = isTrialing && !onTrial && !allAccess;
       const tier = lapsed ? "Free" : asTier(sub?.plan?.name);
       const features = new Set<Feature>(
         onTrial ? ALL_FEATURES : tier ? defaultFeaturesForTier(tier) : ALL_FEATURES,
       );
-      return { tier, onTrial, features };
+      return { tier, onTrial, allAccess, features };
     });
   } catch {
-    return { tier: null, onTrial: false, features: new Set(ALL_FEATURES) };
+    return { tier: null, onTrial: false, allAccess: false, features: new Set(ALL_FEATURES) };
   }
 }
 

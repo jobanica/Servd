@@ -137,10 +137,16 @@ export async function getTableQrAccess(restaurantId: string): Promise<TableQrAcc
   }
 
   const purchased = await hasPaidAddon(restaurantId, UNLIMITED_TABLES_ADDON);
-  // A plan MAY include it (nothing does today), and only off-trial — a trial
-  // unlocking it would let anyone print a floor plan for free for a fortnight.
+  // A plan MAY include it, and normally only off-trial — a trial unlocking it
+  // would let anyone print a floor plan for free and keep it on the Free plan.
+  //
+  // All Access is the exception: its trial ends in a bill, and an account that
+  // doesn't pay is suspended, which takes every QR code offline with it. There
+  // is no free floor plan to walk away with, and a dine-in restaurant trying
+  // the product on a single table hasn't really tried it.
   const access = await getPlanAccess(restaurantId);
-  const viaPlan = !access.onTrial && access.features.has("unlimitedTables");
+  const viaPlan =
+    (!access.onTrial || access.allAccess) && access.features.has("unlimitedTables");
 
   const quota = tableQuota({ tableCount, grandfathered, unlocked: purchased || viaPlan });
   const pending = quota.unlimited ? false : await hasPendingAddon(restaurantId, UNLIMITED_TABLES_ADDON);

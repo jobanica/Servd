@@ -61,6 +61,20 @@ export function trackPurchase(pesos: number): void {
 }
 
 /**
+ * A preview that went live on the free 30-day trial — Meta's standard
+ * StartTrial, NOT Purchase. Reporting a trial as a ₱499 purchase would teach
+ * the ad account to find people who never pay, and make the cost-per-sale in
+ * the ads dashboard a fiction.
+ */
+export function trackStartTrial(): void {
+  try {
+    window.fbq?.("track", "StartTrial", { value: 0, currency: "PHP" });
+  } catch {
+    /* pixel absent or blocked */
+  }
+}
+
+/**
  * Our own view counter, so the funnel is measurable whether or not the pixel is
  * configured — and so the numbers the founder makes decisions on live in a
  * database they own rather than in an ad account.

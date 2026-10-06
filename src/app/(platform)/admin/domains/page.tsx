@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireAdminPage } from "@/server/tenancy/require-admin";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { getCustomDomainAccess, CUSTOM_DOMAIN_PRICE } from "@/server/billing/addons";
+import { getPlanAccess } from "@/server/billing/feature-gate";
 import { formatPeso } from "@/lib/money";
 import { getDomainProvider } from "@/server/domains";
 import { SubdomainForm, CustomDomainForm } from "@/components/admin/DomainForms";
@@ -12,13 +13,14 @@ import { WebAddressForm } from "@/components/admin/WebAddressForm";
 
 export default async function DomainsPage() {
   const { restaurantId } = await requireAdminPage();
-  const [restaurant, access] = await Promise.all([
+  const [restaurant, access, plan] = await Promise.all([
     tenantDb(restaurantId, (tx) =>
       tx.restaurant.findFirstOrThrow({
         select: { slug: true, subdomain: true, customDomain: true, customDomainVerifiedAt: true },
       }),
     ),
     getCustomDomainAccess(restaurantId),
+    getPlanAccess(restaurantId),
   ]);
   const priceLabel = formatPeso(CUSTOM_DOMAIN_PRICE);
 
@@ -44,7 +46,34 @@ export default async function DomainsPage() {
           "mango-gril" would be indefensible. */}
       <WebAddressForm current={restaurant.slug} appUrl={appUrl} />
 
-      {!access.allowed ? (
+      {!access.allowed && plan.allAccess ? (
+        // All Access includes custom domains, but — like every plan — not
+        // during the free trial: a domain provisions real infrastructure. The
+        // one-time unlock beside it would be refused (it's already in their
+        // plan), so they're sent to the one thing that does open it.
+        <div className="rounded-tile border border-plum-ink/10 bg-white p-6">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl" aria-hidden>🔒</span>
+            <div className="min-w-0">
+              <h2 className="font-heading text-lg font-bold text-plum-ink">
+                Custom domain — included in All Access
+              </h2>
+              <p className="mt-1 text-sm text-plum-ink/70">
+                Run your ordering site on your own web address (e.g.{" "}
+                <span className="font-semibold text-plum-ink">order.yourrestaurant.com</span>). It
+                switches on with your first monthly payment — your free trial covers everything
+                else in the meantime.
+              </p>
+              <Link
+                href="/admin/billing"
+                className="mt-3 inline-block rounded-full px-5 py-2.5 text-sm font-semibold btn-brand"
+              >
+                Go to billing →
+              </Link>
+            </div>
+          </div>
+        </div>
+      ) : !access.allowed ? (
         <div className="rounded-tile border border-plum-ink/10 bg-white p-6">
           <div className="flex items-start gap-3">
             <span className="text-2xl" aria-hidden>🔒</span>

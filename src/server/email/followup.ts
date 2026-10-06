@@ -20,7 +20,7 @@ import { getEmailCreds, sendBatch } from "./provider";
  *
  * Two tracks:
  *   A — gave an email, hasn't reached a preview → "come back and finish"
- *   B — reached a preview, hasn't paid          → "activate for ₱499"
+ *   B — reached a preview, hasn't gone live   → "go live, free for 30 days"
  *
  * Reaching a preview cancels the rest of A and schedules B.
  */

@@ -1,4 +1,5 @@
 import "server-only";
+import { wentLiveLine } from "@/lib/billing/go-live-copy";
 
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { renderAccountEmail } from "@/lib/email/render";
@@ -36,7 +37,15 @@ async function send(to: string, subject: string, paragraphs: string[]): Promise<
  * this link — so there is no password in the database to email, which is the
  * point. Mailing one would put a working credential in an inbox forever.
  */
-export async function sendActivationEmail(restaurantId: string): Promise<boolean> {
+export async function sendActivationEmail(
+  restaurantId: string,
+  /**
+   * Whether money changed hands. A ₱499 activation is "yours for good"; a
+   * preview that went live on the free trial is not, and must not be told it
+   * is — that sentence in an inbox is a promise.
+   */
+  paid = true,
+): Promise<boolean> {
   try {
     const r = await systemDb((tx) =>
       tx.restaurant.findUnique({
@@ -64,7 +73,9 @@ export async function sendActivationEmail(restaurantId: string): Promise<boolean
 
     const paragraphs = [
       `${r.name} is live 🎉`,
-      "Your payment went through and your ordering system is yours for good — one payment, no monthly fees.",
+      paid
+        ? "Your payment went through and your ordering system is yours for good — one payment, no monthly fees."
+        : wentLiveLine(false),
       `Your username is: ${username}`,
       claimUrl
         ? `Set your password here, then you're in: ${claimUrl}`

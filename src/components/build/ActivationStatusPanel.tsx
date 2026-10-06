@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { pollActivation } from "@/server/build/status-action";
-import { trackPurchase } from "@/components/create/Pixel";
+import { trackPurchase, trackStartTrial } from "@/components/create/Pixel";
+import { wentLiveLine } from "@/lib/billing/go-live-copy";
 import type { ActivationStatus } from "@/server/build/activation";
 
 const ACTIVATION_PESOS = 499;
@@ -31,9 +32,11 @@ export function ActivationStatusPanel({
   useEffect(() => {
     if (status.status === "activated" && !reported.current) {
       reported.current = true;
-      trackPurchase(ACTIVATION_PESOS);
+      // A trial go-live is not a sale — see trackStartTrial.
+      if (status.paid) trackPurchase(ACTIVATION_PESOS);
+      else trackStartTrial();
     }
-  }, [status.status]);
+  }, [status.status, status.paid]);
 
   useEffect(() => {
     if (status.status === "activated") return;
@@ -59,8 +62,7 @@ export function ActivationStatusPanel({
           {status.restaurantName} is live
         </h1>
         <p className="mt-1 text-sm text-plum-ink/55">
-          Your online ordering system is yours for life — one payment, no monthly fees. Set
-          your password to open your dashboard.
+          {wentLiveLine(status.paid)} Set your password to open your dashboard.
         </p>
 
         {status.claimUrl ? (

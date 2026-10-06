@@ -1,4 +1,5 @@
 import "server-only";
+import { isAllAccessPlan } from "@/lib/billing/all-access";
 
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { getPlanAccess } from "@/server/billing/feature-gate";
@@ -27,6 +28,7 @@ export async function resolveBannerPlan(
   let override: string | null = null;
   let trialEndsAt: string | null = null;
   let planName: string | null = null;
+  let planId: string | null = null;
   try {
     const r = await systemDb((tx) =>
       tx.restaurant.findFirst({ where: { id: restaurantId }, select: { bannerPlan: true } }),
@@ -40,11 +42,12 @@ export async function resolveBannerPlan(
       tx.subscription.findFirst({
         where: { restaurantId },
         orderBy: { createdAt: "desc" },
-        select: { trialEndsAt: true, plan: { select: { name: true } } },
+        select: { trialEndsAt: true, planId: true, plan: { select: { name: true } } },
       }),
     );
     trialEndsAt = sub?.trialEndsAt?.toISOString() ?? null;
     planName = sub?.plan?.name ?? null;
+    planId = sub?.planId ?? null;
   } catch {
     /* best-effort */
   }
@@ -57,6 +60,11 @@ export async function resolveBannerPlan(
   if (onTrial) return { plan: "trial", trialEndsAt };
   if (planName && /lite/i.test(planName)) return { plan: "lite", trialEndsAt };
   if (tier === "Growth" || tier === "Business") return { plan: "growth", trialEndsAt };
+  // All Access is identified by its id, not its name — this function matches
+  // the others by name, and "All Access" would otherwise fall through to the
+  // capped starter experience below and be told to upgrade from the plan that
+  // already includes everything.
+  if (isAllAccessPlan(planId)) return { plan: "growth", trialEndsAt };
   // Free tier, unknown, or no subscription → the capped starter experience.
   return { plan: "starter", trialEndsAt };
 }

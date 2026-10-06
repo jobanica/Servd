@@ -54,7 +54,7 @@ Tapusin mo ang sa {{name}}:
     subject: "Ready na ang restaurant mo 🎉",
     body: `Congrats! Live na ang preview ng {{name}}. Makikita na ng customers ang menu mo at maka-order sila.
 
-Para tanggapin ang totoong orders, activate mo na — ₱499 one-time, sa'yo na habambuhay.
+Para tanggapin ang totoong orders, i-live mo na — libre ang unang 30 araw, tapos ₱800 kada buwan.
 
 ${BUTTON_TAG}
 
@@ -74,7 +74,7 @@ ${BUTTON_TAG}`,
     subject: "Ilang order na ang nawawala sa'yo?",
     body: `Bawat araw na walang ordering page, may customers na hindi maka-order pag busy ka o sarado ang chat.
 
-₱499 one-time, tapos sa'yo na ang {{name}} page habambuhay.
+Libre ang unang 30 araw, tapos ₱800 kada buwan — kasama na ang POS, kitchen display, inventory at HR.
 
 ${BUTTON_TAG}`,
   },
@@ -91,8 +91,8 @@ Sa sariling ordering page, diretso sa'yo ang bayad at sa'yo rin ang customer.
 ${BUTTON_TAG}`,
   },
   B_day7: {
-    subject: "Activate na? ₱499 lang, one-time",
-    body: `Simple lang: ₱499 one-time, live agad ang {{name}}.
+    subject: "I-live na? Libre ang unang 30 araw",
+    body: `Simple lang: i-live mo ngayon ang {{name}} — libre ng 30 araw, tapos ₱800 kada buwan.
 
 ${BUTTON_TAG}`,
   },

@@ -1,6 +1,7 @@
 import { getBuildState } from "@/server/build/queries";
 import { readBuildCookie } from "@/server/build/session";
 import { BuildWizard } from "@/components/build/BuildWizard";
+import { allAccessLive } from "@/server/build/activation";
 
 export const metadata = {
   title: "Create your free restaurant preview · Servd",
@@ -27,6 +28,9 @@ export default async function BuildPage({
         initial={initial}
         appUrl={appUrl}
         startAt={go === "activate" || go === "preview" ? go : undefined}
+        // Which "go live" this is decides what the button promises — and has
+        // to match what pressing it actually does.
+        goLiveMode={(await allAccessLive()) ? "trial" : "activation"}
       />
     </main>
   );

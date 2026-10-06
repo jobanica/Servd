@@ -38,7 +38,7 @@ const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID ?? "";
 
 const TITLE = "Create your restaurant's online ordering page — free";
 const DESCRIPTION =
-  "Upload your logo and menu, build your preview, and experience how your customers can order online. No credit card. ₱499 one-time to activate.";
+  "Upload your logo and menu, build your preview, and experience how your customers can order online. No credit card. Free for 30 days, then ₱800 a month.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
@@ -86,7 +86,7 @@ const BENEFITS: [string, string, string][] = [
 const FAQ: [string, string][] = [
   [
     "Is it really free to try?",
-    "Yes — build your full preview and experience the ordering flow free. The ₱499 one-time payment only comes when you're ready to accept real orders.",
+    "Yes — build your full preview and experience the ordering flow free. When you go live you get 30 more days free with every feature on, and only then does it become ₱800 a month.",
   ],
   [
     "What do I need to start?",
@@ -97,8 +97,8 @@ const FAQ: [string, string][] = [
     "Your page goes live right away and we email you your username plus a link to set your own password. From there you can add the rest of your menu, print your table QR codes, and start taking orders.",
   ],
   [
-    "Do I pay monthly?",
-    "No. Activation is a one-time ₱499 and your online ordering page is yours for good — walang monthly bayad. Other features are optional one-time unlocks you can add later if you want them.",
+    "How much is it after the trial?",
+    "₱800 a month for everything — online ordering, the POS, kitchen display, inventory, accounting, HR and the rest. The Content Calendar is the one thing sold separately. You get a bill in your dashboard each month and seven days to pay it.",
   ],
 ];
 
@@ -143,7 +143,7 @@ export default async function CreatePage() {
 
             <div data-cta-anchor className="mt-7">
               <Cta href={buildHref} />
-              <CtaNote>No credit card • No commitment • ₱499 one-time to activate</CtaNote>
+              <CtaNote>No credit card • Free for 30 days • Then ₱800/month</CtaNote>
             </div>
           </div>
 

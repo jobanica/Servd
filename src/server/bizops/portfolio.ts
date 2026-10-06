@@ -1,4 +1,5 @@
 import "server-only";
+import { isAllAccessPlan } from "@/lib/billing/all-access";
 
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { capFor } from "@/lib/billing/planLimits";
@@ -102,11 +103,16 @@ export async function getPortfolio(now = new Date()): Promise<PortfolioRow[] | n
       tx.subscription.findMany({
         where: { restaurantId: { in: ids } },
         orderBy: { createdAt: "desc" },
-        select: { restaurantId: true, plan: { select: { name: true } } },
+        select: { restaurantId: true, planId: true, plan: { select: { name: true } } },
       }),
     ).catch(() => []);
     const planName = new Map<string, string>();
-    for (const s of subs) if (!planName.has(s.restaurantId)) planName.set(s.restaurantId, s.plan?.name ?? "");
+    // All Access is recorded by id: this resolver otherwise goes by name, and
+    // "All Access" matches none of them, so it would read as the capped tier.
+    for (const s of subs) {
+      if (planName.has(s.restaurantId)) continue;
+      planName.set(s.restaurantId, isAllAccessPlan(s.planId) ? ALL_ACCESS_KEY : (s.plan?.name ?? ""));
+    }
 
     // Everything ever paid, and what they own.
     const [paidActivations, paidAddons] = await Promise.all([
@@ -194,7 +200,11 @@ export async function getPortfolio(now = new Date()): Promise<PortfolioRow[] | n
  * which is the safe direction: it can surface a shop as near its cap that
  * isn't, never hide one that is.
  */
+/** Stands in for the All Access plan's name, which no rule below matches. */
+const ALL_ACCESS_KEY = "\u0000all-access";
+
 function resolvePlan(name: string): string {
+  if (name === ALL_ACCESS_KEY) return "growth"; // every feature, uncapped
   if (!name) return "starter";
   if (/lite/i.test(name)) return "lite";
   if (/growth|business/i.test(name)) return "growth";

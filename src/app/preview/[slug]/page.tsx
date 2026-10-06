@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { allAccessLive } from "@/server/build/activation";
 import { getPublicMenu } from "@/server/menu/public-menu";
 import { defaultPaymentConfig, defaultDeliveryConfig, defaultBookingConfig } from "@/server/storefront/storefront";
 import { getPreviewRestaurant, stampPreviewReached } from "@/server/build/queries";
@@ -35,6 +36,7 @@ export default async function PreviewPage({ params }: { params: Promise<{ slug: 
     <PreviewStorefront
       isOwner={isOwner}
       buildHref="/build"
+      goLiveMode={isOwner && (await allAccessLive()) ? "trial" : "activation"}
       order={{
         slug,
         restaurantName: restaurant.displayName || restaurant.name,

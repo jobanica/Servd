@@ -136,6 +136,11 @@ export default async function BizOpsPage({
               value={fmtPeso(revenue.unlocks)}
               hint={`${revenue.unlockCount} bought`}
             />
+            <Stat
+              label="Monthly plan payments"
+              value={fmtPeso(revenue.plans)}
+              hint={`${revenue.planCount} paid`}
+            />
           </div>
         )}
       </Section>
@@ -147,14 +152,20 @@ export default async function BizOpsPage({
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Stat label="MRR" value={fmtPeso(revenue.mrr)} big />
             <Stat label="Active subscriptions" value={fmtCount(revenue.mrrCount)} />
-            <div className="rounded-tile border border-plum-ink/10 bg-cream/40 p-4 sm:col-span-2">
+            <Stat
+              label="All Access"
+              value={fmtPeso(revenue.allAccessMrr)}
+              hint={`${revenue.allAccessCount} paying`}
+            />
+            <div className="rounded-tile border border-plum-ink/10 bg-cream/40 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-plum-ink/45">
-                Why MRR is small
+                What&apos;s in MRR
               </p>
               <p className="mt-1 text-xs leading-relaxed text-plum-ink/60">
-                Servd sells one-time unlocks, not monthly plans. The only recurring line in the
-                product is the content scheduler, so this figure is the sum of live subscriptions
-                to it — not a plan MRR. The money is in the row above.
+                Paying All Access accounts (₱800/month, new accounts from 6 Oct 2026) plus
+                Content Calendar subscriptions. Trials aren&apos;t counted until they pay.
+                Accounts from before then are grandfathered on one-time unlocks, which show in
+                the row above.
               </p>
             </div>
           </div>

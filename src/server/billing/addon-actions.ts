@@ -8,6 +8,8 @@ import { isFeature, type Feature } from "@/lib/billing/features";
 import { addonKeyFor, listOwnedFeatures } from "@/server/billing/owned-features";
 import { getFeaturePrices } from "@/server/billing/feature-pricing";
 import { getPlanAccess } from "@/server/billing/feature-gate";
+import { getCurrentSubscription } from "@/server/billing/subscription";
+import { isAllAccessPlan } from "@/lib/billing/all-access";
 import { getCustomDomainAccess } from "@/server/billing/addons";
 import {
   MONTHLY_FEATURES,
@@ -43,6 +45,14 @@ export async function startFeatureUnlock(featureKey: string): Promise<UnlockResu
     getFeaturePrices(),
   ]);
   if (owned.has(feature)) return { error: "You already own this feature." };
+  // All Access includes every feature sold this way, trial or not — so there
+  // is nothing to sell it, and taking money for something already in the
+  // monthly price would be charging twice. The checks below let a trial and a
+  // custom domain through, which is right for the older plans and wrong here.
+  const sub = await getCurrentSubscription(restaurantId).catch(() => null);
+  if (isAllAccessPlan(sub?.planId)) {
+    return { error: "This is already included in your All Access plan." };
+  }
   // A live trial unlocks everything temporarily; custom domain deliberately
   // doesn't count, so buying during a trial stays possible for it.
   if (feature !== "customDomain" && !access.onTrial && access.features.has(feature)) {

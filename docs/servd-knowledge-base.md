@@ -1,5 +1,13 @@
 # Servd — Product Knowledge Base
 
+> **PRICING UPDATE — 6 October 2026.** New accounts are on **All Access:
+> ₱800 a month** for every feature except the Content Calendar, after a 30-day
+> free trial. Restaurants that went live **before** 6 October 2026 are
+> grandfathered on the one-time pricing described below and are never moved.
+> Partner-set-up restaurants still land on the Free plan. **`servd-pricing.md`
+> is the authority on prices** — where this document disagrees with it, it wins.
+
+
 A reference describing everything Servd does. Written to be loaded into an AI
 assistant as source knowledge for answering customer and staff questions.
 
@@ -524,7 +532,7 @@ not book a rider.
 
 ## 18. Pricing
 
-**There is no monthly subscription.** Servd is a one-time-payment product. Full
+**For grandfathered accounts there is no monthly subscription** (new accounts: ₱800/month, see the update above). For them Servd is a one-time-payment product. Full
 detail is in the separate pricing document; the short version:
 
 | | Price | Billing |

@@ -475,28 +475,35 @@ export default async function Home() {
       <section id="pricing" className="mx-auto max-w-6xl px-6 py-20">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="font-heading text-4xl font-extrabold tracking-tight">
-            Pay once. Keep it forever.
+            One price. Everything included.
           </h2>
           <p className="mt-3 text-plum-ink/70">
-            No monthly subscription. Start free with QR ordering, then unlock only the features you
-            actually want — each is a <strong>one-time payment</strong> and it&apos;s yours for good.{" "}
+            Every feature for one monthly price — no add-ons to work out, no tiers to compare. Try it
+            free for 30 days, no card required.{" "}
             <strong>We handle the setup for you</strong> — message us to get onboarded.
           </p>
         </div>
 
-        {/* What every account gets, free */}
+        {/* The plan. One card, because there is one plan. */}
         <div className="mx-auto mt-10 max-w-3xl rounded-tile border border-brand-primary/25 bg-brand-primary/5 p-6 text-center">
-          <p className="font-heading text-xl font-extrabold text-brand-primary">Free to start</p>
-          <p className="mt-1.5 text-sm text-plum-ink/70">
-            Unlimited dine-in QR codes, the cashier POS, kitchen display and your online ordering
-            page — at no cost, with no card required.
+          <p className="font-heading text-sm font-bold uppercase tracking-wide text-brand-primary">
+            All Access
+          </p>
+          <p className="mt-1 font-heading text-4xl font-extrabold text-plum-ink">
+            ₱800<span className="text-lg font-bold text-plum-ink/50"> / month</span>
+          </p>
+          <p className="mt-1 text-sm font-semibold text-brand-primary">
+            First 30 days free · no card to start
+          </p>
+          <p className="mt-3 text-sm text-plum-ink/70">
+            Unlimited dine-in QR codes, the cashier POS, kitchen display, your online ordering page,
+            reservations, loyalty, promos, gift cards, inventory, accounting, HR and payroll, offline
+            mode, your own domain and more.
+          </p>
+          <p className="mt-3 text-xs text-plum-ink/50">
+            The Content Calendar is sold separately. SMS is pay-as-you-go with credits.
           </p>
         </div>
-
-        <p className="mx-auto mt-6 max-w-2xl text-center text-sm text-plum-ink/55">
-          Unlock features one at a time, whenever you need them — you&apos;ll see the price for each
-          inside your dashboard. Message us and we&apos;ll walk you through what fits your restaurant.
-        </p>
 
         {/* Refund policy */}
         <div id="refund" className="mx-auto mt-12 max-w-2xl scroll-mt-24 rounded-tile border border-plum-ink/10 bg-white p-6 text-center">
@@ -530,7 +537,8 @@ export default async function Home() {
             ["Do diners need to download an app?", "No. They scan the QR on the table and your menu opens in their browser — order and pay right there."],
             ["Where does the money go?", "Your money goes directly to you. We don't hold any of your money — payments land in your own account."],
             ["Can I use my own branding?", "Yes — your logo, colors, tagline, and even your own domain. Diners only ever see your brand."],
-            ["Is there a free trial?", "Yes — every new account starts with a 30-day free trial of every feature, no card required. When the trial ends you're moved to the Free plan automatically (QR dine-in ordering, kitchen display and cashier POS) — keep using it for free forever, or upgrade to Growth or Business for online ordering, payments, marketing and the back office."],
+            ["Is there a free trial?", "Yes — every new account starts with a 30-day free trial of every feature, no card required. After that it's ₱800 a month for everything (the Content Calendar is sold separately). You get a bill in your dashboard each month, and seven days to pay it before the account is paused."],
+            ["How much does it cost?", "₱800 a month, for every feature — the POS, kitchen display, online ordering, inventory, accounting, HR and the rest. The only extras are the Content Calendar, which has its own monthly price, and SMS, which you top up with credits as you use it."],
             ["Does it work on iPad for the cashier?", "Yes. Printing supports cloud/poll printers and AirPrint so it works on any device."],
             ["What's your refund policy?", "We offer a 30-day money-back guarantee on plan/system upgrade payments — reach out within 30 days of the charge and we'll refund it. One-time setup fees (the agent setup / onboarding done for your restaurant) are non-refundable, since that work is completed up front."],
           ].map(([q, a]) => (

@@ -1,11 +1,19 @@
 # Servd — feature & price summary
 
+> **PRICING UPDATE — 6 October 2026.** New accounts are on **All Access:
+> ₱800 a month** for every feature except the Content Calendar, after a 30-day
+> free trial. Restaurants that went live **before** 6 October 2026 are
+> grandfathered on the one-time pricing described below and are never moved.
+> Partner-set-up restaurants still land on the Free plan. **`servd-pricing.md`
+> is the authority on prices** — where this document disagrees with it, it wins.
+
+
 Compact reference for loading into an AI chatbot. Philippine Pesos.
 Verified against live pricing 7 Sep 2026. Authority: Super-admin → Feature
 pricing. If a customer's billing screen differs, the screen is right.
 
 Servd is an all-in-one restaurant POS + online ordering system for the
-Philippines. One-time payments only. No monthly fee. No commission on sales.
+Philippines. New accounts: ₱800 a month for everything after a 30-day free trial. Accounts from before 6 October 2026: one-time payments, no monthly fee. No commission on sales.
 
 ## Free — every account, never gated
 

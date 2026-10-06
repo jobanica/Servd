@@ -45,16 +45,22 @@ export default function TermsPage() {
             </p>
           </Section>
 
-          <Section title="Activation and what you pay">
+          <Section title="What you pay">
             <p>
-              Activation costs <strong>₱499, once</strong>. It is not a subscription and there
-              is no monthly fee for your online ordering page — once activated it stays yours.
+              Accounts that go live from <strong>6 October 2026</strong> are on{" "}
+              <strong>All Access</strong>: a 30-day free trial, then <strong>₱800 a month</strong>{" "}
+              for every feature except the Content Calendar, which is sold separately. SMS is
+              charged by credits as you use them. Each month&apos;s bill appears in your
+              dashboard; if it isn&apos;t paid within 7 days of falling due, your account —
+              including your ordering page — is paused until it is. Pausing deletes nothing:
+              your menu, orders and settings are all still there when you pay.
             </p>
             <p className="mt-2">
-              Other features are optional and sold separately as one-time unlocks. You will see
-              the price for each inside your dashboard before you buy it. We may change the
-              price of features you have not bought; we will not retroactively charge you for
-              one you already own.
+              Accounts that went live before 6 October 2026 keep the terms they joined on.
+              For those, activation was <strong>₱499, once</strong>, with no monthly fee for
+              the online ordering page, and other features are sold as one-time unlocks that
+              stay yours. We may change the price of features you have not bought; we will not
+              retroactively charge you for one you already own.
             </p>
           </Section>
 

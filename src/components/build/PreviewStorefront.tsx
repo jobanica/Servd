@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { goLiveCopy, type GoLiveMode } from "@/lib/billing/go-live-copy";
 import Link from "next/link";
 import { WebOrder, type WebOrderProps } from "@/components/site/WebOrder";
 import { requestActivation } from "@/server/build/activate-action";
@@ -19,11 +20,15 @@ export function PreviewStorefront({
   order,
   isOwner,
   buildHref,
+  goLiveMode = "activation",
 }: {
   order: WebOrderProps;
   isOwner: boolean;
   buildHref: string;
+  /** Free 30-day trial (All Access live) or the old ₱499 activation. */
+  goLiveMode?: GoLiveMode;
 }) {
+  const copy = goLiveCopy(goLiveMode);
   const [prompt, setPrompt] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,8 +87,9 @@ export function PreviewStorefront({
                   disabled={busy}
                   className="mt-5 w-full rounded-full py-3.5 font-heading text-base font-bold btn-brand disabled:opacity-60"
                 >
-                  {busy ? "Opening payment…" : "Activate for ₱499"}
+                  {busy ? copy.busy : copy.button}
                 </button>
+                <p className="mt-2 text-xs text-plum-ink/45">{copy.footnote}</p>
                 {error && <p className="mt-2 text-sm text-guava">{error}</p>}
                 <Link
                   href={buildHref}

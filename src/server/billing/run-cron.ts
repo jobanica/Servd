@@ -5,6 +5,7 @@ import { nextBillingAction } from "@/lib/billing/lifecycle";
 import { addMonths } from "@/lib/billing/period";
 import { PLAN_FIELDS } from "@/server/billing/subscription";
 import { renewFeatureSubscriptions } from "@/server/billing/feature-subscriptions";
+import { isAllAccessPlan, nextAllAccessAction } from "@/lib/billing/all-access";
 
 export interface CronSummary {
   processed: number;
@@ -45,6 +46,17 @@ export async function runBillingCron(now: Date = new Date()): Promise<CronSummar
   };
 
   for (const sub of subs) {
+    // The ₱800 All Access plan has its own rules (one invoice per unpaid
+    // month, 7 days' grace from the due date, then suspended) and is handled
+    // entirely here. Everything below this block is the ORIGINAL billing logic
+    // and is reached only by the plans that existed before All Access, so the
+    // accounts on them — every account that existed when it was introduced —
+    // are billed exactly as they always were.
+    if (isAllAccessPlan(sub.planId)) {
+      await billAllAccess(sub, now, s);
+      continue;
+    }
+
     const decision = nextBillingAction(
       {
         status: sub.status as "trialing" | "active" | "past_due",
@@ -166,4 +178,99 @@ export async function runBillingCron(now: Date = new Date()): Promise<CronSummar
   s.featuresLapsed = feat.lapsed;
 
   return s;
+}
+
+type CronSub = {
+  id: string;
+  restaurantId: string;
+  status: string;
+  trialEndsAt: Date | null;
+  currentPeriodEnd: Date | null;
+  cancelAtPeriodEnd: boolean;
+  plan: { priceMonthly: number };
+};
+
+/**
+ * One All Access subscription's turn in the daily run. The decision is pure
+ * (lib/billing/all-access); this only reads what it needs and does it.
+ */
+async function billAllAccess(sub: CronSub, now: Date, s: CronSummary): Promise<void> {
+  const [openInvoice, restaurant] = await systemDb(async (tx) => [
+    await tx.restaurantInvoice.findFirst({
+      where: { restaurantId: sub.restaurantId, status: "open" },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, periodStart: true },
+    }),
+    await tx.restaurant.findUnique({
+      where: { id: sub.restaurantId },
+      select: { status: true },
+    }),
+  ]);
+
+  const decision = nextAllAccessAction(
+    {
+      status: sub.status as "trialing" | "active" | "past_due" | "cancelled",
+      trialEndsAt: sub.trialEndsAt,
+      currentPeriodEnd: sub.currentPeriodEnd,
+      openInvoiceDueAt: openInvoice?.periodStart ?? null,
+      suspended: restaurant?.status === "suspended",
+      cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+    },
+    now,
+  );
+
+  if (decision.action === "none") return;
+
+  if (decision.action === "cancel") {
+    await systemDb(async (tx) => {
+      await tx.subscription.update({ where: { id: sub.id }, data: { status: "cancelled" } });
+      await tx.restaurant.update({
+        where: { id: sub.restaurantId },
+        data: { status: "suspended" },
+        select: { id: true },
+      });
+    });
+    s.cancelled++;
+    return;
+  }
+
+  if (decision.action === "suspend") {
+    await systemDb((tx) =>
+      tx.restaurant.update({
+        where: { id: sub.restaurantId },
+        data: { status: "suspended" },
+        select: { id: true },
+      }),
+    );
+    s.suspended++;
+    return;
+  }
+
+  // "invoice": a month has fallen due. ONE invoice for it, dated at the due
+  // date — the grace period is counted from that date, not from whenever the
+  // run noticed. An owner who pressed "Pay now" earlier and walked away left
+  // an open invoice behind; that one is re-dated to the month it's actually
+  // for, rather than a second one being stacked beside it, and so that its
+  // grace isn't measured from the day they pressed the button.
+  const periodEnd = addMonths(decision.dueAt, 1);
+  await systemDb(async (tx) => {
+    if (openInvoice) {
+      await tx.restaurantInvoice.update({
+        where: { id: openInvoice.id },
+        data: { periodStart: decision.dueAt, periodEnd, amount: sub.plan.priceMonthly },
+      });
+    } else {
+      await tx.restaurantInvoice.create({
+        data: {
+          restaurantId: sub.restaurantId,
+          amount: sub.plan.priceMonthly,
+          status: "open",
+          periodStart: decision.dueAt,
+          periodEnd,
+        },
+      });
+    }
+    await tx.subscription.update({ where: { id: sub.id }, data: { status: "past_due" } });
+  });
+  s.awaiting++;
 }

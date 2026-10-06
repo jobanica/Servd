@@ -1,4 +1,5 @@
 import "server-only";
+import { ALL_ACCESS_PLAN_ID } from "@/lib/billing/all-access";
 
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { manilaStartOfDay, manilaStartOfDaysAgo } from "@/lib/time/manila";
@@ -36,10 +37,20 @@ export interface RevenueBreakdown {
   /** One-time feature unlocks — domain, inventory, accounting, HR… */
   unlocks: number;
   unlockCount: number;
+  /**
+   * Plan payments — overwhelmingly the ₱800 All Access month. Paid plan
+   * invoices were never counted here before, which was harmless while nobody
+   * was on a monthly plan and would hide the whole business once they are.
+   */
+  plans: number;
+  planCount: number;
   total: number;
-  /** Monthly recurring, from live subscriptions. Servd's only recurring line. */
+  /** Monthly recurring: paying All Access accounts plus Content Calendar subscriptions. */
   mrr: number;
   mrrCount: number;
+  /** Of which All Access. Trials aren't counted — they haven't paid anything. */
+  allAccessMrr: number;
+  allAccessCount: number;
 }
 
 /**
@@ -76,11 +87,25 @@ export async function getRevenue(since: Date): Promise<RevenueBreakdown | null> 
       });
       const unlocks = addons.reduce((s, a) => s + a.amount, 0);
 
+      // Money actually collected for plans in the window.
+      const planInvoices = await tx.restaurantInvoice.findMany({
+        where: { status: "paid", paidAt: { gte: since } },
+        select: { amount: true },
+      });
+      const plans = planInvoices.reduce((s, i) => s + i.amount, 0);
+
       // MRR is a snapshot, not a windowed sum: it's what renews next month.
       const subs = await tx.featureSubscription.findMany({
         where: { status: "active" },
         select: { priceMonthly: true },
       });
+      // Paying All Access accounts. "active" only: a trial hasn't paid, and a
+      // past-due account isn't recurring revenue until it does.
+      const allAccess = await tx.subscription.findMany({
+        where: { planId: ALL_ACCESS_PLAN_ID, status: "active" },
+        select: { plan: { select: { priceMonthly: true } } },
+      });
+      const allAccessMrr = allAccess.reduce((s, x) => s + x.plan.priceMonthly, 0);
 
       return {
         activations,
@@ -89,9 +114,13 @@ export async function getRevenue(since: Date): Promise<RevenueBreakdown | null> 
         branchCount,
         unlocks,
         unlockCount: addons.length,
-        total: activations + branches + unlocks,
-        mrr: subs.reduce((s, x) => s + x.priceMonthly, 0),
-        mrrCount: subs.length,
+        plans,
+        planCount: planInvoices.length,
+        total: activations + branches + unlocks + plans,
+        mrr: subs.reduce((s, x) => s + x.priceMonthly, 0) + allAccessMrr,
+        mrrCount: subs.length + allAccess.length,
+        allAccessMrr,
+        allAccessCount: allAccess.length,
       };
     });
   } catch {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { goLiveCopy, type GoLiveCopy, type GoLiveMode } from "@/lib/billing/go-live-copy";
 import { formatPeso } from "@/lib/money";
 import { saveBusiness, addBuildItem, deleteBuildItem, type BuildResult } from "@/server/build/actions";
 import { requestActivation } from "@/server/build/activate-action";
@@ -27,11 +28,14 @@ export function BuildWizard({
   initial,
   appUrl,
   startAt,
+  goLiveMode = "activation",
 }: {
   initial: BuildState | null;
   appUrl: string;
   /** Deep link from a marketing email — open straight on that step. */
   startAt?: "activate" | "preview";
+  /** Free 30-day trial (All Access live) or the old ₱499 activation. */
+  goLiveMode?: GoLiveMode;
 }) {
   const [state, setState] = useState<BuildState | null>(initial);
   const [step, setStep] = useState<Step>(() => {
@@ -85,7 +89,12 @@ export function BuildWizard({
       )}
 
       {step === 3 && state && (
-        <ActivateStep state={state} appUrl={appUrl} onBack={() => setStep(2)} />
+        <ActivateStep
+          state={state}
+          appUrl={appUrl}
+          onBack={() => setStep(2)}
+          copy={goLiveCopy(goLiveMode)}
+        />
       )}
 
       {error && (
@@ -441,10 +450,12 @@ function ActivateStep({
   state,
   appUrl,
   onBack,
+  copy,
 }: {
   state: BuildState;
   appUrl: string;
   onBack: () => void;
+  copy: GoLiveCopy;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -475,7 +486,7 @@ function ActivateStep({
           "Real orders straight to your kitchen",
           "Your own ordering website + table QR codes",
           "Cashier, kitchen and sales dashboard",
-          "Yours for life — one payment, no monthly fees",
+          copy.perk,
         ].map((line) => (
           <li key={line} className="flex gap-2">
             <span className="text-brand-primary">✓</span>
@@ -489,9 +500,9 @@ function ActivateStep({
         disabled={busy}
         className="mt-5 w-full rounded-full py-3.5 font-heading text-base font-bold btn-brand disabled:opacity-60"
       >
-        {busy ? "Opening payment…" : "Activate for ₱499"}
+        {busy ? copy.busy : copy.button}
       </button>
-      <p className="mt-2 text-xs text-plum-ink/45">One-time. Pay with GCash or card.</p>
+      <p className="mt-2 text-xs text-plum-ink/45">{copy.footnote}</p>
       {error && <p className="mt-2 text-sm text-guava">{error}</p>}
 
       <div className="mt-5 rounded-xl bg-cream/60 p-3 text-left">

@@ -5,7 +5,7 @@ import { systemDb } from "@/server/tenancy/scoped-db";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getPlatformBilling } from "@/server/billing/platform-settings";
 import { XenditBillingProvider } from "@/server/billing/xendit";
-import { provisionFreePlan } from "@/server/billing/subscription";
+import { getAllAccessPlan, provisionFreePlan, provisionTrial } from "@/server/billing/subscription";
 import { addonKeyFor } from "@/server/billing/owned-features";
 import { readBuildCookie } from "./session";
 import { sendActivationEmail } from "@/server/email/transactional";
@@ -147,6 +147,67 @@ export async function createActivationCheckout(
   return { ok: true, checkout: { requestId: request.id, checkoutUrl } };
 }
 
+/**
+ * Is the ₱800 All Access plan live? When it is, a preview goes live free on a
+ * 30-day trial; when its row hasn't been created yet, the old ₱499 paywall
+ * stays in place exactly as it was. Going free BEFORE the plan exists would
+ * hand out lifetime-free accounts — the trial would fall back to the Free plan.
+ */
+export async function allAccessLive(): Promise<boolean> {
+  try {
+    return !!(await systemDb((tx) => getAllAccessPlan(tx)));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Take a preview live on the All Access trial — no payment now. The first
+ * ₱800 is billed when the 30 days are up, like every other new account.
+ *
+ * Runs through the very same activateRequest a paid activation does, with an
+ * amount of 0, so the login, the claim link, the activation email and the
+ * suppression of acquisition emails all happen exactly as they always have.
+ * The /build/success page polls the request and shows the login, as it does
+ * after a Xendit payment.
+ */
+export async function activateOnTrial(
+  restaurantId: string,
+): Promise<{ ok: true; requestId: string } | { ok: false; error: string }> {
+  const restaurant = await systemDb((tx) =>
+    tx.restaurant.findFirst({
+      where: { id: restaurantId, status: "preview" },
+      select: { id: true, contactPhone: true, contactFb: true },
+    }),
+  );
+  if (!restaurant) return { ok: false, error: "This preview is no longer available." };
+
+  const request = await systemDb((tx) =>
+    tx.activationRequest.create({
+      data: {
+        restaurantId,
+        status: "pending",
+        amount: 0, // nothing paid — the trial
+        contactPhone: restaurant.contactPhone,
+        contactFb: restaurant.contactFb,
+      },
+      select: { id: true },
+    }),
+  );
+  await systemDb((tx) =>
+    tx.restaurant.update({
+      where: { id: restaurantId },
+      data: { activationRequestedAt: new Date() },
+      select: { id: true },
+    }),
+  );
+
+  const ok = await activateRequest(request.id);
+  return ok
+    ? { ok: true, requestId: request.id }
+    : { ok: false, error: "Couldn't take your site live just now. Please try again." };
+}
+
 // ---------------------------------------------------------------------------
 // 2. Activation — called ONLY from the verified webhook
 // ---------------------------------------------------------------------------
@@ -160,7 +221,7 @@ async function activateRequest(requestId: string): Promise<boolean> {
   const request = await systemDb((tx) =>
     tx.activationRequest.findUnique({
       where: { id: requestId },
-      select: { id: true, status: true, restaurantId: true, note: true },
+      select: { id: true, status: true, restaurantId: true, note: true, amount: true },
     }),
   );
   if (!request) return false;
@@ -183,7 +244,11 @@ async function activateRequest(requestId: string): Promise<boolean> {
     await systemDb((tx) =>
       tx.activationRequest.update({
         where: { id: request.id },
-        data: { status: "activated", paidAt: new Date(), activatedAt: new Date() },
+        data: {
+          status: "activated",
+          paidAt: request.amount > 0 ? new Date() : null,
+          activatedAt: new Date(),
+        },
         select: { id: true },
       }),
     );
@@ -223,37 +288,49 @@ async function activateRequest(requestId: string): Promise<boolean> {
         data: { restaurantId: restaurant.id, authUserId, role: "admin", email, username },
         select: { id: true },
       });
-      // The ₱499 buys the online ordering system outright — one payment, no
-      // trial and no monthly fee. So: a lifetime (never-expiring) plan, plus a
-      // recorded one-time purchase of onlineOrdering. Recording the purchase
-      // rather than leaning on whatever the Free plan happens to include means
-      // the entitlement survives any later change to that plan's features —
-      // they paid for it, so they own it.
-      await provisionFreePlan(tx, restaurant.id);
-      const addon = addonKeyFor("onlineOrdering");
-      const already = await tx.addonPurchase.findFirst({
-        where: { restaurantId: restaurant.id, addon, status: "paid" },
-        select: { id: true },
-      });
-      if (!already) {
-        await tx.addonPurchase.create({
-          data: {
-            restaurantId: restaurant.id,
-            addon,
-            amount: ACTIVATION_PRICE,
-            status: "paid",
-            providerRef: `diy:${request.id}`, // unique → a replay can't double-grant
-            paidAt: new Date(),
-          },
+      if (request.amount > 0) {
+        // A ₱499 that was actually PAID — an invoice raised before the move to
+        // ₱800/month and settled after it. They paid for the online ordering
+        // system outright, one payment, no monthly fee, and that is what they
+        // get: you don't take the money and deliver something else.
+        //
+        // So: a lifetime (never-expiring) plan, plus a recorded one-time
+        // purchase of onlineOrdering. Recording the purchase rather than leaning
+        // on whatever the Free plan happens to include means the entitlement
+        // survives any later change to that plan's features.
+        await provisionFreePlan(tx, restaurant.id);
+        const addon = addonKeyFor("onlineOrdering");
+        const already = await tx.addonPurchase.findFirst({
+          where: { restaurantId: restaurant.id, addon, status: "paid" },
           select: { id: true },
         });
+        if (!already) {
+          await tx.addonPurchase.create({
+            data: {
+              restaurantId: restaurant.id,
+              addon,
+              amount: request.amount,
+              status: "paid",
+              providerRef: `diy:${request.id}`, // unique → a replay can't double-grant
+              paidAt: new Date(),
+            },
+            select: { id: true },
+          });
+        }
+      } else {
+        // Nothing paid: a preview going live on the ₱800 All Access plan, with
+        // the same 30-day trial as a signup. The first month is billed when it
+        // ends, like every other new account.
+        await provisionTrial(tx, restaurant.id);
       }
       await tx.activationRequest.update({
         where: { id: request.id },
         data: {
           status: "activated",
           loginUsername: username,
-          paidAt: new Date(),
+          // Only a request that took money has been paid. A trial go-live
+          // hasn't, and the super-admin activation list reads this column.
+          paidAt: request.amount > 0 ? new Date() : null,
           activatedAt: new Date(),
         },
         select: { id: true },
@@ -269,14 +346,15 @@ async function activateRequest(requestId: string): Promise<boolean> {
     return false;
   }
 
-  // THE suppression hook. They paid — every unsent acquisition email is
-  // cancelled for good. From here the relationship is in-app, not in the inbox.
+  // THE suppression hook. They're live — paid or on the trial — so every
+  // unsent acquisition email ("activate your preview") is cancelled for good.
+  // From here the relationship is in-app, not in the inbox.
   await suppressOnActivation(restaurant.id);
 
   // Their username + set-password link, by email. Best-effort and last: a mail
   // failure must never undo an activation that already succeeded — the success
   // page and super-admin both still show the link.
-  await sendActivationEmail(restaurant.id);
+  await sendActivationEmail(restaurant.id, request.amount > 0);
 
   // Business-ops timeline. Outside the transaction, after everything that
   // matters has committed, and it cannot throw — an analytics row must never
@@ -284,7 +362,9 @@ async function activateRequest(requestId: string): Promise<boolean> {
   await logEvent({
     restaurantId: restaurant.id,
     eventType: "activation",
-    amount: ACTIVATION_PRICE,
+    // What was actually paid. A trial go-live is ₱0 — recording the old
+    // constant would put revenue in the business-ops figures that never came in.
+    amount: request.amount,
     meta: { requestId: request.id, track: "diy" },
   });
   return true;
@@ -341,6 +421,8 @@ export interface ActivationStatus {
   /** Activated, but this browser can't be shown the claim link. */
   claimBlocked: boolean;
   restaurantName: string;
+  /** Money changed hands — a ₱499 activation — rather than a free trial. */
+  paid: boolean;
 }
 
 /**
@@ -360,6 +442,7 @@ export async function getActivationStatus(requestId: string): Promise<Activation
           status: true,
           providerRef: true,
           loginUsername: true,
+          amount: true,
           restaurant: { select: { name: true, claimToken: true, buildToken: true } },
         },
       }),
@@ -411,5 +494,6 @@ export async function getActivationStatus(requestId: string): Promise<Activation
       row.status === "activated" && claimToken && isBuilder ? `${base}/claim/${claimToken}` : null,
     claimBlocked: row.status === "activated" && !!claimToken && !isBuilder,
     restaurantName: row.restaurant?.name ?? "Your restaurant",
+    paid: row.amount > 0,
   };
 }

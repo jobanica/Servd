@@ -10,6 +10,8 @@ import { getFeaturePrices } from "@/server/billing/feature-pricing";
 import { FEATURE_META, type Feature } from "@/lib/billing/features";
 import { formatPeso } from "@/lib/money";
 import { manilaDate } from "@/lib/time/manila";
+import { isAllAccessPlan } from "@/lib/billing/all-access";
+import { AllAccessBilling } from "@/components/billing/AllAccessBilling";
 
 const FEATURE_LABEL: Record<string, string> = Object.fromEntries(
   FEATURE_META.map((f) => [f.key, f.label]),
@@ -23,9 +25,9 @@ function daysLeft(date: Date | null): number | null {
 export default async function BillingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ upgrade?: string; unlocked?: string }>;
+  searchParams: Promise<{ upgrade?: string; unlocked?: string; paid?: string }>;
 }) {
-  const { upgrade, unlocked } = await searchParams;
+  const { upgrade, unlocked, paid } = await searchParams;
   // allowSuspended so an owner can pay their way out of suspension here.
   const { restaurantId } = await requireAdminPage({ allowSuspended: true });
 
@@ -41,6 +43,33 @@ export default async function BillingPage({
       tx.addonPurchase.findMany({ where: { status: "pending" }, select: { addon: true } }),
     ).catch(() => [] as { addon: string }[]),
   ]);
+
+  // The ₱800 All Access plan has its own page. Decided here, before anything
+  // below runs, so the page every grandfathered account sees — one-time
+  // unlocks, no monthly subscription — is untouched by it.
+  if (sub && isAllAccessPlan(sub.planId)) {
+    const r = await tenantDb(restaurantId, (tx) =>
+      tx.restaurant.findFirst({ select: { status: true } }),
+    );
+    const open = invoices.find((i) => i.status === "open");
+    return (
+      <AllAccessBilling
+        price={sub.plan.priceMonthly}
+        status={sub.status as "trialing" | "active" | "past_due" | "cancelled"}
+        suspended={r?.status === "suspended"}
+        trialEndsAt={sub.trialEndsAt}
+        currentPeriodEnd={sub.currentPeriodEnd}
+        openInvoiceDueAt={open?.periodStart ?? null}
+        invoices={invoices.map((i) => ({
+          id: i.id,
+          createdAt: i.createdAt,
+          amount: i.amount,
+          status: i.status,
+        }))}
+        justPaid={paid === "1"}
+      />
+    );
+  }
 
   const pendingAddons = new Set(pendingRows.map((r) => r.addon));
   const onTrial = sub?.status === "trialing" && !!sub.trialEndsAt && new Date(sub.trialEndsAt).getTime() > Date.now();

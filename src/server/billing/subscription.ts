@@ -1,6 +1,11 @@
 import type { Prisma } from "@prisma/client";
 import { tenantDb, systemDb } from "@/server/tenancy/scoped-db";
 import { addMonths } from "@/lib/billing/period";
+import {
+  ALL_ACCESS_PLAN_ID,
+  ALL_ACCESS_TRIAL_DAYS,
+  isAllAccessPlan,
+} from "@/lib/billing/all-access";
 
 /**
  * Explicit plan fields — everything EXCEPT `features` (which ships in a later
@@ -17,8 +22,8 @@ export const PLAN_FIELDS = {
   createdAt: true,
 } satisfies Prisma.PlanSelect;
 
-/** New-account trial length: every new restaurant starts on a 30-day Business
- * trial (full access). There is no separate per-plan trial. */
+/** Trial length for the OLDER signup path — kept for the fallback when the
+ * All Access plan row hasn't been created yet. */
 export const SIGNUP_TRIAL_DAYS = 30;
 
 /** The lowest-priced active plan = the Free tier. */
@@ -49,15 +54,36 @@ export async function getFreePlan(tx: Prisma.TransactionClient) {
 }
 
 /**
- * Provisions a brand-new restaurant with a 30-day BUSINESS TRIAL — every feature
- * unlocked, no card. When it ends unpaid the daily billing cron downgrades them
- * to the Free plan. Call inside a super-admin tx during signup / account creation.
+ * The ₱800 All Access plan, by its fixed id. Null when the migration that
+ * creates it (prisma/manual/add-all-access-plan.sql) hasn't been run.
+ */
+export async function getAllAccessPlan(tx: Prisma.TransactionClient) {
+  return tx.plan.findFirst({ where: { id: ALL_ACCESS_PLAN_ID }, select: PLAN_FIELDS });
+}
+
+/**
+ * Provisions a brand-new restaurant: a 30-day All Access trial, then ₱800 a
+ * month. Every feature but the Content Calendar, no card.
+ *
+ * Called ONLY where an account is created or first goes live — signup, the
+ * super-admin's two create paths, a demo being converted, a self-built preview
+ * going live. That is the whole grandfathering mechanism: an account that
+ * already exists never passes through here again, so it keeps the plan it has.
+ *
+ * Falls back to the old behaviour (the top plan's trial, which drops to Free
+ * when it ends) when the All Access row doesn't exist yet. A deploy that lands
+ * before the migration must not stop people signing up; it just means those
+ * few accounts start on the old terms. Run the migration first.
  */
 export async function provisionTrial(tx: Prisma.TransactionClient, restaurantId: string) {
-  const plan = (await getTopPlan(tx)) ?? (await getDefaultPlan(tx));
+  const plan =
+    (await getAllAccessPlan(tx)) ?? (await getTopPlan(tx)) ?? (await getDefaultPlan(tx));
   if (!plan) return; // no plans yet — skip; restaurant stays active
   const trialEndsAt = new Date();
-  trialEndsAt.setDate(trialEndsAt.getDate() + SIGNUP_TRIAL_DAYS);
+  trialEndsAt.setDate(
+    trialEndsAt.getDate() +
+      (isAllAccessPlan(plan.id) ? ALL_ACCESS_TRIAL_DAYS : SIGNUP_TRIAL_DAYS),
+  );
   // `select: { id }` keeps Prisma's RETURNING from referencing newer columns a
   // schema-lagged live DB may not have yet.
   await tx.restaurant.update({
