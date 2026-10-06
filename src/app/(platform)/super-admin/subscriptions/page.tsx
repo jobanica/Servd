@@ -273,6 +273,19 @@ export default async function SubscriptionsPage({
                 <input type="hidden" name="restaurantId" value={s.restaurantId} />
                 <div className="flex gap-1">
                   <select name="planId" defaultValue={s.planId ?? ""} className={field}>
+                    {/* The account's own plan stays in its list even once it's
+                        retired. Without it the select shows the first active
+                        plan instead — so a grandfathered Business account would
+                        read as FREE, and pressing Assign would quietly downgrade
+                        a customer who was promised they'd keep what they had. */}
+                    {(() => {
+                      const own = plans.find((p) => p.id === s.planId && !p.isActive);
+                      return own ? (
+                        <option key={own.id} value={own.id}>
+                          {own.name} · {formatPeso(own.priceMonthly)} (retired — current plan)
+                        </option>
+                      ) : null;
+                    })()}
                     {activePlans.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name} · {formatPeso(p.priceMonthly)}

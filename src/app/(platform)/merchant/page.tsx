@@ -31,7 +31,7 @@ export default async function MerchantPage() {
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-cream px-6 text-center">
         <h1 className="font-heading text-2xl font-bold text-plum-ink">Online ordering isn&apos;t on your plan</h1>
         <p className="max-w-sm text-sm text-plum-ink/60">
-          The Incoming Orders screen needs the online-ordering feature (Growth plan and up). Ask the
+          The Incoming Orders screen needs the online-ordering feature. Ask the
           restaurant owner to upgrade.
         </p>
         <Link href="/admin/billing?upgrade=onlineOrdering" className="rounded-full px-6 py-3 font-semibold btn-brand">

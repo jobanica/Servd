@@ -127,3 +127,37 @@ describe("the terms keep the grandfathered promise", () => {
     expect(terms).toContain("₱499, once");
   });
 });
+
+describe("retiring Growth and Business", () => {
+  const sql = read("prisma/manual/retire-growth-business.sql").replace(/--.*$/gm, "");
+
+  it("retires them — it never deletes a plan or moves an account", () => {
+    expect(sql).toMatch(/UPDATE "plans"\s+SET "isActive" = false/);
+    expect(sql).not.toMatch(/DELETE/i);
+    expect(sql).not.toMatch(/UPDATE\s+"subscriptions"/i);
+    expect(sql).not.toMatch(/UPDATE\s+"restaurants"/i);
+  });
+
+  it("touches exactly Growth and Business, and never FREE or All Access", () => {
+    const ids = [...sql.matchAll(/'(0{8}-0{4}-0{4}-0{4}-0{10}a\d)'/g)].map((m) => m[1]).sort();
+    expect(ids).toEqual([
+      "00000000-0000-0000-0000-0000000000a2",
+      "00000000-0000-0000-0000-0000000000a3",
+    ]);
+  });
+
+  it("keeps a retired plan visible on the accounts still on it", () => {
+    // Otherwise the picker shows the first active plan instead, and pressing
+    // Assign downgrades a grandfathered customer without anyone meaning to.
+    const page = read("src/app/(platform)/super-admin/subscriptions/page.tsx");
+    expect(page).toMatch(/plans\.find\(\(p\) => p\.id === s\.planId && !p\.isActive\)/);
+    expect(page).toContain("(retired — current plan)");
+  });
+
+  it("no longer offers Growth to anyone", () => {
+    // What renders, not what the comments explain.
+    const shown = (p: string) => read(p).replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    expect(shown("src/app/(platform)/admin/domains/page.tsx")).not.toMatch(/included in Growth|Growth plan/);
+    expect(shown("src/app/(platform)/merchant/page.tsx")).not.toMatch(/Growth plan/);
+  });
+});

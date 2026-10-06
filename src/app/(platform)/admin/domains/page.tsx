@@ -85,8 +85,11 @@ export default async function DomainsPage() {
                 Servd link.
               </p>
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                {/* Option 1 — one-time unlock */}
+              {/* The one way in for an account on the older pricing. There used
+                  to be a second card here — "or included in Growth" — but
+                  Growth is no longer sold, so it pointed at a plan nobody can
+                  buy. */}
+              <div className="mt-4 grid max-w-sm gap-3">
                 <div className="rounded-lg border border-brand-primary/40 bg-cream/40 p-4">
                   <p className="text-xs font-bold uppercase tracking-wide text-plum-ink/45">One-time</p>
                   <p className="font-heading text-2xl font-extrabold text-plum-ink">{priceLabel}</p>
@@ -102,26 +105,7 @@ export default async function DomainsPage() {
                     </p>
                   )}
                 </div>
-
-                {/* Option 2 — included in Growth */}
-                <div className="rounded-lg border border-plum-ink/10 p-4">
-                  <p className="text-xs font-bold uppercase tracking-wide text-plum-ink/45">Or included in</p>
-                  <p className="font-heading text-2xl font-extrabold text-plum-ink">Growth</p>
-                  <p className="mt-1 text-xs text-plum-ink/60">
-                    Custom domains are part of the Growth plan (and above) — plus everything else on that tier.
-                  </p>
-                  <Link
-                    href="/admin/billing"
-                    className="mt-3 inline-block rounded-full border border-plum-ink/20 px-5 py-2.5 text-sm font-semibold text-plum-ink"
-                  >
-                    See plans →
-                  </Link>
-                </div>
               </div>
-
-              <p className="mt-3 text-xs text-plum-ink/45">
-                Free plan and trial accounts need the one-time unlock. Paid Growth/Business plans include it.
-              </p>
             </div>
           </div>
         </div>
