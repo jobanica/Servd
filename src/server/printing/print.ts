@@ -10,6 +10,7 @@ import { parsePrinterConfig, kitchenDestination, isServerDriven } from "@/lib/pr
 import { restaurantSiteUrl } from "@/lib/qr";
 import { getShiftReport } from "./shift-report";
 import { formatOrderNumber } from "@/lib/orders/order-number";
+import { batchLabelFromInstants } from "@/lib/orders/delivery-windows";
 
 /**
  * PLUGGABLE PRINTING
@@ -189,7 +190,24 @@ async function loadTicket(restaurantId: string, orderId: string) {
       }
     }
 
-    return { restaurant, order, meta, payment, settings, ticketNumber, cashTendered };
+    // The delivery batch, for the kitchen's service line. Its own read again,
+    // for the same reason as the two above.
+    let deliveryWindow: string | null = null;
+    if (order) {
+      try {
+        const w = await tx.order.findFirst({
+          where: { id: orderId },
+          select: { deliveryWindowStart: true, deliveryWindowEnd: true },
+        });
+        if (w?.deliveryWindowStart && w.deliveryWindowEnd) {
+          deliveryWindow = batchLabelFromInstants(w.deliveryWindowStart, w.deliveryWindowEnd, { ascii: true });
+        }
+      } catch {
+        /* delivery window columns not migrated yet */
+      }
+    }
+
+    return { restaurant, order, meta, payment, settings, ticketNumber, cashTendered, deliveryWindow };
   });
 }
 
@@ -199,7 +217,7 @@ async function ticketFor(
   orderId: string,
   kind: TicketKind = "receipt",
 ): Promise<Ticket | null> {
-  const { restaurant, order, meta, payment, ticketNumber, cashTendered } = await loadTicket(
+  const { restaurant, order, meta, payment, ticketNumber, cashTendered, deliveryWindow } = await loadTicket(
     restaurantId,
     orderId,
   );
@@ -219,6 +237,7 @@ async function ticketFor(
     orderType: meta.orderType,
     customerName: meta.customerName,
     customerAddress: meta.customerAddress,
+    deliveryWindow,
     orderId: order.id,
     createdAt: order.createdAt.toISOString(),
     total: order.total,

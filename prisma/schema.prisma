@@ -1893,6 +1893,12 @@ model Order {
   acceptedAt          DateTime?
   cancelReason        String? // reason a merchant rejected the order
   scheduledFor        DateTime? // advance order: requested pickup/delivery time (null = ASAP)
+  /// Delivery batch the customer picked, when the store delivers in batches
+  /// (a rider who goes out at 11:00, 11:30, … instead of once per order). The
+  /// Orders app groups by it so a batch goes out as one trip. Nullable, no
+  /// default — hand-run migration; null means not a batch order.
+  deliveryWindowStart DateTime?
+  deliveryWindowEnd   DateTime?
   approvalStatus      String? // advance order: awaiting | approved | declined (null = not an advance order)
   downpaymentAmount   Int? // centavos owner requires up-front to confirm an advance order
   downpaymentRef      String? // customer's payment reference (e.g. GCash ref) for the downpayment

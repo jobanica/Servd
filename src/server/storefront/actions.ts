@@ -8,6 +8,7 @@ import { uploadMenuImage } from "@/server/storage/menu-images";
 import { pesosToCentavos } from "@/lib/money";
 import { getStorefront, type DayHours, type DeliveryZone } from "./storefront";
 import { setNoPackagingItemIds } from "@/server/menu/packaging";
+import { normalizeDeliveryWindows } from "@/lib/orders/delivery-windows";
 import {
   AUTO_ACCEPT_DEFAULT_SECONDS,
   normalizeAutoAcceptSeconds,
@@ -138,6 +139,23 @@ export async function updateStorefront(
       const f = String(formData.get("fulfillment") ?? "both");
       return f === "pickup" ? "pickup" : f === "delivery" ? "delivery" : "both";
     })(),
+    // Delivery batches. The marker says the form actually offered the section;
+    // without it the saved batches are carried over, so a save from anywhere
+    // that doesn't show them can never quietly switch them off.
+    windows: formData.has("windowsField")
+      ? normalizeDeliveryWindows({
+          enabled: formData.get("windowsEnabled") === "on",
+          periods: (() => {
+            try {
+              return JSON.parse(String(formData.get("windowPeriods") ?? "[]"));
+            } catch {
+              return [];
+            }
+          })(),
+          batchMinutes: Number(formData.get("windowBatchMinutes")),
+          cutoffMinutes: Number(formData.get("windowCutoffMinutes")),
+        })
+      : saved.delivery.windows,
   };
   const hoursJson = hours as unknown as Prisma.InputJsonValue;
   const zonesJson = zones as unknown as Prisma.InputJsonValue;

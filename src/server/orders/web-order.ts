@@ -22,6 +22,7 @@ import { getLoyaltyConfig, enrollAccount } from "@/server/loyalty/loyalty";
 import { markCartConverted } from "@/server/marketing/cart-recovery";
 import { formatPeso } from "@/lib/money";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
+import { batchLabel, findOpenBatch, windowInstant } from "@/lib/orders/delivery-windows";
 
 const schema = z.object({
   slug: z.string().min(1),
@@ -39,6 +40,9 @@ const schema = z.object({
   lat: z.number().optional(),
   lng: z.number().optional(),
   scheduledFor: z.string().datetime().optional(), // ISO; advance order (null = ASAP)
+  // Delivery batch the customer picked ("11:30" = the 11:30 batch, today,
+  // Manila time) when the store delivers in batches. Re-checked below.
+  deliveryBatch: z.string().regex(/^\d{2}:\d{2}$/).optional(),
   downpaymentRef: z.string().trim().max(120).optional(), // customer's payment reference
   paymentChoice: z.enum(["cod", "gcash", "maya", "bank"]).optional(), // chosen payment method
   paymentRef: z.string().trim().max(120).optional(), // reference no. for an online payment
@@ -143,9 +147,34 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
     return { ok: false, error: "Please pin your delivery location on the map." };
   }
 
+  // Delivery batches: the rider goes out at set times, and the customer picks
+  // which run their order rides on. The pick is re-checked against the clock
+  // here — a batch chosen at 10:58 and submitted at 11:01 has already left.
+  const windows = storefront.delivery.windows;
+  const batchesOn =
+    d.orderType === "delivery" && windows.enabled && storefront.delivery.mode !== "shipping";
+  let batch: { start: Date; end: Date; label: string } | null = null;
+  if (batchesOn) {
+    if (scheduledFor) {
+      return { ok: false, error: "Please pick a delivery time from today's batches." };
+    }
+    if (!d.deliveryBatch) return { ok: false, error: "Please pick a delivery time." };
+    const now = new Date();
+    const w = findOpenBatch(windows, d.deliveryBatch, now);
+    if (!w) {
+      return { ok: false, error: "That delivery time has just closed — please pick another." };
+    }
+    batch = {
+      start: windowInstant(w.start, now),
+      end: windowInstant(w.end, now),
+      label: batchLabel(w, { ascii: true }),
+    };
+  }
+
   // A "closed now" store still takes ADVANCE orders (they're for later) — only
-  // block ASAP orders when the owner pauses ordering outside opening hours.
-  if (!scheduledFor && storefront.pauseWhenClosed && !isOpenNow(storefront.hours)) {
+  // block ASAP orders when the owner pauses ordering outside opening hours. A
+  // batch order is for later too: ordered at 9:00 for the 11:00 run.
+  if (!scheduledFor && !batch && storefront.pauseWhenClosed && !isOpenNow(storefront.hours)) {
     return { ok: false, error: "We're currently closed. Please order during store hours, or schedule your order for later." };
   }
 
@@ -188,7 +217,10 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
     const feeNote =
       estimate > 0 ? ` · ${kind} ${formatPeso(estimate)}${feeInTotal ? "" : " (rider-paid)"}` : "";
     const prefix = label || feeNote ? `[${label}${feeNote}] ` : "";
-    addressLine = `${prefix}${d.customerAddress?.trim() ?? ""}`.trim() || null;
+    // The batch leads the address so every screen and slip that shows the
+    // address — including ones that predate batches — shows when it goes out.
+    const batchTag = batch ? `[Deliver ${batch.label}] ` : "";
+    addressLine = `${batchTag}${prefix}${d.customerAddress?.trim() ?? ""}`.trim() || null;
   }
 
   // Payment method (cash / GCash / Maya / Bank). The chosen online method must be
@@ -333,6 +365,20 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
       }
     }
     }
+  }
+
+  // The batch, as real instants, for grouping orders by run in the Orders app.
+  // Written on its own so a DB without these columns yet still takes the order
+  // — the batch is in the address line regardless.
+  if (batch) {
+    try {
+      await tenantDb(restaurant.id, (tx) =>
+        tx.order.updateMany({
+          where: { id: order.id },
+          data: { deliveryWindowStart: batch.start, deliveryWindowEnd: batch.end },
+        }),
+      );
+    } catch { /* columns not migrated yet — the address line carries the batch */ }
   }
 
   // Count these servings toward each item's daily cap (best-effort, own tx).

@@ -85,6 +85,8 @@ export interface Ticket {
   customerNote: string | null;
   /** Advance order: when it's wanted for, ISO. Null on an ordinary order. */
   scheduledFor: string | null;
+  /** Delivery batch, already an ASCII label ("11:00-11:30 AM"). Null if none. */
+  deliveryWindow: string | null;
   orderRef: string;
   placedAt: string;
   items: TicketLine[];
@@ -110,6 +112,7 @@ export interface TicketSource extends ReceiptBranding {
   customerPhone?: string | null;
   customerNote?: string | null;
   scheduledFor?: string | null;
+  deliveryWindow?: string | null;
   orderId: string;
   createdAt: string;
   total: number;
@@ -144,6 +147,7 @@ export function buildTicket(src: TicketSource): Ticket {
     customerPhone: src.customerPhone ?? null,
     customerNote: src.customerNote ?? null,
     scheduledFor: src.scheduledFor ?? null,
+    deliveryWindow: src.deliveryWindow ?? null,
     orderRef: src.orderId.slice(0, 8).toUpperCase(),
     placedAt: src.createdAt,
     items: src.items.map((i) => ({
@@ -193,7 +197,15 @@ export function ticketDocLabel(t: Ticket): string {
  */
 export function ticketServiceLine(t: Ticket): string | null {
   if (t.kind !== "kitchen") return null;
-  return `*** ${orderTypeLabel(t.orderType).toUpperCase()} ***`;
+  const type = orderTypeLabel(t.orderType).toUpperCase();
+  // A batch delivery says which run it rides on, so the kitchen cooks to the
+  // batch and bags it with the others. The stars go when the label straddles
+  // noon and the line would otherwise wrap on 58mm paper (32 columns).
+  if (t.orderType === "delivery" && t.deliveryWindow) {
+    const line = `*** ${type} ${t.deliveryWindow} ***`;
+    return line.length <= 32 ? line : `${type} ${t.deliveryWindow}`;
+  }
+  return `*** ${type} ***`;
 }
 
 /** Net payable + VAT-of-net (centavos). */

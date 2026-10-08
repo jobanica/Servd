@@ -4,6 +4,7 @@ import { buildTicket, type Ticket, type TicketKind } from "@/lib/printing/ticket
 import { parsePrinterConfig } from "@/lib/printing/printer-config";
 import { restaurantSiteUrl } from "@/lib/qr";
 import { formatOrderNumber } from "@/lib/orders/order-number";
+import { batchLabelFromInstants } from "@/lib/orders/delivery-windows";
 
 /** Loads an order and shapes it into a Ticket (tenant-scoped). */
 export async function getOrderTicket(
@@ -121,6 +122,21 @@ export async function getOrderTicket(
       /* not migrated yet */
     }
 
+    // The delivery batch, for the kitchen's service line. Newest columns, so
+    // their own read: a lagging DB prints the docket without it.
+    let deliveryWindow: string | null = null;
+    try {
+      const w = await tx.order.findFirst({
+        where: { id: orderId },
+        select: { deliveryWindowStart: true, deliveryWindowEnd: true },
+      });
+      if (w?.deliveryWindowStart && w.deliveryWindowEnd) {
+        deliveryWindow = batchLabelFromInstants(w.deliveryWindowStart, w.deliveryWindowEnd, { ascii: true });
+      }
+    } catch {
+      /* not migrated yet */
+    }
+
     return buildTicket({
       kind,
       restaurantName: restaurant.displayName || restaurant.name,
@@ -140,6 +156,7 @@ export async function getOrderTicket(
       customerPhone,
       customerNote,
       scheduledFor,
+      deliveryWindow,
       orderId: order.id,
       createdAt: order.createdAt.toISOString(),
       total: order.total,

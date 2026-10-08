@@ -9,6 +9,8 @@ import {
   type PackagingMenuCategory,
 } from "./PackagingExemptPicker";
 import { wrapsMidnight } from "@/lib/site/store-hours";
+import { DeliveryBatchesSettings } from "./DeliveryBatchesSettings";
+import type { DeliveryWindowsConfig } from "@/lib/orders/delivery-windows";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 interface DayHours {
@@ -206,6 +208,7 @@ export function StorefrontForm({
       mapEnabled: boolean;
       selfBookRider: boolean;
       selfBookRiderNote: string;
+      windows: DeliveryWindowsConfig;
       fulfillment: "both" | "pickup" | "delivery";
     };
   };
@@ -372,6 +375,9 @@ export function StorefrontForm({
             <input type="hidden" name="selfBookRiderNote" value={initial.delivery.selfBookRiderNote} />
           )}
         </div>
+
+        {/* Delivery batches — the rider goes out at set times. */}
+        <DeliveryBatchesSettings initial={initial.delivery.windows} />
 
         {/* Zones / shipping-regions editor (kept mounted so values persist across modes). */}
         <div className={deliveryMode !== "distance" ? "mt-4" : "hidden"}>

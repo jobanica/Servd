@@ -26,6 +26,12 @@ import { SignOutButton } from "@/components/merchant/SignOutButton";
 import { PlanStatusBanner } from "@/components/billing/PlanStatusBanner";
 import type { PlanBannerData } from "@/lib/billing/planBanner";
 import { DeliveryRiderPanel } from "@/components/delivery/DeliveryRiderPanel";
+import {
+  batchLabelFromInstants,
+  groupByBatch,
+  stripBatchTag,
+  type BatchGroup,
+} from "@/lib/orders/delivery-windows";
 
 const PREP_CHOICES = [10, 15, 20, 30, 45];
 const REJECT_LABELS: { key: RejectReason; label: string }[] = [
@@ -33,6 +39,48 @@ const REJECT_LABELS: { key: RejectReason; label: string }[] = [
   { key: "too_busy", label: "Too busy" },
   { key: "closed", label: "We're closed" },
 ];
+
+/** The address as staff need it — the batch tag is shown as its own badge. */
+function addressOf(o: MerchantOrder): string {
+  const a = o.customerAddress ?? "";
+  return o.deliveryWindowStart ? stripBatchTag(a) : a;
+}
+
+function batchOf(o: MerchantOrder): string | null {
+  return o.deliveryWindowStart && o.deliveryWindowEnd
+    ? batchLabelFromInstants(o.deliveryWindowStart, o.deliveryWindowEnd)
+    : null;
+}
+
+/**
+ * One delivery run's heading: when it goes, how many orders, how many are
+ * cooked — so the rider can see at a glance whether the batch can leave.
+ */
+function BatchHeader({ group, nowMs }: { group: BatchGroup<MerchantOrder>; nowMs: number }) {
+  const n = group.orders.length;
+  if (!group.start) {
+    return (
+      <p className="mb-2 text-xs font-bold uppercase tracking-wide text-plum-ink/45">
+        Not in a batch ({n})
+      </p>
+    );
+  }
+  const ready = group.orders.filter((o) => o.status === "done").length;
+  const mins = Math.round((new Date(group.start).getTime() - nowMs) / 60000);
+  const when = mins > 0 ? `goes in ${mins}m` : "due now";
+  return (
+    <div
+      className={`mb-2 flex items-center justify-between rounded-xl px-3 py-2 ${
+        mins <= 0 ? "bg-red-600 text-white" : mins <= 15 ? "bg-mango/25 text-plum-ink" : "bg-plum-ink/5 text-plum-ink"
+      }`}
+    >
+      <p className="font-heading font-extrabold">🛵 {group.label} batch</p>
+      <p className="text-sm font-semibold">
+        {n} order{n === 1 ? "" : "s"} · {ready}/{n} ready · {when}
+      </p>
+    </div>
+  );
+}
 
 function typeBadge(o: MerchantOrder): string {
   if (o.orderType === "delivery") return "🛵 Delivery";
@@ -366,6 +414,10 @@ export function MerchantBoard({
   }
 
   const topIncoming = data.incoming[0] ?? null;
+  // In progress, by delivery run. Headers only appear once any order is in a
+  // batch, so a store that doesn't use batches sees the list exactly as before.
+  const activeGroups = groupByBatch(data.active);
+  const anyBatches = activeGroups.some((g) => g.start);
 
   return (
     <div className="min-h-screen bg-cream pb-24">
@@ -464,7 +516,7 @@ export function MerchantBoard({
                     {topIncoming.customerPhone ? ` · ${topIncoming.customerPhone}` : ""}
                   </p>
                   {topIncoming.orderType === "delivery" && topIncoming.customerAddress && (
-                    <p className="mt-0.5 text-sm text-plum-ink/60">📍 {topIncoming.customerAddress}</p>
+                    <p className="mt-0.5 text-sm text-plum-ink/60">📍 {addressOf(topIncoming)}</p>
                   )}
                 </div>
                 <div className="text-right">
@@ -473,6 +525,12 @@ export function MerchantBoard({
                 </div>
               </div>
 
+              {batchOf(topIncoming) && (
+                <div className="mt-3 rounded-xl bg-mango/15 px-4 py-3 text-center">
+                  <p className="font-heading text-lg font-extrabold text-plum-ink">🕐 Deliver {batchOf(topIncoming)}</p>
+                  <p className="text-sm font-semibold text-plum-ink/60">Goes out with that batch</p>
+                </div>
+              )}
               {topIncoming.scheduledFor && (
                 <div className="mt-3 rounded-xl bg-mango/15 px-4 py-3 text-center">
                   <p className="font-heading text-lg font-extrabold text-mango">📅 Advance order</p>
@@ -576,8 +634,12 @@ export function MerchantBoard({
             No active orders. New orders will alarm here.
           </p>
         ) : (
+          <div className="space-y-5">
+            {activeGroups.map((g) => (
+            <div key={g.start ?? "loose"}>
+            {anyBatches && <BatchHeader group={g} nowMs={nowMs} />}
           <ul className="space-y-3">
-            {data.active.map((o) => {
+            {g.orders.map((o) => {
               const action = nextAction(o);
               return (
                 <li key={o.id} className="rounded-tile border border-plum-ink/10 bg-white p-4">
@@ -608,7 +670,7 @@ export function MerchantBoard({
                     </div>
                   </div>
                   {o.orderType === "delivery" && o.customerAddress && (
-                    <p className="mt-1 text-sm text-plum-ink/60">📍 {o.customerAddress}</p>
+                    <p className="mt-1 text-sm text-plum-ink/60">📍 {addressOf(o)}</p>
                   )}
                   {o.customerNote && (
                     <p className="mt-1 rounded-lg bg-mango/10 px-2 py-1 text-sm font-semibold text-plum-ink/80">
@@ -649,6 +711,9 @@ export function MerchantBoard({
               );
             })}
           </ul>
+            </div>
+            ))}
+          </div>
         )}
 
         {/* Test order — verify the alarm + customer tracker end-to-end */}

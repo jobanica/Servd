@@ -1,4 +1,9 @@
 import "server-only";
+import {
+  DEFAULT_DELIVERY_WINDOWS,
+  normalizeDeliveryWindows,
+  type DeliveryWindowsConfig,
+} from "@/lib/orders/delivery-windows";
 
 import { tenantDb, systemDb } from "@/server/tenancy/scoped-db";
 import { isOpenAt } from "@/lib/site/store-hours";
@@ -67,6 +72,12 @@ export interface DeliveryConfig {
   selfBookRider: boolean; // after placing, ask the customer to book their OWN rider
   selfBookRiderNote: string; // instructions shown to the customer (e.g. app/link to use)
   fulfillment: "both" | "pickup" | "delivery"; // which order types the online store offers
+  /**
+   * Delivery batches: the rider goes out at set times and the customer picks
+   * one at checkout. Lives in the same JSON column as the rest of the delivery
+   * settings, so it needs no migration of its own.
+   */
+  windows: DeliveryWindowsConfig;
 }
 export interface Storefront {
   hours: DayHours[]; // always length 7, index 0=Sun … 6=Sat
@@ -101,7 +112,7 @@ export interface Storefront {
 }
 
 export function defaultDeliveryConfig(): DeliveryConfig {
-  return { mode: "zones", baseFee: 0, perKm: 0, freeKm: 0, minFee: 0, maxKm: 0, roadFactor: 1.3, originLat: null, originLng: null, feeInTotal: true, mapEnabled: true, selfBookRider: false, selfBookRiderNote: "", fulfillment: "both" };
+  return { mode: "zones", baseFee: 0, perKm: 0, freeKm: 0, minFee: 0, maxKm: 0, roadFactor: 1.3, originLat: null, originLng: null, feeInTotal: true, mapEnabled: true, selfBookRider: false, selfBookRiderNote: "", fulfillment: "both", windows: { ...DEFAULT_DELIVERY_WINDOWS } };
 }
 
 function num(v: unknown, fallback = 0): number {
@@ -130,6 +141,9 @@ function normalizeDeliveryConfig(raw: unknown): DeliveryConfig {
       selfBookRider: !!r.selfBookRider,
       selfBookRiderNote: typeof r.selfBookRiderNote === "string" ? r.selfBookRiderNote.slice(0, 500) : "",
       fulfillment: r.fulfillment === "pickup" ? "pickup" : r.fulfillment === "delivery" ? "delivery" : "both",
+      // Off unless saved on: a shop that never opened the setting keeps
+      // taking delivery orders exactly as before.
+      windows: normalizeDeliveryWindows(r.windows),
     };
   }
   return d;

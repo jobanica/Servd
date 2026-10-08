@@ -24,6 +24,7 @@ import { LocationPicker } from "./LocationPicker";
 import { WebOrderTracker } from "./WebOrderTracker";
 import { haversineKm, computeDistanceFee } from "@/lib/geo/distance";
 import { computePackagingFee, packagedUnits } from "@/lib/pricing/packaging";
+import { batchLabel, openBatches, type DeliveryWindowsConfig } from "@/lib/orders/delivery-windows";
 import { PoweredByServd } from "@/components/branding/PoweredByServd";
 
 function lineId(): string {
@@ -144,6 +145,8 @@ export interface WebOrderProps {
     selfBookRider?: boolean;
     selfBookRiderNote?: string;
     fulfillment?: "both" | "pickup" | "delivery";
+    /** Delivery batches: the customer picks a time, the rider goes out per batch. */
+    windows?: DeliveryWindowsConfig;
   };
   // Where to center the delivery map by default (the store's location), so diners
   // start near the store instead of a far-away default view.
@@ -526,6 +529,28 @@ export function WebOrder(props: WebOrderProps) {
   const dcfg = props.delivery;
   // Nationwide shipping: typed postal address + region fee, no map pin.
   const shippingMode = orderType === "delivery" && dcfg?.mode === "shipping";
+  // Delivery batches. Recomputed against the clock every 30 seconds so a batch
+  // that closes while the customer is choosing disappears from the list. The
+  // server re-checks the pick regardless; this only keeps the screen honest.
+  const batchesConfigured = !!dcfg?.windows?.enabled && dcfg?.mode !== "shipping";
+  const batchesOn = batchesConfigured && orderType === "delivery";
+  const [batchClock, setBatchClock] = useState(() => Date.now());
+  useEffect(() => {
+    if (!batchesConfigured) return;
+    const t = setInterval(() => setBatchClock(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, [batchesConfigured]);
+  const openBatchList = useMemo(
+    () => (batchesConfigured && dcfg?.windows ? openBatches(dcfg.windows, new Date(batchClock)) : []),
+    [batchesConfigured, dcfg?.windows, batchClock],
+  );
+  const [chosenBatch, setChosenBatch] = useState<string | null>(null);
+  // The customer's pick while it's still open; otherwise the earliest open
+  // batch. If their pick closed under them, say so rather than moving it
+  // silently.
+  const chosenStillOpen = !!chosenBatch && openBatchList.some((b) => b.start === chosenBatch);
+  const effectiveBatch = chosenStillOpen ? chosenBatch : (openBatchList[0]?.start ?? null);
+  const batchMovedOn = !!chosenBatch && !chosenStillOpen && !!effectiveBatch;
   // Assembled shipping address string sent to the merchant (kept human-readable).
   const shippingAddress = [
     ship.street.trim(),
@@ -639,10 +664,17 @@ export function WebOrder(props: WebOrderProps) {
     );
   }
 
+  // Batched delivery answers "when" itself, so the advance-order choice (which
+  // is another day, with approval) steps aside for it. Two competing "when"
+  // questions on one checkout is how a customer ends up with neither.
+  const advanceOffered = canSchedule && !batchesOn;
   // When closed + paused, an advance order is still allowed — force "later".
-  const forceLater = canSchedule && paused;
+  const forceLater = advanceOffered && paused;
   const effectiveSchedMode: "asap" | "later" = forceLater ? "later" : schedMode;
-  const schedulingLater = canSchedule && effectiveSchedMode === "later";
+  const schedulingLater = advanceOffered && effectiveSchedMode === "later";
+  // Closed by the clock (not paused by the owner), but a batch is still to
+  // come today: a batch order is for later, so it can still be placed.
+  const batchesCarryClosed = paused && !pausedByOwner && batchesConfigured && openBatchList.length > 0;
   const scheduledIso = schedulingLater ? phPartsToIso(schedDate, schedTime) : undefined;
   // Downpayment the customer will owe on this advance order (mirror of the server
   // calc; the server recomputes authoritatively).
@@ -670,6 +702,7 @@ export function WebOrder(props: WebOrderProps) {
       lat: orderType === "delivery" && !shippingMode ? geo?.lat : undefined,
       lng: orderType === "delivery" && !shippingMode ? geo?.lng : undefined,
       scheduledFor: scheduledIso,
+      deliveryBatch: batchesOn ? effectiveBatch ?? undefined : undefined,
       downpaymentRef: schedulingLater && downpaymentDue > 0 ? downpaymentRef || undefined : undefined,
       paymentChoice: payMethod,
       cashTendered: payMethod === "cod" && cashTenderedCentavos > 0 ? cashTenderedCentavos : undefined,
@@ -807,8 +840,56 @@ export function WebOrder(props: WebOrderProps) {
               </div>
             )}
 
+            {/* When — a delivery batch, if the shop delivers in batches. */}
+            {batchesOn && (
+              <div className="rounded-lg border border-plum-ink/10 p-2">
+                <p className="px-1 pb-1.5 text-sm font-semibold text-plum-ink">
+                  🕐 What time do you want it delivered?
+                </p>
+                {openBatchList.length === 0 ? (
+                  <p className="rounded-md bg-gray-100 px-2 py-2 text-xs font-semibold text-plum-ink/60">
+                    Delivery is finished for today — the last batch has gone out.
+                    {fulfillment === "both" ? " You can still choose pick-up." : ""}
+                  </p>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {openBatchList.map((b) => (
+                        <button
+                          key={b.start}
+                          type="button"
+                          onClick={() => setChosenBatch(b.start)}
+                          className={`rounded-md border px-2 py-2 text-xs font-semibold ${
+                            effectiveBatch === b.start
+                              ? "border-red-600 bg-red-50 text-red-700"
+                              : "border-plum-ink/15 text-plum-ink/70"
+                          }`}
+                        >
+                          {batchLabel(b)}
+                        </button>
+                      ))}
+                    </div>
+                    {batchMovedOn && (
+                      <p className="mt-1.5 px-1 text-xs font-semibold text-red-600">
+                        That time just closed — we&apos;ve moved you to the next batch.
+                      </p>
+                    )}
+                    <p className="mt-1.5 px-1 text-xs text-plum-ink/50">
+                      We deliver in batches — your order goes out with everyone else&apos;s in the
+                      time you choose.
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+            {batchesCarryClosed && orderType !== "delivery" && (
+              <p className="rounded-lg bg-gray-100 px-3 py-2 text-xs font-semibold text-plum-ink/60">
+                🔒 Pick-up is closed right now — choose Delivery to order for a later batch.
+              </p>
+            )}
+
             {/* When — order now, or schedule it for a future date/time. */}
-            {canSchedule && (
+            {advanceOffered && (
               <div className="rounded-lg border border-plum-ink/10 p-2">
                 {forceLater ? (
                   <p className="px-1 pb-1.5 text-xs font-semibold text-plum-ink/60">
@@ -1144,7 +1225,7 @@ export function WebOrder(props: WebOrderProps) {
           <p className="text-xs text-plum-ink/45">VAT (12%) included · {formatPeso(vat)}</p>
         )}
         {error && <p className="mt-2 text-sm text-guava">{error}</p>}
-        {paused && !canSchedule ? (
+        {paused && !advanceOffered && !batchesCarryClosed ? (
           <div className="mt-3 rounded-lg bg-plum-ink/5 px-3 py-2 text-center text-sm font-semibold text-plum-ink/60">
             {pausedByOwner
               ? "🔒 We've paused online orders — the kitchen is at capacity. Please check back shortly."
@@ -1161,7 +1242,7 @@ export function WebOrder(props: WebOrderProps) {
         ) : (
           <button
             onClick={submit}
-            disabled={!demo && (busy || receiptMissing || lines.length === 0 || !name.trim() || !isValidPhone(phone) || (schedulingLater && !scheduledIso) || (orderType === "delivery" && (shippingMode ? !shippingReady : (!address.trim() || (showMap && !geo) || !collectDeliveryFee && !agreeRider || (distanceMode ? !!distance?.outOfRange : (zones.length > 0 && !zone))))))}
+            disabled={!demo && (busy || receiptMissing || lines.length === 0 || !name.trim() || !isValidPhone(phone) || (schedulingLater && !scheduledIso) || (batchesOn && !effectiveBatch) || (batchesCarryClosed && orderType !== "delivery") || (orderType === "delivery" && (shippingMode ? !shippingReady : (!address.trim() || (showMap && !geo) || !collectDeliveryFee && !agreeRider || (distanceMode ? !!distance?.outOfRange : (zones.length > 0 && !zone))))))}
             className="mt-3 w-full rounded-lg bg-green-600 py-3 font-semibold text-white disabled:opacity-50"
           >
             {busy

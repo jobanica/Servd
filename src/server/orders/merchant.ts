@@ -56,6 +56,9 @@ export interface MerchantOrder {
   paymentRef: string | null; // customer's GCash reference
   paymentReceiptUrl: string | null; // uploaded payment screenshot
   customerNote: string | null; // customer's note to the rider
+  /** Delivery batch the customer picked, ISO — null when not a batch order. */
+  deliveryWindowStart: string | null;
+  deliveryWindowEnd: string | null;
   createdAt: string; // ISO
   items: MerchantOrderItem[];
 }
@@ -109,7 +112,9 @@ type Row = {
   items: { nameAtTime: string; quantity: number; note: string | null; modifiers: { nameAtTime: string }[] }[];
 };
 
-function shape(o: Row, extra: OrderExtra): MerchantOrder {
+type OrderWindow = { start: string; end: string };
+
+function shape(o: Row, extra: OrderExtra, win?: OrderWindow): MerchantOrder {
   return {
     id: o.id,
     ref: `#${o.id.slice(0, 8).toUpperCase()}`,
@@ -130,6 +135,8 @@ function shape(o: Row, extra: OrderExtra): MerchantOrder {
     paymentRef: extra.paymentRef,
     paymentReceiptUrl: extra.paymentReceiptUrl,
     customerNote: extra.customerNote,
+    deliveryWindowStart: win?.start ?? null,
+    deliveryWindowEnd: win?.end ?? null,
     createdAt: o.createdAt.toISOString(),
     items: o.items.map((it) => ({
       name: it.nameAtTime,
@@ -178,7 +185,10 @@ async function loadMerchantData(restaurantId: string): Promise<MerchantData> {
   // prepMinutes / cancelReason are newer columns — read them best-effort so the
   // screen still works before the migration runs.
   const allIds = [...incomingRows, ...activeRows, ...historyRows].map((o) => o.id);
-  const extras = await loadExtras(restaurantId, allIds);
+  const [extras, windows] = await Promise.all([
+    loadExtras(restaurantId, allIds),
+    loadWindows(restaurantId, allIds),
+  ]);
   const get = (id: string): OrderExtra => extras.get(id) ?? { prepMinutes: null, acceptedAt: null, cancelReason: null, scheduledFor: null, paymentChoice: null, paymentRef: null, paymentReceiptUrl: null, customerNote: null };
 
   // Scheduled orders still awaiting acceptance + upcoming table bookings.
@@ -190,9 +200,9 @@ async function loadMerchantData(restaurantId: string): Promise<MerchantData> {
   return {
     // Advance orders (scheduled for later) are handled on the Advance orders page,
     // so they're kept out of the live "incoming now" queue until sent to kitchen.
-    incoming: incomingRows.map((o) => shape(o as Row, get(o.id))).filter((o) => !o.scheduledFor),
-    active: activeRows.map((o) => shape(o as Row, get(o.id))),
-    history: historyRows.map((o) => shape(o as Row, get(o.id))),
+    incoming: incomingRows.map((o) => shape(o as Row, get(o.id), windows.get(o.id))).filter((o) => !o.scheduledFor),
+    active: activeRows.map((o) => shape(o as Row, get(o.id), windows.get(o.id))),
+    history: historyRows.map((o) => shape(o as Row, get(o.id), windows.get(o.id))),
     upcoming,
   };
 }
@@ -314,6 +324,29 @@ async function loadExtras(restaurantId: string, ids: string[]): Promise<Map<stri
     );
     for (const r of rows) { const e = map.get(r.id)!; e.paymentReceiptUrl = r.paymentReceiptUrl ?? null; e.customerNote = r.customerNote ?? null; }
   } catch { /* receipt/note columns not migrated yet */ }
+  return map;
+}
+
+/**
+ * Delivery batches, read on their own rather than in loadExtras' fast path:
+ * these are the newest columns, and folding them in would knock every other
+ * optional field onto the slow path until the migration runs.
+ */
+async function loadWindows(restaurantId: string, ids: string[]): Promise<Map<string, OrderWindow>> {
+  const map = new Map<string, OrderWindow>();
+  if (ids.length === 0) return map;
+  try {
+    const rows = await tenantDb(restaurantId, (tx) =>
+      tx.order.findMany({
+        where: { id: { in: ids }, deliveryWindowStart: { not: null } },
+        select: { id: true, deliveryWindowStart: true, deliveryWindowEnd: true },
+      }),
+    );
+    for (const r of rows) {
+      if (!r.deliveryWindowStart || !r.deliveryWindowEnd) continue;
+      map.set(r.id, { start: r.deliveryWindowStart.toISOString(), end: r.deliveryWindowEnd.toISOString() });
+    }
+  } catch { /* not migrated yet — the batch still shows in the address line */ }
   return map;
 }
 

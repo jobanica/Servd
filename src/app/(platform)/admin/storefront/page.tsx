@@ -146,6 +146,7 @@ export default async function StorefrontPage() {
             mapEnabled: sf.delivery.mapEnabled,
             selfBookRider: sf.delivery.selfBookRider,
             selfBookRiderNote: sf.delivery.selfBookRiderNote,
+            windows: sf.delivery.windows,
             fulfillment: sf.delivery.fulfillment,
           },
         }}
