@@ -15,6 +15,10 @@
 
 BEGIN;
 
+-- Never wait long for a lock on the live restaurants table (the two foreign
+-- keys need a brief one). If this times out, nothing was applied: re-run.
+SET LOCAL lock_timeout = '10s';
+
 -- --------------------------------------------------------------------------
 -- agent_accounts
 -- --------------------------------------------------------------------------
