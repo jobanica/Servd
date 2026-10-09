@@ -1320,6 +1320,10 @@ model MenuItem {
   /// hand-run migration. Treat null as false, so every existing menu keeps
   /// charging exactly what it charged before anyone ticks a box.
   noPackaging    Boolean?
+  /// "Available soon": shown to diners under its own button in the menu, but
+  /// not orderable yet. Nullable, no default (hand-run migration
+  /// add-menu-coming-soon.sql); treat null as false.
+  comingSoon     Boolean?
   dietaryTags    String[] @default([]) // diet/allergen tag keys (see src/lib/menu/dietary.ts)
   sortOrder      Int      @default(0)
   createdAt      DateTime @default(now())

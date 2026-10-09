@@ -3,6 +3,7 @@ import { requireAdminPage } from "@/server/tenancy/require-admin";
 import { getMenu } from "@/server/menu/queries";
 import { getServingStates } from "@/server/menu/servings";
 import { getPosOnlyItemIds } from "@/server/menu/pos-only";
+import { getComingSoonItemIds } from "@/server/menu/coming-soon";
 import { formatPeso } from "@/lib/money";
 import { AddCategoryForm } from "@/components/admin/AddCategoryForm";
 import { AddItemForm } from "@/components/admin/AddItemForm";
@@ -30,6 +31,7 @@ export default async function MenuPage() {
   // without a badge an owner has no way to see which ones customers can't
   // actually find.
   const posOnly = await getPosOnlyItemIds(restaurantId);
+  const comingSoon = await getComingSoonItemIds(restaurantId);
   // AI menu import is a paid feature (Growth & Business). Gate on both the API
   // key being configured AND the restaurant's plan including it.
   const aiImportEnabled =
@@ -110,6 +112,11 @@ export default async function MenuPage() {
                       {!item.isAvailable && (
                         <span className="rounded-full bg-muted/20 px-2 py-0.5 text-xs text-muted">
                           Out of stock
+                        </span>
+                      )}
+                      {comingSoon.has(item.id) && (
+                        <span className="rounded-full bg-mango/20 px-2 py-0.5 text-xs font-medium text-plum-ink/80">
+                          🔜 Available soon
                         </span>
                       )}
                       {posOnly.has(item.id) && (

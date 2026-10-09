@@ -11,6 +11,7 @@ import { getModifierGroupOrder } from "@/server/menu/modifier-order";
 import { sortModifierGroups } from "@/lib/menu/modifier-order";
 import { getDishStock } from "@/server/inventory/dish-stock";
 import { getPosOnlyItemIds } from "@/server/menu/pos-only";
+import { getComingSoonItemIds } from "@/server/menu/coming-soon";
 import { variantPrice } from "@/lib/menu/variant-price";
 import type { DinerItem, Selection } from "@/lib/cart/types";
 
@@ -129,6 +130,9 @@ export async function buildValidatedOrder(
   // the web means a stale page or a crafted request — either way it's refused
   // here rather than trusted to have been hidden.
   const posOnly = channel === "pos" ? new Set<string>() : await getPosOnlyItemIds(restaurantId);
+  // "Available soon" items are on the menu to be seen, not ordered. Refused
+  // here too, in case a page from before the owner ticked the box is still open.
+  const comingSoon = channel === "pos" ? new Set<string>() : await getComingSoonItemIds(restaurantId);
 
   let total = 0;
   const items: BuiltOrderItem[] = [];
@@ -142,6 +146,7 @@ export async function buildValidatedOrder(
     // Same wording as a delisted item on purpose: the storefront shouldn't
     // confirm that a counter-only item exists.
     if (posOnly.has(dbItem.id)) throw new OrderValidationError("An item is no longer on the menu.");
+    if (comingSoon.has(dbItem.id)) throw new OrderValidationError(`"${dbItem.name}" isn't available yet — it's coming soon.`);
     if (!dbItem.isAvailable) throw new OrderValidationError(`"${dbItem.name}" is sold out.`);
 
     // Enforce the per-day servings cap (counts every line of this item together).

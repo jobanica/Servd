@@ -10,6 +10,7 @@ import { VariantEditor } from "@/components/admin/VariantEditor";
 import { formatDelta } from "@/lib/money";
 import { EditItemForm } from "@/components/admin/EditItemForm";
 import { getPosOnlyItemIds } from "@/server/menu/pos-only";
+import { getComingSoonItemIds } from "@/server/menu/coming-soon";
 import { getNoPackagingItemIds } from "@/server/menu/packaging";
 import { ItemTranslationForm } from "@/components/admin/ItemTranslationForm";
 import { setItemModifierGroup } from "@/server/menu/actions";
@@ -38,6 +39,7 @@ export default async function EditItemPage({
   // one should cost the checkbox, not the whole edit page.
   const posOnly = (await getPosOnlyItemIds(restaurantId)).has(itemId);
   const noPackaging = (await getNoPackagingItemIds(restaurantId)).has(itemId);
+  const comingSoon = (await getComingSoonItemIds(restaurantId)).has(itemId);
   const servingState = (await getServingStates(restaurantId, [itemId])).get(itemId);
   const variants = await getItemVariants(restaurantId, itemId);
   const translationByLocale = new Map(translations.map((tr) => [tr.locale, tr]));
@@ -67,6 +69,7 @@ export default async function EditItemPage({
           dailyLimit: servingState?.dailyLimit ?? null,
           posOnly,
           noPackaging,
+          comingSoon,
         }}
         categories={categories}
       />

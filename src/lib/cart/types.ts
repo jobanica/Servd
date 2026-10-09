@@ -55,6 +55,11 @@ export interface DinerItem {
    * behaved before the flag existed.
    */
   noPackaging?: boolean;
+  /**
+   * "Available soon": on the menu so diners know it's coming, not orderable
+   * yet. Optional: absent means a normal item.
+   */
+  comingSoon?: boolean;
   originalPrice?: number | null; // pre-discount price when a happy hour is active
   groups: DinerModifierGroup[];
   variants?: DinerVariant[]; // sizes — when present the diner must pick one

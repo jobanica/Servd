@@ -20,6 +20,7 @@ type Item = {
   dietaryTags?: string[];
   dailyLimit?: number | null;
   posOnly?: boolean;
+  comingSoon?: boolean;
   noPackaging?: boolean;
 };
 
@@ -107,6 +108,18 @@ export function EditItemForm({
               The cashier can still punch it; customers never see it. For takeaway
               boxes, add-ons somebody wants three of, staff meals, and anything
               that doesn&apos;t travel well.
+            </span>
+          </span>
+        </label>
+        {/* Available soon. Same hidden-marker trick as above. */}
+        <label className="flex items-start gap-2 text-sm sm:col-span-2">
+          <input type="hidden" name="comingSoonField" value="1" />
+          <input type="checkbox" name="comingSoon" defaultChecked={item.comingSoon === true} className="mt-1" />
+          <span>
+            🔜 Available soon — show it, but don&apos;t take orders yet
+            <span className="mt-0.5 block text-xs font-normal text-plum-ink/50">
+              Customers see it under the &ldquo;Available soon&rdquo; button on your menu, so they know
+              what&apos;s coming. Untick it on launch day and it moves back to its category, ready to order.
             </span>
           </span>
         </label>

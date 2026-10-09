@@ -71,6 +71,12 @@ export function AddItemForm({ categoryId }: { categoryId: string }) {
           <input type="checkbox" name="posOnly" />
           Counter only
         </label>
+        {/* Shown to customers under "Available soon", not orderable yet. */}
+        <label className="flex items-center gap-2 text-sm">
+          <input type="hidden" name="comingSoonField" value="1" />
+          <input type="checkbox" name="comingSoon" />
+          Available soon
+        </label>
         {/* Drinks and anything else that arrives in its own container. */}
         <label className="flex items-center gap-2 text-sm">
           <input type="hidden" name="noPackagingField" value="1" />

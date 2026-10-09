@@ -23,6 +23,7 @@
     "payError": "Couldn't start payment.",
     "paymentConfirming": "✓ Thanks! We're confirming your payment — it'll update shortly.",
     "soldOut": "Sold out",
+    "availableSoon": "🔜 Available soon",
     "menuUnavailable": "This menu isn't available yet. Please check back soon.",
     "viewOrder": "View order",
     "items": "{count, plural, one {# item} other {# items}}"

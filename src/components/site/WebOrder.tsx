@@ -344,7 +344,11 @@ function ProductCard({ item, onPick }: { item: DinerItem; onPick: (i: DinerItem)
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-gray-200 text-3xl font-bold text-gray-400">{item.name.charAt(0)}</div>
         )}
-        {!item.isAvailable && <span className="absolute inset-0 flex items-center justify-center bg-white/70 text-sm font-bold text-plum-ink">Sold out</span>}
+        {!item.isAvailable && (
+          <span className="absolute inset-0 flex items-center justify-center bg-white/70 text-sm font-bold text-plum-ink">
+            {item.comingSoon ? "🔜 Available soon" : "Sold out"}
+          </span>
+        )}
         <button
           onClick={() => onPick(item)}
           disabled={!item.isAvailable}

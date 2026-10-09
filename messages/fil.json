@@ -23,6 +23,7 @@
     "payError": "Hindi masimulan ang bayad.",
     "paymentConfirming": "✓ Salamat! Kinukumpirma namin ang iyong bayad — mag-a-update kaagad.",
     "soldOut": "Ubos na",
+    "availableSoon": "🔜 Malapit na",
     "menuUnavailable": "Hindi pa available ang menu na ito. Bumalik po kayo mamaya.",
     "viewOrder": "Tingnan ang order",
     "items": "{count, plural, other {# item}}"

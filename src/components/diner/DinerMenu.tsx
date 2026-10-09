@@ -43,10 +43,12 @@ interface PromoItem {
 function ProductCard({
   item,
   soldOutLabel,
+  availableSoonLabel = "🔜 Available soon",
   onPick,
 }: {
   item: DinerItem;
   soldOutLabel: string;
+  availableSoonLabel?: string;
   onPick: (item: DinerItem) => void;
 }) {
   return (
@@ -91,7 +93,7 @@ function ProductCard({
 
         {!item.isAvailable && (
           <span className="absolute inset-0 flex items-center justify-center bg-white/70 text-sm font-bold text-brand-ink">
-            {soldOutLabel}
+            {item.comingSoon ? availableSoonLabel : soldOutLabel}
           </span>
         )}
       </div>
@@ -533,7 +535,7 @@ export function DinerMenu({
         ) : (
           <div className="grid grid-cols-2 gap-3">
             {shown.map(({ it }) => (
-              <ProductCard key={it.id} item={it} soldOutLabel={t("soldOut")} onPick={setActiveItem} />
+              <ProductCard key={it.id} item={it} soldOutLabel={t("soldOut")} availableSoonLabel={t("availableSoon")} onPick={setActiveItem} />
             ))}
           </div>
         )}

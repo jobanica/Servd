@@ -146,6 +146,7 @@ export async function createItem(
   );
   await savePosOnly(restaurantId, created.id, formData);
   await saveNoPackaging(restaurantId, created.id, formData);
+  await saveComingSoon(restaurantId, created.id, formData);
   const costError = await saveFoodCost(restaurantId, created.id, formData.get("costPesos"));
   await refresh();
   return costError ? { error: costError } : { ok: true };
@@ -334,6 +335,7 @@ export async function updateItem(
   });
   await savePosOnly(restaurantId, id, formData);
   await saveNoPackaging(restaurantId, id, formData);
+  await saveComingSoon(restaurantId, id, formData);
   const costError = await saveFoodCost(restaurantId, id, formData.get("costPesos"));
   const limitError = await saveDailyLimit(restaurantId, id, formData.get("dailyLimit"));
   await refresh();
@@ -374,6 +376,30 @@ async function savePosOnly(
     );
   } catch {
     /* posOnly column not migrated yet */
+  }
+}
+
+/**
+ * "Available soon", written on its own and best-effort — same reasoning as
+ * savePosOnly: the column arrives in a hand-run migration
+ * (prisma/manual/add-menu-coming-soon.sql), and the item must still save
+ * without it.
+ */
+async function saveComingSoon(
+  restaurantId: string,
+  menuItemId: string,
+  formData: FormData,
+): Promise<void> {
+  if (!formData.has("comingSoonField")) return;
+  try {
+    await tenantDb(restaurantId, (tx) =>
+      tx.menuItem.updateMany({
+        where: { id: menuItemId },
+        data: { comingSoon: formData.get("comingSoon") === "on" },
+      }),
+    );
+  } catch {
+    /* comingSoon column not migrated yet */
   }
 }
 

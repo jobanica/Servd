@@ -10,6 +10,8 @@ import { getModifierGroupOrder } from "@/server/menu/modifier-order";
 import { sortModifierGroups } from "@/lib/menu/modifier-order";
 import { getPosOnlyItemIds } from "@/server/menu/pos-only";
 import { getNoPackagingItemIds } from "@/server/menu/packaging";
+import { getComingSoonItemIds } from "@/server/menu/coming-soon";
+import { withAvailableSoon } from "@/lib/menu/available-soon";
 import { variantPrice } from "@/lib/menu/variant-price";
 
 /**
@@ -111,8 +113,13 @@ export async function getPublicMenu(
     (c) => c.menuItems.length === 0 || c.menuItems.some((i) => !posOnly.has(i.id)),
   );
 
+  // "Available soon" items: on every diner menu they move into their own
+  // section (and button) at the end, shown but not orderable. The cashier POS
+  // leaves them where they are.
+  const comingSoon = await getComingSoonItemIds(restaurantId);
+
   // Overlay the requested locale's translations, falling back to base text.
-  return visible.map((c) => ({
+  const shaped: DinerCategory[] = visible.map((c) => ({
     id: c.id,
     name: c.translations[0]?.name ?? c.name,
     items: c.menuItems.filter((i) => !posOnly.has(i.id)).map((item) => {
@@ -178,7 +185,10 @@ export async function getPublicMenu(
           isAvailable: !modsOut.has(m.id),
         })),
       })),
+      ...(comingSoon.has(item.id) ? { comingSoon: true } : {}),
       };
     }),
   }));
+
+  return opts.includePosOnly ? shaped : withAvailableSoon(shaped, locale);
 }
