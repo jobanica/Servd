@@ -78,6 +78,13 @@ export default function LoginPage() {
         </button>
       </form>
 
+      <p className="mt-4 text-center text-sm text-plum-ink/60">
+        New to Servd?{" "}
+        <Link href="/signup" className="font-semibold text-brand-primary">
+          Create an account
+        </Link>
+      </p>
+
       <div className="mt-6 text-center">
         <Link href="/super-admin" className="text-xs font-medium text-plum-ink/40 hover:text-plum-ink">
           Platform admin

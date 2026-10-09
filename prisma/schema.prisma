@@ -2372,12 +2372,14 @@ model AnnouncementRead {
 // nothing on Restaurant changes.
 // ----------------------------------------------------------------------------
 
-/// A restaurant that came through an agent. The row exists only when there is
-/// a code; its code is set once and a trigger refuses any change to it.
+/// A restaurant billed through the agent portal: every self-signup (activated
+/// by a QR payment CANVEXIA confirms), and any restaurant an admin attached an
+/// agent code to. No row = billed exactly as before.
 model AgentAccount {
   restaurantId              String    @id
-  /// Uppercase, normalised. Immutable (trigger agent_accounts_code_immutable).
-  agentCode                 String
+  /// Uppercase, normalised; null when the owner came without an agent. Once
+  /// set it never changes (trigger agent_accounts_code_immutable).
+  agentCode                 String?
   /// What was reported to the portal in customer.signed_up.
   ownerName                 String
   ownerPhone                String

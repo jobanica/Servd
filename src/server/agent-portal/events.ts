@@ -12,29 +12,30 @@ type Tx = Prisma.TransactionClient;
  */
 
 /**
- * The restaurant's agent code, or null. Read inside a savepoint so that on a
- * database where add-agent-portal.sql has not run yet, the missing table reads
- * as "no agent" instead of aborting the caller's transaction — this guard sits
- * in front of status changes every account goes through.
+ * Whether the restaurant is billed through the agent portal (it has an
+ * agent_accounts row — a self-signup, or a code an admin attached). Read
+ * inside a savepoint so that a database missing the table reads as "no"
+ * instead of aborting the caller's transaction: this guard sits in front of
+ * status changes every account goes through.
  */
-export async function agentCodeOf(tx: Tx, restaurantId: string): Promise<string | null> {
+export async function isPortalBilled(tx: Tx, restaurantId: string): Promise<boolean> {
   await tx.$executeRawUnsafe("SAVEPOINT agent_guard");
   try {
     const row = await tx.agentAccount.findUnique({
       where: { restaurantId },
-      select: { agentCode: true },
+      select: { restaurantId: true },
     });
     await tx.$executeRawUnsafe("RELEASE SAVEPOINT agent_guard");
-    return row?.agentCode ?? null;
+    return !!row;
   } catch {
     await tx.$executeRawUnsafe("ROLLBACK TO SAVEPOINT agent_guard");
-    return null;
+    return false;
   }
 }
 
 /**
- * Queue one event. A no-op — returns null — when the restaurant has no agent
- * code: that single guard is what keeps every other account out of this.
+ * Queue one event. A no-op — returns null — for a restaurant that isn't
+ * portal-billed: that single guard is what keeps every existing account out.
  *
  * Validated against the kit's schema before it is stored, so a malformed event
  * is a bug caught here rather than a row the portal refuses forever.
@@ -46,7 +47,7 @@ export async function enqueueProductEvent(
   data: Record<string, unknown>,
   opts: { eventId?: string; skipDuplicates?: boolean } = {},
 ): Promise<string | null> {
-  if (!(await agentCodeOf(tx, restaurantId))) return null;
+  if (!(await isPortalBilled(tx, restaurantId))) return null;
 
   const event = {
     event_id: opts.eventId ?? newEventId(),
@@ -97,7 +98,7 @@ export async function enqueueCustomerSignedUp(tx: Tx, restaurantId: string): Pro
       business_name: restaurant.displayName || restaurant.name,
       owner_name: agent.ownerName,
       owner_phone: agent.ownerPhone,
-      agent_code: agent.agentCode,
+      agent_code: agent.agentCode ?? null,
       plan: "all-access",
     },
     { skipDuplicates: true },

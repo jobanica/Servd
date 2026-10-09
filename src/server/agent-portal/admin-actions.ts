@@ -59,8 +59,13 @@ export async function attachAgentCode(_prev: AdminFormState, fd: FormData): Prom
         where: { restaurantId: restaurant.id },
         select: { agentCode: true },
       });
-      if (existing) {
+      if (existing?.agentCode) {
         return { error: `${restaurant.name} already has agent code ${existing.agentCode}. Codes can't be changed.` };
+      }
+      if (existing) {
+        // Signed up directly: the portal already has them with no agent, and
+        // attachment there is the portal admin's to change.
+        return { error: `${restaurant.name} signed up without an agent. Assign the agent in the CANVEXIA portal instead.` };
       }
       if (!ownerPhone) {
         const receipt = (restaurant.printerConfig as { receipt?: { phone?: string } } | null)?.receipt;

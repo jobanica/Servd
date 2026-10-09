@@ -176,9 +176,9 @@ describe("the event envelope", () => {
     expect(events).not.toMatch(/external_customer_id:\s*[^,}]*email/);
   });
 
-  it("queues nothing for an account without an agent code", () => {
+  it("queues nothing for an account that isn't billed through the portal", () => {
     const events = read("src/server/agent-portal/events.ts");
-    expect(events).toMatch(/if \(!\(await agentCodeOf\(tx, restaurantId\)\)\) return null;/);
+    expect(events).toMatch(/if \(!\(await isPortalBilled\(tx, restaurantId\)\)\) return null;/);
   });
 });
 
@@ -365,12 +365,21 @@ describe("coverage", () => {
     expect(reversed.paidUntil! < both.paidUntil!).toBe(true);
   });
 
-  it("activation alone entitles until the first monthly payment exists", () => {
-    const now = new Date("2027-03-01T00:00:00Z");
-    const activation = { type: "activation", billingMonthStart: null, monthsCovered: 1 };
-    expect(isEntitled(coverageOf([activation]), now)).toBe(true);
-    // Paid last November; activation was long ago. That's not paid-up today.
-    expect(isEntitled(coverageOf([activation, m("2026-11")]), now)).toBe(false);
+  it("activation covers the month it's confirmed in; monthly is due from the 1st of the next", () => {
+    const activation = {
+      type: "activation", billingMonthStart: null, monthsCovered: 1,
+      decidedAt: new Date("2026-10-20T03:00:00Z"), // 20 Oct, Manila
+    };
+    const c = coverageOf([activation]);
+    expect(c.activationCoversUntil?.toISOString()).toBe("2026-10-31T16:00:00.000Z"); // 1 Nov 00:00 Manila
+    expect(isEntitled(c, new Date("2026-10-31T15:59:00Z"))).toBe(true);
+    expect(isEntitled(c, new Date("2026-11-01T00:00:00Z"))).toBe(false);
+  });
+
+  it("an activation from long ago is not a paid-up subscription today", () => {
+    const activation = { type: "activation", billingMonthStart: null, monthsCovered: 1, decidedAt: new Date("2026-01-10T00:00:00Z") };
+    expect(isEntitled(coverageOf([activation, m("2026-11")]), new Date("2027-03-01T00:00:00Z"))).toBe(false);
+    expect(isEntitled(coverageOf([activation, m("2027-03")]), new Date("2027-03-15T00:00:00Z"))).toBe(true);
   });
 });
 
@@ -394,10 +403,19 @@ describe("grace and suspension", () => {
     expect(lapseAction(input({ subscriptionStatus: "past_due" }), at(7))).toBe("suspend");
   });
 
-  it("is out of scope without a confirmed monthly payment", () => {
-    const activationOnly = coverageOf([{ type: "activation", billingMonthStart: null, monthsCovered: 1 }]);
-    expect(lapseAction(input({ coverage: activationOnly }), at(30))).toBe("none");
+  it("a restaurant that never activated is out of scope — it simply isn't live", () => {
     expect(lapseAction(input({ coverage: coverageOf([]) }), at(30))).toBe("none");
+  });
+
+  it("an activation with no monthly payment lapses at the end of its month", () => {
+    const act = coverageOf([
+      { type: "activation", billingMonthStart: null, monthsCovered: 1, decidedAt: new Date("2026-11-10T03:00:00Z") },
+    ]);
+    const endsAt = act.activationCoversUntil!; // 1 Dec Manila
+    const day = (d: number) => new Date(endsAt.getTime() + d * 86_400_000 + 60_000);
+    expect(lapseAction(input({ coverage: act }), new Date(endsAt.getTime() - 60_000))).toBe("none");
+    expect(lapseAction(input({ coverage: act }), day(0))).toBe("mark_past_due");
+    expect(lapseAction(input({ coverage: act, subscriptionStatus: "past_due" }), day(7))).toBe("suspend");
   });
 
   it("paying again restores a suspended account", () => {
@@ -425,6 +443,42 @@ describe("grace and suspension", () => {
     const route = read("src/app/api/cron/agent-portal/route.ts");
     expect(route.indexOf("suspendLapsedAccounts()")).toBeLessThan(route.indexOf("drainOutbox()"));
     expect(route).toMatch(/catch \(e\) \{\s*console\.error\("\[agent-portal\] sweep failed; draining anyway:"/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe("public signup", () => {
+  const page = read("src/app/(platform)/signup/page.tsx");
+  const action = read("src/app/(platform)/signup/actions.ts");
+
+  it("is open to everyone — no invite redirect", () => {
+    expect(page).not.toMatch(/redirect\(/);
+  });
+
+  it("creates the restaurant NOT live, so ordering stays off until activation", () => {
+    expect(action).toMatch(/status: "pending"/);
+  });
+
+  it("bills every signup through the portal, in the same transaction, agent or not", () => {
+    expect(action).toMatch(/await tx\.agentAccount\.create\(\{\s*data: \{ restaurantId: restaurant\.id, agentCode, ownerName, ownerPhone: phone \}/);
+    expect(action).toMatch(/await enqueueCustomerSignedUp\(tx, restaurant\.id\);/);
+    expect(action).not.toMatch(/if \(agentCode\) \{\s*await tx\.agentAccount/);
+  });
+
+  it("is rate-limited, since anyone can reach it", () => {
+    expect(action).toMatch(/rateLimit\("signup:create"\)/);
+  });
+
+  it("a confirmed activation puts a not-live restaurant live — without a reactivated event", () => {
+    const cov = read("src/server/agent-portal/coverage.ts");
+    expect(cov).toMatch(/coverage\.activationConfirmed && restaurant\?\.status === "pending"/);
+    const ev = read("src/server/agent-portal/events.ts");
+    expect(ev).toMatch(/before\.status === "suspended" && status === "active"/);
+  });
+
+  it("the owner is told they're not live yet, with the way to go live", () => {
+    const n = ownerNotice({ coverage: coverageOf([]), trialEndsAt: null, subscriptionStatus: "trialing", suspended: false, live: false }, new Date());
+    expect(n).toEqual({ kind: "not_live" });
   });
 });
 

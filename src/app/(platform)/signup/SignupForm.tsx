@@ -7,8 +7,8 @@ import { AppIcon, Wordmark } from "@/components/Wordmark";
 import { signUpRestaurant, type SignupState } from "./actions";
 
 /**
- * `agentCode` is set only when the visitor came through a sales agent's link.
- * Without one this is exactly the form it always was.
+ * Public signup. `agentCode` prefills the referral field when the visitor came
+ * through a sales agent's link; otherwise it starts empty and is optional.
  */
 export function SignupForm({ agentCode = null }: { agentCode?: string | null }) {
   const [state, action, pending] = useActionState<SignupState, FormData>(
@@ -25,6 +25,15 @@ export function SignupForm({ agentCode = null }: { agentCode?: string | null }) 
         </div>
         <h1 className="mt-4 font-heading text-2xl font-bold">{t("checkEmail")}</h1>
         <p className="mt-2 text-sm text-plum-ink/60">{t("checkEmailBody")}</p>
+        <div className="mt-5 rounded-lg border border-plum-ink/10 bg-cream/50 p-4 text-left text-sm text-plum-ink/75">
+          <p className="font-semibold text-plum-ink">Then, to go live:</p>
+          <ol className="mt-1 list-decimal space-y-0.5 pl-5">
+            <li>Set up your menu</li>
+            <li>Open <strong>Billing</strong> and sign the service agreement</li>
+            <li>Pay the activation by scanning the QR code</li>
+            <li>Upload your receipt — we confirm it, usually within one business day</li>
+          </ol>
+        </div>
         <Link href="/login" className="mt-6 inline-block font-semibold text-brand-primary">
           {t("goToLogin")}
         </Link>
@@ -42,8 +51,9 @@ export function SignupForm({ agentCode = null }: { agentCode?: string | null }) 
       <p className="mt-1 text-sm text-plum-ink/60">{t("signupSubtitle")}</p>
 
       <div className="mt-4 rounded-lg border border-brand-primary/20 bg-brand-primary/5 px-4 py-3 text-sm text-plum-ink/75">
-        <span className="font-semibold text-brand-primary">✨ 30-day free trial</span> — every
-        feature unlocked, no card. After 30 days you move to the Free plan unless you upgrade.
+        <span className="font-semibold text-brand-primary">How it works</span> — create your account
+        and set up your menu right away. Your ordering page and QR ordering go live once you pay the
+        activation by QR and we confirm it.
       </div>
 
       <form action={action} className="mt-6 space-y-4">
@@ -58,33 +68,18 @@ export function SignupForm({ agentCode = null }: { agentCode?: string | null }) 
             className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2"
           />
         </div>
-        {agentCode && (
-          <div className="rounded-lg border border-plum-ink/10 bg-cream/50 p-3">
-            <label className="block text-sm font-medium" htmlFor="ownerName">
-              Your name
-            </label>
-            <input
-              id="ownerName"
-              name="ownerName"
-              required
-              autoComplete="name"
-              className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2"
-            />
-            <label className="mt-3 block text-sm font-medium" htmlFor="referralCode">
-              Referral code
-            </label>
-            <input
-              id="referralCode"
-              name="referralCode"
-              defaultValue={agentCode}
-              autoCapitalize="characters"
-              className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2 font-mono uppercase"
-            />
-            <p className="mt-1 text-xs text-plum-ink/50">
-              From the Servd sales agent who referred you. Clear it if nobody did.
-            </p>
-          </div>
-        )}
+        <div>
+          <label className="block text-sm font-medium" htmlFor="ownerName">
+            Your name
+          </label>
+          <input
+            id="ownerName"
+            name="ownerName"
+            required
+            autoComplete="name"
+            className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2"
+          />
+        </div>
         <div>
           <label className="block text-sm font-medium" htmlFor="phone">
             {t("phone")}
@@ -123,6 +118,20 @@ export function SignupForm({ agentCode = null }: { agentCode?: string | null }) 
             minLength={8}
             autoComplete="new-password"
             className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium" htmlFor="referralCode">
+            Referral code <span className="font-normal text-plum-ink/50">(optional)</span>
+          </label>
+          <input
+            id="referralCode"
+            name="referralCode"
+            defaultValue={agentCode ?? ""}
+            autoCapitalize="characters"
+            placeholder="From the Servd agent who referred you"
+            className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2 font-mono uppercase placeholder:font-sans placeholder:normal-case"
           />
         </div>
 

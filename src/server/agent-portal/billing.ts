@@ -3,7 +3,7 @@ import { systemDb, tenantDb } from "@/server/tenancy/scoped-db";
 import { getCustomerTerms } from "@/lib/agent-kit/client";
 import type { CustomerTermsResponse } from "@/lib/agent-kit/events";
 import { nextBillingMonth, canSubmitActivation } from "@/lib/agent-kit/billing";
-import { coverageOf, ownerNotice, type Coverage, type OwnerNotice } from "@/lib/agent-portal/lapse";
+import { coverageOf, ownerNotice, paidThrough, type Coverage, type OwnerNotice } from "@/lib/agent-portal/lapse";
 import { portalConfig } from "./config";
 
 export interface PaymentDetails {
@@ -62,7 +62,10 @@ export interface AgentPayment {
 }
 
 export interface AgentBillingState {
-  agentCode: string;
+  /** Null for a restaurant that signed up without an agent. */
+  agentCode: string | null;
+  /** The ordering page and QR ordering are on (activation confirmed). */
+  live: boolean;
   contractSigned: boolean;
   contractSignedAt: Date | null;
   minimumTermEndsAt: Date | null;
@@ -100,7 +103,7 @@ export async function getAgentBillingState(
           take: 50,
           select: {
             id: true, type: true, monthsCovered: true, billingMonthStart: true, amountCentavos: true,
-            bankReference: true, status: true, reason: true, submittedAt: true,
+            bankReference: true, status: true, reason: true, submittedAt: true, decidedAt: true,
           },
         }),
         sub: await tx.subscription.findFirst({
@@ -125,6 +128,7 @@ export async function getAgentBillingState(
 
   return {
     agentCode: base.agent.agentCode,
+    live: base.restaurant?.status === "active",
     contractSigned: base.agent.contractStatus === "signed",
     contractSignedAt: base.agent.contractSignedAt,
     minimumTermEndsAt: base.agent.contractMinimumTermEndsAt,
@@ -146,11 +150,13 @@ export async function getAgentBillingState(
         trialEndsAt: base.sub?.status === "trialing" ? base.sub.trialEndsAt : null,
         subscriptionStatus: base.sub?.status ?? null,
         suspended: base.restaurant?.status === "suspended",
+        live: base.restaurant?.status === "active",
       },
       now,
     ),
     canSubmitActivation: canSubmitActivation(base.payments),
-    suggestedMonth: nextBillingMonth(coverage.paidUntil, now),
+    // The first month not yet paid for — after the activation's own month.
+    suggestedMonth: nextBillingMonth(paidThrough(coverage), now),
     terms,
     portalConfigured: !!config,
     paymentDetails,

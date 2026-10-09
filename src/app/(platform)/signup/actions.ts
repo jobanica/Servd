@@ -12,6 +12,7 @@ import { lookupAgentCode } from "@/lib/agent-kit/client";
 import { portalRefusedCode } from "@/lib/agent-portal/referral";
 import { portalConfig } from "@/server/agent-portal/config";
 import { enqueueCustomerSignedUp } from "@/server/agent-portal/events";
+import { rateLimit } from "@/server/build/rate-limit";
 
 export type SignupState = { ok?: boolean; error?: string } | null;
 
@@ -23,10 +24,14 @@ const schema = z.object({
 });
 
 /**
- * Self-serve restaurant signup. Creates the Supabase Auth user (which triggers
- * the confirmation email) and provisions the tenant + first owner (role=admin).
- * The restaurant starts `active` so the owner can onboard immediately; login is
- * gated by Supabase until the email is confirmed.
+ * Public self-serve restaurant signup. Creates the Supabase Auth user (which
+ * triggers the confirmation email) and provisions the tenant + first owner.
+ *
+ * The restaurant starts NOT LIVE (`pending`): the owner can sign in and set up
+ * the menu straight away, but the ordering page and QR ordering stay off until
+ * they activate — sign the agreement, pay by QR, upload the receipt — and
+ * CANVEXIA confirms the payment. Every signup is billed through the agent
+ * portal; an agent's code, if there is one, only decides who earns commission.
  */
 export async function signUpRestaurant(
   _prev: SignupState,
@@ -43,12 +48,15 @@ export async function signUpRestaurant(
   }
   const { restaurantName, phone, email, password } = parsed.data;
 
-  // A CANVEXIA sales agent's code, if the form carried one. Then the owner's
-  // name is required too — the portal records who it is paying commission on.
-  let agentCode = normalizeReferralCode(String(formData.get("referralCode") ?? ""));
+  // The portal records every customer by name and phone, agent or not.
   const ownerName = String(formData.get("ownerName") ?? "").trim().slice(0, 120);
-  if (agentCode && !ownerName) return { error: "Enter your name." };
+  if (!ownerName) return { error: "Enter your name." };
+  // A CANVEXIA sales agent's code, if there is one — optional.
+  let agentCode = normalizeReferralCode(String(formData.get("referralCode") ?? ""));
   if (agentCode) agentCode = await keepUnlessRefused(agentCode);
+
+  const limited = await rateLimit("signup:create");
+  if (!limited.ok) return { error: limited.error ?? "Please try again later." };
 
   try {
     const supabase = await createSupabaseServerClient();
@@ -77,7 +85,8 @@ export async function signUpRestaurant(
             name: restaurantName,
             displayName: restaurantName,
             slug,
-            status: "active",
+            // Not live until the activation payment is confirmed.
+            status: "pending",
             // Seed the contact phone — it also shows on printed receipts.
             printerConfig: { receipt: { phone } },
             staff: { create: { authUserId, role: "admin", email } },
@@ -86,16 +95,14 @@ export async function signUpRestaurant(
         });
         // 30-day Business trial — every feature unlocked, no card.
         await provisionTrial(tx, restaurant.id);
-        // In the SAME transaction as the restaurant: the agent row and the
-        // customer.signed_up event commit with it or not at all. The portal is
-        // not called here — the worker delivers the event.
-        if (agentCode) {
-          await tx.agentAccount.create({
-            data: { restaurantId: restaurant.id, agentCode, ownerName, ownerPhone: phone },
-            select: { restaurantId: true },
-          });
-          await enqueueCustomerSignedUp(tx, restaurant.id);
-        }
+        // In the SAME transaction as the restaurant: the portal-billing row
+        // and the customer.signed_up event commit with it or not at all. The
+        // portal is not called here — the worker delivers the event.
+        await tx.agentAccount.create({
+          data: { restaurantId: restaurant.id, agentCode, ownerName, ownerPhone: phone },
+          select: { restaurantId: true },
+        });
+        await enqueueCustomerSignedUp(tx, restaurant.id);
       });
     } catch (e) {
       console.error("[signup] provisioning failed:", e);
@@ -109,11 +116,9 @@ export async function signUpRestaurant(
     }
 
     // Recorded — forget the agent cookie.
-    if (agentCode) {
-      try {
-        (await cookies()).delete(REF_COOKIE);
-      } catch { /* cookie clearing is cosmetic */ }
-    }
+    try {
+      (await cookies()).delete(REF_COOKIE);
+    } catch { /* cookie clearing is cosmetic */ }
     return { ok: true };
   } catch (e) {
     // Never let the action crash into a 500 page — surface a friendly message.

@@ -15,9 +15,9 @@ export interface SweepSummary {
  * suspend_lapsed_accounts: the clock-driven half of agent billing. A lapse is
  * caused by time passing, not by any request, so it is swept on a schedule.
  *
- * In scope: ONLY restaurants with an agent code AND at least one confirmed
- * monthly payment. Everyone else — every account without a code, and agent
- * accounts that have not paid a month yet — is never read here.
+ * In scope: ONLY portal-billed restaurants with a confirmed activation or
+ * monthly payment. Every other account — and a portal-billed one that never
+ * activated, which is simply not live — is never read here.
  *
  * Lapsed → past_due, nothing else. AGENT_GRACE_DAYS later → suspended, which
  * reports customer.cancelled. The plan is never changed.
@@ -30,7 +30,7 @@ export async function suspendLapsedAccounts(now = new Date()): Promise<SweepSumm
   for (let cursor: string | undefined; ; ) {
     const rows = await systemDb((tx) =>
       tx.subscriptionManualPayment.findMany({
-        where: { type: "monthly", status: "confirmed", ...(cursor ? { restaurantId: { gt: cursor } } : {}) },
+        where: { status: "confirmed", ...(cursor ? { restaurantId: { gt: cursor } } : {}) },
         distinct: ["restaurantId"],
         orderBy: { restaurantId: "asc" },
         take: PAGE,

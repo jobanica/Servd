@@ -24,7 +24,8 @@ export type Bucket =
   | "build:upload"
   | "build:activate"
   | "landing:event"
-  | "agent:receipt";
+  | "agent:receipt"
+  | "signup:create";
 
 /** Per-hour allowance for each bucket, per IP. */
 const LIMITS: Record<Bucket, number> = {
@@ -39,6 +40,9 @@ const LIMITS: Record<Bucket, number> = {
   // Agent-referred owners uploading payment receipts. A real owner sends one
   // or two a month; this only stops a script hammering the portal's storage.
   "agent:receipt": 20,
+  // Public self-signup: a few real attempts (typos, a second branch), not a
+  // script creating accounts.
+  "signup:create": 5,
 };
 
 /** Hashed client IP, or "unknown" behind a proxy that strips everything. */

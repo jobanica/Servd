@@ -26,8 +26,12 @@ export function AgentBilling({ s }: { s: AgentBillingState }) {
     <div className="space-y-6">
       <div>
         <Link href="/admin" className="text-sm text-plum-ink/50">← Dashboard</Link>
-        <h1 className="font-heading text-2xl font-bold">Billing</h1>
-        <p className="text-sm text-plum-ink/50">Paid by bank transfer — upload your receipt and we confirm it.</p>
+        <h1 className="font-heading text-2xl font-bold">{s.live ? "Billing" : "Activate your restaurant"}</h1>
+        <p className="text-sm text-plum-ink/50">
+          {s.live
+            ? "Paid by QR or bank transfer — upload your receipt and we confirm it."
+            : "Sign the agreement, pay the activation by QR, then upload your receipt. You go live once we confirm it."}
+        </p>
       </div>
 
       <AgentNotice notice={s.notice} showLink={false} />

@@ -9,7 +9,7 @@
  * No money in here: what an owner owes is the portal's to say, read from it
  * when the billing page renders. Servd only knows which months are paid.
  */
-import { coverageEnd } from "@/lib/agent-kit/billing";
+import { addMonthKey, coverageEnd, manilaMonthKey, manilaMonthStart } from "@/lib/agent-kit/billing";
 
 export const AGENT_GRACE_DAYS = 7;
 /** Start nagging this many days before paid coverage runs out. */
@@ -21,10 +21,18 @@ export interface ConfirmedPayment {
   type: string; // "activation" | "monthly"
   billingMonthStart: Date | null;
   monthsCovered: number;
+  /** When CANVEXIA confirmed it. Dates the activation's month. */
+  decidedAt?: Date | null;
 }
 
 export interface Coverage {
   activationConfirmed: boolean;
+  /**
+   * The activation covers the Manila month it was confirmed in; monthly
+   * payments are due from the 1st of the next. This is when that ends. Null
+   * without a confirmed activation.
+   */
+  activationCoversUntil: Date | null;
   /** Any confirmed monthly payment at all. */
   hasMonthly: boolean;
   /** When the last paid month ends (Manila). Null with no monthly payment. */
@@ -33,8 +41,13 @@ export interface Coverage {
 
 export function coverageOf(confirmed: ConfirmedPayment[]): Coverage {
   const monthly = confirmed.filter((p) => p.type === "monthly" && p.billingMonthStart);
+  const activation = confirmed.find((p) => p.type === "activation");
   return {
-    activationConfirmed: confirmed.some((p) => p.type === "activation"),
+    activationConfirmed: !!activation,
+    activationCoversUntil:
+      activation?.decidedAt != null
+        ? manilaMonthStart(addMonthKey(manilaMonthKey(activation.decidedAt), 1))
+        : null,
     hasMonthly: monthly.length > 0,
     paidUntil: coverageEnd(
       monthly.map((p) => ({ billingMonthStart: p.billingMonthStart!, monthsCovered: p.monthsCovered })),
@@ -42,14 +55,20 @@ export function coverageOf(confirmed: ConfirmedPayment[]): Coverage {
   };
 }
 
+/** The end of everything paid for — activation month or monthly coverage. */
+export function paidThrough(c: Coverage): Date | null {
+  const ends = [c.paidUntil, c.activationCoversUntil].filter((d): d is Date => !!d);
+  return ends.length ? new Date(Math.max(...ends.map((d) => d.getTime()))) : null;
+}
+
 /**
- * Entitled when coverage is live, or when activated with no monthly payment
- * yet. Once any monthly payment exists, coverage alone governs: an activation
- * fee paid last January is not a paid-up subscription today.
+ * Entitled while something paid for is still running: the activation's own
+ * month, or a paid monthly period. An activation from last January is not a
+ * paid-up subscription today.
  */
 export function isEntitled(c: Coverage, now: Date): boolean {
-  if (c.paidUntil && c.paidUntil > now) return true;
-  return c.activationConfirmed && !c.hasMonthly;
+  const end = paidThrough(c);
+  return !!end && end > now;
 }
 
 export interface LapseInput {
@@ -62,9 +81,9 @@ export interface LapseInput {
 
 export type LapseAction = "none" | "mark_past_due" | "suspend" | "restore";
 
-/** When this account's access runs out: the later of paid coverage and trial. */
+/** When this account's access runs out: the later of what's paid and the trial. */
 export function accessEnds(input: Pick<LapseInput, "coverage" | "trialEndsAt">): Date | null {
-  const ends = [input.coverage.paidUntil, input.trialEndsAt].filter((d): d is Date => !!d);
+  const ends = [paidThrough(input.coverage), input.trialEndsAt].filter((d): d is Date => !!d);
   return ends.length ? new Date(Math.max(...ends.map((d) => d.getTime()))) : null;
 }
 
@@ -76,14 +95,15 @@ export function suspendsAt(end: Date): Date {
 /**
  * One account's turn in the sweep.
  *
- * In scope only once a monthly payment has been confirmed — before that there
- * is no paid period to lapse from, and this never acts on a guess. Lapsed →
+ * In scope once an activation or a monthly payment has been confirmed — before
+ * that there is no paid period to lapse from (a restaurant that never
+ * activated is simply not live), and this never acts on a guess. Lapsed →
  * past_due at once and nothing else; AGENT_GRACE_DAYS later → suspended. Day 6
  * is still grace; day 7 is not. The plan is never touched: suspension is the
  * only consequence, and paying again undoes it.
  */
 export function lapseAction(input: LapseInput, now: Date): LapseAction {
-  if (!input.coverage.hasMonthly) return "none";
+  if (!inScope(input.coverage)) return "none";
   const end = accessEnds(input);
   if (!end) return "none";
 
@@ -95,16 +115,25 @@ export function lapseAction(input: LapseInput, now: Date): LapseAction {
   return input.subscriptionStatus === "past_due" ? "none" : "mark_past_due";
 }
 
+function inScope(c: Coverage): boolean {
+  return c.activationConfirmed || c.hasMonthly;
+}
+
 export type OwnerNotice =
+  | { kind: "not_live" }
   | { kind: "renew_soon"; endsAt: Date; daysLeft: number }
   | { kind: "past_due"; endedAt: Date; suspendsAt: Date; daysLeft: number }
   | { kind: "suspended" }
   | null;
 
-/** The warning an owner sees before (and after) the sweep acts. */
-export function ownerNotice(input: LapseInput, now: Date): OwnerNotice {
+/**
+ * The warning an owner sees before (and after) the sweep acts — or, before
+ * activation, that the restaurant isn't live yet.
+ */
+export function ownerNotice(input: LapseInput & { live?: boolean }, now: Date): OwnerNotice {
   if (input.suspended) return { kind: "suspended" };
-  if (!input.coverage.hasMonthly) return null;
+  if (input.live === false && !input.coverage.activationConfirmed) return { kind: "not_live" };
+  if (!inScope(input.coverage)) return null;
   const end = accessEnds(input);
   if (!end) return null;
   if (now < end) {

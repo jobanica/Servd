@@ -37,8 +37,9 @@ export default async function AgentsPage() {
       <div>
         <h1 className="font-heading text-2xl font-bold">Sales agents</h1>
         <p className="text-sm text-plum-ink/50">
-          Restaurants referred by CANVEXIA agents report to the agent portal, which confirms their payments and
-          works out commission.
+          Every self-signup activates by paying through the CANVEXIA agent portal, which confirms the payment
+          (and, for agent-referred restaurants, works out commission). A restaurant goes live when its activation
+          payment is confirmed.
         </p>
       </div>
 
@@ -105,19 +106,22 @@ export default async function AgentsPage() {
           </section>
 
           <section className="rounded-tile border border-plum-ink/10 bg-white p-5">
-            <h2 className="font-heading font-bold">Referred restaurants ({data.accounts.length})</h2>
+            <h2 className="font-heading font-bold">Restaurants billed through the portal ({data.accounts.length})</h2>
             {data.accounts.length > 0 && (
               <ul className="mt-2 divide-y divide-plum-ink/5 text-sm">
                 {data.accounts.map((a) => (
                   <li key={a.restaurantId} className="flex items-start justify-between gap-3 py-2">
                     <span>
                       <span className="font-semibold">{a.restaurant}</span>
+                      <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-semibold ${a.live ? "bg-mango/20 text-plum-ink" : "bg-plum-ink/5 text-plum-ink/60"}`}>
+                        {a.live ? "Live" : a.status === "suspended" ? "Suspended" : "Not live yet"}
+                      </span>
                       <span className="block text-xs text-plum-ink/50">
                         {a.ownerName} · {a.ownerPhone}
                       </span>
                     </span>
                     <span className="text-right">
-                      <span className="font-mono">{a.agentCode}</span>
+                      <span className="font-mono">{a.agentCode ?? "Direct"}</span>
                       <span className="block text-xs text-plum-ink/50">
                         {a.contractStatus === "signed"
                           ? `Agreement signed${a.contractSignedAt ? ` ${manilaDate(a.contractSignedAt)}` : ""}`
@@ -162,15 +166,20 @@ async function load() {
     const ids = [...new Set([...failedRows.map((f) => f.restaurantId), ...accountRows.map((a) => a.restaurantId)])];
     const names = new Map(
       (
-        await tx.restaurant.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } })
-      ).map((r) => [r.id, r.name]),
+        await tx.restaurant.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, status: true } })
+      ).map((r) => [r.id, r]),
     );
-    const nameOf = (id: string) => names.get(id) ?? `${id.slice(0, 8)}… (deleted)`;
+    const nameOf = (id: string) => names.get(id)?.name ?? `${id.slice(0, 8)}… (deleted)`;
 
     return {
       counts: { pending: counts.pending ?? 0, sent: counts.sent ?? 0, failed: counts.failed ?? 0 },
       failed: failedRows.map((f) => ({ ...f, restaurant: nameOf(f.restaurantId) })),
-      accounts: accountRows.map((a) => ({ ...a, restaurant: nameOf(a.restaurantId) })),
+      accounts: accountRows.map((a) => ({
+        ...a,
+        restaurant: nameOf(a.restaurantId),
+        status: names.get(a.restaurantId)?.status ?? null,
+        live: names.get(a.restaurantId)?.status === "active",
+      })),
     };
   });
 }

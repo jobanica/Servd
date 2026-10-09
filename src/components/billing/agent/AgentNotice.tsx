@@ -15,6 +15,22 @@ export function AgentNotice({ notice, showLink = true }: { notice: OwnerNotice; 
     </Link>
   ) : null;
 
+  if (notice.kind === "not_live") {
+    return (
+      <div className="rounded-tile border border-brand-primary/30 bg-brand-primary/5 p-4 text-sm text-plum-ink">
+        <p className="font-semibold">Your restaurant isn&apos;t live yet.</p>
+        <p className="mt-1 text-plum-ink/70">
+          Set up your menu now. Your ordering page and QR ordering switch on once you sign the agreement, pay the
+          activation by QR and we confirm your receipt.
+        </p>
+        {showLink && (
+          <Link href="/admin/billing" className="mt-2 inline-block font-semibold text-brand-primary">
+            Activate my restaurant →
+          </Link>
+        )}
+      </div>
+    );
+  }
   if (notice.kind === "renew_soon") {
     return (
       <div className="rounded-tile border border-mango/40 bg-mango/10 p-4 text-sm text-plum-ink">

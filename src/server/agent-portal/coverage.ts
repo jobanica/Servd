@@ -1,6 +1,6 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
-import { coverageOf, isEntitled, type Coverage } from "@/lib/agent-portal/lapse";
+import { coverageOf, isEntitled, paidThrough, type Coverage } from "@/lib/agent-portal/lapse";
 import { setRestaurantStatus } from "./events";
 
 type Tx = Prisma.TransactionClient;
@@ -9,7 +9,7 @@ type Tx = Prisma.TransactionClient;
 export async function paidCoverage(tx: Tx, restaurantId: string): Promise<Coverage> {
   const confirmed = await tx.subscriptionManualPayment.findMany({
     where: { restaurantId, status: "confirmed" },
-    select: { type: true, billingMonthStart: true, monthsCovered: true },
+    select: { type: true, billingMonthStart: true, monthsCovered: true, decidedAt: true },
   });
   return coverageOf(confirmed);
 }
@@ -23,6 +23,9 @@ export async function paidCoverageEnd(tx: Tx, restaurantId: string): Promise<Dat
  * apply_paid_coverage: make the account match what has been paid for. Run in
  * the transaction that changed a payment.
  *
+ * A confirmed activation puts a restaurant that isn't live yet live — its
+ * ordering page and QR ordering switch on.
+ *
  * Entitled → the subscription is active (or still trialing) through the paid
  * period, and a suspension is lifted — which reports customer.reactivated.
  * Not entitled → only the paid-through date is recorded. Suspending is never
@@ -31,6 +34,12 @@ export async function paidCoverageEnd(tx: Tx, restaurantId: string): Promise<Dat
  */
 export async function applyPaidCoverage(tx: Tx, restaurantId: string, now: Date): Promise<Coverage> {
   const coverage = await paidCoverage(tx, restaurantId);
+  const restaurant = await tx.restaurant.findUnique({ where: { id: restaurantId }, select: { status: true } });
+  if (coverage.activationConfirmed && restaurant?.status === "pending") {
+    // Not a return from churn, so no event: pending → active is going live.
+    await setRestaurantStatus(tx, restaurantId, "active");
+  }
+
   const sub = await tx.subscription.findFirst({
     where: { restaurantId },
     orderBy: { createdAt: "desc" },
@@ -44,19 +53,18 @@ export async function applyPaidCoverage(tx: Tx, restaurantId: string, now: Date)
         where: { id: sub.id },
         data: {
           status: trialRunning ? "trialing" : "active",
-          currentPeriodEnd: coverage.paidUntil ?? sub.currentPeriodEnd,
+          currentPeriodEnd: paidThrough(coverage) ?? sub.currentPeriodEnd,
         },
         select: { id: true },
       });
     }
-    const r = await tx.restaurant.findUnique({ where: { id: restaurantId }, select: { status: true } });
-    if (r?.status === "suspended") {
+    if (restaurant?.status === "suspended") {
       await setRestaurantStatus(tx, restaurantId, "active");
     }
-  } else if (sub && coverage.paidUntil) {
+  } else if (sub && paidThrough(coverage)) {
     await tx.subscription.update({
       where: { id: sub.id },
-      data: { currentPeriodEnd: coverage.paidUntil },
+      data: { currentPeriodEnd: paidThrough(coverage) },
       select: { id: true },
     });
   }
