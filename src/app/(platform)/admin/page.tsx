@@ -8,6 +8,8 @@ import { listInventory } from "@/server/inventory/queries";
 import { hasModule } from "@/server/billing/entitlements";
 import { getPlanBannerData } from "@/server/billing/plan-status";
 import { PlanStatusBanner } from "@/components/billing/PlanStatusBanner";
+import { getAgentBillingState } from "@/server/agent-portal/billing";
+import { AgentNotice } from "@/components/billing/agent/AgentNotice";
 import { formatPeso } from "@/lib/money";
 import { manilaStartOfDay, manilaStartOfDaysAgo } from "@/lib/time/manila";
 import { RevenueChart } from "@/components/analytics/Charts";
@@ -155,6 +157,8 @@ export default async function AdminHome() {
 
   // Unified plan-status banner (trial countdown + Free-tier order cap).
   const bannerData = await safe("plan banner", getPlanBannerData(rid), null);
+  // Agent-referred accounts only: the warning before a lapse suspends them.
+  const agentBilling = await safe("agent billing", getAgentBillingState(rid), null);
 
   return (
     <div className="space-y-5">
@@ -164,6 +168,7 @@ export default async function AdminHome() {
       </div>
 
       {bannerData && <PlanStatusBanner surface="dashboard" data={bannerData} />}
+      {agentBilling?.notice && <AgentNotice notice={agentBilling.notice} />}
 
       {/* Top row — KPIs */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">

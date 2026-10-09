@@ -12,6 +12,8 @@ import { formatPeso } from "@/lib/money";
 import { manilaDate } from "@/lib/time/manila";
 import { isAllAccessPlan } from "@/lib/billing/all-access";
 import { AllAccessBilling } from "@/components/billing/AllAccessBilling";
+import { getAgentBillingState } from "@/server/agent-portal/billing";
+import { AgentBilling } from "@/components/billing/agent/AgentBilling";
 
 const FEATURE_LABEL: Record<string, string> = Object.fromEntries(
   FEATURE_META.map((f) => [f.key, f.label]),
@@ -30,6 +32,13 @@ export default async function BillingPage({
   const { upgrade, unlocked, paid } = await searchParams;
   // allowSuspended so an owner can pay their way out of suspension here.
   const { restaurantId } = await requireAdminPage({ allowSuspended: true });
+
+  // A restaurant that came through a CANVEXIA sales agent is billed through
+  // the agent portal — agreement, bank transfer, receipt — instead of the
+  // ₱800 plan. Every other account has no agent row and falls straight
+  // through to the page below, unchanged.
+  const agent = await getAgentBillingState(restaurantId, { withTerms: true });
+  if (agent) return <AgentBilling s={agent} />;
 
   const [sub, invoices, access, owned, prices, pendingRows] = await Promise.all([
     getCurrentSubscription(restaurantId),

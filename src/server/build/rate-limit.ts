@@ -23,7 +23,8 @@ export type Bucket =
   | "build:write"
   | "build:upload"
   | "build:activate"
-  | "landing:event";
+  | "landing:event"
+  | "agent:receipt";
 
 /** Per-hour allowance for each bucket, per IP. */
 const LIMITS: Record<Bucket, number> = {
@@ -35,6 +36,9 @@ const LIMITS: Record<Bucket, number> = {
   // (a view plus a click, and they may come back). This is a graffiti guard on
   // the founder's ad numbers, not a gate on anything that matters.
   "landing:event": 200,
+  // Agent-referred owners uploading payment receipts. A real owner sends one
+  // or two a month; this only stops a script hammering the portal's storage.
+  "agent:receipt": 20,
 };
 
 /** Hashed client IP, or "unknown" behind a proxy that strips everything. */

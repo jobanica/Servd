@@ -40,12 +40,23 @@ export async function runBillingCron(now: Date = new Date()): Promise<CronSummar
     }),
   ]);
 
+  // Restaurants that came through a CANVEXIA agent are billed through the
+  // portal (receipts, confirmed there; lapses handled by the agent sweep), not
+  // here. Read on its own and best-effort: before add-agent-portal.sql runs
+  // there are none, and an error must not stop everyone else's billing.
+  const agentBilled = new Set<string>();
+  try {
+    const rows = await systemDb((tx) => tx.agentAccount.findMany({ select: { restaurantId: true } }));
+    for (const r of rows) agentBilled.add(r.restaurantId);
+  } catch { /* not migrated yet — no agent accounts */ }
+
   const s: CronSummary = {
     processed: subs.length, charged: 0, failed: 0, awaiting: 0, suspended: 0, cancelled: 0,
     featuresRenewed: 0, featuresInvoiced: 0, featuresLapsed: 0,
   };
 
   for (const sub of subs) {
+    if (agentBilled.has(sub.restaurantId)) continue;
     // The ₱800 All Access plan has its own rules (one invoice per unpaid
     // month, 7 days' grace from the due date, then suspended) and is handled
     // entirely here. Everything below this block is the ORIGINAL billing logic

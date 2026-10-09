@@ -6,7 +6,11 @@ import { useTranslations } from "next-intl";
 import { AppIcon, Wordmark } from "@/components/Wordmark";
 import { signUpRestaurant, type SignupState } from "./actions";
 
-export function SignupForm() {
+/**
+ * `agentCode` is set only when the visitor came through a sales agent's link.
+ * Without one this is exactly the form it always was.
+ */
+export function SignupForm({ agentCode = null }: { agentCode?: string | null }) {
   const [state, action, pending] = useActionState<SignupState, FormData>(
     signUpRestaurant,
     null,
@@ -54,6 +58,33 @@ export function SignupForm() {
             className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2"
           />
         </div>
+        {agentCode && (
+          <div className="rounded-lg border border-plum-ink/10 bg-cream/50 p-3">
+            <label className="block text-sm font-medium" htmlFor="ownerName">
+              Your name
+            </label>
+            <input
+              id="ownerName"
+              name="ownerName"
+              required
+              autoComplete="name"
+              className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2"
+            />
+            <label className="mt-3 block text-sm font-medium" htmlFor="referralCode">
+              Referral code
+            </label>
+            <input
+              id="referralCode"
+              name="referralCode"
+              defaultValue={agentCode}
+              autoCapitalize="characters"
+              className="mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2 font-mono uppercase"
+            />
+            <p className="mt-1 text-xs text-plum-ink/50">
+              From the Servd sales agent who referred you. Clear it if nobody did.
+            </p>
+          </div>
+        )}
         <div>
           <label className="block text-sm font-medium" htmlFor="phone">
             {t("phone")}

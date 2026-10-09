@@ -4,6 +4,7 @@ import { createServerClient } from "@supabase/ssr";
 import { parseHost } from "@/lib/host";
 import { readUtmParams, encodeUtm, UTM_COOKIE, UTM_MAX_AGE } from "@/lib/utm";
 import { PATH_HEADER } from "@/lib/platform/admin-scope";
+import { captureAgentRef } from "@/lib/agent-portal/ref-capture";
 
 /**
  * Host-based multi-tenant routing.
@@ -51,8 +52,9 @@ function captureUtm(req: NextRequest, res: NextResponse): NextResponse {
  * gone; only the ad tags are still worth keeping.
  */
 function captureAttribution(req: NextRequest, res: NextResponse): NextResponse {
-  return captureUtm(req, res);
+  return captureAgentRef(req, captureUtm(req, res));
 }
+
 
 type PendingCookie = { name: string; value: string; options?: Record<string, unknown> };
 

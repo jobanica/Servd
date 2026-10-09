@@ -16,6 +16,7 @@ import { addMonths } from "@/lib/billing/period";
 import { ALL_FEATURES, type Feature } from "@/lib/billing/features";
 import { migrationHint } from "@/lib/db/migration-hint";
 import { CUSTOM_DOMAIN_ADDON, CUSTOM_DOMAIN_PRICE } from "@/server/billing/addons";
+import { setRestaurantStatus } from "@/server/agent-portal/events";
 
 export type ActionState =
   | { ok?: boolean; message?: string; error?: string; credentials?: { username: string; password: string } }
@@ -284,7 +285,8 @@ export async function setToLite(formData: FormData): Promise<void> {
       data: { planId: plan.id, status: "active", failedCharges: 0, cancelAtPeriodEnd: false },
       select: { id: true },
     });
-    await tx.restaurant.update({ where: { id: restaurantId }, data: { planId: plan.id, status: "active" }, select: { id: true } });
+    await tx.restaurant.update({ where: { id: restaurantId }, data: { planId: plan.id }, select: { id: true } });
+    await setRestaurantStatus(tx, restaurantId, "active", null);
   });
   if (createdPlanId) await setPlanFeatures(createdPlanId, LITE_FEATURES);
   refresh();
@@ -311,7 +313,7 @@ export async function setSubscriptionStatus(formData: FormData): Promise<void> {
     });
     // Active/trialing → restore access; cancelled/past_due → suspend access.
     const restaurantStatus = status === "active" || status === "trialing" ? "active" : "suspended";
-    await tx.restaurant.update({ where: { id: restaurantId }, data: { status: restaurantStatus }, select: { id: true } });
+    await setRestaurantStatus(tx, restaurantId, restaurantStatus, `Subscription set to ${status} by Servd`);
   });
   refresh();
 }
@@ -332,7 +334,7 @@ export async function extendTrial(formData: FormData): Promise<void> {
       data: { status: "trialing", trialEndsAt, currentPeriodEnd: trialEndsAt, cancelAtPeriodEnd: false },
       select: { id: true },
     });
-    await tx.restaurant.update({ where: { id: restaurantId }, data: { status: "active" }, select: { id: true } });
+    await setRestaurantStatus(tx, restaurantId, "active");
   });
   refresh();
 }
@@ -352,7 +354,7 @@ export async function compMonth(formData: FormData): Promise<void> {
       data: { status: "active", currentPeriodEnd: addMonths(base, 1), failedCharges: 0, cancelAtPeriodEnd: false },
       select: { id: true },
     });
-    await tx.restaurant.update({ where: { id: restaurantId }, data: { status: "active" }, select: { id: true } });
+    await setRestaurantStatus(tx, restaurantId, "active");
   });
   refresh();
 }
@@ -418,11 +420,8 @@ export async function revokeFullAccess(_prev: ActionState, formData: FormData): 
         },
         select: { id: true },
       });
-      await tx.restaurant.update({
-        where: { id: restaurantId },
-        data: { ...(free ? { planId: free.id } : {}), status: "active" },
-        select: { id: true },
-      });
+      if (free) await tx.restaurant.update({ where: { id: restaurantId }, data: { planId: free.id }, select: { id: true } });
+      await setRestaurantStatus(tx, restaurantId, "active");
     });
   } catch (e) {
     console.error("revokeFullAccess failed", e);
@@ -438,7 +437,9 @@ export async function setRestaurantAccess(formData: FormData): Promise<void> {
   const restaurantId = String(formData.get("restaurantId"));
   const access = String(formData.get("access")); // "active" | "suspended"
   if (access !== "active" && access !== "suspended") return;
-  await systemDb((tx) => tx.restaurant.update({ where: { id: restaurantId }, data: { status: access }, select: { id: true } }));
+  // Through setRestaurantStatus so an agent-referred account's suspension and
+  // return reach the portal (customer.cancelled / customer.reactivated).
+  await systemDb((tx) => setRestaurantStatus(tx, restaurantId, access, "Suspended by Servd"));
   refresh();
 }
 

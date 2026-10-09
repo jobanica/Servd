@@ -6,6 +6,7 @@ import {
   ALL_ACCESS_TRIAL_DAYS,
   isAllAccessPlan,
 } from "@/lib/billing/all-access";
+import { setRestaurantStatus } from "@/server/agent-portal/events";
 
 /**
  * Explicit plan fields — everything EXCEPT `features` (which ships in a later
@@ -210,7 +211,8 @@ export async function startPlan(restaurantId: string, planId: string) {
 
       if (sub) await tx.subscription.update({ where: { id: sub.id }, data, select: { id: true } });
       else await tx.subscription.create({ data: { restaurantId, ...data } as Prisma.SubscriptionUncheckedCreateInput, select: { id: true } });
-      await tx.restaurant.update({ where: { id: restaurantId }, data: { planId, status: "active" }, select: { id: true } });
+      await tx.restaurant.update({ where: { id: restaurantId }, data: { planId }, select: { id: true } });
+      await setRestaurantStatus(tx, restaurantId, "active");
     });
 
   try {

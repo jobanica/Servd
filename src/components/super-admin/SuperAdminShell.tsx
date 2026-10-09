@@ -64,6 +64,7 @@ const NAV = [
   { label: "Invoices", href: "/super-admin/invoices", d: I.receipt },
   { label: "Payments", href: "/super-admin/payments", d: I.card },
   { label: "Partners", href: "/super-admin/partners", d: I.card },
+  { label: "Sales agents", href: "/super-admin/agents", d: I.userPlus },
   { label: "Announcements", href: "/super-admin/announcements", d: I.bell },
   { label: "Feedback", href: "/super-admin/feedback", d: I.chat },
 ];

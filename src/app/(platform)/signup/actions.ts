@@ -6,6 +6,12 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { uniqueSlug } from "@/lib/slug";
 import { provisionTrial } from "@/server/billing/subscription";
+import { cookies } from "next/headers";
+import { REF_COOKIE, normalizeReferralCode } from "@/lib/agent-kit/ref";
+import { lookupAgentCode } from "@/lib/agent-kit/client";
+import { portalRefusedCode } from "@/lib/agent-portal/referral";
+import { portalConfig } from "@/server/agent-portal/config";
+import { enqueueCustomerSignedUp } from "@/server/agent-portal/events";
 
 export type SignupState = { ok?: boolean; error?: string } | null;
 
@@ -36,6 +42,13 @@ export async function signUpRestaurant(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
   const { restaurantName, phone, email, password } = parsed.data;
+
+  // A CANVEXIA sales agent's code, if the form carried one. Then the owner's
+  // name is required too — the portal records who it is paying commission on.
+  let agentCode = normalizeReferralCode(String(formData.get("referralCode") ?? ""));
+  const ownerName = String(formData.get("ownerName") ?? "").trim().slice(0, 120);
+  if (agentCode && !ownerName) return { error: "Enter your name." };
+  if (agentCode) agentCode = await keepUnlessRefused(agentCode);
 
   try {
     const supabase = await createSupabaseServerClient();
@@ -73,6 +86,16 @@ export async function signUpRestaurant(
         });
         // 30-day Business trial — every feature unlocked, no card.
         await provisionTrial(tx, restaurant.id);
+        // In the SAME transaction as the restaurant: the agent row and the
+        // customer.signed_up event commit with it or not at all. The portal is
+        // not called here — the worker delivers the event.
+        if (agentCode) {
+          await tx.agentAccount.create({
+            data: { restaurantId: restaurant.id, agentCode, ownerName, ownerPhone: phone },
+            select: { restaurantId: true },
+          });
+          await enqueueCustomerSignedUp(tx, restaurant.id);
+        }
       });
     } catch (e) {
       console.error("[signup] provisioning failed:", e);
@@ -85,10 +108,27 @@ export async function signUpRestaurant(
       return { error: "Couldn't create your restaurant. Please try again." };
     }
 
+    // Recorded — forget the agent cookie.
+    if (agentCode) {
+      try {
+        (await cookies()).delete(REF_COOKIE);
+      } catch { /* cookie clearing is cosmetic */ }
+    }
     return { ok: true };
   } catch (e) {
     // Never let the action crash into a 500 page — surface a friendly message.
     console.error("[signup] unexpected error:", e);
     return { error: "Something went wrong creating your account. Please try again." };
   }
+}
+
+/**
+ * Keep the code unless the portal POSITIVELY says it is not an active agent's.
+ * No portal configured, a timeout or any error means keep it: signup never
+ * fails, and never loses an agent's customer, because the portal is down.
+ */
+async function keepUnlessRefused(code: string): Promise<string | null> {
+  const config = portalConfig();
+  if (!config) return code;
+  return portalRefusedCode(await lookupAgentCode(config, code)) ? null : code;
 }

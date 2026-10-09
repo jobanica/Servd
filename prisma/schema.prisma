@@ -2361,3 +2361,110 @@ model AnnouncementRead {
   @@index([staffUserId])
   @@map("announcement_reads")
 }
+
+// ----------------------------------------------------------------------------
+// CANVEXIA agent portal (sales agents on commission). Servd reports what
+// happened; the portal decides what anyone is owed. No commission logic here.
+//
+// Everything lives in its own tables so an account without an agent code has
+// no row anywhere below and behaves exactly as before. Hand-run migration:
+// prisma/manual/add-agent-portal.sql. Plain scalar ids, no Prisma relations:
+// nothing on Restaurant changes.
+// ----------------------------------------------------------------------------
+
+/// A restaurant that came through an agent. The row exists only when there is
+/// a code; its code is set once and a trigger refuses any change to it.
+model AgentAccount {
+  restaurantId              String    @id
+  /// Uppercase, normalised. Immutable (trigger agent_accounts_code_immutable).
+  agentCode                 String
+  /// What was reported to the portal in customer.signed_up.
+  ownerName                 String
+  ownerPhone                String
+  /// 'unsigned' | 'signed' — the portal's contract.signed sets it.
+  contractStatus            String    @default("unsigned")
+  contractId                String?
+  contractSignedAt          DateTime?
+  contractMinimumTermEndsAt DateTime?
+  createdAt                 DateTime  @default(now())
+
+  @@map("agent_accounts")
+}
+
+/// Events queued for the portal, written in the same transaction as the change
+/// they describe and delivered by the worker (/api/cron/agent-portal).
+model ProductEventOutbox {
+  id            String    @id @default(uuid())
+  /// The restaurant id — the portal's external_customer_id. No FK: a
+  /// customer.cancelled for a deleted restaurant must still go out.
+  restaurantId  String
+  eventId       String    @unique
+  type          String
+  payload       Json
+  /// 'pending' | 'sent' | 'failed'
+  status        String    @default("pending")
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime  @default(now())
+  lastStatus    Int?
+  lastError     String?
+  /// The portal's answer: processed | pending | duplicate | refused.
+  portalStatus  String?
+  createdAt     DateTime  @default(now())
+  sentAt        DateTime?
+
+  @@index([status, restaurantId, createdAt])
+  @@map("product_event_outbox")
+}
+
+/// Callbacks received from the portal, for exactly-once application. No FK to
+/// restaurants: a callback for a customer Servd does not know is recorded too.
+model ProductCallbackInbox {
+  eventId    String   @id
+  type       String
+  payload    Json
+  receivedAt DateTime @default(now())
+  outcome    String?
+
+  @@map("product_callback_inbox")
+}
+
+/// A bank-transfer receipt an agent-referred owner submitted. The portal
+/// confirms, rejects or reverses it; only a confirmation grants anything.
+model SubscriptionManualPayment {
+  id                String    @id @default(uuid())
+  restaurantId      String
+  /// 'activation' | 'monthly'
+  type              String
+  monthsCovered     Int       @default(1)
+  /// First month paid for (monthly only), the 1st at UTC midnight.
+  billingMonthStart DateTime? @db.Date
+  amountCentavos    Int
+  /// Normalised (uppercase, no spaces). Globally unique: the same reference
+  /// twice is the same payment twice.
+  bankReference     String    @unique
+  /// Path in the PORTAL's private storage, as its upload returned it.
+  receiptPath       String?
+  /// 'submitted' | 'confirmed' | 'rejected' | 'reversed'
+  status            String    @default("submitted")
+  reason            String?
+  submittedBy       String?
+  eventId           String    @unique
+  submittedAt       DateTime  @default(now())
+  decidedAt         DateTime?
+
+  @@index([restaurantId, submittedAt])
+  @@map("subscription_manual_payments")
+}
+
+/// Where agent-referred owners send money: one platform-wide row, edited by a
+/// super-admin. JSON: { qrUrl, gcash:{name,number}, maya:{…}, bank:{bank,name,number}, note }.
+/// Its own table rather than a platform_settings column, because that row is
+/// upserted without a column list in several places and a lagging column
+/// would break every one of them.
+model PaymentCollection {
+  id        String   @id @default("platform")
+  details   Json
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@map("payment_collection")
+}
