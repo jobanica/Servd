@@ -55,6 +55,7 @@ export default async function InventoryPage() {
     costPerUnit: i.costPerUnit,
     reorderLevel: i.reorderLevel,
     low: i.low,
+    supplierId: i.supplierId ?? null,
     supplierName: i.supplier?.name ?? null,
   }));
 
@@ -137,7 +138,7 @@ export default async function InventoryPage() {
         }
         ingredients={
           <div className="space-y-3">
-            <InventoryTable items={rows} />
+            <InventoryTable items={rows} suppliers={suppliers} />
             <Panel title="➕ Add ingredient" hint="Create a new ingredient to track">
               <AddInventoryItemForm suppliers={suppliers} />
             </Panel>

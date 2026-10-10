@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { formatPeso } from "@/lib/money";
 import {
   deleteInventoryItem,
+  editInventoryItem,
+  type FormState,
   recordWaste,
   recordCount,
   recordRestock,
@@ -18,8 +20,12 @@ export interface InventoryRow {
   costPerUnit: number; // centavos
   reorderLevel: number;
   low: boolean;
+  supplierId: string | null;
   supplierName: string | null;
 }
+
+type Supplier = { id: string; name: string };
+type Panel = { id: string; mode: "adjust" | "edit" } | null;
 
 /**
  * The ingredient list.
@@ -32,10 +38,10 @@ export interface InventoryRow {
  * Same shape as the Products tab next door, so the two halves of inventory
  * behave identically.
  */
-export function InventoryTable({ items }: { items: InventoryRow[] }) {
+export function InventoryTable({ items, suppliers = [] }: { items: InventoryRow[]; suppliers?: Supplier[] }) {
   const [query, setQuery] = useState("");
   const [lowOnly, setLowOnly] = useState(false);
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [panel, setPanel] = useState<Panel>(null);
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -95,8 +101,9 @@ export function InventoryTable({ items }: { items: InventoryRow[] }) {
             <IngredientCard
               key={i.id}
               item={i}
-              open={openId === i.id}
-              onToggle={() => setOpenId(openId === i.id ? null : i.id)}
+              suppliers={suppliers}
+              mode={panel?.id === i.id ? panel.mode : null}
+              onMode={(mode) => setPanel(mode && !(panel?.id === i.id && panel.mode === mode) ? { id: i.id, mode } : null)}
             />
           ))}
         </ul>
@@ -107,14 +114,17 @@ export function InventoryTable({ items }: { items: InventoryRow[] }) {
 
 function IngredientCard({
   item: i,
-  open,
-  onToggle,
+  suppliers,
+  mode,
+  onMode,
 }: {
   item: InventoryRow;
-  open: boolean;
-  onToggle: () => void;
+  suppliers: Supplier[];
+  mode: "adjust" | "edit" | null;
+  onMode: (mode: "adjust" | "edit" | null) => void;
 }) {
   const out = i.stockQty <= 0;
+  const open = mode === "adjust";
 
   return (
     // min-w-0: a grid item won't shrink below its content without it, and a
@@ -142,17 +152,32 @@ function IngredientCard({
           <p className="text-[11px] text-plum-ink/45">{out ? "none left" : i.unit}</p>
         </div>
 
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-expanded={open}
-          className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-semibold ${
-            open ? "border-brand-primary text-brand-primary" : "border-plum-ink/15 text-plum-ink/70"
-          }`}
-        >
-          Adjust {open ? "▴" : "▾"}
-        </button>
+        {/* Stacked, so both fit beside the count on a phone. */}
+        <div className="flex shrink-0 flex-col gap-1">
+          <button
+            type="button"
+            onClick={() => onMode("adjust")}
+            aria-expanded={open}
+            className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${
+              open ? "border-brand-primary text-brand-primary" : "border-plum-ink/15 text-plum-ink/70"
+            }`}
+          >
+            Adjust {open ? "▴" : "▾"}
+          </button>
+          <button
+            type="button"
+            onClick={() => onMode("edit")}
+            aria-expanded={mode === "edit"}
+            className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${
+              mode === "edit" ? "border-brand-primary text-brand-primary" : "border-plum-ink/15 text-plum-ink/70"
+            }`}
+          >
+            ✏️ Edit
+          </button>
+        </div>
       </div>
+
+      {mode === "edit" && <EditIngredient item={i} suppliers={suppliers} onDone={() => onMode(null)} />}
 
       {open && (
         <div className="space-y-2 border-t border-plum-ink/10 bg-cream/40 p-3">
@@ -225,6 +250,99 @@ function IngredientCard({
         </div>
       )}
     </li>
+  );
+}
+
+/**
+ * Name, unit, cost per unit, low-stock level and supplier. Stock on hand isn't
+ * here on purpose: changing the count goes through Adjust, which records why.
+ */
+function EditIngredient({
+  item: i,
+  suppliers,
+  onDone,
+}: {
+  item: InventoryRow;
+  suppliers: Supplier[];
+  onDone: () => void;
+}) {
+  const [state, action, pending] = useActionState<FormState, FormData>(editInventoryItem, null);
+  useEffect(() => {
+    if (state?.ok) onDone();
+  }, [state, onDone]);
+  const field = "mt-1 w-full rounded-lg border border-plum-ink/15 bg-white px-2 py-1.5 text-sm";
+
+  return (
+    <form action={action} className="space-y-2 border-t border-plum-ink/10 bg-cream/40 p-3">
+      <input type="hidden" name="id" value={i.id} />
+      <div className="grid gap-2 sm:grid-cols-2">
+        <label className="text-xs font-semibold text-plum-ink/70 sm:col-span-2">
+          Name
+          <input name="name" defaultValue={i.name} required maxLength={80} className={field} />
+        </label>
+        <label className="text-xs font-semibold text-plum-ink/70">
+          Cost per {i.unit} (₱)
+          <input
+            name="costPesos"
+            type="number"
+            step="0.01"
+            min="0"
+            inputMode="decimal"
+            required
+            defaultValue={(i.costPerUnit / 100).toFixed(2)}
+            className={field}
+          />
+        </label>
+        <label className="text-xs font-semibold text-plum-ink/70">
+          Unit
+          <input name="unit" defaultValue={i.unit} required maxLength={16} className={field} />
+        </label>
+        <label className="text-xs font-semibold text-plum-ink/70">
+          Low-stock alert at
+          <input
+            name="reorderLevel"
+            type="number"
+            step="0.01"
+            min="0"
+            inputMode="decimal"
+            defaultValue={i.reorderLevel}
+            className={field}
+          />
+        </label>
+        <label className="text-xs font-semibold text-plum-ink/70">
+          Supplier
+          <select name="supplierId" defaultValue={i.supplierId ?? ""} className={field}>
+            <option value="">No supplier</option>
+            {suppliers.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <p className="text-[11px] text-plum-ink/45">
+        To change how many you have, use Adjust. The new cost is used from now on; adding stock with a cost
+        averages it again.
+      </p>
+      {state?.error && <p className="text-xs font-semibold text-guava">{state.error}</p>}
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={pending}
+          className="flex-1 rounded-lg bg-brand-primary px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+        >
+          {pending ? "Saving…" : "Save changes"}
+        </button>
+        <button
+          type="button"
+          onClick={onDone}
+          className="rounded-lg border border-plum-ink/20 px-3 py-1.5 text-xs font-semibold text-plum-ink/70"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }
 

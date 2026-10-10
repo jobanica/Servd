@@ -74,22 +74,65 @@ export async function createInventoryItem(_p: FormState, formData: FormData): Pr
   return { ok: true };
 }
 
-export async function updateInventoryItem(formData: FormData): Promise<void> {
+const editSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().trim().min(1, "Name is required").max(80),
+  unit: z.string().trim().min(1, "Unit is required").max(16),
+  costPesos: z.coerce.number({ message: "Enter the cost per unit" }).min(0).max(1_000_000),
+  reorderLevel: qty,
+  supplierId: z.string().uuid().optional().or(z.literal("")),
+});
+
+/**
+ * Edit an ingredient's details: name, unit, cost per unit, low-stock level and
+ * supplier. Stock on hand is NOT edited here — that goes through Adjust, so
+ * every change to the count leaves a movement behind.
+ *
+ * The cost is set as typed. It's the weighted-average cost the next restock
+ * blends with, and what recipes and food cost read from now on.
+ *
+ * Every field is sent and validated together, so a missing one is an error
+ * rather than a silently cleared supplier or reset low-stock level.
+ */
+export async function editInventoryItem(_p: FormState, formData: FormData): Promise<FormState> {
   const { restaurantId } = await requireManagerAction();
-  await ensureModule(restaurantId);
-  const id = String(formData.get("id"));
-  await tenantDb(restaurantId, (tx) =>
-    tx.inventoryItem.update({
-      where: { id },
-      data: {
-        name: String(formData.get("name") ?? "").trim() || undefined,
-        unit: String(formData.get("unit") ?? "").trim() || undefined,
-        reorderLevel: Number(formData.get("reorderLevel") ?? 0),
-        supplierId: (String(formData.get("supplierId") ?? "") || null) as string | null,
-      },
-    }),
-  );
+  try {
+    await ensureModule(restaurantId);
+    const d = editSchema.parse({
+      id: formData.get("id"),
+      name: formData.get("name"),
+      unit: formData.get("unit"),
+      costPesos: formData.get("costPesos"),
+      reorderLevel: formData.get("reorderLevel") ?? 0,
+      supplierId: formData.get("supplierId") ?? "",
+    });
+    const updated = await tenantDb(restaurantId, async (tx) => {
+      if (d.supplierId) {
+        const supplier = await tx.supplier.findFirst({
+          where: { id: d.supplierId, restaurantId },
+          select: { id: true },
+        });
+        if (!supplier) throw new Error("That supplier no longer exists.");
+      }
+      // Scoped to this restaurant's ingredients — never a product's stock row.
+      return tx.inventoryItem.updateMany({
+        where: { id: d.id, restaurantId, menuItemId: null },
+        data: {
+          name: d.name,
+          unit: d.unit,
+          costPerUnit: pesosToCentavos(d.costPesos),
+          reorderLevel: d.reorderLevel,
+          supplierId: d.supplierId || null,
+        },
+      });
+    });
+    if (updated.count === 0) return { error: "That ingredient no longer exists." };
+  } catch (e) {
+    if (e instanceof z.ZodError) return { error: e.issues[0]?.message ?? "Invalid input" };
+    return { error: e instanceof Error ? e.message : "Couldn't save the ingredient" };
+  }
   revalidatePath("/admin/inventory");
+  return { ok: true };
 }
 
 export async function deleteInventoryItem(formData: FormData): Promise<void> {
