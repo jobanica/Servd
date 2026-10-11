@@ -4,7 +4,7 @@ import { buildTicket, type Ticket, type TicketKind } from "@/lib/printing/ticket
 import { parsePrinterConfig } from "@/lib/printing/printer-config";
 import { restaurantSiteUrl } from "@/lib/qr";
 import { formatOrderNumber } from "@/lib/orders/order-number";
-import { batchLabelFromInstants } from "@/lib/orders/delivery-windows";
+import { batchLabelFromInstants, isAsapAddress } from "@/lib/orders/delivery-windows";
 
 /** Loads an order and shapes it into a Ticket (tenant-scoped). */
 export async function getOrderTicket(
@@ -136,6 +136,9 @@ export async function getOrderTicket(
     } catch {
       /* not migrated yet */
     }
+
+    // An ASAP order has no batch; its address tag says so.
+    if (!deliveryWindow && isAsapAddress(customerAddress)) deliveryWindow = "ASAP";
 
     return buildTicket({
       kind,

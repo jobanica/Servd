@@ -31,6 +31,13 @@ export interface DeliveryWindowsConfig {
   batchMinutes: number;
   /** Stop taking orders for a batch this many minutes before it starts. */
   cutoffMinutes: number;
+  /**
+   * Also offer "ASAP" beside the batches: a rider goes out for this order on
+   * its own, for an extra fee. Only while the store is open.
+   */
+  asapEnabled: boolean;
+  /** Extra charge for ASAP, centavos. */
+  asapFee: number;
 }
 
 export interface DeliveryWindow {
@@ -47,7 +54,22 @@ export const DEFAULT_DELIVERY_WINDOWS: DeliveryWindowsConfig = {
   ],
   batchMinutes: 30,
   cutoffMinutes: 0,
+  asapEnabled: false,
+  asapFee: 0,
 };
+
+/** The value the checkout sends for "deliver ASAP" instead of a batch time. */
+export const ASAP = "asap";
+
+/**
+ * The address tag an ASAP order carries, e.g. "[ASAP +₱50.00]". Not anchored:
+ * a cash order's "[COD …]" tag is put in front of it.
+ */
+export const ASAP_ADDRESS_TAG = /\[ASAP[^\]]*\]/;
+
+export function isAsapAddress(address: string | null | undefined): boolean {
+  return !!address && ASAP_ADDRESS_TAG.test(address);
+}
 
 export const BATCH_MINUTE_CHOICES = [15, 20, 30, 45, 60] as const;
 
@@ -73,6 +95,7 @@ export function normalizeDeliveryWindows(raw: unknown): DeliveryWindowsConfig {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const batch = Number(r.batchMinutes);
   const cutoff = Number(r.cutoffMinutes);
+  const asapFee = Number(r.asapFee);
   const periods = Array.isArray(r.periods)
     ? (r.periods as unknown[])
         .map((p) => {
@@ -93,6 +116,8 @@ export function normalizeDeliveryWindows(raw: unknown): DeliveryWindowsConfig {
       ? batch
       : DEFAULT_DELIVERY_WINDOWS.batchMinutes,
     cutoffMinutes: Number.isFinite(cutoff) ? Math.min(120, Math.max(0, Math.round(cutoff))) : 0,
+    asapEnabled: r.asapEnabled === true,
+    asapFee: Number.isFinite(asapFee) ? Math.min(1_000_000, Math.max(0, Math.round(asapFee))) : 0,
   };
 }
 

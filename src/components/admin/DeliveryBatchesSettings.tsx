@@ -27,6 +27,7 @@ export function DeliveryBatchesSettings({ initial }: { initial: DeliveryWindowsC
   );
   const [batchMinutes, setBatchMinutes] = useState(initial.batchMinutes);
   const [cutoff, setCutoff] = useState(initial.cutoffMinutes);
+  const [asap, setAsap] = useState(initial.asapEnabled);
 
   const batches = useMemo(() => batchesFor({ periods, batchMinutes }), [periods, batchMinutes]);
 
@@ -135,6 +136,44 @@ export function DeliveryBatchesSettings({ initial }: { initial: DeliveryWindowsC
                 <option value={60}>1 hour before</option>
               </select>
             </label>
+          </div>
+
+          {/* ASAP beside the batches: a rider goes out for this one order. */}
+          <div className="rounded-lg border border-plum-ink/10 bg-white p-3">
+            <label className="flex items-start gap-2 text-sm font-semibold">
+              <input
+                type="checkbox"
+                name="windowAsap"
+                checked={asap}
+                onChange={(e) => setAsap(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                ⚡ Also offer ASAP delivery
+                <span className="mt-0.5 block text-xs font-normal text-plum-ink/50">
+                  For customers who can&apos;t wait for the next batch. Shown at checkout before the batch
+                  times, only while you&apos;re open, with the extra fee below.
+                </span>
+              </span>
+            </label>
+            {asap && (
+              <label className="mt-2 block text-xs font-semibold text-plum-ink/60">
+                ASAP fee (₱)
+                <input
+                  type="number"
+                  name="windowAsapFeePesos"
+                  min="0"
+                  step="1"
+                  inputMode="decimal"
+                  defaultValue={initial.asapFee ? initial.asapFee / 100 : ""}
+                  placeholder="e.g. 50"
+                  className={`ml-2 w-24 ${field}`}
+                />
+                <span className="mt-1 block font-normal text-plum-ink/45">
+                  Added to the order total on top of the usual delivery fee. Leave blank for no extra fee.
+                </span>
+              </label>
+            )}
           </div>
 
           {/* The batches themselves — what customers will actually see. */}

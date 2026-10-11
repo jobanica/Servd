@@ -10,7 +10,7 @@ import { parsePrinterConfig, kitchenDestination, isServerDriven } from "@/lib/pr
 import { restaurantSiteUrl } from "@/lib/qr";
 import { getShiftReport } from "./shift-report";
 import { formatOrderNumber } from "@/lib/orders/order-number";
-import { batchLabelFromInstants } from "@/lib/orders/delivery-windows";
+import { batchLabelFromInstants, isAsapAddress } from "@/lib/orders/delivery-windows";
 
 /**
  * PLUGGABLE PRINTING
@@ -206,6 +206,9 @@ async function loadTicket(restaurantId: string, orderId: string) {
         /* delivery window columns not migrated yet */
       }
     }
+
+    // An ASAP order has no batch; its address tag says so.
+    if (!deliveryWindow && isAsapAddress(meta.customerAddress)) deliveryWindow = "ASAP";
 
     return { restaurant, order, meta, payment, settings, ticketNumber, cashTendered, deliveryWindow };
   });

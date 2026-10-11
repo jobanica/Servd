@@ -22,7 +22,7 @@ import { getLoyaltyConfig, enrollAccount } from "@/server/loyalty/loyalty";
 import { markCartConverted } from "@/server/marketing/cart-recovery";
 import { formatPeso } from "@/lib/money";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
-import { batchLabel, findOpenBatch, windowInstant } from "@/lib/orders/delivery-windows";
+import { ASAP, batchLabel, findOpenBatch, windowInstant } from "@/lib/orders/delivery-windows";
 
 const schema = z.object({
   slug: z.string().min(1),
@@ -42,7 +42,8 @@ const schema = z.object({
   scheduledFor: z.string().datetime().optional(), // ISO; advance order (null = ASAP)
   // Delivery batch the customer picked ("11:30" = the 11:30 batch, today,
   // Manila time) when the store delivers in batches. Re-checked below.
-  deliveryBatch: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  // …or "asap", when the store also offers ASAP delivery for a fee.
+  deliveryBatch: z.union([z.string().regex(/^\d{2}:\d{2}$/), z.literal("asap")]).optional(),
   downpaymentRef: z.string().trim().max(120).optional(), // customer's payment reference
   paymentChoice: z.enum(["cod", "gcash", "maya", "bank"]).optional(), // chosen payment method
   paymentRef: z.string().trim().max(120).optional(), // reference no. for an online payment
@@ -154,13 +155,30 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
   const batchesOn =
     d.orderType === "delivery" && windows.enabled && storefront.delivery.mode !== "shipping";
   let batch: { start: Date; end: Date; label: string } | null = null;
+  // ASAP instead of a batch: its own rider, for the owner's extra fee. Priced
+  // here from the saved settings, never from the client.
+  let asapFee = 0;
+  let asap = false;
   if (batchesOn) {
     if (scheduledFor) {
       return { ok: false, error: "Please pick a delivery time from today's batches." };
     }
     if (!d.deliveryBatch) return { ok: false, error: "Please pick a delivery time." };
+    if (d.deliveryBatch === ASAP) {
+      if (!windows.asapEnabled) {
+        return { ok: false, error: "ASAP delivery isn't available — please pick a delivery time." };
+      }
+      // ASAP means now: unlike a batch, it is never taken while closed.
+      if (!isOpenNow(storefront.hours)) {
+        return { ok: false, error: "ASAP delivery is only available while we're open — please pick a delivery time." };
+      }
+      asap = true;
+      asapFee = Math.max(0, windows.asapFee);
+    }
+  }
+  if (batchesOn && !asap) {
     const now = new Date();
-    const w = findOpenBatch(windows, d.deliveryBatch, now);
+    const w = findOpenBatch(windows, d.deliveryBatch ?? "", now);
     if (!w) {
       return { ok: false, error: "That delivery time has just closed — please pick another." };
     }
@@ -219,7 +237,11 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
     const prefix = label || feeNote ? `[${label}${feeNote}] ` : "";
     // The batch leads the address so every screen and slip that shows the
     // address — including ones that predate batches — shows when it goes out.
-    const batchTag = batch ? `[Deliver ${batch.label}] ` : "";
+    const batchTag = batch
+      ? `[Deliver ${batch.label}] `
+      : asap
+        ? `[ASAP${asapFee > 0 ? ` +${formatPeso(asapFee)}` : ""}] `
+        : "";
     addressLine = `${batchTag}${prefix}${d.customerAddress?.trim() ?? ""}`.trim() || null;
   }
 
@@ -281,7 +303,7 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
     customerAddress: addressLine,
     status: "pending" as const,
     paymentStatus: "unpaid" as const,
-    total: built.total + deliveryFee + codFee + packagingFee,
+    total: built.total + deliveryFee + codFee + packagingFee + asapFee,
     discountAmount,
     discountLabel,
     items: { create: orderItemsCreate(built.items) },

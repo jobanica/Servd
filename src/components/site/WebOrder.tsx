@@ -24,7 +24,7 @@ import { LocationPicker } from "./LocationPicker";
 import { WebOrderTracker } from "./WebOrderTracker";
 import { haversineKm, computeDistanceFee } from "@/lib/geo/distance";
 import { computePackagingFee, packagedUnits } from "@/lib/pricing/packaging";
-import { batchLabel, openBatches, type DeliveryWindowsConfig } from "@/lib/orders/delivery-windows";
+import { ASAP, batchLabel, openBatches, type DeliveryWindowsConfig } from "@/lib/orders/delivery-windows";
 import { PoweredByServd } from "@/components/branding/PoweredByServd";
 
 function lineId(): string {
@@ -554,7 +554,14 @@ export function WebOrder(props: WebOrderProps) {
   // silently.
   const chosenStillOpen = !!chosenBatch && openBatchList.some((b) => b.start === chosenBatch);
   const effectiveBatch = chosenStillOpen ? chosenBatch : (openBatchList[0]?.start ?? null);
-  const batchMovedOn = !!chosenBatch && !chosenStillOpen && !!effectiveBatch;
+  const batchMovedOn = !!chosenBatch && chosenBatch !== ASAP && !chosenStillOpen && !!effectiveBatch;
+  // ASAP beside the batches — a rider goes out for this order alone, for an
+  // extra fee — and only while the store is actually open. Chosen explicitly,
+  // or by default once the last batch of the day has gone.
+  const asapOffered =
+    batchesOn && !!dcfg?.windows?.asapEnabled && !(!!props.ordersPaused || openNow === false);
+  const pickedAsap = asapOffered && (chosenBatch === ASAP || openBatchList.length === 0);
+  const asapFee = pickedAsap ? Math.max(0, dcfg?.windows?.asapFee ?? 0) : 0;
   // Assembled shipping address string sent to the merchant (kept human-readable).
   const shippingAddress = [
     ship.street.trim(),
@@ -605,7 +612,7 @@ export function WebOrder(props: WebOrderProps) {
     packedUnits,
   );
   const discount = appliedPromo?.amount ?? 0;
-  const total = Math.max(0, subtotal + deliveryFee + codFee + packagingFee - discount);
+  const total = Math.max(0, subtotal + deliveryFee + codFee + packagingFee + asapFee - discount);
   // Change preview, shown live so the customer picks a note that actually works.
   const changePreview = cashTenderedCentavos > 0 ? cashTenderedCentavos - total : null;
 
@@ -706,7 +713,7 @@ export function WebOrder(props: WebOrderProps) {
       lat: orderType === "delivery" && !shippingMode ? geo?.lat : undefined,
       lng: orderType === "delivery" && !shippingMode ? geo?.lng : undefined,
       scheduledFor: scheduledIso,
-      deliveryBatch: batchesOn ? effectiveBatch ?? undefined : undefined,
+      deliveryBatch: batchesOn ? (pickedAsap ? ASAP : effectiveBatch ?? undefined) : undefined,
       downpaymentRef: schedulingLater && downpaymentDue > 0 ? downpaymentRef || undefined : undefined,
       paymentChoice: payMethod,
       cashTendered: payMethod === "cod" && cashTenderedCentavos > 0 ? cashTenderedCentavos : undefined,
@@ -850,11 +857,25 @@ export function WebOrder(props: WebOrderProps) {
                 <p className="px-1 pb-1.5 text-sm font-semibold text-plum-ink">
                   🕐 What time do you want it delivered?
                 </p>
+                {asapOffered && (
+                  <button
+                    type="button"
+                    onClick={() => setChosenBatch(ASAP)}
+                    className={`mb-1.5 flex w-full items-center justify-between rounded-md border px-3 py-2 text-xs font-semibold ${
+                      pickedAsap ? "border-red-600 bg-red-50 text-red-700" : "border-plum-ink/15 text-plum-ink/70"
+                    }`}
+                  >
+                    <span>⚡ ASAP — deliver right away</span>
+                    <span>{(dcfg?.windows?.asapFee ?? 0) > 0 ? `+${formatPeso(dcfg!.windows!.asapFee)}` : "no extra fee"}</span>
+                  </button>
+                )}
                 {openBatchList.length === 0 ? (
-                  <p className="rounded-md bg-gray-100 px-2 py-2 text-xs font-semibold text-plum-ink/60">
-                    Delivery is finished for today — the last batch has gone out.
-                    {fulfillment === "both" ? " You can still choose pick-up." : ""}
-                  </p>
+                  !asapOffered && (
+                    <p className="rounded-md bg-gray-100 px-2 py-2 text-xs font-semibold text-plum-ink/60">
+                      Delivery is finished for today — the last batch has gone out.
+                      {fulfillment === "both" ? " You can still choose pick-up." : ""}
+                    </p>
+                  )
                 ) : (
                   <>
                     <div className="grid grid-cols-2 gap-1.5">
@@ -864,7 +885,7 @@ export function WebOrder(props: WebOrderProps) {
                           type="button"
                           onClick={() => setChosenBatch(b.start)}
                           className={`rounded-md border px-2 py-2 text-xs font-semibold ${
-                            effectiveBatch === b.start
+                            !pickedAsap && effectiveBatch === b.start
                               ? "border-red-600 bg-red-50 text-red-700"
                               : "border-plum-ink/15 text-plum-ink/70"
                           }`}
@@ -1192,7 +1213,7 @@ export function WebOrder(props: WebOrderProps) {
       </div>
 
       <div className="border-t border-black/5 px-4 py-3">
-        {checkout && (orderType === "delivery" || discount > 0 || packagingFee > 0) && (
+        {checkout && (orderType === "delivery" || discount > 0 || packagingFee > 0 || asapFee > 0) && (
           <div className="mb-1 space-y-0.5 text-sm text-plum-ink/60">
             <div className="flex justify-between"><span>Subtotal</span><span>{formatPeso(subtotal)}</span></div>
             {orderType === "delivery" && (collectDeliveryFee ? (
@@ -1211,6 +1232,9 @@ export function WebOrder(props: WebOrderProps) {
                 <span>Packaging fee{props.payment?.packagingFeeMode === "item" ? ` (×${packedUnits})` : ""}</span>
                 <span>{formatPeso(packagingFee)}</span>
               </div>
+            )}
+            {asapFee > 0 && (
+              <div className="flex justify-between"><span>⚡ ASAP delivery</span><span>{formatPeso(asapFee)}</span></div>
             )}
             {codFee > 0 && (
               <div className="flex justify-between"><span>COD fee</span><span>{formatPeso(codFee)}</span></div>
@@ -1246,7 +1270,7 @@ export function WebOrder(props: WebOrderProps) {
         ) : (
           <button
             onClick={submit}
-            disabled={!demo && (busy || receiptMissing || lines.length === 0 || !name.trim() || !isValidPhone(phone) || (schedulingLater && !scheduledIso) || (batchesOn && !effectiveBatch) || (batchesCarryClosed && orderType !== "delivery") || (orderType === "delivery" && (shippingMode ? !shippingReady : (!address.trim() || (showMap && !geo) || !collectDeliveryFee && !agreeRider || (distanceMode ? !!distance?.outOfRange : (zones.length > 0 && !zone))))))}
+            disabled={!demo && (busy || receiptMissing || lines.length === 0 || !name.trim() || !isValidPhone(phone) || (schedulingLater && !scheduledIso) || (batchesOn && !effectiveBatch && !pickedAsap) || (batchesCarryClosed && orderType !== "delivery") || (orderType === "delivery" && (shippingMode ? !shippingReady : (!address.trim() || (showMap && !geo) || !collectDeliveryFee && !agreeRider || (distanceMode ? !!distance?.outOfRange : (zones.length > 0 && !zone))))))}
             className="mt-3 w-full rounded-lg bg-green-600 py-3 font-semibold text-white disabled:opacity-50"
           >
             {busy

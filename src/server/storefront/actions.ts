@@ -154,6 +154,9 @@ export async function updateStorefront(
           })(),
           batchMinutes: Number(formData.get("windowBatchMinutes")),
           cutoffMinutes: Number(formData.get("windowCutoffMinutes")),
+          asapEnabled: formData.get("windowAsap") === "on",
+          // Typed in pesos; stored in centavos.
+          asapFee: Math.round(Number(formData.get("windowAsapFeePesos") ?? 0) * 100),
         })
       : saved.delivery.windows,
   };

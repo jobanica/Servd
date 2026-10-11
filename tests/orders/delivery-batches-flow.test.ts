@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildTicket, ticketLines, ticketServiceLine, WIDTH, type TicketSource } from "@/lib/printing/ticket";
-import { groupByBatch, stripBatchTag } from "@/lib/orders/delivery-windows";
+import { groupByBatch, stripBatchTag, isAsapAddress, normalizeDeliveryWindows } from "@/lib/orders/delivery-windows";
 
 /**
  * Delivery batches end to end: the customer's pick is re-checked by the order
@@ -99,7 +99,7 @@ describe("the order path", () => {
   const src = read("src/server/orders/web-order.ts");
 
   it("re-checks the customer's pick against the clock", () => {
-    expect(src).toMatch(/findOpenBatch\(windows, d\.deliveryBatch, now\)/);
+    expect(src).toMatch(/findOpenBatch\(windows, d\.deliveryBatch \?\? "", now\)/);
     expect(src).toMatch(/That delivery time has just closed/);
   });
 
@@ -132,5 +132,45 @@ describe("the settings save", () => {
     const src = read("src/server/storefront/actions.ts");
     expect(src).toMatch(/formData\.has\("windowsField"\)/);
     expect(src).toMatch(/: saved\.delivery\.windows/);
+  });
+});
+
+describe("ASAP beside the batches", () => {
+  const src = read("src/server/orders/web-order.ts");
+
+  it("is off unless the owner turns it on, with a fee in centavos", () => {
+    expect(normalizeDeliveryWindows({ enabled: true }).asapEnabled).toBe(false);
+    const n = normalizeDeliveryWindows({ enabled: true, asapEnabled: true, asapFee: 5000 });
+    expect(n.asapEnabled).toBe(true);
+    expect(n.asapFee).toBe(5000);
+    expect(normalizeDeliveryWindows({ asapFee: -10 }).asapFee).toBe(0);
+  });
+
+  it("is refused when the owner hasn't offered it", () => {
+    expect(src).toMatch(/if \(!windows\.asapEnabled\) \{\s*return \{ ok: false/);
+  });
+
+  it("is refused while the store is closed — ASAP means now", () => {
+    expect(src).toMatch(/d\.deliveryBatch === ASAP\) \{[\s\S]*if \(!isOpenNow\(storefront\.hours\)\)/);
+  });
+
+  it("charges the fee from saved settings, never from the client", () => {
+    expect(src).toMatch(/asapFee = Math\.max\(0, windows\.asapFee\);/);
+    expect(src).toMatch(/total: built\.total \+ deliveryFee \+ codFee \+ packagingFee \+ asapFee,/);
+  });
+
+  it("is recognised from the address tag, even behind a COD tag", () => {
+    expect(isAsapAddress("[ASAP +₱50.00] Blk 4 Lot 7")).toBe(true);
+    expect(isAsapAddress("[COD +₱10.00] [ASAP] Blk 4")).toBe(true);
+    expect(isAsapAddress("[Deliver 11:00-11:30 AM] Blk 4")).toBe(false);
+    expect(isAsapAddress(null)).toBe(false);
+  });
+
+  it("prints as DELIVERY ASAP for the kitchen", () => {
+    const t = buildTicket({ ...kitchen, deliveryWindow: "ASAP" });
+    expect(ticketServiceLine(t)).toBe("*** DELIVERY ASAP ***");
+    for (const p of ["src/server/printing/print.ts", "src/server/printing/ticket-query.ts"]) {
+      expect(read(p), p).toMatch(/isAsapAddress\(/);
+    }
   });
 });

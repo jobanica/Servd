@@ -29,6 +29,7 @@ import { DeliveryRiderPanel } from "@/components/delivery/DeliveryRiderPanel";
 import {
   batchLabelFromInstants,
   groupByBatch,
+  isAsapAddress,
   stripBatchTag,
   type BatchGroup,
 } from "@/lib/orders/delivery-windows";
@@ -61,7 +62,7 @@ function BatchHeader({ group, nowMs }: { group: BatchGroup<MerchantOrder>; nowMs
   if (!group.start) {
     return (
       <p className="mb-2 text-xs font-bold uppercase tracking-wide text-plum-ink/45">
-        Not in a batch ({n})
+        ⚡ ASAP &amp; other orders ({n})
       </p>
     );
   }
@@ -525,6 +526,12 @@ export function MerchantBoard({
                 </div>
               </div>
 
+              {isAsapAddress(topIncoming.customerAddress) && (
+                <div className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-center">
+                  <p className="font-heading text-lg font-extrabold text-red-600">⚡ Deliver ASAP</p>
+                  <p className="text-sm font-semibold text-plum-ink/60">Not in a batch — send it on its own</p>
+                </div>
+              )}
               {batchOf(topIncoming) && (
                 <div className="mt-3 rounded-xl bg-mango/15 px-4 py-3 text-center">
                   <p className="font-heading text-lg font-extrabold text-plum-ink">🕐 Deliver {batchOf(topIncoming)}</p>
@@ -646,6 +653,9 @@ export function MerchantBoard({
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="font-heading font-bold">
+                        {isAsapAddress(o.customerAddress) && (
+                          <span className="mr-1.5 rounded-full bg-red-600 px-2 py-0.5 text-xs font-bold text-white">⚡ ASAP</span>
+                        )}
                         {typeBadge(o)}
                         {o.orderNumber ? ` · ${o.orderNumber}` : ""}
                       </p>
