@@ -16,6 +16,8 @@ import { MonthlyFeatureControl } from "@/components/super-admin/MonthlyFeatureCo
 import { QrAccessControl } from "@/components/super-admin/QrAccessControl";
 import { MONTHLY_FEATURES } from "@/server/billing/feature-subscriptions";
 import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
+import { DeleteAccountButton } from "@/components/super-admin/DeleteAccountButton";
+import { isDormant, lastActivityLabel, DORMANT_DAYS } from "@/lib/billing/dormant";
 import { TempPasswordButton } from "@/components/super-admin/TempPasswordButton";
 import { addSmsCredits, setSenderName } from "@/server/sms/admin";
 import { formatPeso } from "@/lib/money";
@@ -136,7 +138,14 @@ export default async function SubscriptionsPage({
     listQrAccess(),
   ]);
   const activePlans = plans.filter((p) => p.isActive);
-  const { rows: filtered, label: filterLabel } = filterSubs(allSubs, sp);
+  const now = new Date();
+  const dormant = (s: SubscriptionRow) =>
+    isDormant({ createdAt: s.createdAt, lastOrderAt: health.get(s.restaurantId)?.lastOrderAt ?? null }, now);
+  const dormantCount = allSubs.filter(dormant).length;
+  const { rows: filtered, label: filterLabel } =
+    sp.filter === "dormant"
+      ? { rows: allSubs.filter(dormant), label: `Dormant — no orders in ${DORMANT_DAYS}+ days` }
+      : filterSubs(allSubs, sp);
 
   // Free-text search on top of any status/access filter.
   const query = (sp.q ?? "").trim().toLowerCase();
@@ -178,6 +187,15 @@ export default async function SubscriptionsPage({
         )}
       </div>
 
+      {sp.filter !== "dormant" && dormantCount > 0 && (
+        <Link
+          href="/super-admin/subscriptions?filter=dormant"
+          className="inline-block rounded-full border border-plum-ink/15 bg-white px-3 py-1 text-xs font-semibold text-plum-ink/70 hover:bg-cream"
+        >
+          💤 Dormant accounts ({dormantCount})
+        </Link>
+      )}
+
       <SubscriptionSearch
         initial={sp.q ?? ""}
         keep={{ status: sp.status, access: sp.access, filter: sp.filter }}
@@ -198,6 +216,11 @@ export default async function SubscriptionsPage({
               </div>
               <div className="flex items-center gap-2 text-xs text-plum-ink/60">
                 <StatusBadge status={s.status} />
+                {dormant(s) && (
+                  <span className="rounded-full bg-plum-ink/10 px-2 py-0.5 font-semibold text-plum-ink/60">
+                    💤 dormant
+                  </span>
+                )}
                 {s.restaurantStatus === "suspended" && (
                   <span className="rounded-full bg-guava/15 px-2 py-0.5 font-semibold text-guava">
                     suspended
@@ -341,6 +364,15 @@ export default async function SubscriptionsPage({
                       {s.restaurantStatus === "suspended" ? "Restore access" : "Suspend access"}
                     </button>
                   </form>
+                  {/* Only dormant accounts can be deleted — the server checks again. */}
+                  {dormant(s) && (
+                    <DeleteAccountButton
+                      restaurantId={s.restaurantId}
+                      name={s.restaurantName}
+                      slug={s.slug}
+                      activity={lastActivityLabel(health.get(s.restaurantId)?.lastOrderAt ?? null, now)}
+                    />
+                  )}
                   {/* Hidden save offer — one tap assigns Lite (₱299 / 300 orders) + activates. */}
                   <form action={setToLite}>
                     <input type="hidden" name="restaurantId" value={s.restaurantId} />
