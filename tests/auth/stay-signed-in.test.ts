@@ -28,8 +28,10 @@ describe("the session refresh in middleware", () => {
   it("checks the result of getUser rather than only catching a throw", () => {
     // A refresh failure does not throw — it comes back as an error value. The
     // try/catch alone never saw it.
-    expect(src).toMatch(/const\s*\{\s*data,\s*error\s*\}\s*=\s*await\s+supabase\.auth\.getUser\(\)/);
-    expect(src).toMatch(/renewed\s*=\s*!error\s*&&\s*!!data\.user/);
+    // (Raced against a timeout since the dinner-rush 504s; a timeout reads as
+    // "not renewed", the same as an error.)
+    expect(src).toMatch(/Promise\.race\(\[\s*supabase\.auth\.getUser\(\)/);
+    expect(src).toMatch(/renewed\s*=\s*!!result\s*&&\s*!result\.error\s*&&\s*!!result\.data\.user/);
   });
 
   it("does not mutate the request's cookies before it knows", () => {

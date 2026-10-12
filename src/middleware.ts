@@ -58,6 +58,9 @@ function captureAttribution(req: NextRequest, res: NextResponse): NextResponse {
 
 type PendingCookie = { name: string; value: string; options?: Record<string, unknown> };
 
+/** How long the session refresh may hold up a page before it's skipped. */
+const SESSION_REFRESH_TIMEOUT_MS = 3000;
+
 /**
  * Keeps staff signed in. Supabase access tokens are short-lived and have to be
  * swapped for a fresh one using the refresh token. Server Components can't
@@ -94,8 +97,16 @@ async function refreshSession(req: NextRequest): Promise<PendingCookie[]> {
         },
       },
     });
-    const { data, error } = await supabase.auth.getUser();
-    renewed = !error && !!data.user;
+    // Bounded: this runs before EVERY page, and when Supabase is slow (a busy
+    // database at the dinner rush) an unbounded wait here turned into a 504
+    // MIDDLEWARE_INVOCATION_TIMEOUT on every screen — the till included. Past
+    // the limit we carry on with the cookies we already have, exactly as for
+    // a failed renewal below; the page resolves the session itself.
+    const result = await Promise.race([
+      supabase.auth.getUser(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), SESSION_REFRESH_TIMEOUT_MS)),
+    ]);
+    renewed = !!result && !result.error && !!result.data.user;
   } catch {
     /* Supabase unreachable — keep serving with the cookies we already have
        rather than bouncing the user to /login. */
