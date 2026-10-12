@@ -467,10 +467,16 @@ export function DinerMenu({
               <button
                 key={c.id}
                 onClick={() => setActiveCat(c.id)}
-                className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-semibold ${
+                className={`flex items-center gap-1.5 whitespace-nowrap rounded-full py-1.5 text-sm font-semibold ${
+                  c.imageUrl ? "pl-1.5 pr-3.5" : "px-3.5"
+                } ${
                   activeCat === c.id ? "bg-brand-primary text-white" : "bg-white text-brand-ink/70 ring-1 ring-brand-ink/10"
                 }`}
               >
+                {c.imageUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={c.imageUrl} alt="" loading="lazy" className="h-6 w-6 rounded-full object-cover" />
+                )}
                 {c.name}
               </button>
             ))}

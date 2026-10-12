@@ -68,6 +68,8 @@ export interface DinerItem {
 export interface DinerCategory {
   id: string;
   name: string;
+  /** Tab photo: the category's own, else its first dish photo. Optional. */
+  imageUrl?: string | null;
   items: DinerItem[];
 }
 

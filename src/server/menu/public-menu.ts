@@ -122,6 +122,12 @@ export async function getPublicMenu(
   const shaped: DinerCategory[] = visible.map((c) => ({
     id: c.id,
     name: c.translations[0]?.name ?? c.name,
+    // The owner's category photo, else the first dish photo in it, so the
+    // tabs have pictures before anyone uploads one.
+    imageUrl:
+      c.imageUrl ??
+      c.menuItems.find((i) => !posOnly.has(i.id) && !comingSoon.has(i.id) && i.imageUrl)?.imageUrl ??
+      null,
     items: c.menuItems.filter((i) => !posOnly.has(i.id)).map((item) => {
       const eff = effectivePrice(item.price, { id: item.id, categoryId: item.categoryId }, happyHours);
       // Out of daily servings → sold out for the rest of today.

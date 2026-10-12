@@ -16,7 +16,7 @@ import { prepareReceipt } from "@/lib/images/receipt";
 import { getWebOrderStatus } from "@/server/orders/web-order-status";
 import { previewPromoCode } from "@/server/promotions/redeem";
 import { CartThumb } from "@/components/diner/CartThumb";
-import { CategoryTabs, categorySectionId } from "@/components/menu/CategoryTabs";
+import { CategoryTabs, categorySectionId, hasTabPhotos } from "@/components/menu/CategoryTabs";
 import { captureCartLead } from "@/server/marketing/cart-recovery";
 import { replaceCartLine, selectionFromLine } from "@/lib/cart/edit-line";
 import { wrapsMidnight } from "@/lib/site/store-hours";
@@ -642,6 +642,8 @@ export function WebOrder(props: WebOrderProps) {
   }
   const vat = Math.round(total - total / (1 + VAT_RATE));
   const nonEmpty = categories.filter((c) => c.items.length > 0);
+  // Photo tabs make the category strip taller; sections stop further down.
+  const tabPhotos = hasTabPhotos(nonEmpty);
   const q = search.trim().toLowerCase();
   const shownCats = q
     ? nonEmpty
@@ -1459,7 +1461,7 @@ export function WebOrder(props: WebOrderProps) {
           the two menus can't drift apart. */}
       {!q && (
         <CategoryTabs
-          categories={nonEmpty.map((c) => ({ id: c.id, name: c.name }))}
+          categories={nonEmpty.map((c) => ({ id: c.id, name: c.name, imageUrl: c.imageUrl ?? null }))}
           className="mt-3 px-5"
         />
       )}
@@ -1478,7 +1480,7 @@ export function WebOrder(props: WebOrderProps) {
 
         {shownCats.length === 0 && <p className="rounded-2xl bg-gray-50 p-6 text-center text-sm text-plum-ink/50">No items match your search.</p>}
         {shownCats.map((cat, ci) => (
-          <section key={cat.id} id={categorySectionId(cat.id)} className="mb-7 scroll-mt-16">
+          <section key={cat.id} id={categorySectionId(cat.id)} className={`mb-7 ${tabPhotos ? "scroll-mt-28" : "scroll-mt-16"}`}>
             <h2 className="mb-3 flex items-center gap-2 font-heading text-xl font-extrabold text-plum-ink">
               {ci === 0 && <span aria-hidden>🔥</span>}
               {cat.name}

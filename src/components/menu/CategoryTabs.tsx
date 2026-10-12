@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type RefObject } from "react";
+import { hasTabPhotos } from "@/lib/menu/tab-photos";
 
 /**
  * The sticky category strip above a menu.
@@ -19,7 +20,11 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 export interface TabCategory {
   id: string;
   name: string;
+  /** Optional tab photo. When any category has one, the strip shows photos. */
+  imageUrl?: string | null;
 }
+
+export { hasTabPhotos };
 
 /** The DOM id of a category's section. Both sides must agree on this. */
 export function categorySectionId(id: string): string {
@@ -44,6 +49,8 @@ export function CategoryTabs({
 
   // Keyed on the visible ids so it re-binds when a search filters the list.
   const ids = categories.map((c) => c.id).join(",");
+  // Photo tabs make the strip taller, so the band it watches starts lower.
+  const photos = hasTabPhotos(categories);
 
   useEffect(() => {
     const list = ids ? ids.split(",") : [];
@@ -64,11 +71,11 @@ export function CategoryTabs({
       },
       // Watch the band just below the strip, so a heading scrolling under the
       // tabs hands over to the next one instead of staying underlined.
-      { root, rootMargin: "-64px 0px -70% 0px", threshold: 0 },
+      { root, rootMargin: `${photos ? "-112px" : "-64px"} 0px -70% 0px`, threshold: 0 },
     );
     nodes.forEach((n) => observer.observe(n));
     return () => observer.disconnect();
-  }, [ids, scrollRef]);
+  }, [ids, scrollRef, photos]);
 
   // With more categories than fit, the underlined one has to be brought back
   // into view or it's underlined somewhere nobody can see.
@@ -116,11 +123,46 @@ export function CategoryTabs({
     >
       <div
         ref={stripRef}
-        className="flex gap-5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className={`flex overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+          photos ? "gap-3" : "gap-5"
+        }`}
       >
         {categories.map((c, i) => {
           // Before any scrolling has happened, the first tab is the active one.
           const on = active ? active === c.id : i === 0;
+          if (photos) {
+            return (
+              <button
+                key={c.id}
+                type="button"
+                data-cat={c.id}
+                onClick={() => jump(c.id)}
+                className={`flex w-[76px] shrink-0 flex-col items-center gap-1 border-b-2 pb-2 pt-3 transition-colors ${
+                  on ? "border-plum-ink" : "border-transparent"
+                }`}
+              >
+                <span
+                  className={`flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-gray-100 ring-2 transition ${
+                    on ? "ring-plum-ink" : "ring-transparent"
+                  }`}
+                >
+                  {c.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={c.imageUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-lg font-bold text-plum-ink/40">{c.name.replace(/^[^\p{L}\p{N}]+/u, "").charAt(0)}</span>
+                  )}
+                </span>
+                <span
+                  className={`line-clamp-2 w-full text-center text-[11px] font-bold leading-tight ${
+                    on ? "text-plum-ink" : "text-plum-ink/55"
+                  }`}
+                >
+                  {c.name}
+                </span>
+              </button>
+            );
+          }
           return (
             <button
               key={c.id}

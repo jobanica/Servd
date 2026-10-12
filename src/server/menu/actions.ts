@@ -62,6 +62,33 @@ export async function renameCategory(formData: FormData): Promise<void> {
   await refresh();
 }
 
+/**
+ * A category's photo, shown on the menu's category tabs. An uploaded image
+ * replaces it; "remove" clears it, and the first dish photo in the category
+ * stands in again.
+ */
+export async function setCategoryImage(formData: FormData): Promise<{ error?: string }> {
+  const { restaurantId } = await requireManagerAction();
+  const id = String(formData.get("id") ?? "");
+  let imageUrl: string | null;
+  if (formData.get("remove") === "1") {
+    imageUrl = null;
+  } else {
+    const file = formData.get("image");
+    if (!(file instanceof File) || file.size === 0) return { error: "Choose a photo." };
+    try {
+      imageUrl = await uploadMenuImage(restaurantId, file);
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "Couldn't upload the photo." };
+    }
+  }
+  await tenantDb(restaurantId, (tx) =>
+    tx.category.updateMany({ where: { id, restaurantId }, data: { imageUrl } }),
+  );
+  await refresh();
+  return {};
+}
+
 export async function deleteCategory(formData: FormData): Promise<void> {
   const { restaurantId } = await requireManagerAction();
   const id = String(formData.get("id"));

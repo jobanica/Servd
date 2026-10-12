@@ -33,5 +33,13 @@ export function withAvailableSoon(categories: DinerCategory[], locale = "en"): D
     .map((c) => ({ ...c, items: c.items.filter((i) => !i.comingSoon) }))
     .filter((c, idx) => c.items.length > 0 || categories[idx].items.length === 0);
 
-  return [...rest, { id: AVAILABLE_SOON_ID, name: availableSoonLabel(locale), items: soon }];
+  return [
+    ...rest,
+    {
+      id: AVAILABLE_SOON_ID,
+      name: availableSoonLabel(locale),
+      imageUrl: soon.find((i) => i.imageUrl)?.imageUrl ?? null,
+      items: soon,
+    },
+  ];
 }

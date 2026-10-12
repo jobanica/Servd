@@ -1266,6 +1266,9 @@ model Category {
   id           String   @id @default(uuid())
   restaurantId String
   name         String
+  /// Photo on the menu's category tab. Null = the first dish photo in the
+  /// category stands in. Added by prisma/manual/add-category-image.sql.
+  imageUrl     String?
   sortOrder    Int      @default(0)
   createdAt    DateTime @default(now())
 

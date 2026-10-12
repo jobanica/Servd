@@ -82,7 +82,7 @@ export default async function MenuPage() {
           className="rounded-tile border border-plum-ink/10 bg-white p-4"
         >
           <div className="flex items-center justify-between">
-            <CategoryHeader id={category.id} name={category.name} />
+            <CategoryHeader id={category.id} name={category.name} imageUrl={category.imageUrl} />
           </div>
 
           <SortableList

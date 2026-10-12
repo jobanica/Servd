@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { renameCategory, deleteCategory } from "@/server/menu/actions";
+import { useRef, useState } from "react";
+import { renameCategory, deleteCategory, setCategoryImage } from "@/server/menu/actions";
 import { ConfirmSubmitButton } from "./ConfirmSubmitButton";
 
 /**
@@ -9,7 +9,16 @@ import { ConfirmSubmitButton } from "./ConfirmSubmitButton";
  * and the "Delete category" action. Rename calls the existing renameCategory
  * server action, which revalidates the page so the new name shows immediately.
  */
-export function CategoryHeader({ id, name }: { id: string; name: string }) {
+export function CategoryHeader({
+  id,
+  name,
+  imageUrl = null,
+}: {
+  id: string;
+  name: string;
+  /** The category's own photo (not the dish photo standing in for it). */
+  imageUrl?: string | null;
+}) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(name);
   const [saving, setSaving] = useState(false);
@@ -69,6 +78,7 @@ export function CategoryHeader({ id, name }: { id: string; name: string }) {
   return (
     <div className="flex w-full items-center justify-between">
       <div className="flex items-center gap-2">
+        <CategoryPhoto id={id} name={name} imageUrl={imageUrl} />
         <h2 className="font-heading text-lg font-bold">{name}</h2>
         <button
           type="button"
@@ -87,6 +97,73 @@ export function CategoryHeader({ id, name }: { id: string; name: string }) {
           Delete category
         </ConfirmSubmitButton>
       </form>
+    </div>
+  );
+}
+
+/**
+ * The category's photo on the menu's category tabs. Tap to upload or change;
+ * without one, the first dish photo in the category is shown to customers.
+ */
+function CategoryPhoto({ id, name, imageUrl }: { id: string; name: string; imageUrl: string | null }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function send(fd: FormData) {
+    setBusy(true);
+    setError(null);
+    fd.set("id", id);
+    const r = await setCategoryImage(fd);
+    if (r?.error) setError(r.error);
+    setBusy(false);
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => input.current?.click()}
+        title={imageUrl ? `Change the photo for ${name}` : `Add a photo for ${name}`}
+        className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-dashed border-plum-ink/25 bg-cream text-base disabled:opacity-50"
+      >
+        {imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <span aria-hidden>📷</span>
+        )}
+        {busy && <span className="absolute inset-0 flex items-center justify-center bg-white/70 text-xs">…</span>}
+      </button>
+      <input
+        ref={input}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (!file) return;
+          const fd = new FormData();
+          fd.set("image", file);
+          void send(fd);
+        }}
+      />
+      {imageUrl && !busy && (
+        <button
+          type="button"
+          onClick={() => {
+            const fd = new FormData();
+            fd.set("remove", "1");
+            void send(fd);
+          }}
+          className="text-[11px] text-muted hover:text-guava"
+        >
+          Remove photo
+        </button>
+      )}
+      {error && <span className="text-[11px] text-guava">{error}</span>}
     </div>
   );
 }
