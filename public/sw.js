@@ -103,10 +103,13 @@ self.addEventListener("push", (event) => {
       body: data.body || "You have a new order.",
       icon: "/brand/icon-192.png",
       badge: "/brand/icon-192.png",
-      tag: data.tag || "servd-order", // collapse duplicates
+      tag: data.tag || "servd-order", // one per order (the server sends order-<ref>)
       renotify: true,
       requireInteraction: true, // stays until tapped
-      vibrate: [200, 100, 200, 100, 200],
+      silent: false, // play the phone's notification sound
+      // Long enough to notice in an apron pocket.
+      vibrate: [400, 150, 400, 150, 400, 150, 800],
+      timestamp: Date.now(),
       data: { url: data.url || "/merchant" },
     }),
   );

@@ -53,6 +53,9 @@ export async function sendOrderPush(restaurantId: string, payload: OrderPushPayl
     title: "New online order 🛎️",
     body: `${payload.orderType === "delivery" ? "🛵 Delivery" : "🥡 Pickup"} · ${payload.ref}${payload.scheduled ? " · advance order" : ""}`,
     url: "/merchant",
+    // One notification per order. A shared tag made the second order of a
+    // rush quietly replace the first in the shade.
+    tag: `order-${payload.ref}`,
   });
 
   await deliver(subs, body);
@@ -95,6 +98,40 @@ export async function sendDinerPush(orderId: string, payload: DinerPushPayload):
   }));
 }
 
+/**
+ * How every push goes out.
+ *
+ * urgency "high": without it the push service treats the message as normal
+ * priority, and an Android phone asleep in Doze holds normal-priority
+ * messages until its next maintenance window — the "no alert when the app is
+ * minimized" complaint. High priority wakes the device now.
+ *
+ * TTL 15 minutes: an order alert that couldn't be delivered in a quarter of
+ * an hour is no longer an alert; the default (four weeks) would surface it
+ * long after the order was dealt with.
+ */
+export const PUSH_OPTIONS = { urgency: "high", TTL: 15 * 60 } as const;
+
+/** One test alert to one device — the merchant app's "Test alert" button. */
+export async function sendTestPushTo(sub: { endpoint: string; p256dh: string; auth: string }): Promise<boolean> {
+  if (!ensureConfigured()) return false;
+  try {
+    await webpush.sendNotification(
+      { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+      JSON.stringify({
+        title: "Test alert 🛎️",
+        body: "This is how a new order will alert you, even when the app is minimized.",
+        url: "/merchant",
+        tag: "servd-test",
+      }),
+      PUSH_OPTIONS,
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Fan a payload out to every device, pruning subscriptions the browser dropped. */
 async function deliver(
   subs: { endpoint: string; p256dh: string; auth: string }[],
@@ -104,7 +141,7 @@ async function deliver(
   await Promise.all(
     subs.map(async (s) => {
       try {
-        await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, body);
+        await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, body, PUSH_OPTIONS);
       } catch (e) {
         const status = (e as { statusCode?: number }).statusCode;
         if (status === 404 || status === 410) dead.push(s.endpoint); // gone — prune

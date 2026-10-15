@@ -3,6 +3,9 @@
 import { z } from "zod";
 import { requireStaff } from "@/server/tenancy/current-user";
 import { tenantDb, systemDb } from "@/server/tenancy/scoped-db";
+import { sendTestPushTo } from "@/server/push/send";
+
+const TEST_ALERT_DELAY_MS = 8000;
 
 const MERCHANT_ROLES = ["merchant", "cashier", "admin", "manager"] as const;
 
@@ -41,6 +44,30 @@ export async function savePushSubscription(input: PushSubInput): Promise<{ ok: b
   } catch {
     return { ok: false }; // table not migrated yet
   }
+}
+
+/**
+ * Send a test alert to THIS device, after a short delay so there's time to
+ * minimize the app first — the only way to check the thing that matters.
+ * Only to a subscription stored for the signed-in staff's own restaurant.
+ */
+export async function sendTestAlert(endpoint: string): Promise<{ ok: boolean; error?: string }> {
+  let staff;
+  try {
+    staff = await requireStaff([...MERCHANT_ROLES]);
+  } catch {
+    return { ok: false, error: "Sign in again." };
+  }
+  const sub = await systemDb((tx) =>
+    tx.pushSubscription.findFirst({
+      where: { endpoint: String(endpoint).slice(0, 1000), restaurantId: staff.restaurantId },
+      select: { endpoint: true, p256dh: true, auth: true },
+    }),
+  ).catch(() => null);
+  if (!sub) return { ok: false, error: "This phone isn't set up for alerts yet — tap Turn on alerts first." };
+  await new Promise((r) => setTimeout(r, TEST_ALERT_DELAY_MS));
+  const sent = await sendTestPushTo(sub);
+  return sent ? { ok: true } : { ok: false, error: "The alert couldn't be sent. Turn alerts off and on again." };
 }
 
 const dinerSchema = schema.extend({
