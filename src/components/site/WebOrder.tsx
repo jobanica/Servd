@@ -572,6 +572,10 @@ export function WebOrder(props: WebOrderProps) {
   // or by default once the last batch of the day has gone.
   const asapOffered =
     batchesOn && !!dcfg?.windows?.asapEnabled && !(!!props.ordersPaused || openNow === false);
+  // Offered, but the store isn't open yet (or has closed): shown greyed out,
+  // so customers know it's there once the store opens.
+  const asapLater =
+    batchesOn && !!dcfg?.windows?.asapEnabled && !props.ordersPaused && openNow === false;
   const pickedAsap = asapOffered && (chosenBatch === ASAP || openBatchList.length === 0);
   const asapFee = pickedAsap ? Math.max(0, dcfg?.windows?.asapFee ?? 0) : 0;
   // Assembled shipping address string sent to the merchant (kept human-readable).
@@ -883,6 +887,12 @@ export function WebOrder(props: WebOrderProps) {
                     <span>⚡ ASAP — deliver right away</span>
                     <span>{(dcfg?.windows?.asapFee ?? 0) > 0 ? `+${formatPeso(dcfg!.windows!.asapFee)}` : "no extra fee"}</span>
                   </button>
+                )}
+                {asapLater && (
+                  <div className="mb-1.5 flex w-full items-center justify-between rounded-md border border-dashed border-plum-ink/15 bg-gray-50 px-3 py-2 text-xs font-semibold text-plum-ink/45">
+                    <span>⚡ ASAP — available once we&apos;re open</span>
+                    <span>{(dcfg?.windows?.asapFee ?? 0) > 0 ? `+${formatPeso(dcfg!.windows!.asapFee)}` : "no extra fee"}</span>
+                  </div>
                 )}
                 {openBatchList.length === 0 ? (
                   !asapOffered && (

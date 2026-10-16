@@ -173,4 +173,13 @@ describe("ASAP beside the batches", () => {
       expect(read(p), p).toMatch(/isAsapAddress\(/);
     }
   });
+
+  it("shows greyed out while the store is closed, so customers know it's there", () => {
+    const web = read("src/components/site/WebOrder.tsx");
+    expect(web).toMatch(/const asapLater =\s*batchesOn && !!dcfg\?\.windows\?\.asapEnabled && !props\.ordersPaused && openNow === false;/);
+    expect(web).toMatch(/ASAP — available once we&apos;re open/);
+    // Only a label: it can't be picked until the store opens.
+    const block = web.slice(web.indexOf("{asapLater && ("), web.indexOf("available once we"));
+    expect(block).not.toMatch(/onClick/);
+  });
 });
