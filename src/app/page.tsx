@@ -497,8 +497,8 @@ export default async function Home() {
           </p>
           <p className="mt-3 text-sm text-plum-ink/70">
             Unlimited dine-in QR codes, the cashier POS, kitchen display, your online ordering page,
-            reservations, loyalty, promos, gift cards, inventory, accounting, HR and payroll, offline
-            mode, your own domain and more.
+            reservations, loyalty, promos, gift cards, inventory, accounting, HR and payroll, your own
+            domain and more.
           </p>
           <p className="mt-3 text-xs text-plum-ink/50">
             The Content Calendar is sold separately. SMS is pay-as-you-go with credits.

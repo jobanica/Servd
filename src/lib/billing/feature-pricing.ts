@@ -1,4 +1,4 @@
-import { ALL_FEATURES, type Feature } from "@/lib/billing/features";
+import { ALL_FEATURES, FEATURE_META, type Feature } from "@/lib/billing/features";
 
 /**
  * One-time unlock pricing per gateable feature. Pure data so the super-admin
@@ -44,7 +44,7 @@ export const DEFAULT_FEATURE_PRICES: FeaturePriceMap = {
   reservations: { price: 120_000, enabled: true },
   dataExport: { price: 50_000, enabled: true },
   auditLog: { price: 60_000, enabled: true },
-  offline: { price: 150_000, enabled: true },
+  offline: { price: 150_000, enabled: false }, // retired from sale
   accounting: { price: 250_000, enabled: true },
   inventory: { price: 300_000, enabled: true },
   hr: { price: 300_000, enabled: true },
@@ -67,5 +67,9 @@ export function normalizeFeaturePrices(raw: unknown): FeaturePriceMap {
       enabled: typeof row.enabled === "boolean" ? row.enabled : out[key].enabled,
     };
   }
+  // A retired feature is never for sale, whatever an older saved price list
+  // says — this is what keeps the buy button, the unlock card and the
+  // purchase action from offering it.
+  for (const f of FEATURE_META) if (f.retired) out[f.key] = { ...out[f.key], enabled: false };
   return out;
 }

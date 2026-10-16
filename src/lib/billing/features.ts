@@ -38,10 +38,10 @@ export interface FeatureMeta {
   label: string;
   group: string;
   /**
-   * No longer sold, and gates nothing. Kept in the list so a restaurant that
-   * already bought it doesn't have the purchase silently disappear, and so
-   * sanitizeFeatures() doesn't strip it out of stored plans. Hidden from the
-   * feature store unless it's owned.
+   * No longer sold. Kept in the list so a restaurant that already bought it
+   * (or whose plan includes it) keeps it, and so sanitizeFeatures() doesn't
+   * strip it out of stored plans. Hidden from the feature store unless it's
+   * owned, and never priced for sale (normalizeFeaturePrices).
    */
   retired?: boolean;
   /**
@@ -82,7 +82,15 @@ export const FEATURE_META: FeatureMeta[] = [
   { key: "aiMenuImport", label: "AI menu import", group: "Marketing & growth" , blurb: "Photograph a printed menu and have it typed up for you." },
   { key: "dataExport", label: "Data export (sales, orders, menu)", group: "Operations & back office" , blurb: "Download your sales, orders and menu as spreadsheets." },
   { key: "auditLog", label: "Audit log (who changed what)", group: "Operations & back office" , blurb: "A record of who changed what — voids, discounts, price edits, refunds." },
-  { key: "offline", label: "Offline mode (keep taking orders)", group: "Operations & back office" , blurb: "Keep taking orders when the internet drops; everything syncs once it's back." },
+  // Retired from sale. Shops that bought it, and plans that include it, keep
+  // it working — hasFeature() reads the plan and purchases, never this flag.
+  {
+    key: "offline",
+    label: "Offline mode (keep taking orders)",
+    group: "Operations & back office",
+    retired: true,
+    blurb: "Keep taking orders when the internet drops; everything syncs once it's back.",
+  },
   { key: "accounting", label: "Accounting (sales, VAT, P&L)", group: "Operations & back office" , blurb: "Sales, VAT and profit worked out for you, with expenses and cost of goods." },
   { key: "inventory", label: "Inventory, COGS, low-stock & reorder", group: "Operations & back office" , blurb: "Count stock, cost your recipes, and get told before you run out." },
   { key: "hr", label: "HR, attendance & payroll", group: "Operations & back office" , blurb: "Attendance, shifts and payroll for your staff." },
