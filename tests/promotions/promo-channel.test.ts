@@ -102,6 +102,42 @@ describe("the mechanics shown on the ordering website", () => {
   });
 });
 
+describe("the website card doesn't repeat itself", () => {
+  const promo = (extra = {}) => ({
+    id: "fd",
+    title: "Free Delivery",
+    description: null,
+    freeItemId: null,
+    type: "free_delivery",
+    value: 0,
+    minSpend: 0,
+    expiresAt: null,
+    code: "FREEDELIVERY",
+    channel: "online",
+    ...extra,
+  });
+
+  it("drops the lines the title, the code button and the website already say", () => {
+    const [shown] = storefrontPromos([promo()], new Map());
+    expect(shown.mechanics).toEqual([]);
+    expect(shown.code).toBe("FREEDELIVERY");
+  });
+
+  it("keeps the minimum order and the end date", () => {
+    const [shown] = storefrontPromos(
+      [promo({ minSpend: 30_000, expiresAt: "2026-12-31T15:00:00.000Z" })],
+      new Map(),
+      new Date("2026-10-16T00:00:00.000Z"),
+    );
+    expect(shown.mechanics).toEqual(["Minimum order of ₱300.00", "Valid until Dec 31, 2026"]);
+  });
+
+  it("keeps the offer when the title doesn't say it", () => {
+    const [shown] = storefrontPromos([promo({ title: "Weekend treat", type: "percent", value: 15 })], new Map());
+    expect(shown.mechanics).toEqual(["15% off"]);
+  });
+});
+
 describe("every redemption path checks the channel on the server", () => {
   it("the ordering website redeems as online", () => {
     expect(read("src/server/orders/web-order.ts")).toMatch(

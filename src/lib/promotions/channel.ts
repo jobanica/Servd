@@ -114,6 +114,31 @@ export function storefrontPromos(
       description: p.description,
       code: p.code ? p.code.toUpperCase() : null,
       imageUrl: p.imageUrl ?? null,
-      mechanics: promoMechanics(p, { freeItemName: p.freeItemId ? itemNames.get(p.freeItemId) : null, now }),
+      mechanics: websiteMechanics(p, itemNames, now),
     }));
+}
+
+/**
+ * The mechanics minus what the website card already says. The card shows the
+ * title and the code with its own button, and everyone there is ordering
+ * online, so these lines only repeat it:
+ *  - the offer, when the title already names it ("Free Delivery");
+ *  - "Online orders only" and "For delivery orders";
+ *  - "Use code X at checkout".
+ * What's left is what a customer could miss: the minimum order and the date.
+ */
+function websiteMechanics(
+  p: PromoForMechanics & { title: string; freeItemId: string | null },
+  itemNames: Map<string, string>,
+  now: Date,
+): string[] {
+  const title = p.title.toLowerCase();
+  const lines = promoMechanics(p, { freeItemName: p.freeItemId ? itemNames.get(p.freeItemId) : null, now });
+  return lines.filter((line, i) => {
+    if (i === 0 && p.type !== "info" && title.includes(line.toLowerCase())) return false;
+    if (line === "For delivery orders") return false;
+    if (line === "Online orders only (delivery & pickup)") return false;
+    if (line.startsWith("Use code ")) return false;
+    return true;
+  });
 }
