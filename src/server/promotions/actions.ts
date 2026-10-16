@@ -6,6 +6,7 @@ import { requireStaff } from "@/server/tenancy/current-user";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { pesosToCentavos } from "@/lib/money";
 import { normalizePromoChannel } from "@/lib/promotions/channel";
+import { uploadMenuImage } from "@/server/storage/menu-images";
 
 export type PromoFormState = { ok?: boolean; error?: string } | null;
 
@@ -80,6 +81,17 @@ export async function createPromotion(
   const minSpend = v.minSpendRaw ? pesosToCentavos(Number(v.minSpendRaw) || 0) : 0;
   const expiresAt = v.expiresAt ? new Date(v.expiresAt) : null;
 
+  // Optional photo, uploaded before the row so a failed upload saves nothing.
+  let imageUrl: string | null = null;
+  const image = formData.get("image");
+  if (image instanceof File && image.size > 0) {
+    try {
+      imageUrl = await uploadMenuImage(staff.restaurantId, image);
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "Couldn't upload the photo." };
+    }
+  }
+
   try {
     await tenantDb(staff.restaurantId, async (tx) => {
       // Enforce coupon-code uniqueness per restaurant (case-insensitive).
@@ -104,6 +116,7 @@ export async function createPromotion(
           minSpend,
           expiresAt,
           channel: normalizePromoChannel(formData.get("channel")),
+          imageUrl,
         },
       });
     });
@@ -158,4 +171,27 @@ export async function setPromotionChannel(formData: FormData): Promise<void> {
     }),
   );
   revalidatePath("/admin/promotions");
+}
+
+/** Add, change or remove an existing promotion's photo. */
+export async function setPromotionImage(formData: FormData): Promise<{ error?: string }> {
+  const staff = await requireStaff(["admin", "manager"]);
+  const id = String(formData.get("id") ?? "");
+  let imageUrl: string | null;
+  if (formData.get("remove") === "1") {
+    imageUrl = null;
+  } else {
+    const file = formData.get("image");
+    if (!(file instanceof File) || file.size === 0) return { error: "Choose a photo." };
+    try {
+      imageUrl = await uploadMenuImage(staff.restaurantId, file);
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "Couldn't upload the photo." };
+    }
+  }
+  await tenantDb(staff.restaurantId, (tx) =>
+    tx.promotion.updateMany({ where: { id, restaurantId: staff.restaurantId }, data: { imageUrl } }),
+  );
+  revalidatePath("/admin/promotions");
+  return {};
 }

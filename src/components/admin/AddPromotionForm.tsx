@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { createPromotion, type PromoFormState } from "@/server/promotions/actions";
 import { SubmitButton } from "./SubmitButton";
+import { ImageField } from "./ImageField";
 import { PROMO_CHANNEL_OPTIONS } from "@/lib/promotions/channel";
 
 type MenuItemOpt = { id: string; name: string };
@@ -20,11 +21,14 @@ export function AddPromotionForm({ menuItems }: { menuItems: MenuItemOpt[] }) {
   const [state, action] = useActionState<PromoFormState, FormData>(createPromotion, null);
   const formRef = useRef<HTMLFormElement>(null);
   const [type, setType] = useState("percent");
+  // Remounts the photo picker after a save so its preview clears with the form.
+  const [photoKey, setPhotoKey] = useState(0);
 
   useEffect(() => {
     if (state?.ok) {
       formRef.current?.reset();
       setType("percent");
+      setPhotoKey((k) => k + 1);
     }
   }, [state]);
 
@@ -135,6 +139,8 @@ export function AddPromotionForm({ menuItems }: { menuItems: MenuItemOpt[] }) {
           className={input}
         />
       </div>
+
+      <ImageField key={photoKey} name="image" label="Photo (optional) — shown with the promo on your website" />
 
       <div className="flex items-center gap-3">
         <SubmitButton pendingLabel="Saving…">Add promotion</SubmitButton>

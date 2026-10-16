@@ -159,3 +159,30 @@ describe("the owner sets it, and the website shows it", () => {
     expect(read("src/components/site/WebOrder.tsx")).toMatch(/p\.mechanics\.map/);
   });
 });
+
+describe("a promotion's photo", () => {
+  it("is read with the promo and passed to the website card", () => {
+    expect(read("src/server/promotions/queries.ts")).toMatch(/imageUrl: true,/);
+    const [shown] = storefrontPromos(
+      [{ id: "a", title: "Sale", description: null, freeItemId: null, type: "percent", value: 10, minSpend: 0, expiresAt: null, code: "X", imageUrl: "https://img/x.jpg" }],
+      new Map(),
+    );
+    expect(shown.imageUrl).toBe("https://img/x.jpg");
+    expect(read("src/components/site/WebOrder.tsx")).toMatch(/<img src=\{p\.imageUrl\}/);
+    expect(read("src/components/diner/DinerMenu.tsx")).toMatch(/<img src=\{p\.imageUrl\}/);
+  });
+
+  it("can be added when creating a promo, and added, changed or removed later", () => {
+    expect(read("src/components/admin/AddPromotionForm.tsx")).toMatch(/<ImageField key=\{photoKey\} name="image"/);
+    const actions = read("src/server/promotions/actions.ts");
+    expect(actions).toMatch(/imageUrl = await uploadMenuImage\(staff\.restaurantId, image\)/);
+    expect(actions).toMatch(/export async function setPromotionImage/);
+    // Scoped to the owner's own restaurant.
+    expect(actions).toMatch(/where: \{ id, restaurantId: staff\.restaurantId \}, data: \{ imageUrl \}/);
+    expect(read("src/app/(platform)/admin/promotions/page.tsx")).toMatch(/<PromoPhoto id=\{p\.id\}/);
+  });
+
+  it("is shrunk on the phone before upload", () => {
+    expect(read("src/components/admin/PromoPhoto.tsx")).toMatch(/compressImageFile\(file\)/);
+  });
+});

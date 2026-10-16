@@ -2131,6 +2131,9 @@ model Promotion {
   /// (delivery & pickup), "dine_in" = in the restaurant (QR menu & bill).
   /// Added by prisma/manual/add-promotion-channel.sql.
   channel      String?
+  /// Photo shown with the promo on the website and table menu.
+  /// Added by prisma/manual/add-promotion-image.sql.
+  imageUrl     String?
   active       Boolean   @default(true)
   sortOrder    Int       @default(0)
   createdAt    DateTime  @default(now())

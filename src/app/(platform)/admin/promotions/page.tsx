@@ -6,6 +6,7 @@ import { getMenu } from "@/server/menu/queries";
 import { deletePromotion, togglePromotion } from "@/server/promotions/actions";
 import { AddPromotionForm } from "@/components/admin/AddPromotionForm";
 import { PromoChannelSelect } from "@/components/admin/PromoChannelSelect";
+import { PromoPhoto } from "@/components/admin/PromoPhoto";
 import { channelBadge } from "@/lib/promotions/channel";
 import { offerSummary } from "@/lib/promotions/compute";
 import { formatPeso } from "@/lib/money";
@@ -55,6 +56,7 @@ export default async function PromotionsPage() {
                 key={p.id}
                 className="flex items-start gap-3 rounded-tile border border-plum-ink/10 bg-white px-4 py-3"
               >
+                <PromoPhoto id={p.id} title={p.title} imageUrl={p.imageUrl} />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-heading font-bold">{p.title}</span>

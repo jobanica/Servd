@@ -39,6 +39,7 @@ interface PromoItem {
   freeItemId: string | null;
   minSpend: number;
   channel?: string | null;
+  imageUrl?: string | null;
 }
 
 /** Product card — image, "+" affordance, price pill, name. */
@@ -704,23 +705,29 @@ export function DinerMenu({
             ) : (
               <ul className="mt-4 space-y-3">
                 {promotions.map((p) => (
-                  <li key={p.id} className="rounded-tile border border-brand-primary/20 bg-brand-primary/5 p-4">
-                    <p className="font-heading font-bold text-brand-ink">{p.title}</p>
-                    {channelBadge(p.channel ?? null) && (
-                      <p className="mt-1 text-xs font-semibold text-brand-primary">{channelBadge(p.channel ?? null)}</p>
+                  <li key={p.id} className="overflow-hidden rounded-tile border border-brand-primary/20 bg-brand-primary/5">
+                    {p.imageUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={p.imageUrl} alt={p.title} loading="lazy" className="aspect-[2/1] w-full object-cover" />
                     )}
-                    {p.description && (
-                      <p className="mt-1 text-sm text-brand-ink/65">{p.description}</p>
-                    )}
-                    {p.code && (
-                      <p className="mt-2 text-sm text-brand-ink/70">
-                        Use code{" "}
-                        <span className="rounded-md bg-white px-2 py-0.5 font-mono font-bold text-brand-primary">
-                          {p.code}
-                        </span>{" "}
-                        at checkout
-                      </p>
-                    )}
+                    <div className="p-4">
+                      <p className="font-heading font-bold text-brand-ink">{p.title}</p>
+                      {channelBadge(p.channel ?? null) && (
+                        <p className="mt-1 text-xs font-semibold text-brand-primary">{channelBadge(p.channel ?? null)}</p>
+                      )}
+                      {p.description && (
+                        <p className="mt-1 text-sm text-brand-ink/65">{p.description}</p>
+                      )}
+                      {p.code && (
+                        <p className="mt-2 text-sm text-brand-ink/70">
+                          Use code{" "}
+                          <span className="rounded-md bg-white px-2 py-0.5 font-mono font-bold text-brand-primary">
+                            {p.code}
+                          </span>{" "}
+                          at checkout
+                        </p>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>

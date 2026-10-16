@@ -85,6 +85,7 @@ export interface StorefrontPromo {
   description: string | null;
   /** Upper-cased, or null for an info-only promo. */
   code: string | null;
+  imageUrl: string | null;
   mechanics: string[];
 }
 
@@ -94,7 +95,13 @@ export interface StorefrontPromo {
  * "Free Halo-halo" rather than "Free item".
  */
 export function storefrontPromos(
-  promos: (PromoForMechanics & { id: string; title: string; description: string | null; freeItemId: string | null })[],
+  promos: (PromoForMechanics & {
+    id: string;
+    title: string;
+    description: string | null;
+    freeItemId: string | null;
+    imageUrl?: string | null;
+  })[],
   itemNames: Map<string, string>,
   now: Date = new Date(),
 ): StorefrontPromo[] {
@@ -106,6 +113,7 @@ export function storefrontPromos(
       title: p.title,
       description: p.description,
       code: p.code ? p.code.toUpperCase() : null,
+      imageUrl: p.imageUrl ?? null,
       mechanics: promoMechanics(p, { freeItemName: p.freeItemId ? itemNames.get(p.freeItemId) : null, now }),
     }));
 }

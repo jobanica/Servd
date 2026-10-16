@@ -16,6 +16,7 @@ export interface Promotion {
   sortOrder: number;
   /** null = everywhere, "online" or "dine_in". */
   channel: string | null;
+  imageUrl: string | null;
 }
 
 const SELECT = {
@@ -31,6 +32,7 @@ const SELECT = {
   active: true,
   sortOrder: true,
   channel: true,
+  imageUrl: true,
 } as const;
 
 /** All promotions for the admin (active + inactive). Resilient to a missing table. */

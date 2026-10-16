@@ -1487,31 +1487,37 @@ export function WebOrder(props: WebOrderProps) {
             <h2 className="mb-2 font-heading text-lg font-extrabold text-plum-ink">🎉 Promos</h2>
             <div className="space-y-3">
               {props.promotions!.map((p) => (
-                <div key={p.id} className="rounded-2xl border border-brand-primary/20 bg-brand-primary/5 p-4">
-                  <p className="font-heading text-base font-bold text-plum-ink">{p.title}</p>
-                  {p.description && <p className="mt-0.5 text-sm text-plum-ink/65">{p.description}</p>}
-                  {p.mechanics.length > 0 && (
-                    <ul className="mt-2 list-disc space-y-0.5 pl-5 text-sm text-plum-ink/75">
-                      {p.mechanics.map((m) => (
-                        <li key={m}>{m}</li>
-                      ))}
-                    </ul>
+                <div key={p.id} className="overflow-hidden rounded-2xl border border-brand-primary/20 bg-brand-primary/5">
+                  {p.imageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={p.imageUrl} alt={p.title} loading="lazy" className="aspect-[2/1] w-full object-cover" />
                   )}
-                  {p.code && (
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <span className="rounded-md bg-white px-2 py-1 font-mono text-sm font-bold text-brand-primary">{p.code}</span>
-                      <button
-                        type="button"
-                        onClick={() => takeOfferCode(p.code!)}
-                        className="rounded-full bg-brand-primary px-3 py-1 text-xs font-semibold text-white"
-                      >
-                        {pickedPromoCode === p.code ? "✓ Code added" : "Use code"}
-                      </button>
-                      {pickedPromoCode === p.code && (
-                        <span className="text-xs text-plum-ink/55">Tap Apply at checkout.</span>
-                      )}
-                    </div>
-                  )}
+                  <div className="p-4">
+                    <p className="font-heading text-base font-bold text-plum-ink">{p.title}</p>
+                    {p.description && <p className="mt-0.5 text-sm text-plum-ink/65">{p.description}</p>}
+                    {p.mechanics.length > 0 && (
+                      <ul className="mt-2 list-disc space-y-0.5 pl-5 text-sm text-plum-ink/75">
+                        {p.mechanics.map((m) => (
+                          <li key={m}>{m}</li>
+                        ))}
+                      </ul>
+                    )}
+                    {p.code && (
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <span className="rounded-md bg-white px-2 py-1 font-mono text-sm font-bold text-brand-primary">{p.code}</span>
+                        <button
+                          type="button"
+                          onClick={() => takeOfferCode(p.code!)}
+                          className="rounded-full bg-brand-primary px-3 py-1 text-xs font-semibold text-white"
+                        >
+                          {pickedPromoCode === p.code ? "✓ Code added" : "Use code"}
+                        </button>
+                        {pickedPromoCode === p.code && (
+                          <span className="text-xs text-plum-ink/55">Tap Apply at checkout.</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
