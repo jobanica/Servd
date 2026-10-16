@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildTicket, ticketLines, ticketServiceLine, WIDTH, type TicketSource } from "@/lib/printing/ticket";
-import { groupByBatch, stripBatchTag, isAsapAddress, normalizeDeliveryWindows } from "@/lib/orders/delivery-windows";
+import { groupByBatch, stripBatchTag, isAsapAddress, normalizeDeliveryWindows, visibleBatches } from "@/lib/orders/delivery-windows";
 
 /**
  * Delivery batches end to end: the customer's pick is re-checked by the order
@@ -181,5 +181,29 @@ describe("ASAP beside the batches", () => {
     // Only a label: it can't be picked until the store opens.
     const block = web.slice(web.indexOf("{asapLater && ("), web.indexOf("available once we"));
     expect(block).not.toMatch(/onClick/);
+  });
+});
+
+describe("the delivery-time picker", () => {
+  const day = Array.from({ length: 10 }, (_, i) => ({ start: `b${i}` }));
+
+  it("shows the nearest 4 batches until the customer asks for all", () => {
+    expect(visibleBatches(day, "b0", false).map((b) => b.start)).toEqual(["b0", "b1", "b2", "b3"]);
+    expect(visibleBatches(day, "b0", true)).toHaveLength(10);
+  });
+
+  it("keeps a later pick on screen when the list is folded", () => {
+    expect(visibleBatches(day, "b8", false).map((b) => b.start)).toEqual(["b0", "b1", "b2", "b3", "b8"]);
+  });
+
+  it("has nothing to fold on a short day", () => {
+    expect(visibleBatches(day.slice(0, 3), null, false)).toHaveLength(3);
+  });
+
+  it("offers Show all only when there are more than 4", () => {
+    const web = read("src/components/site/WebOrder.tsx");
+    expect(web).toMatch(/visibleBatches\(openBatchList, effectiveBatch, allBatches\)/);
+    expect(web).toMatch(/openBatchList\.length > NEAREST_BATCHES &&/);
+    expect(web).toMatch(/Show all times/);
   });
 });

@@ -24,7 +24,7 @@ import { LocationPicker } from "./LocationPicker";
 import { WebOrderTracker } from "./WebOrderTracker";
 import { haversineKm, computeDistanceFee } from "@/lib/geo/distance";
 import { computePackagingFee, packagedUnits } from "@/lib/pricing/packaging";
-import { ASAP, batchLabel, openBatches, type DeliveryWindowsConfig } from "@/lib/orders/delivery-windows";
+import { ASAP, batchLabel, openBatches, visibleBatches, NEAREST_BATCHES, type DeliveryWindowsConfig } from "@/lib/orders/delivery-windows";
 import { PoweredByServd } from "@/components/branding/PoweredByServd";
 import type { StorefrontPromo } from "@/lib/promotions/channel";
 
@@ -561,6 +561,8 @@ export function WebOrder(props: WebOrderProps) {
     [batchesConfigured, dcfg?.windows, batchClock],
   );
   const [chosenBatch, setChosenBatch] = useState<string | null>(null);
+  // Only the nearest few batches until the customer asks for the whole day.
+  const [allBatches, setAllBatches] = useState(false);
   // The customer's pick while it's still open; otherwise the earliest open
   // batch. If their pick closed under them, say so rather than moving it
   // silently.
@@ -904,7 +906,7 @@ export function WebOrder(props: WebOrderProps) {
                 ) : (
                   <>
                     <div className="grid grid-cols-2 gap-1.5">
-                      {openBatchList.map((b) => (
+                      {visibleBatches(openBatchList, effectiveBatch, allBatches).map((b) => (
                         <button
                           key={b.start}
                           type="button"
@@ -919,6 +921,15 @@ export function WebOrder(props: WebOrderProps) {
                         </button>
                       ))}
                     </div>
+                    {openBatchList.length > NEAREST_BATCHES && (
+                      <button
+                        type="button"
+                        onClick={() => setAllBatches((v) => !v)}
+                        className="mt-1.5 w-full rounded-md py-1.5 text-xs font-semibold text-brand-primary"
+                      >
+                        {allBatches ? "Show fewer times" : `Show all times (${openBatchList.length - NEAREST_BATCHES} more)`}
+                      </button>
+                    )}
                     {batchMovedOn && (
                       <p className="mt-1.5 px-1 text-xs font-semibold text-red-600">
                         That time just closed — we&apos;ve moved you to the next batch.

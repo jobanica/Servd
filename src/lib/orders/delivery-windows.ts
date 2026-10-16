@@ -256,3 +256,22 @@ export function groupByBatch<T extends { deliveryWindowStart: string | null; del
   );
   return loose.length ? [{ start: null, label: null, orders: loose }, ...batches] : batches;
 }
+
+/** How many upcoming batches the ordering page shows before "Show all times". */
+export const NEAREST_BATCHES = 4;
+
+/**
+ * The batches to show: the nearest few, or all of them once the customer asks.
+ * A pick further down the day stays on screen after the list is folded.
+ */
+export function visibleBatches<T extends { start: string }>(
+  list: T[],
+  chosen: string | null,
+  showAll: boolean,
+  count: number = NEAREST_BATCHES,
+): T[] {
+  if (showAll || list.length <= count) return list;
+  const shown = list.slice(0, count);
+  const picked = chosen ? list.find((b) => b.start === chosen) : undefined;
+  return picked && !shown.includes(picked) ? [...shown, picked] : shown;
+}
