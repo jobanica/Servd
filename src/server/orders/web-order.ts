@@ -287,7 +287,7 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
   let discountLabel: string | null = null;
   if (d.couponCode) {
     try {
-      const promo = await resolvePromo(restaurant.id, d.couponCode, built, deliveryFee);
+      const promo = await resolvePromo(restaurant.id, d.couponCode, built, deliveryFee, "online");
       if (promo && promo.amount > 0) {
         discountAmount = Math.min(promo.amount, built.total + deliveryFee); // never below 0
         discountLabel = promo.label;

@@ -26,6 +26,7 @@ import { haversineKm, computeDistanceFee } from "@/lib/geo/distance";
 import { computePackagingFee, packagedUnits } from "@/lib/pricing/packaging";
 import { ASAP, batchLabel, openBatches, type DeliveryWindowsConfig } from "@/lib/orders/delivery-windows";
 import { PoweredByServd } from "@/components/branding/PoweredByServd";
+import type { StorefrontPromo } from "@/lib/promotions/channel";
 
 function lineId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -71,6 +72,8 @@ export interface WebOrderProps {
   coverImageUrl?: string | null;
   rating?: { count: number; average: number | null } | null;
   categories: DinerCategory[];
+  /** Online promos with their mechanics (server-built; dine-in-only ones never reach here). */
+  promotions?: StorefrontPromo[];
   contact?: { address: string | null; phone: string | null };
   loyalty?: LoyaltyInfo | null;
   /** The owner stopped online orders by hand. Beats the clock. */
@@ -459,6 +462,15 @@ export function WebOrder(props: WebOrderProps) {
   const [coupon, setCoupon] = useState("");
   const [couponBusy, setCouponBusy] = useState(false);
   const [couponError, setCouponError] = useState<string | null>(null);
+  // The promo whose "Use code" was tapped — its code waits in the coupon box.
+  const [pickedPromoCode, setPickedPromoCode] = useState<string | null>(null);
+  function takeOfferCode(code: string) {
+    setCoupon(code);
+    setCouponOpen(true);
+    setAppliedPromo(null);
+    setCouponError(null);
+    setPickedPromoCode(code);
+  }
   const [appliedPromo, setAppliedPromo] = useState<{ code: string; amount: number; label: string } | null>(null);
   // Customer's agreement to pay the rider directly (required when the fee isn't
   // collected in-app).
@@ -635,6 +647,7 @@ export function WebOrder(props: WebOrderProps) {
       code,
       lines: lines.map((l) => ({ itemId: l.itemId, quantity: l.quantity, modifierIds: l.modifiers.map((m) => m.modifierId), variantId: l.variantId })),
       deliveryFee: orderType === "delivery" ? deliveryFee : 0,
+      where: "online",
     });
     setCouponBusy(false);
     if (res.ok) setAppliedPromo({ code, amount: res.amount, label: res.label });
@@ -1468,6 +1481,43 @@ export function WebOrder(props: WebOrderProps) {
 
       {/* Menu */}
       <main id="menu" className="px-5 pb-28 pt-4">
+        {/* Online promos — what each one is and how it works, before ordering. */}
+        {!q && (props.promotions?.length ?? 0) > 0 && (
+          <section aria-label="Promos" className="mb-5">
+            <h2 className="mb-2 font-heading text-lg font-extrabold text-plum-ink">🎉 Promos</h2>
+            <div className="space-y-3">
+              {props.promotions!.map((p) => (
+                <div key={p.id} className="rounded-2xl border border-brand-primary/20 bg-brand-primary/5 p-4">
+                  <p className="font-heading text-base font-bold text-plum-ink">{p.title}</p>
+                  {p.description && <p className="mt-0.5 text-sm text-plum-ink/65">{p.description}</p>}
+                  {p.mechanics.length > 0 && (
+                    <ul className="mt-2 list-disc space-y-0.5 pl-5 text-sm text-plum-ink/75">
+                      {p.mechanics.map((m) => (
+                        <li key={m}>{m}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {p.code && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <span className="rounded-md bg-white px-2 py-1 font-mono text-sm font-bold text-brand-primary">{p.code}</span>
+                      <button
+                        type="button"
+                        onClick={() => takeOfferCode(p.code!)}
+                        className="rounded-full bg-brand-primary px-3 py-1 text-xs font-semibold text-white"
+                      >
+                        {pickedPromoCode === p.code ? "✓ Code added" : "Use code"}
+                      </button>
+                      {pickedPromoCode === p.code && (
+                        <span className="text-xs text-plum-ink/55">Tap Apply at checkout.</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Loyalty promo card */}
         {loyalty?.enabled && (
           <div className="mb-4 overflow-hidden rounded-2xl bg-gradient-to-r from-red-600 to-orange-500 p-4 text-white shadow-sm">

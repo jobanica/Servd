@@ -3,6 +3,7 @@
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { buildValidatedOrder, OrderValidationError } from "@/server/orders/build-order";
 import { computePromo, type PromoRule } from "@/lib/promotions/compute";
+import { promoAppliesTo, wrongChannelMessage, type PromoWhere } from "@/lib/promotions/channel";
 
 /**
  * Coupon redemption — shared by the diner "Apply code" preview and the
@@ -34,6 +35,7 @@ export async function findPromoByCode(restaurantId: string, code: string) {
           freeItemId: true,
           minSpend: true,
           expiresAt: true,
+          channel: true,
         },
       }),
     );
@@ -56,9 +58,12 @@ export async function resolvePromo(
   code: string,
   built: Built,
   deliveryFee = 0,
+  where: PromoWhere = "online",
 ): Promise<ResolvedPromo | null> {
   const promo = await findPromoByCode(restaurantId, code);
   if (!promo) return null;
+  // An online-only code never discounts a dine-in order, and vice versa.
+  if (!promoAppliesTo(promo.channel, where)) return null;
   const rule: PromoRule = {
     type: promo.type,
     value: promo.value,
@@ -91,6 +96,8 @@ export async function previewPromoCode(input: {
   code: string;
   lines: { itemId: string; quantity: number; modifierIds?: string[]; variantId?: string }[];
   deliveryFee?: number; // centavos — so free-delivery codes can be previewed on a delivery order
+  /** Where the cart is being ordered: the ordering website or a table's QR menu. */
+  where?: PromoWhere;
 }): Promise<PreviewResult> {
   const code = (input.code ?? "").trim();
   if (!code) return { ok: false, error: "Enter a code." };
@@ -102,6 +109,9 @@ export async function previewPromoCode(input: {
 
   const promo = await findPromoByCode(restaurant.id, code);
   if (!promo) return { ok: false, error: "That code isn't valid or has expired." };
+  if (!promoAppliesTo(promo.channel, input.where === "dine_in" ? "dine_in" : "online")) {
+    return { ok: false, error: wrongChannelMessage(promo.channel) };
+  }
 
   let built: Built;
   try {

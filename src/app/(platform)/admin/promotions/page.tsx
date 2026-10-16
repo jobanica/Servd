@@ -5,6 +5,8 @@ import { getPromotions } from "@/server/promotions/queries";
 import { getMenu } from "@/server/menu/queries";
 import { deletePromotion, togglePromotion } from "@/server/promotions/actions";
 import { AddPromotionForm } from "@/components/admin/AddPromotionForm";
+import { PromoChannelSelect } from "@/components/admin/PromoChannelSelect";
+import { channelBadge } from "@/lib/promotions/channel";
 import { offerSummary } from "@/lib/promotions/compute";
 import { formatPeso } from "@/lib/money";
 import { manilaDate } from "@/lib/time/manila";
@@ -27,8 +29,10 @@ export default async function PromotionsPage() {
         </Link>
         <h1 className="font-heading text-2xl font-bold">Promotions</h1>
         <p className="text-sm text-plum-ink/50">
-          Create coupon offers customers redeem at checkout with a code. Active ones show in the
-          diner app under <strong>Promos</strong>.
+          Create coupon offers customers redeem at checkout with a code. Choose where each one
+          applies: everywhere, online orders only (delivery &amp; pickup), or dine-in only. Online
+          promos are shown with their mechanics on your ordering website; dine-in promos show in
+          the table menu under <strong>Promos</strong>.
         </p>
       </div>
 
@@ -64,6 +68,11 @@ export default async function PromotionsPage() {
                         {p.code}
                       </span>
                     )}
+                    {channelBadge(p.channel) && (
+                      <span className="rounded-full bg-plum-ink/5 px-2 py-0.5 text-xs font-semibold text-plum-ink/70">
+                        {channelBadge(p.channel)}
+                      </span>
+                    )}
                     {!p.active && (
                       <span className="rounded-full bg-plum-ink/5 px-2 py-0.5 text-xs font-semibold text-plum-ink/50">
                         Cancelled
@@ -80,6 +89,9 @@ export default async function PromotionsPage() {
                     {p.minSpend > 0 && `Min spend ${formatPeso(p.minSpend)} · `}
                     {p.expiresAt && `Expires ${manilaDate(p.expiresAt)}`}
                   </p>
+                  <div className="mt-2">
+                    <PromoChannelSelect id={p.id} channel={p.channel} />
+                  </div>
                 </div>
                 <form action={togglePromotion}>
                   <input type="hidden" name="id" value={p.id} />

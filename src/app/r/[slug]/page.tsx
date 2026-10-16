@@ -7,6 +7,7 @@ import { getPublicRatingStats } from "@/server/feedback/queries";
 import { hasFeature } from "@/server/billing/feature-gate";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { WebOrder } from "@/components/site/WebOrder";
+import { getStorefrontPromos } from "@/server/promotions/storefront";
 import { storefrontMetadata } from "@/lib/site/metadata";
 import { getServdBranding } from "@/server/branding/powered-by";
 
@@ -52,6 +53,9 @@ export default async function RestaurantSite({
     getServdBranding(restaurant.id),
   ]);
 
+  // After the menu: the promo cards name the free item from it.
+  const promotions = await getStorefrontPromos(restaurant.id, categories);
+
   return (
     <WebOrder
       slug={slug}
@@ -60,6 +64,7 @@ export default async function RestaurantSite({
       coverImageUrl={restaurant.coverImageUrl}
       rating={rating}
       categories={categories}
+      promotions={promotions}
       contact={contact}
       loyalty={loyalty}
       hours={sf.hours}

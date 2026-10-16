@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireStaff } from "@/server/tenancy/current-user";
 import { tenantDb } from "@/server/tenancy/scoped-db";
 import { pesosToCentavos } from "@/lib/money";
+import { normalizePromoChannel } from "@/lib/promotions/channel";
 
 export type PromoFormState = { ok?: boolean; error?: string } | null;
 
@@ -102,6 +103,7 @@ export async function createPromotion(
           freeItemId: v.type === "free_item" || v.type === "bogo" ? v.freeItemId || null : null,
           minSpend,
           expiresAt,
+          channel: normalizePromoChannel(formData.get("channel")),
         },
       });
     });
@@ -140,6 +142,19 @@ export async function togglePromotion(formData: FormData): Promise<void> {
     tx.promotion.updateMany({
       where: { id, restaurantId: staff.restaurantId },
       data: { active: !active },
+    }),
+  );
+  revalidatePath("/admin/promotions");
+}
+
+/** Change where an existing promotion can be used (everywhere / online / dine-in). */
+export async function setPromotionChannel(formData: FormData): Promise<void> {
+  const staff = await requireStaff(["admin", "manager"]);
+  const id = String(formData.get("id") ?? "");
+  await tenantDb(staff.restaurantId, (tx) =>
+    tx.promotion.updateMany({
+      where: { id, restaurantId: staff.restaurantId },
+      data: { channel: normalizePromoChannel(formData.get("channel")) },
     }),
   );
   revalidatePath("/admin/promotions");

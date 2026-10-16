@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { createPromotion, type PromoFormState } from "@/server/promotions/actions";
 import { SubmitButton } from "./SubmitButton";
+import { PROMO_CHANNEL_OPTIONS } from "@/lib/promotions/channel";
 
 type MenuItemOpt = { id: string; name: string };
 
@@ -109,6 +110,16 @@ export function AddPromotionForm({ menuItems }: { menuItems: MenuItemOpt[] }) {
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
+          <label className={label}>Where it applies</label>
+          <select name="channel" defaultValue="" className={input}>
+            {PROMO_CHANNEL_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
           <label className={label}>Expires (optional)</label>
           <input name="expiresAt" type="date" className={input} />
         </div>
@@ -120,7 +131,7 @@ export function AddPromotionForm({ menuItems }: { menuItems: MenuItemOpt[] }) {
           name="description"
           rows={2}
           maxLength={300}
-          placeholder="Dine-in only. Cannot be combined with other offers."
+          placeholder="Cannot be combined with other offers."
           className={input}
         />
       </div>

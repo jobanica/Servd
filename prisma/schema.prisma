@@ -2127,6 +2127,10 @@ model Promotion {
   freeItemId   String? // menu item for free_item / bogo
   minSpend     Int       @default(0) // centavos: minimum order subtotal to qualify
   expiresAt    DateTime? // optional auto-expiry
+  /// Where it can be used: null = everywhere, "online" = the ordering website
+  /// (delivery & pickup), "dine_in" = in the restaurant (QR menu & bill).
+  /// Added by prisma/manual/add-promotion-channel.sql.
+  channel      String?
   active       Boolean   @default(true)
   sortOrder    Int       @default(0)
   createdAt    DateTime  @default(now())

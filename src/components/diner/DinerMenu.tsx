@@ -10,6 +10,7 @@ import { useCart } from "@/lib/cart/useCart";
 import type { CartLine, DinerCategory, DinerItem } from "@/lib/cart/types";
 import { placeOrder } from "@/server/orders/place-order";
 import { previewPromoCode } from "@/server/promotions/redeem";
+import { channelBadge } from "@/lib/promotions/channel";
 import type { PlaceOrderResult } from "@/lib/validation/order";
 import { ItemModal } from "./ItemModal";
 import { CartDrawer } from "./CartDrawer";
@@ -37,6 +38,7 @@ interface PromoItem {
   value: number;
   freeItemId: string | null;
   minSpend: number;
+  channel?: string | null;
 }
 
 /** Product card — image, "+" affordance, price pill, name. */
@@ -291,6 +293,7 @@ export function DinerMenu({
           modifierIds: l.modifiers.map((m) => m.modifierId),
           variantId: l.variantId,
         })),
+        where: "dine_in",
       });
       if (res.ok) {
         setAppliedPromo({ label: res.label, amount: res.amount });
@@ -703,6 +706,9 @@ export function DinerMenu({
                 {promotions.map((p) => (
                   <li key={p.id} className="rounded-tile border border-brand-primary/20 bg-brand-primary/5 p-4">
                     <p className="font-heading font-bold text-brand-ink">{p.title}</p>
+                    {channelBadge(p.channel ?? null) && (
+                      <p className="mt-1 text-xs font-semibold text-brand-primary">{channelBadge(p.channel ?? null)}</p>
+                    )}
                     {p.description && (
                       <p className="mt-1 text-sm text-brand-ink/65">{p.description}</p>
                     )}

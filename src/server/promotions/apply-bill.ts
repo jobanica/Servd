@@ -6,6 +6,7 @@ import { notifyOrdersChanged } from "@/server/realtime/notify";
 import { findPromoByCode } from "@/server/promotions/redeem";
 import { getActivePromotions } from "@/server/promotions/queries";
 import { computePromo, offerSummary } from "@/lib/promotions/compute";
+import { promoAppliesTo, wrongChannelMessage } from "@/lib/promotions/channel";
 
 /**
  * Diner-applied coupon at the bill stage (dine-in, after eating). No session —
@@ -80,7 +81,7 @@ export async function listRedeemableCodes(input: {
   );
   if (!restaurant) return [];
 
-  const promos = await getActivePromotions(restaurant.id);
+  const promos = await getActivePromotions(restaurant.id, "dine_in");
   return promos
     .filter((p) => p.code && p.type !== "info")
     .map((p) => ({
@@ -109,6 +110,9 @@ export async function applyBillPromo(input: {
 
   const promo = await findPromoByCode(ctx.restaurantId, code);
   if (!promo) return { ok: false, error: "That code isn't valid or has expired." };
+  if (!promoAppliesTo(promo.channel, "dine_in")) {
+    return { ok: false, error: wrongChannelMessage(promo.channel) };
+  }
 
   const orders = await outstandingOrders(ctx.restaurantId, ctx.tableId);
   if (orders.length === 0) return { ok: false, error: "Nothing to pay right now." };

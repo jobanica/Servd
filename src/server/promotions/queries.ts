@@ -1,5 +1,6 @@
 import "server-only";
 import { tenantDb, systemDb } from "@/server/tenancy/scoped-db";
+import { promoAppliesTo, type PromoWhere } from "@/lib/promotions/channel";
 
 export interface Promotion {
   id: string;
@@ -13,6 +14,8 @@ export interface Promotion {
   expiresAt: Date | null;
   active: boolean;
   sortOrder: number;
+  /** null = everywhere, "online" or "dine_in". */
+  channel: string | null;
 }
 
 const SELECT = {
@@ -27,6 +30,7 @@ const SELECT = {
   expiresAt: true,
   active: true,
   sortOrder: true,
+  channel: true,
 } as const;
 
 /** All promotions for the admin (active + inactive). Resilient to a missing table. */
@@ -44,10 +48,14 @@ export async function getPromotions(restaurantId: string): Promise<Promotion[]> 
   }
 }
 
-/** Active, non-expired promotions for the diner app. Resilient to a missing table. */
-export async function getActivePromotions(restaurantId: string): Promise<Promotion[]> {
+/** Active, non-expired promotions for the diner app. Resilient to a missing table.
+ * Pass `where` to keep only the promos that apply there (online or dine-in). */
+export async function getActivePromotions(
+  restaurantId: string,
+  where?: PromoWhere,
+): Promise<Promotion[]> {
   try {
-    return await systemDb((tx) =>
+    const rows = await systemDb((tx) =>
       tx.promotion.findMany({
         where: {
           restaurantId,
@@ -58,6 +66,7 @@ export async function getActivePromotions(restaurantId: string): Promise<Promoti
         select: SELECT,
       }),
     );
+    return where ? rows.filter((p) => promoAppliesTo(p.channel, where)) : rows;
   } catch {
     return [];
   }

@@ -37,7 +37,7 @@ export default async function DinerOrderPage({
   const locale = await getLocale();
   const [categories, promotions, loyalty, loyaltyOk, promoOk, rating, branding] = await Promise.all([
     getPublicMenu(restaurant.id, locale),
-    getActivePromotions(restaurant.id),
+    getActivePromotions(restaurant.id, "dine_in"),
     getLoyaltyConfig(restaurant.id),
     hasFeature(restaurant.id, "loyalty"),
     hasFeature(restaurant.id, "promotions"),

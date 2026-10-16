@@ -29,7 +29,7 @@ export default async function SiteTablePage({
   const locale = await getLocale();
   const [categories, promotions, loyalty, rating, branding] = await Promise.all([
     getPublicMenu(restaurant.id, locale),
-    getActivePromotions(restaurant.id),
+    getActivePromotions(restaurant.id, "dine_in"),
     getLoyaltyConfig(restaurant.id),
     getPublicRatingStats(restaurant.id),
     getServdBranding(restaurant.id),

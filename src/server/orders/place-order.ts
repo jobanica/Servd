@@ -70,7 +70,7 @@ export async function placeOrder(
   // Apply a coupon code if given — recomputed server-side, never trusted.
   let discount: { amount: number; label: string } | null = null;
   if (couponCode?.trim()) {
-    const resolved = await resolvePromo(ctx.restaurantId, couponCode, built, 0);
+    const resolved = await resolvePromo(ctx.restaurantId, couponCode, built, 0, "dine_in");
     if (resolved) discount = { amount: resolved.amount, label: resolved.label };
   }
 

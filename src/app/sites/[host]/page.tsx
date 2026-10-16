@@ -6,6 +6,7 @@ import { getPublicStorefront, isOpenNow } from "@/server/storefront/storefront";
 import { getPublicRatingStats } from "@/server/feedback/queries";
 import { systemDb } from "@/server/tenancy/scoped-db";
 import { WebOrder } from "@/components/site/WebOrder";
+import { getStorefrontPromos } from "@/server/promotions/storefront";
 import { storefrontMetadata } from "@/lib/site/metadata";
 import { getServdBranding } from "@/server/branding/powered-by";
 
@@ -39,6 +40,9 @@ export default async function SiteHomePage({
   ]);
   const c = (contactRow?.printerConfig as { receipt?: { address?: string; phone?: string } } | null)?.receipt;
 
+  // After the menu: the promo cards name the free item from it.
+  const promotions = await getStorefrontPromos(restaurant.id, categories);
+
   return (
     <WebOrder
       slug={restaurant.slug}
@@ -47,6 +51,7 @@ export default async function SiteHomePage({
       coverImageUrl={restaurant.coverImageUrl}
       rating={rating}
       categories={categories}
+      promotions={promotions}
       contact={{ address: c?.address ?? null, phone: c?.phone ?? null }}
       loyalty={loyalty}
       hours={sf.hours}
