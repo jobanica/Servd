@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   // on iOS 16.4+ also requires the app to be added to the home screen this way.
   appleWebApp: {
     capable: true,
-    title: "Servd Orders",
+    title: "Servd",
     statusBarStyle: "default",
   },
   icons: {

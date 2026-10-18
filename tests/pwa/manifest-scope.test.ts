@@ -5,7 +5,7 @@ import { safeLoginPath } from "@/lib/pwa/app-login";
 
 /**
  * Servd installs as separate phone apps from one site: Servd (cashier),
- * Servd Orders (merchant), Riders and Servd Kitchen.
+ * Merchant, Riders and Servd Kitchen.
  *
  * Two Android rules pull against each other:
  *  - Chrome calls a page "already installed" when ANY installed app's scope
@@ -67,6 +67,21 @@ describe("each installable app", () => {
       });
     });
   }
+});
+
+describe("the merchant app", () => {
+  it("is called Merchant, with the Servd mark on red", () => {
+    const m = JSON.parse(read("public/merchant.webmanifest"));
+    expect(m.name).toBe("Merchant");
+    expect(m.short_name).toBe("Merchant");
+    for (const icon of m.icons) {
+      expect(icon.src).toMatch(/^\/brand\/merchant\//);
+      expect(existsSync(join(process.cwd(), "public", icon.src))).toBe(true);
+    }
+    const layout = read("src/app/(platform)/merchant/layout.tsx");
+    expect(layout).toMatch(/title: "Merchant" \}/);
+    expect(layout).toMatch(/\/brand\/merchant\/icon-apple-180\.png/);
+  });
 });
 
 describe("signing out", () => {
