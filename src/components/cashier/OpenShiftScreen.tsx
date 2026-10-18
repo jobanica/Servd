@@ -130,6 +130,7 @@ export function OpenShiftScreen({
             what puts the takings under a name.
           </p>
           <form action={signOut} className="mt-2">
+            <input type="hidden" name="to" value="/cashier/login" />
             <button className="rounded-full border border-plum-ink/15 px-4 py-2 text-sm font-semibold text-plum-ink/70 hover:bg-cream">
               Sign out
             </button>

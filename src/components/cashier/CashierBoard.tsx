@@ -683,6 +683,7 @@ export function CashierBoard({
       )}
 
       <form action={signOut}>
+        <input type="hidden" name="to" value="/cashier/login" />
         <button className={sidebarBtn}>Sign out</button>
       </form>
     </>

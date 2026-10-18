@@ -17,7 +17,7 @@ const EMPTY: RiderBoard = {
 export default async function RiderPage() {
   const user = await getCurrentUser();
   if (!user || user.kind !== "staff" || !["rider", "admin"].includes(user.role)) {
-    redirect("/login");
+    redirect("/rider/login");
   }
 
   // Riders carry the shop's delivery orders, which come from online ordering.
@@ -28,7 +28,7 @@ export default async function RiderPage() {
         <p className="max-w-sm text-sm text-plum-ink/60">
           The Rider app works with online delivery orders. Ask the restaurant owner to upgrade.
         </p>
-        <Link href="/login" className="rounded-full px-6 py-3 font-semibold btn-brand">
+        <Link href="/rider/login" className="rounded-full px-6 py-3 font-semibold btn-brand">
           Back
         </Link>
       </div>

@@ -4,7 +4,7 @@
   "short_name": "Riders",
   "description": "Servd deliveries for riders",
   "start_url": "/rider",
-  "scope": "/",
+  "scope": "/rider",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#7C3AED",

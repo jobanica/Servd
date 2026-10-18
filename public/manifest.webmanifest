@@ -1,9 +1,10 @@
 {
+  "id": "/cashier",
   "name": "Servd",
   "short_name": "Servd",
-  "description": "Servd cashier & kitchen",
+  "description": "Servd cashier",
   "start_url": "/cashier",
-  "scope": "/",
+  "scope": "/cashier",
   "display": "standalone",
   "background_color": "#FFF6EC",
   "theme_color": "#FF7A1A",

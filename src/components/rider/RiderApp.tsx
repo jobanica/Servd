@@ -76,7 +76,7 @@ export function RiderApp({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <InstallButton subtle />
-            <SignOutButton dark />
+            <SignOutButton dark to="/rider/login" />
           </div>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-1 rounded-full bg-white/15 p-1 text-sm font-semibold">

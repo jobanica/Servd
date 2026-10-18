@@ -13,7 +13,7 @@ import { signOut } from "../login/actions";
 export default async function KitchenHome() {
   const user = await getCurrentUser();
   if (!user || user.kind !== "staff" || !["kitchen", "admin"].includes(user.role)) {
-    redirect("/login");
+    redirect("/kitchen/login");
   }
 
   let initialOrders;
@@ -22,7 +22,7 @@ export default async function KitchenHome() {
     const r = await tenantDb(user.restaurantId, (tx) =>
       tx.restaurant.findFirstOrThrow({ select: { status: true } }),
     );
-    if (r.status === "suspended") return redirect("/suspended");
+    if (r.status === "suspended") return redirect("/kitchen/suspended");
     initialOrders = await getKitchenOrders();
     offlineEnabled = await hasFeature(user.restaurantId, "offline");
   } catch (e) {
@@ -66,10 +66,12 @@ export default async function KitchenHome() {
               🎓 Tutorials
             </a>
           )}
-          <a href="/clock/me" className="rounded-full px-4 py-2 text-sm font-semibold btn-brand">
+          {/* In the browser: the time clock is outside the kitchen app's scope. */}
+          <a href="/clock/me" target="_blank" rel="noreferrer" className="rounded-full px-4 py-2 text-sm font-semibold btn-brand">
             Clock in/out
           </a>
           <form action={signOut}>
+            <input type="hidden" name="to" value="/kitchen/login" />
             <button className="rounded-full border border-plum-ink/15 px-4 py-2 text-sm font-semibold">
               Sign out
             </button>

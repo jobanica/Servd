@@ -20,7 +20,7 @@ export default async function TicketPage({
   const { doc } = await searchParams;
   const user = await getCurrentUser();
   if (!user || user.kind !== "staff" || !["cashier", "admin"].includes(user.role)) {
-    redirect("/login");
+    redirect("/cashier/login");
   }
 
   const kind = doc === "bill" ? "bill" : doc === "kitchen" ? "kitchen" : "receipt";

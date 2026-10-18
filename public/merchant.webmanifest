@@ -1,9 +1,10 @@
 {
+  "id": "/merchant",
   "name": "Servd Orders",
   "short_name": "Orders",
   "description": "Servd incoming online orders for merchants",
   "start_url": "/merchant",
-  "scope": "/",
+  "scope": "/merchant",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#3B1E54",

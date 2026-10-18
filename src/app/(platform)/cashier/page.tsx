@@ -19,7 +19,7 @@ import { OpenShiftScreen } from "@/components/cashier/OpenShiftScreen";
 export default async function CashierHome() {
   const user = await getCurrentUser();
   if (!user || user.kind !== "staff" || !["cashier", "admin"].includes(user.role)) {
-    redirect("/login");
+    redirect("/cashier/login");
   }
 
   let initialTables;
@@ -29,7 +29,7 @@ export default async function CashierHome() {
     const r = await tenantDb(user.restaurantId, (tx) =>
       tx.restaurant.findFirstOrThrow({ select: { status: true } }),
     );
-    if (r.status === "suspended") return redirect("/suspended");
+    if (r.status === "suspended") return redirect("/cashier/suspended");
     [initialTables, initialIncoming, offlineEnabled] = await Promise.all([
       getCashierTables(),
       getIncomingOrders(),

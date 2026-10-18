@@ -436,6 +436,9 @@ export function MerchantBoard({
       {(data.upcoming?.advanceOrders ?? 0) + (data.upcoming?.bookings ?? 0) > 0 && (
         <a
           href="/admin/advance-orders"
+          // In the browser: outside the merchant app's scope (lib/pwa/app-login).
+          target="_blank"
+          rel="noreferrer"
           className="flex items-center justify-between gap-3 border-b border-mango/30 bg-mango/10 px-4 py-3"
         >
           <span className="min-w-0">

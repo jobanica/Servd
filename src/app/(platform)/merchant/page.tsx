@@ -21,7 +21,7 @@ const EMPTY_QUEUE: MerchantData = {
 export default async function MerchantPage() {
   const user = await getCurrentUser();
   if (!user || user.kind !== "staff" || !["merchant", "admin", "cashier"].includes(user.role)) {
-    redirect("/login");
+    redirect("/merchant/login");
   }
 
   // Online ordering is the whole point of this screen — gate on the plan.
@@ -34,7 +34,8 @@ export default async function MerchantPage() {
           The Incoming Orders screen needs the online-ordering feature. Ask the
           restaurant owner to upgrade.
         </p>
-        <Link href="/admin/billing?upgrade=onlineOrdering" className="rounded-full px-6 py-3 font-semibold btn-brand">
+        {/* Opens in the browser: billing is outside the merchant app's scope. */}
+        <Link href="/admin/billing?upgrade=onlineOrdering" target="_blank" rel="noreferrer" className="rounded-full px-6 py-3 font-semibold btn-brand">
           See plans
         </Link>
       </div>

@@ -64,7 +64,8 @@ describe("the orders screen", () => {
     expect(src).not.toMatch(/UNAUTHORIZED|FORBIDDEN/);
     // Exactly one redirect survives: the guard at the top, for someone who
     // genuinely isn't signed in.
-    expect(src.match(/redirect\("\/login"\)/g) ?? []).toHaveLength(1);
+    // (to the merchant app's own sign-in, inside its scope — tests/pwa).
+    expect(src.match(/redirect\("\/(merchant\/)?login"\)/g) ?? []).toHaveLength(1);
   });
 
   it("shows an empty queue instead, and says the list isn't current", () => {

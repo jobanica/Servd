@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { signOut } from "@/app/(platform)/login/actions";
+import type { AppLoginPath } from "@/lib/pwa/app-login";
 
 /**
  * Sign out of the merchant screen.
@@ -15,7 +16,7 @@ import { signOut } from "@/app/(platform)/login/actions";
  * The confirm times out on its own, so a stray tap doesn't leave "Sure?" armed
  * for the rest of the night waiting for a second stray tap to land on it.
  */
-export function SignOutButton({ dark = false }: { dark?: boolean }) {
+export function SignOutButton({ dark = false, to = "/merchant/login" }: { dark?: boolean; to?: AppLoginPath }) {
   const [confirming, setConfirming] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -43,6 +44,7 @@ export function SignOutButton({ dark = false }: { dark?: boolean }) {
   return (
     <span className="flex items-center gap-1">
       <form action={signOut}>
+        <input type="hidden" name="to" value={to} />
         <button className={`${base} bg-red-600 text-white hover:bg-red-700`}>
           Sign out?
         </button>

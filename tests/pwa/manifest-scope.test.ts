@@ -1,72 +1,109 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { safeLoginPath } from "@/lib/pwa/app-login";
 
 /**
- * An installed PWA can only navigate inside its manifest `scope`. Leaving that
- * scope in a standalone WebAPK does not degrade gracefully on Android — it
- * bounces out of the app, and on some builds takes the app down with it
- * ("Orders keeps stopping").
+ * Servd installs as separate phone apps from one site: Servd (cashier),
+ * Servd Orders (merchant), Riders and Servd Kitchen.
  *
- * The merchant app shipped with scope "/merchant", so the moment a session
- * lapsed and the page redirected to /login the app was out of bounds. Nobody
- * could diagnose it by reinstalling, because a reinstall fetches the same
- * manifest.
+ * Two Android rules pull against each other:
+ *  - Chrome calls a page "already installed" when ANY installed app's scope
+ *    covers it. With every app scoped to "/", installing Riders made the
+ *    merchant app impossible to install.
+ *  - An installed app that navigates outside its scope can crash ("Orders keeps
+ *    stopping") — which is what a lapsed session's redirect to /login did when
+ *    the merchant app was scoped to /merchant before.
  *
- * These assert that every screen each app can actually reach is inside its own
- * scope.
+ * So each app is scoped to its own path, and everything it redirects to (sign
+ * in, sign out, a paused account) lives inside that path.
  */
 
-function manifest(name: string) {
-  return JSON.parse(readFileSync(join(process.cwd(), "public", name), "utf8")) as {
-    start_url: string;
-    scope: string;
-  };
-}
+const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
+const manifest = (f: string) => JSON.parse(read(`public/${f}`)) as { id: string; start_url: string; scope: string };
 
-/** Would a WebAPK with this scope be allowed to open this path? */
+/** Would a WebAPK with this scope open this path? */
 function inScope(scope: string, path: string): boolean {
   return path === scope || path.startsWith(scope.endsWith("/") ? scope : `${scope}/`);
 }
 
-describe("merchant.webmanifest", () => {
-  const m = manifest("merchant.webmanifest");
+const APPS = [
+  { file: "manifest.webmanifest", app: "cashier", pages: ["cashier/page.tsx", "cashier/delivery/page.tsx", "cashier/ticket/[orderId]/page.tsx"] },
+  { file: "merchant.webmanifest", app: "merchant", pages: ["merchant/page.tsx"] },
+  { file: "rider.webmanifest", app: "rider", pages: ["rider/page.tsx"] },
+  { file: "kitchen.webmanifest", app: "kitchen", pages: ["kitchen/page.tsx"] },
+];
 
-  it("still launches straight into the orders screen", () => {
-    expect(m.start_url).toBe("/merchant");
+describe("each installable app", () => {
+  for (const { file, app, pages } of APPS) {
+    describe(file, () => {
+      const m = manifest(file);
+
+      it("is its own app, scoped to its own path", () => {
+        expect(m.id).toBe(`/${app}`);
+        expect(m.start_url).toBe(`/${app}`);
+        expect(m.scope).toBe(`/${app}`);
+      });
+
+      it("never covers another app's start page", () => {
+        for (const other of APPS) {
+          if (other.app === app) continue;
+          expect(inScope(m.scope, manifest(other.file).start_url), other.file).toBe(false);
+        }
+      });
+
+      it("signs in inside its scope", () => {
+        expect(inScope(m.scope, `/${app}/login`)).toBe(true);
+        expect(existsSync(join(process.cwd(), `src/app/(platform)/${app}/login/page.tsx`))).toBe(true);
+      });
+
+      it("sends a lapsed session to its own sign-in, never to /login", () => {
+        for (const p of pages) {
+          const src = read(`src/app/(platform)/${p}`);
+          expect(src, p).toMatch(new RegExp(`redirect\\("/${app}/login"\\)`));
+          expect(src, p).not.toMatch(/redirect\("\/login"\)/);
+          expect(src, p).not.toMatch(/redirect\("\/suspended"\)/);
+        }
+      });
+    });
+  }
+});
+
+describe("signing out", () => {
+  it("lands on the sign-in the form names, and only one of ours", () => {
+    expect(safeLoginPath("/rider/login")).toBe("/rider/login");
+    expect(safeLoginPath("https://evil.example/login")).toBe("/login");
+    expect(safeLoginPath(null)).toBe("/login");
+    expect(read("src/app/(platform)/login/actions.ts")).toMatch(/redirect\(to\);/);
   });
 
-  it("covers sign-in, which any lapsed session redirects to", () => {
-    // The actual bug: /login sits outside a "/merchant" scope, so an expired
-    // token took the installed app down instead of asking staff to sign in.
-    expect(inScope(m.scope, "/login")).toBe(true);
+  it("keeps each app's sign-out inside it", () => {
+    expect(read("src/components/rider/RiderApp.tsx")).toMatch(/<SignOutButton dark to="\/rider\/login" \/>/);
+    expect(read("src/components/merchant/SignOutButton.tsx")).toMatch(/to = "\/merchant\/login"/);
+    expect(read("src/components/cashier/CashierBoard.tsx")).toMatch(/name="to" value="\/cashier\/login"/);
+    expect(read("src/components/cashier/OpenShiftScreen.tsx")).toMatch(/name="to" value="\/cashier\/login"/);
+    expect(read("src/app/(platform)/kitchen/page.tsx")).toMatch(/name="to" value="\/kitchen\/login"/);
   });
 
-  it("covers everywhere the merchant screen can send someone", () => {
-    for (const path of ["/merchant", "/login", "/suspended", "/admin/billing"]) {
-      expect(inScope(m.scope, path)).toBe(true);
-    }
+  it("a paused account stays inside the cashier and kitchen apps", () => {
+    expect(read("src/app/(platform)/cashier/page.tsx")).toMatch(/redirect\("\/cashier\/suspended"\)/);
+    expect(read("src/app/(platform)/kitchen/page.tsx")).toMatch(/redirect\("\/kitchen\/suspended"\)/);
   });
 });
 
-describe("manifest.webmanifest", () => {
-  const m = manifest("manifest.webmanifest");
-
-  it("covers sign-in too", () => {
-    expect(inScope(m.scope, "/login")).toBe(true);
-  });
-
-  it("launches into the cashier screen", () => {
-    expect(m.start_url).toBe("/cashier");
+describe("links that leave an app", () => {
+  it("open in the browser instead of navigating the app out of scope", () => {
+    expect(read("src/app/(platform)/merchant/page.tsx")).toMatch(/href="\/admin\/billing\?upgrade=onlineOrdering" target="_blank"/);
+    expect(read("src/components/merchant/MerchantBoard.tsx")).toMatch(/href="\/admin\/advance-orders"[\s\S]{0,120}target="_blank"/);
+    expect(read("src/app/(platform)/kitchen/page.tsx")).toMatch(/href="\/clock\/me" target="_blank"/);
   });
 });
 
 describe("inScope", () => {
   it("does not let a sibling path masquerade as in-scope", () => {
-    // "/merchant-tools" is NOT inside "/merchant"; a bare startsWith says it is.
     expect(inScope("/merchant", "/merchant-tools")).toBe(false);
     expect(inScope("/merchant", "/merchant")).toBe(true);
-    expect(inScope("/merchant", "/merchant/orders")).toBe(true);
-    expect(inScope("/", "/anything/at/all")).toBe(true);
+    expect(inScope("/merchant", "/merchant/login")).toBe(true);
+    expect(inScope("/rider", "/riders")).toBe(false);
   });
 });

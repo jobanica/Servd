@@ -6,6 +6,7 @@ import { systemDb } from "@/server/tenancy/scoped-db";
 import { getCurrentUser } from "@/server/tenancy/current-user";
 import { homeForAdmin } from "@/lib/platform/admin-scope";
 import { MANAGER_HOME } from "@/lib/admin/manager-scope";
+import { safeLoginPath } from "@/lib/pwa/app-login";
 
 /** Resolve a login identifier to the auth email. Accepts an email OR a username. */
 async function resolveEmail(identifier: string): Promise<string | null> {
@@ -64,10 +65,15 @@ export async function signIn(_prev: unknown, formData: FormData) {
  * laptop would also kick the phone, the cashier tablet and the kitchen screen
  * out mid-shift. "local" ends just the current session's tokens.
  */
-export async function signOut() {
+/**
+ * Signs out, landing on the sign-in page the form names: an installed app
+ * passes its own (e.g. /rider/login) so it never leaves its scope.
+ */
+export async function signOut(formData?: FormData) {
+  const to = safeLoginPath(formData instanceof FormData ? formData.get("to") : null);
   const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut({ scope: "local" });
-  redirect("/login");
+  redirect(to);
 }
 
 /** Sends a password-reset email. Always reports success (no account enumeration). */

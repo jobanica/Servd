@@ -8,7 +8,7 @@ import { StaffDataError } from "@/components/StaffDataError";
 export default async function CashierDeliveryPage() {
   const user = await getCurrentUser();
   if (!user || user.kind !== "staff" || !["cashier", "admin"].includes(user.role)) {
-    redirect("/login");
+    redirect("/cashier/login");
   }
 
   let initial;
