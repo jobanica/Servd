@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { formatPeso } from "@/lib/money";
 import { prepareReceipt } from "@/lib/images/receipt";
 import { useOrdersRefresh } from "@/lib/realtime/useOrdersRefresh";
@@ -15,6 +15,7 @@ import {
 } from "@/server/rider/actions";
 import { MiniMap } from "@/components/cashier/MiniMap";
 import { SignOutButton } from "@/components/merchant/SignOutButton";
+import { InstallButton } from "@/components/merchant/InstallButton";
 
 /**
  * The Rider app: a phone screen inside Servd. Today's delivery orders, a map
@@ -44,6 +45,12 @@ export function RiderApp({
   }, []);
   useOrdersRefresh(restaurantId, reload, 15_000);
 
+  // The service worker makes it installable (Chrome won't offer "Install app"
+  // without one) and keeps a page to show when the signal drops mid-run.
+  useEffect(() => {
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+  }, []);
+
   async function run(id: string, fn: () => ReturnType<typeof refreshRiderBoard>) {
     setBusy(id);
     setError(null);
@@ -62,12 +69,15 @@ export function RiderApp({
       <header className="sticky top-0 z-20 bg-red-600 px-4 pb-3 pt-[max(env(safe-area-inset-top),12px)] text-white shadow">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <p className="truncate font-heading text-lg font-extrabold">🛵 Rider</p>
+            <p className="truncate font-heading text-lg font-extrabold">🛵 Riders</p>
             <p className="truncate text-xs text-white/80">
               {riderName} · {restaurantName}
             </p>
           </div>
-          <SignOutButton dark />
+          <div className="flex shrink-0 items-center gap-2">
+            <InstallButton subtle />
+            <SignOutButton dark />
+          </div>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-1 rounded-full bg-white/15 p-1 text-sm font-semibold">
           <button

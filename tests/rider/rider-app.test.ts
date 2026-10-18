@@ -138,8 +138,23 @@ describe("signing in as a rider", () => {
     expect(read("src/server/staff/actions.ts")).toMatch(/createSchema\.shape\.role\.safeParse\(formData\.get\("role"\)\)/);
   });
 
-  it("installs as its own app", () => {
-    expect(read("public/rider.webmanifest")).toMatch(/"start_url": "\/rider"/);
-    expect(read("src/app/(platform)/rider/layout.tsx")).toMatch(/manifest: "\/rider\.webmanifest"/);
+  it("installs as its own app, Riders, with the purple Servd icon", () => {
+    const manifest = JSON.parse(read("public/rider.webmanifest"));
+    expect(manifest.start_url).toBe("/rider");
+    expect(manifest.id).toBe("/rider");
+    expect(manifest.name).toBe("Riders");
+    expect(manifest.short_name).toBe("Riders");
+    for (const icon of manifest.icons) expect(icon.src).toMatch(/^\/brand\/rider\//);
+    expect(manifest.icons.some((i: { purpose: string }) => i.purpose === "maskable")).toBe(true);
+    const layout = read("src/app/(platform)/rider/layout.tsx");
+    expect(layout).toMatch(/manifest: "\/rider\.webmanifest"/);
+    expect(layout).toMatch(/title: "Riders" \}/);
+    expect(layout).toMatch(/\/brand\/rider\/icon-apple-180\.png/);
+  });
+
+  it("registers the service worker and offers Install app", () => {
+    const app = read("src/components/rider/RiderApp.tsx");
+    expect(app).toMatch(/navigator\.serviceWorker\.register\("\/sw\.js"\)/);
+    expect(app).toMatch(/<InstallButton subtle \/>/);
   });
 });
