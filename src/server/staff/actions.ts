@@ -11,7 +11,7 @@ export type FormState = { ok?: boolean; error?: string } | null;
 const createSchema = z.object({
   email: z.string().trim().email("Enter a valid email"),
   password: z.string().min(8, "Password must be at least 8 characters"),
-  role: z.enum(["kitchen", "cashier", "merchant", "manager", "admin"]),
+  role: z.enum(["kitchen", "cashier", "merchant", "rider", "manager", "admin"]),
   displayName: z.string().trim().max(80).optional().or(z.literal("")),
 });
 
@@ -75,7 +75,9 @@ export async function createStaff(
 export async function updateStaffRole(formData: FormData): Promise<void> {
   const me = await requireAdminAction();
   const id = String(formData.get("id"));
-  const role = formData.get("role") as "kitchen" | "cashier" | "merchant" | "manager" | "admin";
+  const parsed = createSchema.shape.role.safeParse(formData.get("role"));
+  if (!parsed.success) return;
+  const role = parsed.data;
   if (id === me.staffUserId) return; // can't change your own role (lockout guard)
   await tenantDb(me.restaurantId, (tx) =>
     tx.staffUser.update({ where: { id }, data: { role }, select: { id: true } }),

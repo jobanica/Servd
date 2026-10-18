@@ -64,6 +64,7 @@ const ITEM_FEATURE: Record<string, string> = {
   "/admin/reservations": "reservations",
   "/admin/advance-orders": "onlineOrdering",
   "/merchant": "onlineOrdering",
+  "/admin/riders": "onlineOrdering",
   "/admin/export": "dataExport",
   "/admin/audit": "auditLog",
 };
@@ -94,6 +95,7 @@ const NAV: { group: string; items: Item[] }[] = [
       { label: "Kitchen", href: "/kitchen", d: I.fire },
       { label: "Cashier", href: "/cashier", d: I.cash },
       { label: "Merchant app", href: "/merchant", d: I.bell },
+      { label: "Riders", href: "/admin/riders", d: I.box },
       { label: "Shift history", href: "/admin/shifts", d: I.cash },
       { label: "My time clock", href: "/clock/me", d: I.receipt },
     ],

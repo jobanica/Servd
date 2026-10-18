@@ -30,6 +30,7 @@ enum StaffRole {
   manager // HR / scheduling
   admin // restaurant owner/admin
   merchant // online "Incoming Orders" screen only (no full cashier UI)
+  rider // the Rider app only: delivery orders, map, mark delivered & paid
 }
 
 enum RestaurantStatus {
@@ -1853,6 +1854,16 @@ model Order {
   customerLat         Float? // pinned delivery location
   customerLng         Float?
   deliveryStatus      String? // null → out_for_delivery → delivered
+  /// The Rider app (prisma/manual/add-rider-delivery.sql): the staff user
+  /// delivering it, when they left with it and handed it over, how the
+  /// customer paid them ("cash" | "gcash" | "prepaid"), what they collected
+  /// (centavos), and the GCash receipt photo's path in the private bucket.
+  riderId             String?
+  riderPickedUpAt     DateTime?
+  deliveredAt         DateTime?
+  riderPayMethod      String?
+  riderCollected      Int?
+  riderReceiptPath    String?
   status              OrderStatus   @default(new)
   billRequested       Boolean       @default(false)
   paymentStatus       PaymentStatus @default(unpaid)

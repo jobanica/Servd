@@ -11,7 +11,15 @@ export default async function MyClockPage() {
 
   const status = await getMyClockStatus();
   const home =
-    user.role === "kitchen" ? "/kitchen" : user.role === "cashier" ? "/cashier" : "/admin";
+    user.role === "kitchen"
+      ? "/kitchen"
+      : user.role === "cashier"
+        ? "/cashier"
+        : user.role === "merchant"
+          ? "/merchant"
+          : user.role === "rider"
+            ? "/rider"
+            : "/admin";
 
   return (
     <main className="min-h-screen bg-cream px-4 py-10">

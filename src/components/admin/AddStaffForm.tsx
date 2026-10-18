@@ -20,6 +20,7 @@ export function AddStaffForm() {
           <option value="cashier">Cashier — POS only</option>
           <option value="kitchen">Kitchen — kitchen display only</option>
           <option value="merchant">Merchant — incoming online orders only</option>
+          <option value="rider">Rider — delivery orders, map, mark delivered &amp; paid</option>
           <option value="manager">Manager — menu, service, marketing &amp; back office (no settings)</option>
           <option value="admin">Admin — full access</option>
         </select>

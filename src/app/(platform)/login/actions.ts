@@ -53,6 +53,7 @@ export async function signIn(_prev: unknown, formData: FormData) {
   if (user.role === "kitchen") redirect("/kitchen");
   if (user.role === "cashier") redirect("/cashier");
   if (user.role === "merchant") redirect("/merchant");
+  if (user.role === "rider") redirect("/rider");
   if (user.role === "manager") redirect(MANAGER_HOME);
   redirect("/admin");
 }

@@ -36,6 +36,7 @@ export const MANAGER_SECTIONS = [
   "/kitchen",
   "/cashier",
   "/merchant",
+  "/admin/riders",
   "/admin/shifts",
   "/clock",
   // Grow

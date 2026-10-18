@@ -5,13 +5,14 @@ import { AddStaffForm } from "@/components/admin/AddStaffForm";
 import { StaffCredentials } from "@/components/admin/StaffCredentials";
 import { updateStaffRole, deleteStaff } from "@/server/staff/actions";
 
-const ROLES = ["cashier", "kitchen", "merchant", "manager", "admin"] as const;
+const ROLES = ["cashier", "kitchen", "merchant", "rider", "manager", "admin"] as const;
 const ACCESS: Record<string, string> = {
   admin: "Full dashboard",
   manager: "Menu, service, marketing & back office — not settings",
   cashier: "Cashier POS only",
   kitchen: "Kitchen display only",
   merchant: "Incoming online orders only",
+  rider: "Rider app only — delivery orders, map, mark delivered & paid",
 };
 
 export default async function StaffPage() {
