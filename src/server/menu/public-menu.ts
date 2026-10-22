@@ -13,6 +13,7 @@ import { getNoPackagingItemIds } from "@/server/menu/packaging";
 import { getComingSoonItemIds } from "@/server/menu/coming-soon";
 import { withAvailableSoon } from "@/lib/menu/available-soon";
 import { variantPrice } from "@/lib/menu/variant-price";
+import { getOnlineHiddenCategoryIds } from "@/server/menu/online-hidden";
 
 /**
  * Loads a restaurant's full menu for the diner page, by restaurantId. Returns
@@ -31,7 +32,7 @@ import { variantPrice } from "@/lib/menu/variant-price";
 export async function getPublicMenu(
   restaurantId: string,
   locale = "en",
-  opts: { includePosOnly?: boolean } = {},
+  opts: { includePosOnly?: boolean; online?: boolean } = {},
 ): Promise<DinerCategory[]> {
   const categories = await systemDb((tx) =>
     tx.category.findMany({
@@ -109,8 +110,13 @@ export async function getPublicMenu(
 
   // A category emptied entirely by that filter goes with it — a "Staff meals"
   // heading with nothing under it advertises the hidden menu it's meant to hide.
+  // The online ordering website (`online`) also leaves out the categories the
+  // owner hid from it; the table QR menu and the cashier don't.
+  const hiddenOnline = opts.online ? await getOnlineHiddenCategoryIds(restaurantId) : new Set<string>();
   const visible = categories.filter(
-    (c) => c.menuItems.length === 0 || c.menuItems.some((i) => !posOnly.has(i.id)),
+    (c) =>
+      !hiddenOnline.has(c.id) &&
+      (c.menuItems.length === 0 || c.menuItems.some((i) => !posOnly.has(i.id))),
   );
 
   // "Available soon" items: on every diner menu they move into their own

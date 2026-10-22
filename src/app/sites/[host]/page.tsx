@@ -31,7 +31,7 @@ export default async function SiteHomePage({
   if (!restaurant) notFound();
 
   const [categories, loyalty, sf, contactRow, rating, branding] = await Promise.all([
-    getPublicMenu(restaurant.id),
+    getPublicMenu(restaurant.id, "en", { online: true }),
     getLoyaltyConfig(restaurant.id),
     getPublicStorefront(restaurant.id),
     systemDb((tx) => tx.restaurant.findFirst({ where: { id: restaurant.id }, select: { printerConfig: true } })).catch(() => null),

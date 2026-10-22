@@ -89,6 +89,15 @@ export async function setCategoryImage(formData: FormData): Promise<{ error?: st
   return {};
 }
 
+/** Hide a whole category from the online ordering website, or show it again. */
+export async function setCategoryHideOnline(id: string, hidden: boolean): Promise<void> {
+  const { restaurantId } = await requireManagerAction();
+  await tenantDb(restaurantId, (tx) =>
+    tx.category.updateMany({ where: { id, restaurantId }, data: { hideOnline: hidden } }),
+  );
+  await refresh();
+}
+
 export async function deleteCategory(formData: FormData): Promise<void> {
   const { restaurantId } = await requireManagerAction();
   const id = String(formData.get("id"));

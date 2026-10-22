@@ -14,6 +14,7 @@ import { getPosOnlyItemIds } from "@/server/menu/pos-only";
 import { getComingSoonItemIds } from "@/server/menu/coming-soon";
 import { variantPrice } from "@/lib/menu/variant-price";
 import type { DinerItem, Selection } from "@/lib/cart/types";
+import { getOnlineHiddenCategoryIds } from "@/server/menu/online-hidden";
 
 /**
  * Shared, server-side order validation + pricing. Both the diner (`placeOrder`)
@@ -56,8 +57,13 @@ export class OrderValidationError extends Error {}
  * Where the order is being rung up. Counter-only items are punchable at the
  * till and refused everywhere else — the storefront hides them, and this makes
  * hiding them irrelevant to whether they can be ordered.
+ *
+ *  web    — a diner: the table QR menu (and anything that doesn't say).
+ *  online — the online ordering website: a diner too, and also refused the
+ *           categories the owner hid from the website.
+ *  pos    — the cashier.
  */
-export type OrderChannel = "web" | "pos";
+export type OrderChannel = "web" | "online" | "pos";
 
 export async function buildValidatedOrder(
   restaurantId: string,
@@ -133,6 +139,9 @@ export async function buildValidatedOrder(
   // "Available soon" items are on the menu to be seen, not ordered. Refused
   // here too, in case a page from before the owner ticked the box is still open.
   const comingSoon = channel === "pos" ? new Set<string>() : await getComingSoonItemIds(restaurantId);
+  // Categories hidden from the website: a stale page or a crafted request
+  // can't order from them there.
+  const hiddenOnline = channel === "online" ? await getOnlineHiddenCategoryIds(restaurantId) : new Set<string>();
 
   let total = 0;
   const items: BuiltOrderItem[] = [];
@@ -146,6 +155,9 @@ export async function buildValidatedOrder(
     // Same wording as a delisted item on purpose: the storefront shouldn't
     // confirm that a counter-only item exists.
     if (posOnly.has(dbItem.id)) throw new OrderValidationError("An item is no longer on the menu.");
+    if (dbItem.categoryId && hiddenOnline.has(dbItem.categoryId)) {
+      throw new OrderValidationError(`"${dbItem.name}" isn't available for online orders.`);
+    }
     if (comingSoon.has(dbItem.id)) throw new OrderValidationError(`"${dbItem.name}" isn't available yet — it's coming soon.`);
     if (!dbItem.isAvailable) throw new OrderValidationError(`"${dbItem.name}" is sold out.`);
 

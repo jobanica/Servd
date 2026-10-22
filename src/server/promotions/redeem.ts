@@ -123,6 +123,7 @@ export async function previewPromoCode(input: {
         modifierIds: l.modifierIds ?? [],
         variantId: l.variantId,
       })),
+      { channel: input.where === "dine_in" ? "web" : "online" },
     );
   } catch (e) {
     if (e instanceof OrderValidationError) return { ok: false, error: e.message };

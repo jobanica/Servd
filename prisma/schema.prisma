@@ -1270,6 +1270,9 @@ model Category {
   /// Photo on the menu's category tab. Null = the first dish photo in the
   /// category stands in. Added by prisma/manual/add-category-image.sql.
   imageUrl     String?
+  /// Hidden from the online ordering website (QR menu and cashier still show
+  /// it). Added by prisma/manual/add-category-hide-online.sql.
+  hideOnline   Boolean  @default(false)
   sortOrder    Int      @default(0)
   createdAt    DateTime @default(now())
 

@@ -198,7 +198,7 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
 
   let built;
   try {
-    built = await buildValidatedOrder(restaurant.id, d.lines);
+    built = await buildValidatedOrder(restaurant.id, d.lines, { channel: "online" });
   } catch (e) {
     if (e instanceof OrderValidationError) return { ok: false, error: e.message };
     return { ok: false, error: "We couldn't build your order. Please try again." };

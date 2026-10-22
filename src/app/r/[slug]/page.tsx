@@ -45,7 +45,7 @@ export default async function RestaurantSite({
   if (!(await hasFeature(restaurant.id, "onlineOrdering"))) notFound();
 
   const [categories, loyalty, contact, sf, rating, branding] = await Promise.all([
-    getPublicMenu(restaurant.id),
+    getPublicMenu(restaurant.id, "en", { online: true }),
     getLoyaltyConfig(restaurant.id),
     getContact(restaurant.id),
     getPublicStorefront(restaurant.id),

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { renameCategory, deleteCategory, setCategoryImage } from "@/server/menu/actions";
+import { renameCategory, deleteCategory, setCategoryImage, setCategoryHideOnline } from "@/server/menu/actions";
 import { ConfirmSubmitButton } from "./ConfirmSubmitButton";
 
 /**
@@ -13,11 +13,14 @@ export function CategoryHeader({
   id,
   name,
   imageUrl = null,
+  hideOnline = false,
 }: {
   id: string;
   name: string;
   /** The category's own photo (not the dish photo standing in for it). */
   imageUrl?: string | null;
+  /** Hidden from the online ordering website. */
+  hideOnline?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(name);
@@ -88,6 +91,7 @@ export function CategoryHeader({
           Edit
         </button>
       </div>
+      <OnlineToggle id={id} hidden={hideOnline} />
       <form action={deleteCategory}>
         <input type="hidden" name="id" value={id} />
         <ConfirmSubmitButton
@@ -165,5 +169,30 @@ function CategoryPhoto({ id, name, imageUrl }: { id: string; name: string; image
       )}
       {error && <span className="text-[11px] text-guava">{error}</span>}
     </div>
+  );
+}
+
+/**
+ * Show or hide the whole category on the online ordering website. The table QR
+ * menu and the cashier keep showing it.
+ */
+function OnlineToggle({ id, hidden }: { id: string; hidden: boolean }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        await setCategoryHideOnline(id, !hidden);
+        setBusy(false);
+      }}
+      title={hidden ? "Hidden from the online ordering website — tap to show it" : "Tap to hide this whole category from the online ordering website"}
+      className={`ml-auto mr-3 shrink-0 rounded-full px-3 py-1 text-xs font-semibold disabled:opacity-50 ${
+        hidden ? "bg-guava/15 text-guava" : "bg-plum-ink/5 text-plum-ink/60 hover:text-plum-ink"
+      }`}
+    >
+      {busy ? "…" : hidden ? "🚫 Hidden online" : "🌐 Shown online"}
+    </button>
   );
 }

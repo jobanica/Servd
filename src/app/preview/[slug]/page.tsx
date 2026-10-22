@@ -22,7 +22,7 @@ export default async function PreviewPage({ params }: { params: Promise<{ slug: 
   const restaurant = await getPreviewRestaurant(slug);
   if (!restaurant) notFound();
 
-  const categories = await getPublicMenu(restaurant.id);
+  const categories = await getPublicMenu(restaurant.id, "en", { online: true });
 
   // Only the builder (the cookie holder) is offered the payment button; anyone
   // they share the link with still gets the full browse-and-checkout demo.
