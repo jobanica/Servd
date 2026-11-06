@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 const STATE_LABEL: Record<string, string> = {
   pending: "Awaiting confirmation",
-  confirmed: "Confirmed",
+  confirmed: "Recorded",
   disputed: "Under review",
   waived: "Waived",
   settled: "Settled",
@@ -90,7 +90,7 @@ export default async function CommissionPage() {
                         : l.status === "cancelled"
                           ? "Cancelled — no commission"
                           : l.status === "closed"
-                            ? "Completed — being recorded"
+                            ? "Completed — recorded within 15 minutes"
                             : "In progress — charged only if completed"}
                       {l.entry?.disputeNote && <p className="text-guava">{l.entry.disputeNote}</p>}
                     </td>

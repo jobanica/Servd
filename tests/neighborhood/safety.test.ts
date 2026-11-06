@@ -56,6 +56,16 @@ describe("accrual", () => {
     expect(src).toMatch(/\.filter\(\(o\) => owesCommission\(p\.restaurant, p, o\)\)/);
   });
 
+  it("records a completed order as confirmed straight away — no approval step", () => {
+    expect(src).toMatch(/state: "confirmed",\s*orderedAt: o\.createdAt,/);
+    expect(src).not.toMatch(/state: "pending",\s*orderedAt/);
+  });
+
+  it("runs every 15 minutes, and drafts statements only once on the 1st", () => {
+    expect(read("vercel.json")).toMatch(/"path": "\/api\/cron\/neighborhood",\s*"schedule": "\*\/15 \* \* \* \*"/);
+    expect(read("src/app/api/cron/neighborhood/route.ts")).toMatch(/endsWith\("-01"\) && manilaHour === 3 && now\.getUTCMinutes\(\) < 15/);
+  });
+
   it("can't double-charge when re-run", () => {
     expect(src).toMatch(/commissionEntries: \{ none: \{\} \}/);
     expect(src).toMatch(/createMany\(\{ data: rows, skipDuplicates: true \}\)/);

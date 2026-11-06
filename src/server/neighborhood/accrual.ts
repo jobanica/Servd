@@ -15,11 +15,13 @@ import {
  * Commission accrual, as an idempotent sync — never inside an order path.
  *
  * It reads completed platform orders of neighborhood partners and writes one
- * `pending` entry per order. The unique index on commission_entries.orderId
+ * entry per order, already `confirmed`: a delivered order counts without
+ * anyone having to approve it. A partner who says an order didn't really
+ * happen flags it, which moves it to `disputed` for Servd to review. The unique index on commission_entries.orderId
  * plus `skipDuplicates` make re-running it harmless: it can never charge an
  * order twice. Because it runs apart from checkout, a failure here can never
  * fail, slow down or roll back a customer's order; a missed run is simply
- * caught up by the next one (nightly cron, and on demand from the ledger).
+ * caught up by the next one (every 15 minutes by cron, and on demand).
  *
  * It also flips entries for orders later cancelled or refunded to
  * `cancelled`, while they're not yet on an issued statement. An issued
@@ -133,7 +135,8 @@ async function accruePartner(p: Partner, now: Date): Promise<number> {
         rateBps: p.commissionRateBps,
         commissionAmount: commissionFor(base, p.commissionRateBps),
         paymentMethod: paymentMethodOf(o.payments),
-        state: "pending",
+        // Recorded as confirmed on completion — no waiting for approval.
+        state: "confirmed",
         orderedAt: o.createdAt,
       };
     });

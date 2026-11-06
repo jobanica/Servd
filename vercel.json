@@ -24,7 +24,7 @@
     },
     {
       "path": "/api/cron/neighborhood",
-      "schedule": "0 19 * * *"
+      "schedule": "*/15 * * * *"
     }
   ]
 }

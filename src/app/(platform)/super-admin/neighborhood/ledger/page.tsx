@@ -36,7 +36,7 @@ export default async function LedgerPage({
       <NbChrome
         active="ledger"
         title="Commission ledger"
-        intro="One entry per completed platform order of a neighborhood partner, written by the accrual sync (nightly, or now). Confirm completed orders; dispute a line without holding up the rest of the statement."
+        intro="One entry per completed platform order of a neighborhood partner, recorded as confirmed within 15 minutes of completion (or now, with Sync). Dispute or waive a line without holding up the rest of the statement."
         flash={{ ok: sp.ok, error: sp.error }}
       />
 

@@ -5,13 +5,14 @@ import { generateStatement } from "@/server/neighborhood/statements";
 import { manilaDate, manilaMonth, previousMonth } from "@/lib/neighborhood/commission";
 
 /**
- * Nightly neighborhood commission run. Protected by CRON_SECRET, like the
- * other crons.
+ * Neighborhood commission run, every 15 minutes. Protected by CRON_SECRET,
+ * like the other crons.
  *
- *  1. Accrual backfill: an entry for every completed platform order of a
+ *  1. Accrual: a confirmed entry for every completed platform order of a
  *     neighborhood partner that doesn't have one yet (idempotent), and
- *     cancelled entries for orders since cancelled or refunded.
- *  2. On the 1st (Manila), a draft statement for last month per active
+ *     cancelled entries for orders since cancelled or refunded. So a delivered
+ *     order is on the books within minutes.
+ *  2. Once, at 3 AM Manila on the 1st, a draft statement for last month per
  *     partner. Drafts are rebuilt if run again; an issued one is left alone.
  *
  * Touches no standard account: accrual reads only active agreements of
@@ -30,7 +31,9 @@ export async function GET(req: NextRequest) {
   });
 
   let drafts = 0;
-  if (manilaDate(now).endsWith("-01")) {
+  // 3:00–3:14 AM Manila on the 1st: the one run of the month that drafts statements.
+  const manilaHour = (now.getUTCHours() + 8) % 24;
+  if (manilaDate(now).endsWith("-01") && manilaHour === 3 && now.getUTCMinutes() < 15) {
     const month = previousMonth(manilaMonth(now));
     const partners = await systemDb((tx) =>
       tx.territoryPartner.findMany({
