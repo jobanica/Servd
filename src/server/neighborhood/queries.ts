@@ -306,3 +306,37 @@ export async function listStatements() {
     }),
   );
 }
+
+/** Partner payments with their receipts: waiting first, then the latest decided. */
+export async function listCommissionPayments() {
+  const { signCommissionReceipts } = await import("@/server/storage/commission-receipts");
+  const rows = await systemDb((tx) =>
+    tx.commissionPayment.findMany({
+      orderBy: [{ status: "desc" }, { submittedAt: "desc" }],
+      take: 60,
+      include: {
+        partner: {
+          select: {
+            id: true,
+            restaurant: { select: { name: true, displayName: true } },
+            territory: { select: { name: true } },
+            statements: { where: { status: { in: ["issued", "partially_paid"] } }, select: { commissionDue: true, amountPaid: true } },
+          },
+        },
+      },
+    }),
+  );
+  const signed = await signCommissionReceipts(rows.map((r) => r.receiptPath));
+  return rows.map((r) => ({
+    ...r,
+    partnerName: partnerName(r.partner.restaurant),
+    owed: r.partner.statements.reduce((s, st) => s + Math.max(0, st.commissionDue - st.amountPaid), 0),
+    receiptUrl: signed.get(r.receiptPath) ?? null,
+  }));
+}
+
+/** "Nov 7 – Nov 13" for a weekly statement's period. */
+export function weekLabel(periodStart: Date, periodEnd: Date): string {
+  const f = (d: Date) => d.toLocaleDateString("en-PH", { timeZone: "UTC", month: "short", day: "numeric" });
+  return `${f(periodStart)} – ${f(periodEnd)}`;
+}

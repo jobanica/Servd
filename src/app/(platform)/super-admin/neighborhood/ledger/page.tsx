@@ -126,7 +126,7 @@ export default async function LedgerPage({
                         <span className="capitalize">{e.state}</span>
                         {e.statement && (
                           <Link href={`/super-admin/neighborhood/statements/${e.statement.id}`} className="block text-xs text-brand-primary">
-                            {e.statement.periodStart.toISOString().slice(0, 7)} ({e.statement.status})
+                            week of {e.statement.periodStart.toISOString().slice(5, 10)} ({e.statement.status})
                           </Link>
                         )}
                         {e.disputeNote && <p className="text-xs text-guava">“{e.disputeNote}”</p>}

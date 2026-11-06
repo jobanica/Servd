@@ -61,9 +61,12 @@ describe("accrual", () => {
     expect(src).not.toMatch(/state: "pending",\s*orderedAt/);
   });
 
-  it("runs every 15 minutes, and drafts statements only once on the 1st", () => {
+  it("runs every 15 minutes, and bills the week once, just after midnight on Saturday", () => {
     expect(read("vercel.json")).toMatch(/"path": "\/api\/cron\/neighborhood",\s*"schedule": "\*\/15 \* \* \* \*"/);
-    expect(read("src/app/api/cron/neighborhood/route.ts")).toMatch(/endsWith\("-01"\) && manilaHour === 3 && now\.getUTCMinutes\(\) < 15/);
+    const cron = read("src/app/api/cron/neighborhood/route.ts");
+    expect(cron).toMatch(/isSaturday\(today\) && manilaHour === 0 && now\.getUTCMinutes\(\) < 15/);
+    // Accrual first, so Friday night's orders make the statement.
+    expect(cron.indexOf("syncCommissions(")).toBeLessThan(cron.indexOf("runWeeklyStatements("));
   });
 
   it("can't double-charge when re-run", () => {

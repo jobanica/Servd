@@ -7,8 +7,10 @@ import { systemDb } from "@/server/tenancy/scoped-db";
 import { requireOwnerAction } from "@/server/tenancy/require-admin";
 import { syncCommissions } from "@/server/neighborhood/accrual";
 import {
+  confirmCommissionPayment,
   createAdjustment,
   generateStatement,
+  rejectCommissionPayment,
   issueStatement,
   recordStatementPayment,
   writeOffStatement,
@@ -322,13 +324,14 @@ export async function addAdjustment(fd: FormData): Promise<void> {
 
 export async function generateStatementAction(fd: FormData): Promise<void> {
   await guard(fd);
-  const r = await generateStatement(str(fd, "partnerId"), str(fd, "month"));
+  const r = await generateStatement(str(fd, "partnerId"), str(fd, "saturday"));
   done(fd, r.ok ? { ok: true } : r, "Draft statement ready to review.");
 }
 
 export async function issueStatementAction(fd: FormData): Promise<void> {
   await guard(fd);
-  done(fd, await issueStatement(str(fd, "id"), optInt(fd, "dueDays") ?? 7), "Statement issued.");
+  const dueOn = str(fd, "dueOn");
+  done(fd, await issueStatement(str(fd, "id"), isDay(dueOn) ? { dueOn } : { dueDays: optInt(fd, "dueDays") ?? 0 }), "Statement issued.");
 }
 
 export async function recordPaymentAction(fd: FormData): Promise<void> {
@@ -341,4 +344,16 @@ export async function recordPaymentAction(fd: FormData): Promise<void> {
 export async function writeOffAction(fd: FormData): Promise<void> {
   await guard(fd);
   done(fd, await writeOffStatement(str(fd, "id"), str(fd, "reason")), "Written off.");
+}
+
+// ------------------------------------------------------------- partner payments
+
+export async function confirmPaymentAction(fd: FormData): Promise<void> {
+  await guard(fd);
+  done(fd, await confirmCommissionPayment(str(fd, "id")), "Payment confirmed and applied to the oldest unpaid weeks.");
+}
+
+export async function rejectPaymentAction(fd: FormData): Promise<void> {
+  await guard(fd);
+  done(fd, await rejectCommissionPayment(str(fd, "id"), str(fd, "reason")), "Payment rejected — the partner sees the reason.");
 }

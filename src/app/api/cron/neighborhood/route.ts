@@ -1,8 +1,7 @@
 import { NextRequest } from "next/server";
-import { systemDb } from "@/server/tenancy/scoped-db";
 import { syncCommissions } from "@/server/neighborhood/accrual";
-import { generateStatement } from "@/server/neighborhood/statements";
-import { manilaDate, manilaMonth, previousMonth } from "@/lib/neighborhood/commission";
+import { runWeeklyStatements } from "@/server/neighborhood/statements";
+import { isSaturday, manilaDate } from "@/lib/neighborhood/commission";
 
 /**
  * Neighborhood commission run, every 15 minutes. Protected by CRON_SECRET,
@@ -12,8 +11,9 @@ import { manilaDate, manilaMonth, previousMonth } from "@/lib/neighborhood/commi
  *     neighborhood partner that doesn't have one yet (idempotent), and
  *     cancelled entries for orders since cancelled or refunded. So a delivered
  *     order is on the books within minutes.
- *  2. Once, at 3 AM Manila on the 1st, a draft statement for last month per
- *     partner. Drafts are rebuilt if run again; an issued one is left alone.
+ *  2. Saturday, in the first run after midnight Manila: each partner's
+ *     statement for the week before (Saturday to Friday), issued and due that
+ *     Saturday. Accrual runs first, so Friday night's orders are on it.
  *
  * Touches no standard account: accrual reads only active agreements of
  * restaurants on the neighborhood track.
@@ -30,21 +30,15 @@ export async function GET(req: NextRequest) {
     return null;
   });
 
-  let drafts = 0;
-  // 3:00–3:14 AM Manila on the 1st: the one run of the month that drafts statements.
+  // 00:00–00:14 Manila on a Saturday: the one run of the week that bills.
+  const today = manilaDate(now);
   const manilaHour = (now.getUTCHours() + 8) % 24;
-  if (manilaDate(now).endsWith("-01") && manilaHour === 3 && now.getUTCMinutes() < 15) {
-    const month = previousMonth(manilaMonth(now));
-    const partners = await systemDb((tx) =>
-      tx.territoryPartner.findMany({
-        where: { status: { in: ["active", "paused", "ended"] }, restaurant: { commercialTrack: "neighborhood" } },
-        select: { id: true },
-      }),
-    ).catch(() => []);
-    for (const p of partners) {
-      const r = await generateStatement(p.id, month).catch(() => null);
-      if (r?.ok) drafts++;
-    }
+  let weekly = null;
+  if (isSaturday(today) && manilaHour === 0 && now.getUTCMinutes() < 15) {
+    weekly = await runWeeklyStatements(today, now).catch((e) => {
+      console.error("neighborhood cron: weekly statements failed", e);
+      return null;
+    });
   }
-  return Response.json({ sync, drafts });
+  return Response.json({ sync, weekly });
 }

@@ -16,7 +16,7 @@ export function NbChrome({
     ["network", "Network & territories", "/super-admin/neighborhood"],
     ["partners", "Partners & activation", "/super-admin/neighborhood/partners"],
     ["ledger", "Commission ledger", "/super-admin/neighborhood/ledger"],
-    ["statements", "Statements & aging", "/super-admin/neighborhood/statements"],
+    ["statements", "Statements & payments", "/super-admin/neighborhood/statements"],
   ] as const;
   return (
     <div className="space-y-3">

@@ -2554,6 +2554,7 @@ model TerritoryPartner {
   campaigns  DistributionCampaign[]
   entries    CommissionEntry[]
   statements CommissionStatement[]
+  payments   CommissionPayment[]
 
   @@index([restaurantId])
   @@map("territory_partners")
@@ -2625,4 +2626,24 @@ model CommissionStatement {
 
   @@unique([territoryPartnerId, periodStart, periodEnd])
   @@map("commission_statements")
+}
+
+/// A partner's commission payment by bank QR, with its receipt
+/// (prisma/manual/add-commission-payments.sql). Applied to statements only
+/// when the founder confirms it.
+model CommissionPayment {
+  id                 String    @id @default(uuid())
+  territoryPartnerId String
+  amount             Int // centavos
+  reference          String?
+  receiptPath        String // private commission-receipts bucket
+  status             String    @default("submitted") // submitted | confirmed | rejected
+  reason             String?
+  submittedAt        DateTime  @default(now())
+  decidedAt          DateTime?
+
+  partner TerritoryPartner @relation(fields: [territoryPartnerId], references: [id], onDelete: Restrict)
+
+  @@index([territoryPartnerId, status])
+  @@map("commission_payments")
 }

@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireSuperAdminPage } from "@/server/tenancy/require-admin";
-import { getStatement } from "@/server/neighborhood/queries";
+import { getStatement, weekLabel } from "@/server/neighborhood/queries";
 import { generateStatementAction, issueStatementAction, recordPaymentAction, writeOffAction } from "@/server/neighborhood/actions";
 import { NbChrome, input, label, btn, btnGhost, card } from "@/components/super-admin/neighborhood/NbChrome";
 import { formatPeso } from "@/lib/money";
-import { formatRate, manilaDate } from "@/lib/neighborhood/commission";
+import { addDays, formatRate, manilaDate } from "@/lib/neighborhood/commission";
 
 export const dynamic = "force-dynamic";
 
@@ -26,13 +26,15 @@ export default async function StatementPage({
 
   const back = `/super-admin/neighborhood/statements/${s.id}`;
   const name = s.partner.restaurant.displayName || s.partner.restaurant.name;
-  const month = s.periodStart.toISOString().slice(0, 7);
+  const week = weekLabel(s.periodStart, s.periodEnd);
+  // The Saturday this week is billed on: the day after its last day.
+  const saturday = addDays(s.periodEnd.toISOString().slice(0, 10), 1);
   const balance = Math.max(0, s.commissionDue - s.amountPaid);
   const open = s.status === "issued" || s.status === "partially_paid";
 
   return (
     <div className="space-y-6">
-      <NbChrome active="statements" title={`${name} — ${month}`} intro={`${s.partner.territory.name} · status: ${s.status.replace("_", " ")}`} flash={flash} />
+      <NbChrome active="statements" title={`${name} — week of ${week}`} intro={`${s.partner.territory.name} · status: ${s.status.replace("_", " ")}`} flash={flash} />
 
       <div className="grid gap-3 sm:grid-cols-4">
         <div className={card}><p className="text-xs font-semibold text-plum-ink/50">Orders</p><p className="font-heading text-xl font-extrabold">{s.orderCount}</p></div>
@@ -52,15 +54,15 @@ export default async function StatementPage({
             <form action={generateStatementAction}>
               <input type="hidden" name="back" value={back} />
               <input type="hidden" name="partnerId" value={s.territoryPartnerId} />
-              <input type="hidden" name="month" value={month} />
+              <input type="hidden" name="saturday" value={saturday} />
               <button className={btnGhost}>Rebuild draft</button>
             </form>
             <form action={issueStatementAction} className="flex items-end gap-2">
               <input type="hidden" name="back" value={back} />
               <input type="hidden" name="id" value={s.id} />
               <label>
-                <span className={label}>Due in (days)</span>
-                <input name="dueDays" type="number" min={0} max={90} defaultValue={7} className={`${input} w-20`} />
+                <span className={label}>Due on</span>
+                <input name="dueOn" type="date" defaultValue={saturday} className={input} />
               </label>
               <button className={btn}>Issue statement</button>
             </form>

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import QRCode from "qrcode";
 import { requireSuperAdminPage } from "@/server/tenancy/require-admin";
-import { getPartner, orderingUrl, partnerName, partnerPerformance } from "@/server/neighborhood/queries";
+import { getPartner, orderingUrl, partnerName, partnerPerformance, weekLabel } from "@/server/neighborhood/queries";
 import {
   addAdjustment,
   generateStatementAction,
@@ -14,7 +14,7 @@ import {
 } from "@/server/neighborhood/actions";
 import { NbChrome, input, label, btn, btnGhost, card } from "@/components/super-admin/neighborhood/NbChrome";
 import { formatPeso } from "@/lib/money";
-import { costPerHousehold, formatRate, magnetUrl, manilaDate, manilaMonth, previousMonth } from "@/lib/neighborhood/commission";
+import { costPerHousehold, formatRate, magnetUrl, manilaDate, recentSaturdays } from "@/lib/neighborhood/commission";
 
 export const dynamic = "force-dynamic";
 
@@ -39,8 +39,8 @@ export default async function PartnerPage({
   const page = orderingUrl(p.restaurant);
   const magnet = magnetUrl(page, p.territoryId);
   const qr = await QRCode.toDataURL(magnet, { margin: 1, width: 360 });
-  const thisMonth = manilaMonth();
-  const months = [previousMonth(thisMonth), thisMonth, previousMonth(previousMonth(thisMonth))];
+  // Statements are weekly, billed each Saturday for the week before it.
+  const saturdays = recentSaturdays(manilaDate(new Date()), 4);
 
   return (
     <div className="space-y-6">
@@ -219,9 +219,9 @@ export default async function PartnerPage({
           <input type="hidden" name="back" value={back} />
           <input type="hidden" name="partnerId" value={p.id} />
           <label>
-            <span className={label}>Statement month</span>
-            <select name="month" className={input} defaultValue={months[0]}>
-              {months.map((m) => <option key={m} value={m}>{m}</option>)}
+            <span className={label}>Week billed on Saturday</span>
+            <select name="saturday" className={input} defaultValue={saturdays[0]}>
+              {saturdays.map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
           </label>
           <button className={btn}>Build draft statement</button>
@@ -249,7 +249,7 @@ export default async function PartnerPage({
             {p.statements.map((s) => (
               <li key={s.id} className="flex flex-wrap items-center gap-3 py-1.5">
                 <Link href={`/super-admin/neighborhood/statements/${s.id}`} className="font-semibold text-brand-primary">
-                  {s.periodStart.toISOString().slice(0, 7)}
+                  {weekLabel(s.periodStart, s.periodEnd)}
                 </Link>
                 <span className="capitalize text-plum-ink/70">{s.status.replace("_", " ")}</span>
                 <span>{s.orderCount} orders</span>

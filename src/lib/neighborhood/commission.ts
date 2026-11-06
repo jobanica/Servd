@@ -148,6 +148,53 @@ export function addDays(day: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+// ------------------------------------------------------------- weeks
+
+/**
+ * Commission is paid weekly, every Saturday. A Saturday's statement covers the
+ * seven days before it — Saturday to Friday, Manila time — and is due that
+ * Saturday.
+ */
+
+/** Day of the week of a "YYYY-MM-DD" (0 = Sunday … 6 = Saturday). */
+export function weekday(day: string): number {
+  return new Date(`${day}T00:00:00Z`).getUTCDay();
+}
+
+export function isSaturday(day: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) && weekday(day) === 6;
+}
+
+/** The week a Saturday's statement covers: the Saturday before to the Friday before. */
+export function weekPeriod(dueSaturday: string): { periodStart: string; periodEnd: string; dueOn: string; from: Date; to: Date } | null {
+  if (!isSaturday(dueSaturday)) return null;
+  const periodStart = addDays(dueSaturday, -7);
+  const periodEnd = addDays(dueSaturday, -1);
+  return {
+    periodStart,
+    periodEnd,
+    dueOn: dueSaturday,
+    from: new Date(`${periodStart}T00:00:00+08:00`),
+    to: new Date(`${dueSaturday}T00:00:00+08:00`),
+  };
+}
+
+/** The Saturday this Manila day's orders will be billed on (the next Saturday after it). */
+export function billingSaturday(day: string): string {
+  return addDays(day, 7 - ((weekday(day) + 1) % 7));
+}
+
+/** The most recent Saturdays (today included when it is one), newest first. */
+export function recentSaturdays(today: string, n: number): string[] {
+  let sat = addDays(today, -((weekday(today) + 1) % 7));
+  const out: string[] = [];
+  for (let i = 0; i < n; i++) {
+    out.push(sat);
+    sat = addDays(sat, -7);
+  }
+  return out;
+}
+
 // ------------------------------------------------------------- statements
 
 export type StatementStatus = "draft" | "issued" | "partially_paid" | "paid" | "written_off";
@@ -284,4 +331,25 @@ export function parseRatePercent(raw: unknown): number | null {
   const n = Number(String(raw ?? "").trim());
   if (!Number.isFinite(n) || n < 0 || n > 100) return null;
   return Math.round(n * 100);
+}
+
+/**
+ * A confirmed payment, applied to open statements oldest first. Whatever is
+ * left over (paid ahead, or more than was owed) becomes a credit.
+ */
+export function allocatePayment(
+  amount: number,
+  statements: { id: string; commissionDue: number; amountPaid: number }[],
+): { applied: { id: string; amount: number }[]; credit: number } {
+  let left = Math.max(0, Math.trunc(amount));
+  const applied: { id: string; amount: number }[] = [];
+  for (const s of statements) {
+    if (left <= 0) break;
+    const owed = Math.max(0, s.commissionDue - s.amountPaid);
+    if (owed <= 0) continue;
+    const take = Math.min(owed, left);
+    applied.push({ id: s.id, amount: take });
+    left -= take;
+  }
+  return { applied, credit: left };
 }

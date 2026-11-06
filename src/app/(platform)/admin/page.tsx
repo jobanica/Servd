@@ -14,6 +14,7 @@ import { formatPeso } from "@/lib/money";
 import { manilaStartOfDay, manilaStartOfDaysAgo } from "@/lib/time/manila";
 import { RevenueChart } from "@/components/analytics/Charts";
 import { hasTutorials } from "@/server/tutorials/tutorials";
+import { commissionDueSummary } from "@/server/neighborhood/partner";
 
 /** Resolves a promise, returning a fallback if it throws (schema-lag safe). */
 /**
@@ -76,7 +77,7 @@ export default async function AdminHome() {
 
   const restaurant = await tenantDb(rid, (tx) =>
     tx.restaurant.findFirstOrThrow({
-      select: { name: true, displayName: true, slug: true, status: true, onboardingCompletedAt: true },
+      select: { name: true, displayName: true, slug: true, status: true, onboardingCompletedAt: true, commercialTrack: true },
     }),
   );
   // Setup is the owner's job, and /admin/onboarding is not a manager's to
@@ -159,6 +160,11 @@ export default async function AdminHome() {
   const bannerData = await safe("plan banner", getPlanBannerData(rid), null);
   // Agent-referred accounts only: the warning before a lapse suspends them.
   const agentBilling = await safe("agent billing", getAgentBillingState(rid), null);
+  // Neighborhood partners only (and only the owner): their weekly commission.
+  const commission =
+    restaurant.commercialTrack === "neighborhood" && user.role === "admin"
+      ? await safe("commission", commissionDueSummary(rid), null)
+      : null;
 
   return (
     <div className="space-y-5">
@@ -169,6 +175,21 @@ export default async function AdminHome() {
 
       {bannerData && <PlanStatusBanner surface="dashboard" data={bannerData} />}
       {agentBilling?.notice && <AgentNotice notice={agentBilling.notice} />}
+      {commission && (
+        <div className={`flex flex-wrap items-center justify-between gap-3 rounded-tile border p-5 ${commission.dueNow > 0 ? "border-guava/30 bg-guava/5" : "border-plum-ink/10 bg-white"}`}>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-plum-ink/50">Total commission due</p>
+            <p className={`font-heading text-3xl font-extrabold ${commission.dueNow > 0 ? "text-guava" : ""}`}>{formatPeso(commission.dueNow)}</p>
+            <p className="text-sm text-plum-ink/60">
+              Paid every Saturday · this week so far {formatPeso(commission.thisWeek)}, due{" "}
+              {new Date(`${commission.nextSaturday}T12:00:00+08:00`).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", weekday: "short", month: "short", day: "numeric" })}
+            </p>
+          </div>
+          <Link href="/admin/commission" className="rounded-full bg-brand-primary px-5 py-2.5 text-sm font-bold text-white">
+            💳 Pay commission
+          </Link>
+        </div>
+      )}
 
       {/* Top row — KPIs */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">

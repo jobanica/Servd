@@ -6,9 +6,18 @@ import type { PaymentDetails } from "@/server/agent-portal/billing";
 
 const field = "mt-1 w-full rounded-lg border border-plum-ink/15 px-3 py-2 text-sm";
 
-/** The platform-wide "where to pay" block agent-referred owners see. */
-export function PaymentDetailsForm({ initial }: { initial: PaymentDetails }) {
-  const [state, action, pending] = useActionState<AdminFormState, FormData>(savePaymentDetails, null);
+/**
+ * A "where to pay" block: the agent portal's (the default) or another one,
+ * such as the neighborhood partners' commission details, via `save`.
+ */
+export function PaymentDetailsForm({
+  initial,
+  save = savePaymentDetails,
+}: {
+  initial: PaymentDetails;
+  save?: (prev: AdminFormState, fd: FormData) => Promise<AdminFormState>;
+}) {
+  const [state, action, pending] = useActionState<AdminFormState, FormData>(save, null);
   return (
     <form action={action} className="space-y-4">
       <div className="flex flex-wrap items-start gap-4">
