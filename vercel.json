@@ -21,6 +21,10 @@
     {
       "path": "/api/cron/agent-portal",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/neighborhood",
+      "schedule": "0 19 * * *"
     }
   ]
 }

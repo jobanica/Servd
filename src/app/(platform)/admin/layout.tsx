@@ -33,6 +33,7 @@ export default async function AdminLayout({
           logoUrl: true,
           brandPrimaryColor: true,
           brandAccentColor: true,
+          commercialTrack: true,
         },
       }),
     ),
@@ -73,6 +74,8 @@ export default async function AdminLayout({
       feedbackHistory={feedbackHistory}
       unreadFeedbackReplies={unreadFeedbackReplies}
       role={user.role === "manager" ? "manager" : "admin"}
+      // Neighborhood partners (and only they) get a Commission page.
+      neighborhood={restaurant.commercialTrack === "neighborhood"}
     >
       {children}
     </AdminShell>

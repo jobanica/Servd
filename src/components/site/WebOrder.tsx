@@ -27,6 +27,7 @@ import { computePackagingFee, packagedUnits } from "@/lib/pricing/packaging";
 import { ASAP, batchLabel, openBatches, visibleBatches, NEAREST_BATCHES, type DeliveryWindowsConfig } from "@/lib/orders/delivery-windows";
 import { PoweredByServd } from "@/components/branding/PoweredByServd";
 import type { StorefrontPromo } from "@/lib/promotions/channel";
+import { ATTRIBUTION_COOKIE, encodeAttribution, parseAttribution } from "@/lib/neighborhood/commission";
 
 function lineId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -418,6 +419,20 @@ export function WebOrder(props: WebOrderProps) {
     if (dc && (dc.mode === "distance" || dc.mode === "shipping") && dc.baseFee > 0) return dc.baseFee;
     return null;
   }, [zones, props.delivery]);
+  // Arrived from a QR magnet or a campaign link (?src=magnet&t=<territory>):
+  // remember it for 30 days so it survives browsing to checkout. Measurement
+  // only — the order path writes it for neighborhood partners and ignores it
+  // for everyone else.
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(window.location.search);
+      const a = parseAttribution(q.get("src"), q.get("t"));
+      if (a) document.cookie = `${ATTRIBUTION_COOKIE}=${encodeURIComponent(encodeAttribution(a))}; max-age=2592000; path=/; samesite=lax`;
+    } catch {
+      /* attribution is best-effort */
+    }
+  }, []);
+
   // A recent order saved in this browser — lets the customer re-open its status
   // even after closing the tab (shown as a banner above the menu).
   const [recentOrderPath, setRecentOrderPath] = useState<string | null>(null);

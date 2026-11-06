@@ -17,6 +17,7 @@ import { getNoPackagingItemIds } from "@/server/menu/packaging";
 import { uploadMenuImageBytes } from "@/server/storage/menu-images";
 import { haversineKm, computeDistanceFee } from "@/lib/geo/distance";
 import { resolvePromo } from "@/server/promotions/redeem";
+import { recordOrderAttribution } from "@/server/neighborhood/attribution";
 import { getWebOrderCapStatus } from "@/server/billing/order-cap";
 import { getLoyaltyConfig, enrollAccount } from "@/server/loyalty/loyalty";
 import { markCartConverted } from "@/server/marketing/cart-recovery";
@@ -402,6 +403,10 @@ export async function placeWebOrder(input: WebOrderInput): Promise<WebOrderResul
       );
     } catch { /* columns not migrated yet — the address line carries the batch */ }
   }
+
+  // Where it came from (a magnet, a link…), for neighborhood partners only.
+  // Best-effort and after the order exists: it can never fail the order.
+  await recordOrderAttribution(order.id, "direct");
 
   // Count these servings toward each item's daily cap (best-effort, own tx).
   await recordServingsSold(restaurant.id, built.items);

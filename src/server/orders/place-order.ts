@@ -13,6 +13,7 @@ import {
   OrderValidationError,
 } from "@/server/orders/build-order";
 import { resolvePromo } from "@/server/promotions/redeem";
+import { recordOrderAttribution } from "@/server/neighborhood/attribution";
 import { recordServingsSold } from "@/server/menu/servings";
 import { recordVariantsSold } from "@/server/menu/variants";
 import { startOfManilaDay } from "@/lib/orders/order-number";
@@ -126,6 +127,9 @@ export async function placeOrder(
       return { ok: false, error: "We couldn't place your order. Please try again." };
     }
   }
+
+  // Table QR, for neighborhood partners' attribution only (best-effort).
+  await recordOrderAttribution(order.id, "table_qr");
 
   // Count these servings toward each item's daily cap (best-effort, own tx).
   await recordServingsSold(ctx.restaurantId, built.items);

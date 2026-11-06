@@ -478,6 +478,11 @@ model PlanModule {
 model Restaurant {
   id            String           @id @default(uuid())
   name          String
+  /// 'standard' (every account) or 'neighborhood' (an exclusive territory
+  /// partner: ₱10,000 activation + commission on platform orders). Only
+  /// 'neighborhood' accounts ever enter the commission module.
+  /// Added by prisma/manual/add-neighborhood-partners.sql.
+  commercialTrack String @default("standard")
   slug          String           @unique // used in /order/{slug}/{tableToken}
   /// The address this shop used BEFORE the owner corrected it.
   ///
@@ -668,6 +673,7 @@ model Restaurant {
   @@index([demoPartnerId])
   @@map("restaurants")
   cashAdvances CashAdvance[]
+  territoryPartners TerritoryPartner[]
 }
 
 /// Web Push subscriptions for merchant devices — lets a new online order alert
@@ -1867,6 +1873,11 @@ model Order {
   riderPayMethod      String?
   riderCollected      Int?
   riderReceiptPath    String?
+  /// Attribution only (prisma/manual/add-neighborhood-partners.sql): where the
+  /// order came from ('magnet_qr','table_qr','link','messenger','direct') and
+  /// the territory a magnet named. NOT what decides commission.
+  sourceChannel       String?
+  territoryId         String?
   status              OrderStatus   @default(new)
   billRequested       Boolean       @default(false)
   paymentStatus       PaymentStatus @default(unpaid)
@@ -1953,6 +1964,7 @@ model Order {
   @@index([restaurantId, orderNumber]) // daily counter-number lookup
   @@index([tableId])
   @@map("orders")
+  commissionEntries CommissionEntry[]
 }
 
 /// Per-restaurant third-party delivery provider config. Standalone (no Prisma
@@ -2497,4 +2509,120 @@ model PaymentCollection {
   updatedAt DateTime @default(now()) @updatedAt
 
   @@map("payment_collection")
+}
+
+
+// ---------------------------------------------------------------------------
+// Neighborhood Partner & Territory module (prisma/manual/add-neighborhood-partners.sql).
+// Money is integer centavos; rates are basis points (1000 = 10.00%).
+// ---------------------------------------------------------------------------
+
+model Territory {
+  id                String   @id @default(uuid())
+  name              String
+  city              String?
+  province          String?
+  householdEstimate Int?
+  status            String   @default("prospect") // prospect | active | paused | closed
+  notes             String?
+  createdAt         DateTime @default(now())
+
+  partners TerritoryPartner[]
+
+  @@map("territories")
+}
+
+model TerritoryPartner {
+  id                String    @id @default(uuid())
+  territoryId       String
+  restaurantId      String
+  category          String    @default("food")
+  activationFee     Int       @default(1000000) // centavos (₱10,000)
+  activationPaidAt  DateTime?
+  activationMethod  String?
+  activationRef     String?
+  commissionRateBps Int       @default(1000)
+  exclusive         Boolean   @default(true)
+  startsOn          DateTime  @db.Date
+  endsOn            DateTime? @db.Date
+  status            String    @default("pending") // pending | active | paused | ended
+  notes             String?
+  createdAt         DateTime  @default(now())
+
+  territory  Territory              @relation(fields: [territoryId], references: [id], onDelete: Restrict)
+  restaurant Restaurant             @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+  campaigns  DistributionCampaign[]
+  entries    CommissionEntry[]
+  statements CommissionStatement[]
+
+  @@index([restaurantId])
+  @@map("territory_partners")
+}
+
+model DistributionCampaign {
+  id                      String    @id @default(uuid())
+  territoryPartnerId      String
+  quantity                Int       @default(500)
+  printedAt               DateTime?
+  distributionStartedAt   DateTime?
+  distributionCompletedAt DateTime?
+  householdsCovered       Int?
+  unitCost                Int? // centavos per magnet
+  distributor             String?
+  notes                   String?
+  createdAt               DateTime  @default(now())
+
+  partner TerritoryPartner @relation(fields: [territoryPartnerId], references: [id], onDelete: Cascade)
+
+  @@index([territoryPartnerId])
+  @@map("distribution_campaigns")
+}
+
+model CommissionEntry {
+  id                  String    @id @default(uuid())
+  orderId             String? // null only for an adjustment
+  kind                String    @default("order") // order | adjustment
+  territoryPartnerId  String
+  orderTotal          Int
+  commissionableTotal Int
+  rateBps             Int
+  commissionAmount    Int
+  paymentMethod       String? // online | cod
+  state               String    @default("pending") // pending | confirmed | disputed | waived | settled | cancelled
+  statementId         String?
+  disputeNote         String?
+  note                String?
+  orderedAt           DateTime?
+  createdAt           DateTime  @default(now())
+
+  order     Order?               @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  partner   TerritoryPartner     @relation(fields: [territoryPartnerId], references: [id], onDelete: Restrict)
+  statement CommissionStatement? @relation(fields: [statementId], references: [id], onDelete: Restrict)
+
+  @@index([territoryPartnerId, state, orderedAt])
+  @@index([statementId])
+  @@map("commission_entries")
+}
+
+model CommissionStatement {
+  id                 String    @id @default(uuid())
+  territoryPartnerId String
+  periodStart        DateTime  @db.Date
+  periodEnd          DateTime  @db.Date
+  orderCount         Int       @default(0)
+  grossOrders        Int       @default(0)
+  commissionDue      Int       @default(0)
+  status             String    @default("draft") // draft | issued | partially_paid | paid | written_off
+  issuedAt           DateTime?
+  dueAt              DateTime? @db.Date
+  paidAt             DateTime?
+  amountPaid         Int       @default(0)
+  writeOffReason     String?
+  createdAt          DateTime  @default(now())
+
+  partner TerritoryPartner  @relation(fields: [territoryPartnerId], references: [id], onDelete: Restrict)
+  entries CommissionEntry[]
+
+  @@unique([territoryPartnerId, periodStart, periodEnd])
+  @@map("commission_statements")
 }

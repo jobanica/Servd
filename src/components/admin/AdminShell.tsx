@@ -153,6 +153,7 @@ export function AdminShell({
   feedbackHistory = [],
   unreadFeedbackReplies = 0,
   role = "admin",
+  neighborhood = false,
   children,
 }: {
   brand: { name: string; slug: string; status: string; logoUrl?: string | null };
@@ -170,6 +171,8 @@ export function AdminShell({
   unreadFeedbackReplies?: number;
   /** Managers see only the sections they can open; owners see everything. */
   role?: DashboardRole;
+  /** A neighborhood partner: adds the owner's Commission page. Never for standard accounts. */
+  neighborhood?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -189,7 +192,11 @@ export function AdminShell({
   // Hiding a link is not access control — requireAdminPage enforces the same
   // rules on the way in. This stops the sidebar offering a manager a dozen
   // settings links that all bounce them back to the dashboard.
-  const sections = visibleAdminNav(role, NAV);
+  const sections = visibleAdminNav(role, NAV).map((s) =>
+    neighborhood && role === "admin" && s.items.some((i) => i.href === "/admin/orders")
+      ? { ...s, items: [...s.items, { label: "Commission", href: "/admin/commission", d: I.receipt }] }
+      : s,
+  );
 
   const nav = (
     <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
